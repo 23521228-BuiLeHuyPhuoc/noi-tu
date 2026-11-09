@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
-  Ack, ClientToServerEvents, JoinResult, RejectReason, RoomState, ServerToClientEvents,
+  Ack, ActionResult, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
+  RoomSettings, RoomState, ServerToClientEvents,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
@@ -21,12 +22,16 @@ export interface Game {
   notice: string | null;
   /** chênh lệch đồng hồ server - máy (ms) */
   clockOffset: number;
-  createRoom(name: string): Promise<string | null>;
+  createRoom(name: string, gameType: GameType): Promise<string | null>;
   joinRoom(code: string, name: string): Promise<string | null>;
+  configure(p: { gameType?: GameType; settings?: Partial<RoomSettings> }): Promise<string | null>;
   start(): Promise<string | null>;
-  submit(word: string): Promise<RejectReason | null>;
+  act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
   leave(): void;
+  sendFun(f: FunSend): void;
+  /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
+  onFun(cb: (e: FunEvent) => void): () => void;
 }
 
 export function useGame(): Game {
@@ -37,6 +42,7 @@ export function useGame(): Game {
   const [clockOffset, setClockOffset] = useState(0);
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
+  const funListeners = useRef(new Set<(e: FunEvent) => void>());
 
   const remember = useCallback(async (code: string, playerId: string, name: string) => {
     roomCodeRef.current = code;
@@ -56,7 +62,7 @@ export function useGame(): Game {
 
     socket.on('connect', async () => {
       setStatus('online');
-      // vào lại phòng đang chơi dở (sau khi rớt mạng hoặc mở lại app)
+      // vào lại phòng đang chơi dở (sau khi rớt mạng hoặc mở lại trang)
       const code = roomCodeRef.current ?? (await storage.getRoom());
       const playerId = await storage.getPlayerId();
       const name = (await storage.getName()) ?? 'Người chơi';
@@ -79,6 +85,9 @@ export function useGame(): Game {
       setClockOffset(state.serverNow - Date.now());
       setRoom(state);
     });
+    socket.on('fun:event', (e) => {
+      for (const cb of funListeners.current) cb(e);
+    });
 
     storage.getPlayerId().then((id) => id && setMe(id));
     return () => {
@@ -87,7 +96,7 @@ export function useGame(): Game {
     };
   }, [remember, forget]);
 
-  const call = useCallback(async <T,>(fn: (s: GameSocket) => Promise<T>): Promise<T | null> => {
+  const call = useCallback(async <R,>(fn: (s: GameSocket) => Promise<R>): Promise<R | null> => {
     const s = socketRef.current;
     if (!s || !s.connected) return null;
     try {
@@ -98,15 +107,15 @@ export function useGame(): Game {
   }, []);
 
   const enter = useCallback(
-    async (kind: 'create' | 'join', name: string, code = ''): Promise<string | null> => {
+    async (kind: 'create' | 'join', name: string, code = '', gameType?: GameType): Promise<string | null> => {
       setNotice(null);
       const playerId = (await storage.getPlayerId()) ?? undefined;
       const res = await call<Ack<JoinResult>>((s) =>
         kind === 'create'
-          ? s.timeout(ACK_TIMEOUT).emitWithAck('room:create', { name, playerId })
+          ? s.timeout(ACK_TIMEOUT).emitWithAck('room:create', { name, playerId, gameType })
           : s.timeout(ACK_TIMEOUT).emitWithAck('room:join', { code: code.trim().toUpperCase(), name, playerId }),
       );
-      if (!res) return 'Không kết nối được tới server, thử lại nhé.';
+      if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
       if (!res.ok) return errorText[res.error];
       await remember(res.code, res.playerId, name);
       clearInviteParam();
@@ -116,8 +125,8 @@ export function useGame(): Game {
   );
 
   const simple = useCallback(
-    async (event: 'game:start' | 'game:restart'): Promise<string | null> => {
-      const res = await call<Ack>((s) => s.timeout(ACK_TIMEOUT).emitWithAck(event));
+    async (fn: (s: GameSocket) => Promise<Ack>): Promise<string | null> => {
+      const res = await call<Ack>(fn);
       if (!res) return 'Mất kết nối, thử lại nhé.';
       return res.ok ? null : errorText[res.error];
     },
@@ -130,18 +139,27 @@ export function useGame(): Game {
     me,
     notice,
     clockOffset,
-    createRoom: (name) => enter('create', name),
+    createRoom: (name, gameType) => enter('create', name, '', gameType),
     joinRoom: (code, name) => enter('join', name, code),
-    start: () => simple('game:start'),
-    restart: () => simple('game:restart'),
-    submit: async (word) => {
-      const res = await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('word:submit', { word }));
-      if (!res) return 'not_playing';
-      return res.ok ? null : res.reason;
+    configure: (p) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:config', p)),
+    start: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')),
+    restart: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')),
+    act: async (a) => {
+      const res = await call<ActionResult>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:action', a));
+      return res ?? { ok: false, reason: 'not_playing' };
     },
     leave: () => {
       socketRef.current?.emit('room:leave', () => {});
       void forget();
+    },
+    sendFun: (f) => {
+      socketRef.current?.emit('fun:send', f, () => {});
+    },
+    onFun: (cb) => {
+      funListeners.current.add(cb);
+      return () => {
+        funListeners.current.delete(cb);
+      };
     },
   };
 }

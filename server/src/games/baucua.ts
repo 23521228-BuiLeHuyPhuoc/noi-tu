@@ -181,7 +181,7 @@ export class BauCuaGame implements GameEngine {
       ranking: ranked.map((id) => ({
         playerId: id,
         name: this.names[id],
-        detail: `${fmt(net(id))} xu${this.debts[id] ? ` · nợ ${this.debts[id]} lần` : ''}${this.ids.includes(id) ? '' : ' · đã thoát'}`,
+        detail: `${fmt(net(id))} xu${this.debts[id] ? `, nợ ${this.debts[id]} lần` : ''}${this.ids.includes(id) ? '' : ', đã thoát'}`,
       })),
     });
   }

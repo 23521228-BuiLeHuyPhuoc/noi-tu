@@ -21,3 +21,8 @@ services:
         value: "22"
       - key: EXPO_PUBLIC_SERVER_URL
         value: https://noi-tu-server.onrender.com
+    # luôn hỏi lại server để điện thoại không bị kẹt bản cũ sau mỗi lần cập nhật
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache

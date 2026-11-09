@@ -1,29 +1,42 @@
-# Nối Từ
+# Xóm Lầy
 
-Game nối từ tiếng Việt chơi cùng bạn bè ngay trên trình duyệt điện thoại. Phòng tối đa 6 người, mời bằng link hoặc mã phòng, kho từ hơn 45.000 từ ghép 2 chữ.
+Ba game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Cờ cá ngựa**, **Bầu cua**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
-- Tạo phòng → bấm **Gửi link mời bạn bè** → gửi qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
+- Nhập tên → chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
+- Chủ phòng đổi game được ngay trong phòng chờ hoặc sau mỗi ván.
+- Chạm vào avatar bạn bè để **ném** 🩴🍅🥚💩🌹💖 hoặc **hối** (rung máy họ). Nút 💬 để khịa cả phòng.
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
 - Lần đầu mở sau một lúc không ai chơi, server miễn phí cần khoảng 1 phút để thức dậy.
 
 ```
 noi-tu/
   shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt (dùng chung app & server)
-  server/   Node.js + Socket.IO — trọng tài của mọi ván chơi
-  app/      giao diện (React Native Web qua Expo) — xuất ra trang web cho điện thoại
-  e2e/      test giao diện tự động (3 trình duyệt chơi 1 ván thật)
+  server/   Node.js + Socket.IO, trọng tài của mọi ván chơi
+    src/games/   wordchain.ts, ludo.ts, baucua.ts (luật từng game)
+  app/      giao diện (React Native Web qua Expo), xuất ra trang web cho điện thoại
+  e2e/      test giao diện tự động (nhiều trình duyệt chơi thật với nhau)
   docs/     thiết kế
 ```
 
 ## Luật chơi
-- Mỗi từ gồm đúng 2 chữ. Chữ đầu của từ mới phải trùng chữ cuối của từ trước.
-- Mỗi lượt có 30 giây. Gõ sai thì được gõ lại trong thời gian còn lại. Hết giờ mà chưa nối được thì bị loại.
-- Không được dùng lại từ đã dùng trong ván.
-- Màn hình hiện số từ còn có thể nối. Nếu số đó là 0, người chơi vẫn phải chờ hết giờ (bị "chặn đường"). Sau đó người kế tiếp nhận một từ mới ngẫu nhiên.
-- Người còn lại cuối cùng thắng. Chơi một mình thì tính số từ nối được.
-- Gõ dấu kiểu cũ hay kiểu mới đều được (hoà = hòa, thuỷ = thủy), không phân biệt hoa thường.
+
+**Nối từ** (1–6 người)
+- Mỗi từ gồm đúng 2 chữ. Chữ đầu của từ mới phải trùng chữ cuối của từ trước. Không dùng lại từ đã dùng.
+- Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bị loại; người còn lại cuối cùng thắng.
+- Màn hình hiện số từ còn nối được. Mỗi người có 1 quyền **Cứu trợ** xem gợi ý.
+- Gõ dấu kiểu cũ hay mới đều được (hoà = hòa, thuỷ = thủy).
+
+**Cờ cá ngựa** (2–4 người, chọn 2 hoặc 4 ngựa)
+- Đổ 1 hoặc 6 mới được ra quân. Đổ 6 được đổ thêm; 3 lần 6 liên tiếp thì mất lượt.
+- Không được đi qua đầu ngựa khác. Dừng đúng ô ngựa đối thủ là đá về chuồng.
+- Về đích phải đổ vừa đủ. Ai đưa hết ngựa về đích trước thì thắng. Hết giờ (15 giây) thì máy tự đi thay.
+
+**Bầu cua** (1–6 người, xu ảo)
+- Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây; chủ phòng bấm **Lắc!** để lắc sớm.
+- Mở bát 3 con: trúng mấy con ăn gấp bấy nhiêu lần tiền cược, trượt thì mất.
+- Cháy túi thì **vay nóng** 500 xu (bị ghi nợ). Chủ phòng bấm **Tổng kết** để xếp hạng theo xu trừ nợ.
 
 ---
 
@@ -71,17 +84,17 @@ Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Vi
 ## 4. Test
 
 ```bash
-cd server && npm test        # 38 test: chuẩn hóa, từ điển, luật chơi, Socket.IO
+cd server && npm test        # 66 test: chuẩn hóa, từ điển, luật 3 game, phòng, Socket.IO
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để 3 trình duyệt Chrome tự chơi một ván. Xem đầu các file `e2e/*.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Cờ cá ngựa, Bầu cua, ném/khịa/hối). Xem đầu file `play.mjs` để biết cách chạy.
 
 ## Cấu hình server (biến môi trường)
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
 | `PORT` | 3000 | cổng |
-| `TURN_SECONDS` | 30 | số giây mỗi lượt |
+| `TURN_SECONDS` | (theo từng game) | ép số giây mỗi lượt cho mọi game, dùng khi test |
 | `DATA_DIR` | `server/data` | thư mục kho từ |
 
 > Không bắt buộc: muốn đóng gói thành file APK thì `app/eas.json` đã có sẵn cấu hình (`npx eas-cli build -p android --profile preview`).

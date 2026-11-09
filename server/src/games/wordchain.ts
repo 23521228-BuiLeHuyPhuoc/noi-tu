@@ -184,7 +184,7 @@ export class WordChainGame implements GameEngine {
       ranking: ranked.map((p) => ({
         playerId: p.id,
         name: p.name,
-        detail: `${p.words} từ${p.left ? ' · đã thoát' : ''}`,
+        detail: `${p.words} từ${p.left ? ', đã thoát' : ''}`,
       })),
     });
   }

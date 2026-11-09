@@ -1,7 +1,7 @@
-// Chạy: cd app && EXPO_PUBLIC_SERVER_URL=http://localhost:3999 npx expo export -p web --output-dir /tmp/web-dist
+// Chạy: (cd app && EXPO_PUBLIC_SERVER_URL=http://localhost:3999 npx expo export -p web --output-dir /tmp/web-dist)
 //       (cd /tmp/web-dist && python3 -m http.server 8081) ; (cd server && PORT=3999 TURN_SECONDS=8 node dist/server.js)
-//       cd e2e && npm i playwright-core && node play.mjs ../server/data/words.txt /tmp/shots
-// E2E: 3 "điện thoại" (3 context Chrome riêng biệt) chơi một ván thật.
+//       cd e2e && npm i && node play.mjs ../server/data/words.txt /tmp/shots
+// E2E Nối từ: 3 "điện thoại" (3 context Chrome riêng biệt) chơi một ván thật.
 import { chromium } from 'playwright-core';
 import { readFileSync, mkdirSync } from 'node:fs';
 
@@ -36,20 +36,21 @@ for (const name of ['An', 'Bình', 'Chi']) {
     permissions: ['clipboard-read', 'clipboard-write'],
   });
   const page = await ctx.newPage();
-  page.on('pageerror', (e) => console.log(`[${name}] lỗi trang:`, e.message));
+  page.on('pageerror', (e) => {
+    failures++;
+    console.log(`[${name}] lỗi trang:`, e.message);
+  });
   await page.goto(WEB);
   phones.push({ name, page });
 }
 const [A, B, C] = phones;
 const tid = (p, id) => p.page.getByTestId(id);
 const shot = (p, label) => p.page.screenshot({ path: `${SHOTS}/${label}.png` });
+const avatarCount = (p) => p.page.locator('[data-testid^="avatar-"]').count();
 
 // ---- Trang chủ ----
-for (const p of phones) await tid(p, 'create-btn').waitFor();
-await A.page.waitForFunction(() => !document.querySelector('[data-testid="create-btn"]')?.getAttribute('aria-disabled'), null, { timeout: 10000 }).catch(() => {});
-await shot(A, '1-home');
 await tid(A, 'name-input').fill('An');
-await tid(A, 'create-btn').click();
+await tid(A, 'create-wordchain').click();
 await tid(A, 'room-code').waitFor();
 const code = (await tid(A, 'room-code').textContent()).trim();
 check(/^[A-Z2-9]{6}$/.test(code), `tạo phòng, mã = ${code}`);
@@ -61,15 +62,13 @@ await tid(B, 'join-btn').click();
 await tid(B, 'home-error').waitFor();
 check((await tid(B, 'home-error').textContent()).includes('Không tìm thấy phòng'), 'báo lỗi khi mã phòng sai');
 
-// A bấm "Gửi link mời" -> không có bảng chia sẻ (Chrome headless) nên sao chép link
+// link mời
 await tid(A, 'share-btn').click();
-await tid(A, 'toast').waitFor();
+await A.page.getByText('Đã sao chép link mời').waitFor();
 const copied = await A.page.evaluate(() => navigator.clipboard.readText());
 const link = copied.split('\n').find((l) => l.startsWith('http'));
 check(link === `${WEB}/?room=${code}`, `link mời đã sao chép: ${link}`);
 
-// B nhập mã tay (chữ thường), C mở bằng link mời
-await tid(B, 'name-input').fill(B.name);
 await tid(B, 'code-input').fill(code.toLowerCase());
 await tid(B, 'join-btn').click();
 await tid(B, 'room-code').waitFor();
@@ -80,17 +79,17 @@ check((await tid(C, 'code-input').inputValue()) === code, 'mở link mời: mã 
 await tid(C, 'name-input').fill(C.name);
 await tid(C, 'join-btn').click();
 await tid(C, 'room-code').waitFor();
-check(!C.page.url().includes('room='), 'vào phòng xong thì link được dọn sạch (?room= biến mất)');
-await A.page.getByText('Người chơi (3/6)').waitFor();
+check(!C.page.url().includes('room='), 'vào phòng xong thì link được dọn sạch');
+
+await A.page.waitForFunction(() => document.querySelectorAll('[data-testid^="avatar-"]').length === 3);
 check(true, 'cả 3 người vào được phòng chờ');
 check((await tid(B, 'start-btn').count()) === 0, 'chỉ chủ phòng thấy nút Bắt đầu');
 
-// ---- vào lại sau khi tải lại trang (giả lập rớt mạng / mở lại app) ----
+// tải lại trang (giả lập rớt mạng / mở lại app)
 await C.page.reload();
 await tid(C, 'room-code').waitFor({ timeout: 10000 });
 await A.page.waitForTimeout(500);
-check((await A.page.getByText('Người chơi (3/6)').count()) === 1, 'tải lại trang vẫn tự vào lại đúng phòng, không bị nhân đôi');
-await shot(A, '2-lobby');
+check((await avatarCount(A)) === 3, 'tải lại trang vẫn tự vào lại đúng phòng, không bị nhân đôi');
 
 // ---- Chơi ----
 await tid(A, 'start-btn').click();
@@ -105,40 +104,35 @@ async function whoseTurn() {
   }
   return null;
 }
-async function currentWord(p) {
-  return (await tid(p, 'current-word').textContent()).replace(/\s+/g, ' ').trim();
-}
+const currentWord = async (p) => (await tid(p, 'current-word').textContent()).replace(/\s+/g, ' ').trim();
 
 let p = await whoseTurn();
 let word = await currentWord(A);
 used.add(word);
 check(p !== null, `từ mở đầu "${word}", tới lượt ${p?.name}`);
-
-// điền sẵn chữ cuối
 const last0 = word.split(' ')[1];
 check((await tid(p, 'word-input').inputValue()) === last0 + ' ', 'ô nhập điền sẵn chữ cuối');
-
-// số từ còn nối được khớp với kho từ
 const shown = Number((await tid(p, 'next-count').textContent()).match(/Còn\s*(\d+)/)[1]);
 const expected = (byFirst.get(last0) ?? []).filter((w) => !used.has(w)).length;
 check(shown === expected, `hiện "còn ${shown} từ có thể nối" (kho từ: ${expected})`);
 
-// từ sai
 await tid(p, 'word-input').fill(last0 + ' xyzt');
 await tid(p, 'submit-btn').click();
 await tid(p, 'word-error').waitFor();
 check(true, `báo lỗi từ sai: "${await tid(p, 'word-error').textContent()}"`);
-await shot(p, '3-game-error');
 
-// nối đúng 4 từ liên tiếp
+await tid(p, 'hint-btn').click();
+await tid(p, 'hint-word').waitFor();
+const hintText = await tid(p, 'hint-word').textContent();
+check(/Gợi ý: \S+ \S+/.test(hintText), `cứu trợ cho gợi ý: "${hintText}"`);
+await shot(p, '3-game-hint');
+
 for (let i = 0; i < 4; i++) {
   p = await whoseTurn();
   word = await currentWord(p);
-  const last = word.split(' ')[1];
-  const ans = (byFirst.get(last) ?? []).find((w) => !used.has(w));
+  const ans = (byFirst.get(word.split(' ')[1]) ?? []).find((w) => !used.has(w));
   if (!ans) break;
   used.add(ans);
-  // gõ kiểu đặt dấu khác + viết hoa để thử chuẩn hóa
   await tid(p, 'word-input').fill(ans.toUpperCase());
   await tid(p, 'submit-btn').click();
   await A.page.waitForFunction(
@@ -150,15 +144,13 @@ for (let i = 0; i < 4; i++) {
 }
 check(true, 'nối đúng nhiều từ, cả 3 máy cập nhật cùng lúc');
 await shot(A, '4-game');
-await shot(await whoseTurn(), '4-game-myturn');
 
 // ---- không ai trả lời: lần lượt bị loại (lượt 8s) ----
 for (const ph of phones) await tid(ph, 'result-title').waitFor({ timeout: 30000 });
-const title = await tid(A, 'result-title').textContent();
-check(title.includes('thắng'), `kết thúc ván: "${title}"`);
+const titles = await Promise.all(phones.map((ph) => tid(ph, 'result-title').textContent()));
+check(titles.some((t) => t.includes('Bạn thắng')) && titles.some((t) => t.includes('trụ lại')), `kết thúc ván: ${titles.join(' | ')}`);
 await shot(A, '5-result');
 
-// ---- chơi lại ----
 await tid(A, 'restart-btn').click();
 for (const ph of phones) await tid(ph, 'room-code').waitFor();
 check(true, 'chơi lại: cả phòng về phòng chờ');

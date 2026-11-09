@@ -116,7 +116,7 @@ describe('Bầu cua', () => {
     expect(r.winnerId).toBe('p1');
     expect(r.ranking.map((x) => x.playerId)).toEqual(['p1', 'p0']);
     expect(r.ranking[0].detail).toBe('1.300 xu');
-    expect(r.ranking[1].detail).toBe('0 xu · nợ 1 lần');
+    expect(r.ranking[1].detail).toBe('0 xu, nợ 1 lần');
   });
 
   it('người chơi thoát: bỏ cược của họ, chủ phòng mới vẫn điều khiển được', () => {

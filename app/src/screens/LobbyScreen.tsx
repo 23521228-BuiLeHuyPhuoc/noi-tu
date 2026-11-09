@@ -1,78 +1,139 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { RoomState } from '../../../shared/src/types';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { copyText, shareInvite } from '../web';
-import { Button, colors, common } from '../ui';
+import { shareInvite } from '../web';
+import { GAME_META, RULES } from '../messages';
+import { C, sticker } from '../theme';
+import { Button, Card, T, useFeed } from '../ui';
+import { Shell } from '../components/Shell';
+
+const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua'];
 
 export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const feed = useFeed();
   const isHost = room.hostId === game.me;
-
-  const flash = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  };
+  const info = GAME_INFO[room.gameType];
+  const n = room.players.length;
+  const tooFew = n < info.min;
+  const tooMany = n > info.max;
 
   const share = async () => {
     const r = await shareInvite(room.code);
-    if (r === 'copied') flash('Đã sao chép link mời — dán vào Zalo/Messenger gửi bạn bè nhé');
+    if (r === 'copied') feed('Đã sao chép link mời. Dán vào Zalo hoặc Messenger nhé', 'good');
   };
 
+  const startLabel = tooFew
+    ? `Cần ít nhất ${info.min} người`
+    : tooMany
+      ? `${info.name} tối đa ${info.max} người`
+      : n === 1
+        ? 'Chơi một mình'
+        : `Bắt đầu ${info.name}`;
+
   return (
-    <ScrollView contentContainerStyle={common.screen}>
-      <Text style={common.label}>Mã phòng (chạm để sao chép)</Text>
-      <Pressable onPress={async () => (await copyText(room.code)) && flash('Đã sao chép mã phòng')}>
-        <Text testID="room-code" selectable style={styles.code}>{room.code}</Text>
-      </Pressable>
-      <Button testID="share-btn" title="Gửi link mời bạn bè" onPress={share} />
-      {toast && <Text testID="toast" style={styles.toast}>{toast}</Text>}
+    <Shell
+      game={game}
+      room={room}
+      bottom={
+        <>
+          {error && <T style={styles.error}>{error}</T>}
+          {isHost ? (
+            <Button
+              testID="start-btn"
+              title={startLabel}
+              disabled={tooFew || tooMany}
+              onPress={async () => setError(await game.start())}
+            />
+          ) : (
+            <T style={styles.wait}>Chờ chủ phòng bắt đầu…</T>
+          )}
+        </>
+      }
+    >
+      <Card style={styles.invite}>
+        <T style={styles.label}>Mã phòng</T>
+        <T testID="room-code" selectable style={styles.code}>{room.code}</T>
+        <Button testID="share-btn" icon="📨" title="Gửi link mời bạn bè" variant="gold" onPress={share} />
+        <T style={styles.hint}>
+          {n}/{room.maxPlayers} người trong phòng. Chạm vào avatar của bạn bè để chọc họ.
+        </T>
+      </Card>
 
-      <View style={[common.card, { gap: 8 }]}>
-        <Text style={common.label}>
-          Người chơi ({room.players.length}/{room.maxPlayers})
-        </Text>
-        {room.players.map((p) => (
-          <View key={p.id} style={styles.player}>
-            <View style={[styles.dot, { backgroundColor: p.connected ? colors.ok : colors.border }]} />
-            <Text style={styles.name}>
-              {p.name}
-              {p.id === game.me ? ' (bạn)' : ''}
-            </Text>
-            {p.id === room.hostId && <Text style={styles.badge}>Chủ phòng</Text>}
-          </View>
-        ))}
-      </View>
-
-      <Text style={common.muted}>
-        Luật: nối từ 2 chữ, chữ đầu phải trùng chữ cuối của từ trước. Mỗi lượt {room.turnSeconds} giây,
-        gõ sai được gõ lại, hết giờ thì bị loại. Người còn lại cuối cùng thắng.
-      </Text>
-
+      <T style={styles.section}>{isHost ? 'Chọn game' : 'Game của phòng'}</T>
       {isHost ? (
-        <Button
-          testID="start-btn"
-          title={room.players.length === 1 ? 'Chơi một mình' : 'Bắt đầu'}
-          onPress={async () => setError(await game.start())}
-        />
+        <View style={styles.games}>
+          {GAMES.map((g) => {
+            const on = g === room.gameType;
+            return (
+              <Pressable
+                key={g}
+                testID={`pick-${g}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                onPress={() => game.configure({ gameType: g })}
+                style={[styles.pick, sticker(on ? 4 : 2), on && styles.pickOn]}
+              >
+                <T style={styles.pickEmoji}>{GAME_META[g].emoji}</T>
+                <T numberOfLines={1} style={styles.pickName}>{GAME_INFO[g].name}</T>
+              </Pressable>
+            );
+          })}
+        </View>
       ) : (
-        <Text style={[common.muted, { textAlign: 'center' }]}>Đang chờ chủ phòng bắt đầu…</Text>
+        <Card style={styles.chosen}>
+          <T style={styles.pickEmoji}>{GAME_META[room.gameType].emoji}</T>
+          <T style={styles.chosenName}>{info.name}</T>
+        </Card>
       )}
-      {error && <Text style={common.error}>{error}</Text>}
-      <Button title="Thoát phòng" variant="ghost" onPress={game.leave} />
-    </ScrollView>
+
+      {room.gameType === 'ludo' && (
+        <Card style={{ gap: 10 }}>
+          <T style={styles.h3}>Số ngựa mỗi người</T>
+          <View style={styles.row}>
+            {([2, 4] as const).map((k) => (
+              <Button
+                key={k}
+                testID={`pieces-${k}`}
+                small
+                variant={room.settings.ludoPieces === k ? 'ink' : 'paper'}
+                title={k === 2 ? '2 con (nhanh)' : '4 con (chuẩn)'}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { ludoPieces: k } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      <Card style={{ gap: 8 }}>
+        <T style={styles.h3}>Luật chơi</T>
+        {RULES[room.gameType].map((r) => (
+          <T key={r} style={styles.rule}>• {r}</T>
+        ))}
+      </Card>
+    </Shell>
   );
 }
 
 const styles = StyleSheet.create({
-  code: { fontSize: 44, fontWeight: '900', letterSpacing: 8, color: colors.primaryDark, textAlign: 'center' },
-  toast: { textAlign: 'center', color: colors.ok, fontWeight: '600' },
-  player: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  name: { fontSize: 18, color: colors.text, flex: 1 },
-  badge: {
-    fontSize: 12, color: colors.primaryDark, borderWidth: 1, borderColor: colors.primary,
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
-  },
+  invite: { gap: 8, alignItems: 'stretch' },
+  label: { color: C.muted, fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  code: { fontSize: 46, fontWeight: '900', letterSpacing: 8, textAlign: 'center', color: C.son, lineHeight: 52 },
+  hint: { color: C.muted, fontSize: 14, textAlign: 'center' },
+  section: { color: C.onSon, fontWeight: '800', fontSize: 15 },
+  games: { flexDirection: 'row', gap: 10 },
+  pick: { flex: 1, backgroundColor: C.paper, borderRadius: 16, paddingVertical: 12, alignItems: 'center', gap: 2 },
+  pickOn: { backgroundColor: C.gold },
+  pickEmoji: { fontSize: 34 },
+  pickName: { fontSize: 14, fontWeight: '800' },
+  chosen: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  chosenName: { fontSize: 22, fontWeight: '900' },
+  h3: { fontSize: 16, fontWeight: '800' },
+  row: { flexDirection: 'row', gap: 10 },
+  rule: { fontSize: 15, lineHeight: 22 },
+  wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
+  error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
 });

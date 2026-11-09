@@ -1,58 +1,98 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { RoomState } from '../../../shared/src/types';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { Button, colors, common } from '../ui';
+import { avatarOf } from '../avatars';
+import { GAME_META } from '../messages';
+import { play } from '../sound';
+import { C, sticker } from '../theme';
+import { Button, Card, T } from '../ui';
+import { Shell } from '../components/Shell';
+import { Confetti } from '../components/Fun';
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua'];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
-  const [error, setError] = useState<string | null>(null);
+  const r = room.result!;
   const isHost = room.hostId === game.me;
-  const winner = room.players.find((p) => p.id === room.winnerId);
-  const solo = room.players.length === 1 && !room.winnerId;
-  const ranking = [...room.players].sort((a, b) => b.words - a.words);
-  const chain = room.history.flatMap((h) => (h.kind === 'word' || h.kind === 'start' || h.kind === 'newWord' ? [h.word] : []));
+  const iWon = r.winnerId === game.me;
+  const [error, setError] = useState<string | null>(null);
+  const avatarById = new Map(room.players.map((p) => [p.id, p.avatar]));
+
+  useEffect(() => {
+    play(iWon || !r.winnerId ? 'win' : 'lose');
+  }, [iWon, r.winnerId]);
 
   return (
-    <ScrollView contentContainerStyle={common.screen}>
-      <Text testID="result-title" style={[common.title, { textAlign: 'center' }]}>
-        {solo
-          ? `Bạn nối được ${room.totalWords} từ!`
-          : winner
-            ? `🏆 ${winner.name}${winner.id === game.me ? ' (bạn)' : ''} thắng!`
-            : 'Ván chơi kết thúc'}
-      </Text>
-
-      <View style={[common.card, { gap: 6 }]}>
-        <Text style={common.label}>Số từ đã nối</Text>
-        {ranking.map((p) => (
-          <View key={p.id} style={styles.rankRow}>
-            <Text style={styles.rankName}>
-              {p.name}
-              {p.id === game.me ? ' (bạn)' : ''}
-            </Text>
-            <Text style={styles.rankScore}>{p.words}</Text>
-          </View>
-        ))}
+    <Shell
+      game={game}
+      room={room}
+      bottom={
+        isHost ? (
+          <>
+            {error && <T style={styles.error}>{error}</T>}
+            <Button testID="restart-btn" icon="🔁" title={`Chơi lại ${GAME_INFO[room.gameType].name}`} onPress={async () => setError(await game.restart())} />
+            <View style={styles.row}>
+              {GAMES.filter((g) => g !== room.gameType).map((g) => (
+                <Button
+                  key={g}
+                  testID={`switch-${g}`}
+                  small
+                  variant="paper"
+                  title={`${GAME_META[g].emoji} ${GAME_INFO[g].name}`}
+                  style={{ flex: 1 }}
+                  onPress={async () => setError(await game.configure({ gameType: g }))}
+                />
+              ))}
+            </View>
+          </>
+        ) : (
+          <T style={styles.wait}>Chờ chủ phòng chọn ván tiếp theo…</T>
+        )
+      }
+    >
+      {(iWon || !r.winnerId) && <Confetti />}
+      <View style={styles.hero}>
+        <T style={styles.trophy}>{iWon ? '🏆' : r.winnerId ? '🎉' : '🏁'}</T>
+        <T testID="result-title" style={styles.headline}>
+          {iWon ? 'Bạn thắng rồi!' : r.headline}
+        </T>
+        {iWon && <T style={styles.sub}>{r.headline}</T>}
       </View>
-
-      <View style={[common.card, { gap: 6 }]}>
-        <Text style={common.label}>Chuỗi từ của ván ({chain.length})</Text>
-        <Text style={{ fontSize: 16, color: colors.text, lineHeight: 24 }}>{chain.join(' → ')}</Text>
-      </View>
-
-      {isHost ? (
-        <Button testID="restart-btn" title="Chơi lại" onPress={async () => setError(await game.restart())} />
-      ) : (
-        <Text style={[common.muted, { textAlign: 'center' }]}>Đang chờ chủ phòng bấm chơi lại…</Text>
-      )}
-      {error && <Text style={common.error}>{error}</Text>}
-      <Button title="Thoát phòng" variant="ghost" onPress={game.leave} />
-    </ScrollView>
+      <Card style={{ gap: 4 }}>
+        {r.ranking.map((e, i) => {
+          const av = avatarOf(avatarById.get(e.playerId) ?? i);
+          return (
+            <View key={e.playerId} style={[styles.rank, i === 0 && styles.first]}>
+              <T style={styles.medal}>{MEDALS[i] ?? `${i + 1}.`}</T>
+              <View style={[styles.av, sticker(2), { backgroundColor: av.bg }]}>
+                <T style={{ fontSize: 22 }}>{av.emoji}</T>
+              </View>
+              <View style={{ flex: 1 }}>
+                <T numberOfLines={1} style={styles.name}>{e.playerId === game.me ? `${e.name} (bạn)` : e.name}</T>
+                <T style={styles.detail}>{e.detail}</T>
+              </View>
+            </View>
+          );
+        })}
+      </Card>
+    </Shell>
   );
 }
 
 const styles = StyleSheet.create({
-  rankRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  rankName: { fontSize: 17, color: colors.text },
-  rankScore: { fontSize: 17, fontWeight: '800', color: colors.primaryDark },
+  hero: { alignItems: 'center', gap: 4, paddingVertical: 8 },
+  trophy: { fontSize: 64 },
+  headline: { fontSize: 28, fontWeight: '900', color: C.gold, textAlign: 'center', lineHeight: 34 },
+  sub: { color: C.onSon, fontSize: 16, textAlign: 'center' },
+  rank: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 12 },
+  first: { backgroundColor: '#FFF3BF' },
+  medal: { fontSize: 24, width: 34, textAlign: 'center', fontWeight: '900' },
+  av: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  name: { fontWeight: '800', fontSize: 17 },
+  detail: { color: C.muted, fontSize: 14 },
+  row: { flexDirection: 'row', gap: 10 },
+  wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
+  error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
 });
