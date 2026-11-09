@@ -3,9 +3,11 @@ import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { createGameServer, type GameServer } from '../src/app';
 import { smallDict } from './helpers';
-import type { ClientToServerEvents, RoomState, ServerToClientEvents } from '../../shared/src/types';
+import type {
+  BauCuaView, ClientToServerEvents, FunEvent, LudoView, RoomState, ServerToClientEvents, WordChainView,
+} from '../../shared/src/types';
 
-type Client = Socket<ServerToClientEvents, ClientToServerEvents> & { state?: RoomState };
+type Client = Socket<ServerToClientEvents, ClientToServerEvents> & { state?: RoomState; fun: FunEvent[] };
 
 const TURN_MS = 600;
 let server: GameServer;
@@ -28,14 +30,15 @@ afterEach(async () => {
 
 function client(): Promise<Client> {
   const c = connect(url, { transports: ['websocket'], forceNew: true, reconnection: false }) as Client;
+  c.fun = [];
   c.on('room:state', (s) => (c.state = s));
+  c.on('fun:event', (e) => c.fun.push(e));
   clients.push(c);
   return new Promise((resolve) => c.on('connect', () => resolve(c)));
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Chờ tới khi trạng thái mới nhất của client thỏa điều kiện */
 async function until(c: Client, pred: (s: RoomState) => boolean, timeout = 3000): Promise<RoomState> {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
@@ -45,95 +48,108 @@ async function until(c: Client, pred: (s: RoomState) => boolean, timeout = 3000)
   throw new Error('Hết thời gian chờ trạng thái: ' + JSON.stringify(c.state));
 }
 
-const emit = {
-  create: (c: Client, name: string, playerId?: string) => c.emitWithAck('room:create', { name, playerId }),
-  join: (c: Client, code: string, name: string, playerId?: string) => c.emitWithAck('room:join', { code, name, playerId }),
-  start: (c: Client) => c.emitWithAck('game:start'),
-  submit: (c: Client, word: string) => c.emitWithAck('word:submit', { word }),
-  restart: (c: Client) => c.emitWithAck('game:restart'),
-  leave: (c: Client) => c.emitWithAck('room:leave'),
-};
-
-/** Tìm một từ hợp lệ để nối (dùng kho từ nhỏ của test) */
-function answerFor(state: RoomState): string | null {
-  const last = state.currentWord!.split(' ')[1];
-  const used = new Set(state.history.flatMap((h) => ('word' in h ? [h.word] : [])));
-  return smallDict().nextOptions(last, used)[0] ?? null;
+async function roomOf(n: number, gameType?: 'wordchain' | 'ludo' | 'baucua') {
+  const cs = await Promise.all(Array.from({ length: n }, () => client()));
+  const created = await cs[0].emitWithAck('room:create', { name: 'P0', gameType });
+  if (!created.ok) throw new Error(created.error);
+  const ids = [created.playerId];
+  for (let i = 1; i < n; i++) {
+    const j = await cs[i].emitWithAck('room:join', { code: created.code, name: `P${i}` });
+    if (!j.ok) throw new Error(j.error);
+    ids.push(j.playerId);
+  }
+  await until(cs[0], (s) => s.players.length === n);
+  return { cs, ids, code: created.code };
 }
 
-describe('Server + 3 người chơi qua Socket.IO', () => {
-  it('chơi trọn một ván: tạo phòng, vào phòng, nối từ, bị loại, có người thắng, chơi lại', async () => {
-    const [a, b, c] = await Promise.all([client(), client(), client()]);
-
-    const created = await emit.create(a, 'An');
-    expect(created.ok).toBe(true);
-    if (!created.ok) return;
-    const code = created.code;
+describe('Server qua Socket.IO', () => {
+  it('Nối từ: chơi trọn một ván tới khi có người thắng, rồi chơi lại', async () => {
+    const { cs, ids, code } = await roomOf(3);
     expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(await cs[1].emitWithAck('game:start')).toEqual({ ok: false, error: 'not_host' });
+    expect(await cs[0].emitWithAck('game:start')).toEqual({ ok: true });
+    const s0 = await until(cs[2], (s) => s.phase === 'playing');
+    const g0 = s0.game as WordChainView;
+    const cur = cs[ids.indexOf(g0.currentPlayerId!)];
+    const last = g0.currentWord.split(' ')[1];
+    const ans = smallDict().nextOptions(last, new Set([g0.currentWord]))[0];
+    expect(await cur.emitWithAck('game:action', { type: 'submit', word: 'sai bét' })).toEqual({ ok: false, reason: 'chain' });
+    expect(await cur.emitWithAck('game:action', { type: 'submit', word: ans })).toEqual({ ok: true });
+    await until(cs[0], (s) => (s.game as WordChainView).currentWord === ans);
+    const end = await until(cs[0], (s) => s.phase === 'finished', 5000);
+    expect(end.result?.winnerId).toBeTruthy();
+    expect(end.result?.ranking).toHaveLength(3);
+    expect(await cs[0].emitWithAck('game:restart')).toEqual({ ok: true });
+    await until(cs[1], (s) => s.phase === 'lobby' && s.game === null);
+  });
 
-    expect((await emit.join(b, code.toLowerCase(), 'Bình')).ok).toBe(true);
-    expect((await emit.join(c, code, 'Chi')).ok).toBe(true);
-    await until(a, (s) => s.players.length === 3);
+  it('chủ phòng đổi sang Cờ cá ngựa, đổi số ngựa, bắt đầu và đổ xúc xắc', async () => {
+    const { cs, ids } = await roomOf(2);
+    expect(await cs[1].emitWithAck('room:config', { gameType: 'ludo' })).toEqual({ ok: false, error: 'not_host' });
+    expect(await cs[0].emitWithAck('room:config', { gameType: 'ludo', settings: { ludoPieces: 2 } })).toEqual({ ok: true });
+    await until(cs[1], (s) => s.gameType === 'ludo' && s.settings.ludoPieces === 2);
+    await cs[0].emitWithAck('game:start');
+    const s = await until(cs[1], (st) => st.phase === 'playing');
+    const g = s.game as LudoView;
+    expect(g.pieces).toEqual([[-1, -1], [-1, -1]]);
+    const cur = cs[ids.indexOf(g.currentPlayerId!)];
+    expect(await cur.emitWithAck('game:action', { type: 'roll' })).toEqual({ ok: true });
+    await until(cs[0], (st) => (st.game as LudoView).rollId === 1);
+  });
 
-    // người không phải chủ phòng không bắt đầu được
-    expect(await emit.start(b)).toEqual({ ok: false, error: 'not_host' });
-    expect(await emit.start(a)).toEqual({ ok: true });
-    const s0 = await until(c, (s) => s.phase === 'playing');
-    expect(s0.currentWord).toBeTruthy();
-    expect(s0.nextCount).toBeGreaterThan(0);
+  it('tạo phòng Bầu cua, đặt cược, chờ mở bát', async () => {
+    const { cs } = await roomOf(2, 'baucua');
+    expect(cs[0].state!.gameType).toBe('baucua');
+    await cs[0].emitWithAck('game:start');
+    await until(cs[1], (s) => s.phase === 'playing');
+    expect(await cs[1].emitWithAck('game:action', { type: 'bet', symbol: 'cua', amount: 100 })).toEqual({ ok: true });
+    await until(cs[0], (s) => (s.game as BauCuaView).bets[cs[1].state!.players[1].id]?.cua === 100);
+    expect(await cs[0].emitWithAck('game:action', { type: 'shake' })).toEqual({ ok: true });
+    const r = await until(cs[1], (s) => (s.game as BauCuaView).step === 'result', 5000);
+    expect((r.game as BauCuaView).dice).toHaveLength(3);
+  });
 
-    // người đang tới lượt nối một từ đúng
-    const byId = new Map([[created.playerId, a]]);
-    for (const cl of [b, c]) byId.set(cl.state!.players.find((p) => p.name === (cl === b ? 'Bình' : 'Chi'))!.id, cl);
-    const first = byId.get(s0.currentPlayerId!)!;
-    const ans = answerFor(s0)!;
-    expect(await emit.submit(first, 'sai bét')).toEqual({ ok: false, reason: 'chain' });
-    expect(await emit.submit(first, ans)).toEqual({ ok: true });
-    const s1 = await until(a, (s) => s.currentWord === ans);
-    expect(s1.currentPlayerId).not.toBe(s0.currentPlayerId);
-
-    // không ai trả lời -> lần lượt bị loại -> còn 1 người thắng
-    const end = await until(a, (s) => s.phase === 'finished', 5000);
-    expect(end.winnerId).toBeTruthy();
-    expect(end.players.filter((p) => p.eliminated)).toHaveLength(2);
-
-    expect(await emit.restart(a)).toEqual({ ok: true });
-    await until(b, (s) => s.phase === 'lobby' && s.players.length === 3);
+  it('ném dép, khịa, hối: phát cho cả phòng; chặn ném chính mình, người ngoài phòng và spam', async () => {
+    const { cs, ids } = await roomOf(2);
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'throw', to: ids[1], item: 'dep' })).toEqual({ ok: true });
+    expect(await cs[1].emitWithAck('fun:send', { kind: 'taunt', taunt: 'ga' })).toEqual({ ok: true });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'poke', to: ids[1] })).toEqual({ ok: true });
+    await wait(50);
+    expect(cs[1].fun.map((f) => f.kind)).toEqual(['throw', 'taunt', 'poke']);
+    expect(cs[1].fun[0]).toMatchObject({ from: ids[0], to: ids[1], item: 'dep' });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'throw', to: ids[0], item: 'dep' })).toEqual({ ok: false });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'throw', to: 'nguoi-la', item: 'dep' })).toEqual({ ok: false });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'throw', to: ids[1], item: 'bom' as never })).toEqual({ ok: false });
+    const results = [];
+    for (let i = 0; i < 10; i++) results.push((await cs[1].emitWithAck('fun:send', { kind: 'taunt', taunt: 'gg' })).ok);
+    expect(results.filter((x) => !x).length).toBeGreaterThan(0);
   });
 
   it('báo lỗi khi mã phòng sai, tên rỗng', async () => {
     const a = await client();
-    expect(await emit.join(a, 'ZZZZZZ', 'An')).toEqual({ ok: false, error: 'room_not_found' });
-    expect(await emit.create(a, '   ')).toEqual({ ok: false, error: 'invalid_name' });
+    expect(await a.emitWithAck('room:join', { code: 'ZZZZZZ', name: 'An' })).toEqual({ ok: false, error: 'room_not_found' });
+    expect(await a.emitWithAck('room:create', { name: '   ' })).toEqual({ ok: false, error: 'invalid_name' });
     expect(server.manager.size).toBe(0);
   });
 
   it('rớt mạng rồi vào lại bằng playerId cũ giữa ván', async () => {
-    const [a, b] = await Promise.all([client(), client()]);
-    const created = await emit.create(a, 'An');
-    if (!created.ok) throw new Error();
-    const joined = await emit.join(b, created.code, 'Bình');
-    if (!joined.ok) throw new Error();
-    await emit.start(a);
-    await until(a, (s) => s.phase === 'playing');
-
-    b.disconnect();
-    await until(a, (s) => s.players.find((p) => p.id === joined.playerId)?.connected === false);
-
+    const { cs, ids, code } = await roomOf(2);
+    await cs[0].emitWithAck('game:start');
+    await until(cs[0], (s) => s.phase === 'playing');
+    cs[1].disconnect();
+    await until(cs[0], (s) => s.players.find((p) => p.id === ids[1])?.connected === false);
     const b2 = await client();
-    const again = await emit.join(b2, created.code, 'Bình', joined.playerId);
-    expect(again).toEqual({ ok: true, code: created.code, playerId: joined.playerId });
+    expect(await b2.emitWithAck('room:join', { code, name: 'P1', playerId: ids[1] })).toEqual({ ok: true, code, playerId: ids[1] });
     const s = await until(b2, (st) => st.phase === 'playing');
-    expect(s.players).toHaveLength(2);
-    expect(s.players.find((p) => p.id === joined.playerId)!.connected).toBe(true);
+    expect(s.players.find((p) => p.id === ids[1])!.connected).toBe(true);
   });
 
   it('kết nối cũ ngắt sau khi đã vào lại không làm người chơi bị đánh dấu mất kết nối', async () => {
     const a = await client();
-    const created = await emit.create(a, 'An');
+    const created = await a.emitWithAck('room:create', { name: 'An' });
     if (!created.ok) throw new Error();
     const a2 = await client();
-    await emit.join(a2, created.code, 'An', created.playerId);
+    await a2.emitWithAck('room:join', { code: created.code, name: 'An', playerId: created.playerId });
     a.disconnect();
     await wait(100);
     const s = await until(a2, (st) => st.players.length === 1);
@@ -141,21 +157,17 @@ describe('Server + 3 người chơi qua Socket.IO', () => {
   });
 
   it('chủ phòng thoát -> chuyển quyền; mọi người thoát -> phòng bị xóa', async () => {
-    const [a, b] = await Promise.all([client(), client()]);
-    const created = await emit.create(a, 'An');
-    if (!created.ok) throw new Error();
-    const joined = await emit.join(b, created.code, 'Bình');
-    if (!joined.ok) throw new Error();
-    await emit.leave(a);
-    const s = await until(b, (st) => st.players.length === 1);
-    expect(s.hostId).toBe(joined.playerId);
-    await emit.leave(b);
+    const { cs, ids } = await roomOf(2);
+    await cs[0].emitWithAck('room:leave');
+    const s = await until(cs[1], (st) => st.players.length === 1);
+    expect(s.hostId).toBe(ids[1]);
+    await cs[1].emitWithAck('room:leave');
     expect(server.manager.size).toBe(0);
   });
 
   it('phòng không còn ai kết nối thì tự xóa sau một lúc', async () => {
     const a = await client();
-    await emit.create(a, 'An');
+    await a.emitWithAck('room:create', { name: 'An' });
     expect(server.manager.size).toBe(1);
     a.disconnect();
     await wait(800);

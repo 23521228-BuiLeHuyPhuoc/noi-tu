@@ -1,4 +1,7 @@
+import { vi } from 'vitest';
 import { Dictionary } from '../src/dictionary';
+import { Room } from '../src/room';
+import type { BauCuaView, LudoView, WordChainView } from '../../shared/src/types';
 
 /** Kho từ nhỏ, đủ để dựng các tình huống. */
 export const SMALL_WORDS = [
@@ -13,5 +16,36 @@ export function smallDict(words = SMALL_WORDS): Dictionary {
   return new Dictionary(words);
 }
 
-/** rng cố định: luôn trả về 0 -> shuffle giữ gần nguyên thứ tự, randomStart lấy phần tử đầu hợp lệ */
+/** rng cố định: luôn trả về 0 */
 export const zeroRng = () => 0;
+
+export const TURN = 30_000;
+
+export function setup(names: string[], opts: { dict?: Dictionary; rng?: () => number; turnMs?: number } = {}) {
+  const onChange = vi.fn();
+  const room = new Room('ABC123', opts.dict ?? smallDict(), {
+    turnMs: opts.turnMs ?? TURN,
+    disconnectGraceMs: 30_000,
+    rng: opts.rng ?? zeroRng,
+    onChange,
+  });
+  const ids = names.map((n) => {
+    const r = room.addPlayer(n);
+    if (!r.ok) throw new Error(r.error);
+    return r.playerId;
+  });
+  return { room, ids, onChange };
+}
+
+export const wc = (room: Room) => room.toPublic().game as WordChainView;
+export const ludo = (room: Room) => room.toPublic().game as LudoView;
+export const bc = (room: Room) => room.toPublic().game as BauCuaView;
+export const submit = (room: Room, id: string, word: string) => room.action(id, { type: 'submit', word });
+
+/** Bắt đầu ván Nối từ với từ mở đầu cố định */
+export function startWordChain(room: Room, hostId: string, word: string) {
+  const dict = (room as unknown as { dict: Dictionary }).dict;
+  vi.spyOn(dict, 'randomStart').mockReturnValueOnce(word);
+  const r = room.start(hostId);
+  if (!r.ok) throw new Error(r.error);
+}

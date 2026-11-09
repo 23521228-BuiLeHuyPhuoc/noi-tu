@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { toSyllables, firstSyllable, lastSyllable } from '../../shared/src/vi';
 import {
-  MAX_PLAYERS, TURN_SECONDS, WORD_SYLLABLES,
-  type ErrorCode, type HistoryItem, type Phase, type RejectReason, type RoomState,
+  GAME_INFO, MAX_NAME, MAX_PLAYERS,
+  type ActionResult, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
+  type RoomSettings, type RoomState,
 } from '../../shared/src/types';
 import type { Dictionary, Rng } from './dictionary';
+import type { GameEngine } from './games/engine';
+import { WordChainGame } from './games/wordchain';
+import { LudoGame } from './games/ludo';
+import { BauCuaGame } from './games/baucua';
 
 export interface RoomOptions {
+  /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
   turnMs?: number;
   disconnectGraceMs?: number;
   rng?: Rng;
@@ -17,15 +22,14 @@ interface Player {
   id: string;
   name: string;
   connected: boolean;
-  eliminated: boolean;
-  words: number;
+  avatar: number;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
 
 type Result<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
 
-const MAX_NAME = 20;
-const MAX_HISTORY = 300;
+const AVATAR_COUNT = 16;
+const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
 
 export function cleanName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -38,24 +42,16 @@ export class Room {
   phase: Phase = 'lobby';
   players: Player[] = [];
   hostId = '';
+  gameType: GameType = 'wordchain';
+  settings: RoomSettings = { ludoPieces: 4 };
 
-  private currentWord: string | null = null;
-  private currentId: string | null = null;
-  private turnEndsAt: number | null = null;
-  private turnTimer?: ReturnType<typeof setTimeout>;
-  private used = new Set<string>();
-  private history: HistoryItem[] = [];
-  private winnerId: string | null = null;
-  private totalWords = 0;
-  private soloGame = false;
-
-  private readonly turnMs: number;
+  private engine: GameEngine | null = null;
+  private result: GameResult | null = null;
   private readonly graceMs: number;
   private readonly rng: Rng;
   private readonly onChange: (room: Room) => void;
 
-  constructor(readonly code: string, private readonly dict: Dictionary, opts: RoomOptions = {}) {
-    this.turnMs = opts.turnMs ?? TURN_SECONDS * 1000;
+  constructor(readonly code: string, private readonly dict: Dictionary, private readonly opts: RoomOptions = {}) {
     this.graceMs = opts.disconnectGraceMs ?? 30_000;
     this.rng = opts.rng ?? Math.random;
     this.onChange = opts.onChange ?? (() => {});
@@ -84,7 +80,10 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    this.players.push({ id, name: this.uniqueName(name), connected: true, eliminated: false, words: 0 });
+    const usedAvatars = new Set(this.players.map((p) => p.avatar));
+    let avatar = Math.floor(this.rng() * AVATAR_COUNT);
+    while (usedAvatars.has(avatar)) avatar = (avatar + 1) % AVATAR_COUNT;
+    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
@@ -92,13 +91,11 @@ export class Room {
 
   setConnected(playerId: string, connected: boolean): void {
     const p = this.find(playerId);
-    if (!p || p.connected === connected) {
-      if (p && connected) this.clearRemoveTimer(p);
-      return;
-    }
-    p.connected = connected;
+    if (!p) return;
     if (connected) this.clearRemoveTimer(p);
-    else if (this.phase !== 'playing') this.scheduleRemoval(p);
+    if (p.connected === connected) return;
+    p.connected = connected;
+    if (!connected && this.phase !== 'playing') this.scheduleRemoval(p);
     this.changed();
   }
 
@@ -107,99 +104,63 @@ export class Room {
     const p = this.find(playerId);
     if (!p) return;
     this.clearRemoveTimer(p);
-
-    let nextId: string | null = null;
-    const wasCurrent = this.phase === 'playing' && this.currentId === p.id;
-    if (this.phase === 'playing' && !p.eliminated) {
-      this.pushHistory({ kind: 'eliminated', playerId: p.id, name: p.name, reason: 'left' });
-      if (wasCurrent) nextId = this.nextAliveId(p.id, true);
-    }
     this.players = this.players.filter((x) => x.id !== p.id);
     if (this.hostId === p.id) this.hostId = this.players[0]?.id ?? '';
-
-    if (this.phase === 'playing') {
-      if (this.checkEnd()) return;
-      if (wasCurrent) {
-        this.currentId = nextId;
-        this.beginTurn();
-      }
-    }
+    if (this.phase === 'playing') this.engine?.removePlayer(p.id);
     this.changed();
   }
 
-  // ---------- ván chơi ----------
+  // ---------- cấu hình & ván chơi ----------
+
+  configure(byId: string, gameType?: unknown, settings?: Partial<RoomSettings>): Result {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    if (gameType !== undefined) {
+      if (!GAME_TYPES.includes(gameType as GameType)) return { ok: false, error: 'bad_request' };
+      this.gameType = gameType as GameType;
+    }
+    if (settings?.ludoPieces !== undefined) {
+      if (settings.ludoPieces !== 2 && settings.ludoPieces !== 4) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, ludoPieces: settings.ludoPieces };
+    }
+    // đổi game sau khi kết thúc thì quay về phòng chờ
+    if (this.phase === 'finished') this.backToLobby();
+    this.changed();
+    return { ok: true };
+  }
 
   start(byId: string): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
-    if (this.phase !== 'lobby' || this.players.length === 0) return { ok: false, error: 'bad_request' };
+    if (this.phase !== 'lobby') return { ok: false, error: 'bad_request' };
+    const info = GAME_INFO[this.gameType];
+    if (this.players.length < info.min) return { ok: false, error: 'too_few_players' };
+    if (this.players.length > info.max) return { ok: false, error: 'too_many_players' };
 
-    this.shuffle(this.players);
-    for (const p of this.players) {
-      p.eliminated = false;
-      p.words = 0;
+    const order = [...this.players];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
     }
-    this.used = new Set();
-    this.history = [];
-    this.winnerId = null;
-    this.totalWords = 0;
-    this.soloGame = this.players.length === 1;
-
-    const first = this.dict.randomStart(this.used, this.rng);
-    if (!first) return { ok: false, error: 'bad_request' };
-    this.currentWord = first;
-    this.used.add(first);
-    this.pushHistory({ kind: 'start', word: first });
-
+    this.result = null;
+    this.engine = this.createEngine();
     this.phase = 'playing';
-    this.currentId = this.players[0].id;
-    this.beginTurn();
+    this.engine.start(order.map((p) => ({ id: p.id, name: p.name })));
     this.changed();
     return { ok: true };
   }
 
-  submit(byId: string, raw: unknown): { ok: true } | { ok: false; reason: RejectReason } {
-    if (this.phase !== 'playing' || !this.currentWord) return { ok: false, reason: 'not_playing' };
-    if (byId !== this.currentId) return { ok: false, reason: 'not_your_turn' };
-    if (this.turnEndsAt !== null && Date.now() >= this.turnEndsAt) {
-      this.handleTimeout();
-      return { ok: false, reason: 'timeout' };
+  action(byId: string, action: unknown): ActionResult {
+    if (this.phase !== 'playing' || !this.engine) return { ok: false, reason: 'not_playing' };
+    if (!action || typeof action !== 'object' || typeof (action as GameAction).type !== 'string') {
+      return { ok: false, reason: 'bad_action' };
     }
-    if (typeof raw !== 'string' || raw.length > 60) return { ok: false, reason: 'format' };
-
-    const syl = toSyllables(raw);
-    if (!syl || syl.length !== WORD_SYLLABLES) return { ok: false, reason: 'format' };
-    const word = syl.join(' ');
-    if (firstSyllable(word) !== lastSyllable(this.currentWord)) return { ok: false, reason: 'chain' };
-    if (this.used.has(word)) return { ok: false, reason: 'used' };
-    if (!this.dict.has(word)) return { ok: false, reason: 'not_in_dictionary' };
-
-    const player = this.find(byId)!;
-    player.words++;
-    this.totalWords++;
-    this.used.add(word);
-    this.currentWord = word;
-    this.pushHistory({ kind: 'word', word, playerId: byId, name: player.name });
-    this.currentId = this.nextAliveId(byId, false);
-    this.beginTurn();
-    this.changed();
-    return { ok: true };
+    return this.engine.action(byId, action as GameAction);
   }
 
   restart(byId: string): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
     if (this.phase !== 'finished') return { ok: false, error: 'bad_request' };
-    this.phase = 'lobby';
-    this.currentWord = null;
-    this.currentId = null;
-    this.turnEndsAt = null;
-    this.used = new Set();
-    this.history = [];
-    this.winnerId = null;
-    this.totalWords = 0;
-    for (const p of this.players) {
-      p.eliminated = false;
-      p.words = 0;
-    }
+    this.backToLobby();
     this.changed();
     return { ok: true };
   }
@@ -209,92 +170,60 @@ export class Room {
       code: this.code,
       phase: this.phase,
       hostId: this.hostId,
-      players: this.players.map((p) => ({
-        id: p.id, name: p.name, connected: p.connected, eliminated: p.eliminated, words: p.words,
-      })),
+      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, avatar: p.avatar })),
       maxPlayers: MAX_PLAYERS,
-      turnSeconds: this.turnMs / 1000,
-      currentWord: this.currentWord,
-      currentPlayerId: this.phase === 'playing' ? this.currentId : null,
-      turnEndsAt: this.phase === 'playing' ? this.turnEndsAt : null,
+      gameType: this.gameType,
+      settings: this.settings,
       serverNow: Date.now(),
-      nextCount: this.phase === 'playing' && this.currentWord
-        ? this.dict.countNext(lastSyllable(this.currentWord), this.used)
-        : null,
-      history: this.history,
-      winnerId: this.winnerId,
-      totalWords: this.totalWords,
+      game: this.engine ? this.engine.view() : null,
+      result: this.result,
     };
   }
 
   dispose(): void {
-    clearTimeout(this.turnTimer);
+    this.engine?.dispose();
     for (const p of this.players) this.clearRemoveTimer(p);
   }
 
   // ---------- nội bộ ----------
 
-  private beginTurn(): void {
-    clearTimeout(this.turnTimer);
-    this.turnEndsAt = Date.now() + this.turnMs;
-    this.turnTimer = setTimeout(() => this.handleTimeout(), this.turnMs);
-  }
-
-  private handleTimeout(): void {
-    if (this.phase !== 'playing' || !this.currentId || !this.currentWord) return;
-    clearTimeout(this.turnTimer);
-    const loser = this.find(this.currentId);
-    if (loser) {
-      loser.eliminated = true;
-      this.pushHistory({ kind: 'eliminated', playerId: loser.id, name: loser.name, reason: 'timeout' });
+  private createEngine(): GameEngine {
+    const ctx = {
+      rng: this.rng,
+      dict: this.dict,
+      settings: this.settings,
+      turnMs: this.opts.turnMs,
+      hostId: () => this.hostId,
+      isConnected: (id: string) => this.find(id)?.connected ?? false,
+      changed: () => {
+        if (this.phase === 'playing') this.changed();
+      },
+      finish: (result: GameResult) => this.finish(result),
+    };
+    switch (this.gameType) {
+      case 'ludo':
+        return new LudoGame(ctx);
+      case 'baucua':
+        return new BauCuaGame(ctx);
+      default:
+        return new WordChainGame(ctx);
     }
-    if (this.checkEnd()) return;
-
-    // ngõ cụt: đổi từ mới để người kế tiếp không bị loại dây chuyền
-    if (this.dict.countNext(lastSyllable(this.currentWord), this.used) === 0) {
-      const fresh = this.dict.randomStart(this.used, this.rng);
-      if (!fresh) {
-        this.finish();
-        return;
-      }
-      this.currentWord = fresh;
-      this.used.add(fresh);
-      this.pushHistory({ kind: 'newWord', word: fresh });
-    }
-    this.currentId = this.nextAliveId(this.currentId, true);
-    this.beginTurn();
-    this.changed();
   }
 
-  /** Kết thúc ván nếu đủ điều kiện. Trả về true nếu đã kết thúc. */
-  private checkEnd(): boolean {
-    const alive = this.players.filter((p) => !p.eliminated);
-    const over = this.soloGame ? alive.length === 0 : alive.length <= 1;
-    if (!over) return false;
-    this.winnerId = this.soloGame ? null : alive[0]?.id ?? null;
-    this.finish();
-    return true;
-  }
-
-  private finish(): void {
-    clearTimeout(this.turnTimer);
+  private finish(result: GameResult): void {
+    if (this.phase !== 'playing') return;
     this.phase = 'finished';
-    this.currentId = null;
-    this.turnEndsAt = null;
+    this.result = result;
+    this.engine?.dispose();
     for (const p of this.players) if (!p.connected) this.scheduleRemoval(p);
     this.changed();
   }
 
-  /** Người còn chơi kế tiếp sau `afterId`. `skipSelf`: không được chọn lại chính người đó. */
-  private nextAliveId(afterId: string, skipSelf: boolean): string | null {
-    const n = this.players.length;
-    const start = this.players.findIndex((p) => p.id === afterId);
-    for (let i = 1; i <= n; i++) {
-      const p = this.players[(start + i) % n];
-      if (skipSelf && p.id === afterId) continue;
-      if (!p.eliminated) return p.id;
-    }
-    return null;
+  private backToLobby(): void {
+    this.engine?.dispose();
+    this.engine = null;
+    this.result = null;
+    this.phase = 'lobby';
   }
 
   private find(id: string): Player | undefined {
@@ -318,18 +247,6 @@ export class Room {
   private clearRemoveTimer(p: Player): void {
     if (p.removeTimer) clearTimeout(p.removeTimer);
     p.removeTimer = undefined;
-  }
-
-  private pushHistory(item: HistoryItem): void {
-    this.history.push(item);
-    if (this.history.length > MAX_HISTORY) this.history.splice(0, this.history.length - MAX_HISTORY);
-  }
-
-  private shuffle<T>(arr: T[]): void {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(this.rng() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
   }
 
   private changed(): void {

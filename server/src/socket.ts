@@ -1,7 +1,8 @@
 import type { Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '../../shared/src/types';
+import type { ClientToServerEvents, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { cleanName, type Room } from './room';
+import { cleanFun, RateLimiter } from './fun';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -10,7 +11,9 @@ export function broadcastRoom(io: IO, room: Room): void {
   io.to(room.code).emit('room:state', room.toPublic());
 }
 
-/** Gắn các xử lý sự kiện. Server là trọng tài duy nhất: mọi kiểm tra đều ở đây và trong Room. */
+let funSeq = 0;
+
+/** Gắn các xử lý sự kiện. Server là trọng tài duy nhất: mọi kiểm tra đều ở đây và trong Room/engine. */
 export function attachSocketHandlers(io: IO, manager: RoomManager): void {
   // socket đang đại diện cho mỗi người chơi ("CODE:playerId" -> socket.id)
   const activeSocket = new Map<string, string>();
@@ -18,6 +21,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
 
   io.on('connection', (socket: Sock) => {
     let session: { code: string; playerId: string } | null = null;
+    const limiter = new RateLimiter();
 
     const currentRoom = (): Room | undefined => {
       if (!session) return undefined;
@@ -31,10 +35,11 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       socket.leave(code);
       session = null;
       const room = manager.get(code);
+      const mine = activeSocket.get(key(code, playerId)) === socket.id;
+      if (mine) activeSocket.delete(key(code, playerId));
       if (!room) return;
       if (remove) room.removePlayer(playerId);
-      else if (activeSocket.get(key(code, playerId)) === socket.id) room.setConnected(playerId, false);
-      if (activeSocket.get(key(code, playerId)) === socket.id) activeSocket.delete(key(code, playerId));
+      else if (mine) room.setConnected(playerId, false);
     };
 
     const enter = (room: Room, name: unknown, playerId: unknown) => {
@@ -48,7 +53,6 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       }
       session = { code: room.code, playerId: res.playerId };
       activeSocket.set(key(room.code, res.playerId), socket.id);
-      // gửi riêng trạng thái hiện tại (trường hợp vào lại mà trạng thái không đổi)
       socket.emit('room:state', room.toPublic());
       return { ok: true as const, code: room.code, playerId: res.playerId };
     };
@@ -58,7 +62,10 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
       if (!cleanName(p.name)) return ack({ ok: false, error: 'invalid_name' });
       detach(true);
-      ack(enter(manager.create(), p.name, p.playerId));
+      const room = manager.create();
+      const res = enter(room, p.name, p.playerId);
+      if (res.ok && p.gameType) room.configure(res.playerId, p.gameType as GameType);
+      ack(res);
     });
 
     socket.on('room:join', (p, ack) => {
@@ -70,6 +77,14 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       ack(enter(room, p.name, p.playerId));
     });
 
+    socket.on('room:config', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
+      ack(room.configure(session.playerId, p.gameType, p.settings));
+    });
+
     socket.on('game:start', (ack) => {
       if (typeof ack !== 'function') return;
       const room = currentRoom();
@@ -77,11 +92,11 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       ack(room.start(session.playerId));
     });
 
-    socket.on('word:submit', (p, ack) => {
+    socket.on('game:action', (a, ack) => {
       if (typeof ack !== 'function') return;
       const room = currentRoom();
       if (!room || !session) return ack({ ok: false, reason: 'not_playing' });
-      ack(room.submit(session.playerId, p?.word));
+      ack(room.action(session.playerId, a));
     });
 
     socket.on('game:restart', (ack) => {
@@ -94,6 +109,18 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
     socket.on('room:leave', (ack) => {
       detach(true);
       if (typeof ack === 'function') ack({ ok: true });
+    });
+
+    // ném dép, khịa, hối: phát cho cả phòng, có giới hạn tần suất chống spam
+    socket.on('fun:send', (raw, ack) => {
+      const reply = typeof ack === 'function' ? ack : () => {};
+      const room = currentRoom();
+      const f = cleanFun(raw);
+      if (!room || !session || !f) return reply({ ok: false });
+      if ('to' in f && (!room.has(f.to) || f.to === session.playerId)) return reply({ ok: false });
+      if (!limiter.take()) return reply({ ok: false });
+      io.to(room.code).emit('fun:event', { ...f, id: ++funSeq, from: session.playerId });
+      reply({ ok: true });
     });
 
     socket.on('disconnect', () => detach(false));
