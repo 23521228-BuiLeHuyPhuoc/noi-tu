@@ -17,8 +17,8 @@ export interface PublicPlayer {
 
 export type HistoryItem =
   | { kind: 'start'; word: string }
-  | { kind: 'word'; word: string; playerId: string }
-  | { kind: 'eliminated'; playerId: string; reason: 'timeout' | 'left' }
+  | { kind: 'word'; word: string; playerId: string; name: string }
+  | { kind: 'eliminated'; playerId: string; name: string; reason: 'timeout' | 'left' }
   | { kind: 'newWord'; word: string };
 
 export interface RoomState {

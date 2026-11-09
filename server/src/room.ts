@@ -111,7 +111,7 @@ export class Room {
     let nextId: string | null = null;
     const wasCurrent = this.phase === 'playing' && this.currentId === p.id;
     if (this.phase === 'playing' && !p.eliminated) {
-      this.pushHistory({ kind: 'eliminated', playerId: p.id, reason: 'left' });
+      this.pushHistory({ kind: 'eliminated', playerId: p.id, name: p.name, reason: 'left' });
       if (wasCurrent) nextId = this.nextAliveId(p.id, true);
     }
     this.players = this.players.filter((x) => x.id !== p.id);
@@ -178,7 +178,7 @@ export class Room {
     this.totalWords++;
     this.used.add(word);
     this.currentWord = word;
-    this.pushHistory({ kind: 'word', word, playerId: byId });
+    this.pushHistory({ kind: 'word', word, playerId: byId, name: player.name });
     this.currentId = this.nextAliveId(byId, false);
     this.beginTurn();
     this.changed();
@@ -246,7 +246,7 @@ export class Room {
     const loser = this.find(this.currentId);
     if (loser) {
       loser.eliminated = true;
-      this.pushHistory({ kind: 'eliminated', playerId: loser.id, reason: 'timeout' });
+      this.pushHistory({ kind: 'eliminated', playerId: loser.id, name: loser.name, reason: 'timeout' });
     }
     if (this.checkEnd()) return;
 

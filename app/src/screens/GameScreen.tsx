@@ -52,7 +52,7 @@ export function GameScreen({ game, room }: { game: Game; room: RoomState }) {
   const current = names.get(room.currentPlayerId ?? '') ?? '';
 
   return (
-    <View style={common.screen}>
+    <View style={[common.screen, { flex: 1 }]}>
       <View style={styles.topRow}>
         <Text style={common.label}>Phòng {room.code}</Text>
         <Text testID="seconds-left" style={[styles.timer, left <= 5 && { color: colors.danger }]}>{left}s</Text>
@@ -79,7 +79,7 @@ export function GameScreen({ game, room }: { game: Game; room: RoomState }) {
             <TextInput
               testID="word-input"
               ref={inputRef}
-              style={[common.input, { flex: 1 }]}
+              style={[common.input, { flex: 1, minWidth: 0 }]}
               value={text}
               onChangeText={(t) => {
                 setText(t);
@@ -120,7 +120,7 @@ export function GameScreen({ game, room }: { game: Game; room: RoomState }) {
         style={{ flex: 1 }}
         data={history}
         keyExtractor={(_, i) => String(history.length - i)}
-        renderItem={({ item }) => <HistoryRow item={item} names={names} />}
+        renderItem={({ item }) => <HistoryRow item={item} />}
       />
 
       <Button title="Thoát ván" variant="ghost" onPress={game.leave} />
@@ -128,7 +128,7 @@ export function GameScreen({ game, room }: { game: Game; room: RoomState }) {
   );
 }
 
-function HistoryRow({ item, names }: { item: HistoryItem; names: Map<string, string> }) {
+function HistoryRow({ item }: { item: HistoryItem }) {
   switch (item.kind) {
     case 'start':
       return <Text style={styles.sys}>Từ mở đầu: {item.word}</Text>;
@@ -137,14 +137,14 @@ function HistoryRow({ item, names }: { item: HistoryItem; names: Map<string, str
     case 'eliminated':
       return (
         <Text style={[styles.sys, { color: colors.danger }]}>
-          {names.get(item.playerId) ?? 'Một người chơi'} {item.reason === 'timeout' ? 'hết giờ, bị loại' : 'đã rời phòng'}
+          {item.name} {item.reason === 'timeout' ? 'hết giờ, bị loại' : 'đã rời phòng'}
         </Text>
       );
     case 'word':
       return (
         <Text style={styles.row}>
           <Text style={{ fontWeight: '700' }}>{item.word}</Text>
-          <Text style={{ color: colors.muted }}> — {names.get(item.playerId) ?? '?'}</Text>
+          <Text style={{ color: colors.muted }}> — {item.name}</Text>
         </Text>
       );
   }

@@ -1,0 +1,12 @@
+{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SERVER_URL": "https://noi-tu-server.onrender.com"
+      }
+    }
+  }
+}

@@ -33,7 +33,7 @@ export function HomeScreen({ game }: { game: Game }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ActivityIndicator color={colors.primary} />
           <Text style={common.muted}>
-            Đang kết nối tới server… (lần đầu có thể mất khoảng 30 giây để server khởi động)
+            Đang kết nối tới server… (server miễn phí có thể mất khoảng 1 phút để thức dậy)
           </Text>
         </View>
       )}

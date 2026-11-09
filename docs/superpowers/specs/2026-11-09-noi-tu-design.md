@@ -43,7 +43,8 @@ App → server (đều dùng ack callback `{ ok, error? , ... }`):
 
 Server → app:
 - `room:state` — toàn bộ trạng thái phòng (đã lọc cho client), gửi mỗi khi thay đổi
-- `word:rejected { reason, word }` — chỉ gửi cho người gõ sai
+- Từ bị từ chối được báo qua ack của `word:submit` (chỉ người gửi nhận), kèm lý do
+- Lịch sử ván lưu kèm tên người chơi để vẫn hiển thị đúng sau khi họ rời phòng
 
 ### Trình tự ván
 1. Chủ phòng bấm Bắt đầu → xáo thứ tự, chọn từ mở đầu ngẫu nhiên có thể nối tiếp.

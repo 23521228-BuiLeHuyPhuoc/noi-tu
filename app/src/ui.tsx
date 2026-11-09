@@ -33,7 +33,7 @@ export function Button({
 }
 
 export const common = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: 20, gap: 14 },
+  screen: { flexGrow: 1, backgroundColor: colors.bg, padding: 20, gap: 14 },
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   label: { fontSize: 14, color: colors.muted, fontWeight: '600' },
   input: {

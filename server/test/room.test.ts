@@ -131,7 +131,7 @@ describe('Room — ván chơi', () => {
     expect(s.players.find((p) => p.id === order[0])!.eliminated).toBe(true);
     expect(s.currentPlayerId).toBe(order[1]);
     expect(s.currentWord).toBe('con mèo');
-    expect(s.history.at(-1)).toEqual({ kind: 'eliminated', playerId: order[0], reason: 'timeout' });
+    expect(s.history.at(-1)).toMatchObject({ kind: 'eliminated', playerId: order[0], reason: 'timeout' });
   });
 
   it('gửi từ đúng nhưng sau hạn chót thì tính là hết giờ', () => {
@@ -209,13 +209,17 @@ describe('Room — ván chơi', () => {
   it('người đang tới lượt thoát hẳn thì chuyển lượt ngay', () => {
     const { room, ids } = setup(['A', 'B', 'C']);
     startWith(room, ids[0], 'con mèo');
-    const order = room.toPublic().players.map((p) => p.id);
+    const players = room.toPublic().players;
+    const order = players.map((p) => p.id);
     vi.advanceTimersByTime(5_000);
     room.removePlayer(order[0]);
     const s = room.toPublic();
     expect(s.currentPlayerId).toBe(order[1]);
     expect(s.turnEndsAt! - s.serverNow).toBe(TURN);
-    expect(s.history.at(-1)).toEqual({ kind: 'eliminated', playerId: order[0], reason: 'left' });
+    // tên vẫn còn trong lịch sử dù người chơi đã bị xóa khỏi phòng
+    expect(s.history.at(-1)).toEqual({
+      kind: 'eliminated', playerId: order[0], name: players[0].name, reason: 'left',
+    });
   });
 
   it('thoát hẳn khi chỉ còn 2 người thì người còn lại thắng', () => {

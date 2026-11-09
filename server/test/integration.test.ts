@@ -58,7 +58,7 @@ const emit = {
 function answerFor(state: RoomState): string | null {
   const last = state.currentWord!.split(' ')[1];
   const used = new Set(state.history.flatMap((h) => ('word' in h ? [h.word] : [])));
-  return smallDict()['byFirst' as never]?.get?.(last)?.find((w: string) => !used.has(w)) ?? null;
+  return smallDict().nextOptions(last, used)[0] ?? null;
 }
 
 describe('Server + 3 người chơi qua Socket.IO', () => {

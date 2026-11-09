@@ -48,6 +48,11 @@ export class Dictionary {
     return this.words.has(word);
   }
 
+  /** Các từ bắt đầu bằng `syllable` chưa có trong `used` */
+  nextOptions(syllable: string, used: ReadonlySet<string> = new Set()): string[] {
+    return (this.byFirst.get(syllable) ?? []).filter((w) => !used.has(w));
+  }
+
   /** Số từ bắt đầu bằng `syllable` chưa có trong `used` */
   countNext(syllable: string, used: ReadonlySet<string>): number {
     const list = this.byFirst.get(syllable);
