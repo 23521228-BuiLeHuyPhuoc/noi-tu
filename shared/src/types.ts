@@ -49,6 +49,7 @@ export type RejectReason =
   | 'used'
   | 'not_in_dictionary'
   | 'not_your_turn'
+  | 'timeout'
   | 'not_playing';
 
 export type ErrorCode =
