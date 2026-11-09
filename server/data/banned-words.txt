@@ -1,0 +1,2 @@
+# Từ bị loại khỏi kho (sai hoặc không muốn dùng)
+# Mỗi dòng một từ 2 chữ. Dòng bắt đầu bằng # bị bỏ qua. Khởi động lại server để áp dụng.

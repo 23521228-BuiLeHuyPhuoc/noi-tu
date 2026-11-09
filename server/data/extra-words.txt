@@ -1,0 +1,2 @@
+# Từ bổ sung thêm vào kho
+# Mỗi dòng một từ 2 chữ. Dòng bắt đầu bằng # bị bỏ qua. Khởi động lại server để áp dụng.
