@@ -22,6 +22,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6f9fb2b3-7eb6-4fc9-b47f-998754cc2555"
+      }
+    },
+    "owner": "phuochocbai"
   }
 }
