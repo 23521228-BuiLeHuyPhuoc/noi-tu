@@ -45,10 +45,14 @@ Quét mã QR bằng Expo Go. Muốn có thêm người chơi thì mở thêm tr�
 
 > Nếu Windows Firewall hỏi quyền cho Node.js thì chọn **Allow**, không thì điện thoại sẽ không kết nối được tới server.
 
+## Đang chạy
+- Server: <https://noi-tu-server.onrender.com> (kiểm tra: `/health`)
+- Project Expo: <https://expo.dev/accounts/phuochocbai/projects/noi-tu> — các bản build APK nằm ở mục **Builds**
+
 ## 2. Đưa server lên mạng (miễn phí, Render)
 
 1. Đẩy thư mục `noi-tu` lên một repo GitHub.
-2. Vào <https://render.com> → **New → Blueprint**, chọn repo đó. Render tự đọc file `render.yaml` và tạo service `noi-tu-server`.
+2. Vào <https://render.com> → **New → Blueprint**, chọn repo đó. Render tự đọc file `render.yaml` và tạo service `noi-tu-server`. (Repo public có thể dán thẳng link vào mục *Public Git Repository*; khi đó sửa code xong phải vào Render bấm **Manual Deploy**.)
 3. Deploy xong sẽ có địa chỉ dạng `https://noi-tu-server.onrender.com`. Mở `/health` trên địa chỉ đó để kiểm tra, kết quả có dạng `{"ok":true,"words":45570,...}`.
 
 Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng. Người đầu tiên mở app sẽ phải chờ khoảng 1 phút, app có hiện thông báo trong lúc chờ. Trong lúc đang có người chơi, server không ngủ.

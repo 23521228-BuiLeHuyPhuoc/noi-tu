@@ -1,5 +1,7 @@
 // Kiểm tra nhanh server thật: 2 người chơi qua WebSocket, tạo phòng, vào phòng, bắt đầu, nối 1 từ.
-// Chạy trong thư mục app/ (để dùng socket.io-client có sẵn):  node ../e2e/smoke-prod.cjs https://noi-tu-server.onrender.com
+// Chạy (dùng socket.io-client có sẵn trong app/node_modules):
+//   PowerShell:  $env:NODE_PATH="$PWD\app\node_modules"; node e2e\smoke-prod.cjs https://noi-tu-server.onrender.com
+//   bash:        NODE_PATH=app/node_modules node e2e/smoke-prod.cjs https://noi-tu-server.onrender.com
 const { io } = require('socket.io-client');
 const URL = process.argv[2] || 'https://noi-tu-server.onrender.com';
 const opts = { transports: ['websocket'], forceNew: true, reconnection: false };
