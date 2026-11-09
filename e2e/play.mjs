@@ -31,7 +31,10 @@ const check = (cond, msg) => {
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
 const phones = [];
 for (const name of ['An', 'Bình', 'Chi']) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[${name}] lỗi trang:`, e.message));
   await page.goto(WEB);
@@ -58,12 +61,26 @@ await tid(B, 'join-btn').click();
 await tid(B, 'home-error').waitFor();
 check((await tid(B, 'home-error').textContent()).includes('Không tìm thấy phòng'), 'báo lỗi khi mã phòng sai');
 
-for (const p of [B, C]) {
-  await tid(p, 'name-input').fill(p.name);
-  await tid(p, 'code-input').fill(code.toLowerCase());
-  await tid(p, 'join-btn').click();
-  await tid(p, 'room-code').waitFor();
-}
+// A bấm "Gửi link mời" -> không có bảng chia sẻ (Chrome headless) nên sao chép link
+await tid(A, 'share-btn').click();
+await tid(A, 'toast').waitFor();
+const copied = await A.page.evaluate(() => navigator.clipboard.readText());
+const link = copied.split('\n').find((l) => l.startsWith('http'));
+check(link === `${WEB}/?room=${code}`, `link mời đã sao chép: ${link}`);
+
+// B nhập mã tay (chữ thường), C mở bằng link mời
+await tid(B, 'name-input').fill(B.name);
+await tid(B, 'code-input').fill(code.toLowerCase());
+await tid(B, 'join-btn').click();
+await tid(B, 'room-code').waitFor();
+
+await C.page.goto(link);
+await tid(C, 'invite-hint').waitFor();
+check((await tid(C, 'code-input').inputValue()) === code, 'mở link mời: mã phòng tự điền sẵn');
+await tid(C, 'name-input').fill(C.name);
+await tid(C, 'join-btn').click();
+await tid(C, 'room-code').waitFor();
+check(!C.page.url().includes('room='), 'vào phòng xong thì link được dọn sạch (?room= biến mất)');
 await A.page.getByText('Người chơi (3/6)').waitFor();
 check(true, 'cả 3 người vào được phòng chờ');
 check((await tid(B, 'start-btn').count()) === 0, 'chỉ chủ phòng thấy nút Bắt đầu');

@@ -1,26 +1,33 @@
 import { useState } from 'react';
-import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
+import { copyText, shareInvite } from '../web';
 import { Button, colors, common } from '../ui';
 
 export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const isHost = room.hostId === game.me;
 
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
   const share = async () => {
-    try {
-      await Share.share({ message: `Vào chơi Nối Từ với mình nhé! Mã phòng: ${room.code}` });
-    } catch {
-      // thiết bị không hỗ trợ chia sẻ: người dùng tự đọc mã phòng
-    }
+    const r = await shareInvite(room.code);
+    if (r === 'copied') flash('Đã sao chép link mời — dán vào Zalo/Messenger gửi bạn bè nhé');
   };
 
   return (
     <ScrollView contentContainerStyle={common.screen}>
-      <Text style={common.label}>Mã phòng</Text>
-      <Text testID="room-code" selectable style={styles.code}>{room.code}</Text>
-      <Button title="Chia sẻ mã phòng" variant="ghost" onPress={share} />
+      <Text style={common.label}>Mã phòng (chạm để sao chép)</Text>
+      <Pressable onPress={async () => (await copyText(room.code)) && flash('Đã sao chép mã phòng')}>
+        <Text testID="room-code" selectable style={styles.code}>{room.code}</Text>
+      </Pressable>
+      <Button testID="share-btn" title="Gửi link mời bạn bè" onPress={share} />
+      {toast && <Text testID="toast" style={styles.toast}>{toast}</Text>}
 
       <View style={[common.card, { gap: 8 }]}>
         <Text style={common.label}>
@@ -60,6 +67,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
 const styles = StyleSheet.create({
   code: { fontSize: 44, fontWeight: '900', letterSpacing: 8, color: colors.primaryDark, textAlign: 'center' },
+  toast: { textAlign: 'center', color: colors.ok, fontWeight: '600' },
   player: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   name: { fontSize: 18, color: colors.text, flex: 1 },

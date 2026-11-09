@@ -1,12 +1,18 @@
 # Nối Từ
 
-App nối từ tiếng Việt chơi cùng bạn bè. Phòng tối đa 6 người, vào phòng bằng mã, kho từ hơn 45.000 từ ghép 2 chữ.
+Game nối từ tiếng Việt chơi cùng bạn bè ngay trên trình duyệt điện thoại. Phòng tối đa 6 người, mời bằng link hoặc mã phòng, kho từ hơn 45.000 từ ghép 2 chữ.
+
+**Chơi ngay: <https://noi-tu-web.onrender.com>**
+
+- Tạo phòng → bấm **Gửi link mời bạn bè** → gửi qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
+- Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
+- Lần đầu mở sau một lúc không ai chơi, server miễn phí cần khoảng 1 phút để thức dậy.
 
 ```
 noi-tu/
   shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt (dùng chung app & server)
   server/   Node.js + Socket.IO — trọng tài của mọi ván chơi
-  app/      Expo (React Native) — app điện thoại
+  app/      giao diện (React Native Web qua Expo) — xuất ra trang web cho điện thoại
   e2e/      test giao diện tự động (3 trình duyệt chơi 1 ván thật)
   docs/     thiết kế
 ```
@@ -21,33 +27,20 @@ noi-tu/
 
 ---
 
-## 1. Chạy thử trên máy tính + điện thoại (cùng Wi-Fi)
+## 1. Chạy thử trên máy tính
 
-Cần Node.js 20 trở lên.
+Cần Node.js 20 trở lên. Mở 2 cửa sổ terminal:
 
-**Server:**
 ```bash
-cd server
-npm install
-npm run dev            # chạy ở cổng 3000
+cd server && npm install && npm run dev          # server ở cổng 3000
+cd app && npm install && npx expo start --web    # mở giao diện trên trình duyệt
 ```
-
-**App:** cài **Expo Go** trên điện thoại, sau đó:
-```bash
-cd app
-npm install
-# thay 192.168.1.10 bằng IP máy tính của bạn (ipconfig trên Windows)
-set EXPO_PUBLIC_SERVER_URL=http://192.168.1.10:3000     # Windows CMD
-# $env:EXPO_PUBLIC_SERVER_URL="http://192.168.1.10:3000"  # PowerShell
-npx expo start
-```
-Quét mã QR bằng Expo Go. Muốn có thêm người chơi thì mở thêm trên điện thoại khác, hoặc nhấn `w` để mở bản web trên máy tính.
-
-> Nếu Windows Firewall hỏi quyền cho Node.js thì chọn **Allow**, không thì điện thoại sẽ không kết nối được tới server.
+Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SERVER_URL=http://<IP máy tính>:3000`, rồi mở `http://<IP máy tính>:8081` trên điện thoại.
 
 ## Đang chạy
+- Web: <https://noi-tu-web.onrender.com>
 - Server: <https://noi-tu-server.onrender.com> (kiểm tra: `/health`)
-- Project Expo: <https://expo.dev/accounts/phuochocbai/projects/noi-tu> — các bản build APK nằm ở mục **Builds**
+- Cả hai được tạo từ `render.yaml`. Sửa code xong, push lên GitHub rồi vào Render bấm **Manual Deploy** cho service tương ứng.
 
 ## 2. Đưa server lên mạng (miễn phí, Render)
 
@@ -57,23 +50,12 @@ Quét mã QR bằng Expo Go. Muốn có thêm người chơi thì mở thêm tr�
 
 Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng. Người đầu tiên mở app sẽ phải chờ khoảng 1 phút, app có hiện thông báo trong lúc chờ. Trong lúc đang có người chơi, server không ngủ.
 
-## 3. Build file APK để gửi bạn bè
-
-1. Sửa địa chỉ server trong `app/eas.json` (mục `EXPO_PUBLIC_SERVER_URL`) cho đúng địa chỉ Render của bạn.
-2. Build trên cloud của Expo (miễn phí, cần tài khoản expo.dev):
-   ```bash
-   cd app
-   npx eas-cli@latest login
-   npx eas-cli@latest build -p android --profile preview
-   ```
-3. Build xong (khoảng 10–20 phút), Expo sẽ đưa link tải file `.apk`. Gửi link đó cho bạn bè cài. Lúc cài, Android sẽ hỏi cho phép cài từ nguồn không xác định, chọn đồng ý.
-
-## 4. Thêm hoặc bớt từ
+## 3. Thêm hoặc bớt từ
 
 - `server/data/extra-words.txt`: thêm từ (mỗi dòng một từ 2 chữ)
 - `server/data/banned-words.txt`: loại từ sai hoặc từ không muốn cho dùng
 
-Sửa xong thì khởi động lại server (trên Render: push lên GitHub là tự deploy lại). **Không cần build lại app.**
+Sửa xong thì khởi động lại server (trên Render: push lên GitHub rồi bấm Manual Deploy cho `noi-tu-server`). **Không cần build lại app.**
 
 Muốn tạo lại toàn bộ `words.txt` từ nguồn:
 ```bash
@@ -86,12 +68,12 @@ Nguồn:
 
 Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Việt, và bỏ tên riêng.
 
-## 5. Test
+## 4. Test
 
 ```bash
 cd server && npm test        # 38 test: chuẩn hóa, từ điển, luật chơi, Socket.IO
 cd server && npm run typecheck
-cd app && npx tsc --noEmit
+cd app && npx tsc --noEmit && npx expo lint
 ```
 Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để 3 trình duyệt Chrome tự chơi một ván. Xem đầu các file `e2e/*.mjs` để biết cách chạy.
 
@@ -101,3 +83,5 @@ Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để
 | `PORT` | 3000 | cổng |
 | `TURN_SECONDS` | 30 | số giây mỗi lượt |
 | `DATA_DIR` | `server/data` | thư mục kho từ |
+
+> Không bắt buộc: muốn đóng gói thành file APK thì `app/eas.json` đã có sẵn cấu hình (`npx eas-cli build -p android --profile preview`).

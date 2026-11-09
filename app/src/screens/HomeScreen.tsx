@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import type { Game } from '../useGame';
 import { storage } from '../storage';
+import { getInviteCode } from '../web';
 import { Button, colors, common } from '../ui';
 
 export function HomeScreen({ game }: { game: Game }) {
   const [name, setName] = useState('');
-  const [code, setCode] = useState('');
+  const invite = useState(getInviteCode)[0];
+  const [code, setCode] = useState(invite ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,6 +40,11 @@ export function HomeScreen({ game }: { game: Game }) {
         </View>
       )}
       {game.notice && <Text style={common.error}>{game.notice}</Text>}
+      {invite && (
+        <Text testID="invite-hint" style={[common.muted, { color: colors.primaryDark }]}>
+          Bạn được mời vào phòng {invite}. Nhập tên rồi bấm “Vào phòng” nhé!
+        </Text>
+      )}
 
       <Text style={common.label}>Tên của bạn</Text>
       <TextInput

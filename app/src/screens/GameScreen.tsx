@@ -3,42 +3,53 @@ import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HistoryItem, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { rejectText } from '../messages';
+import { vibrate } from '../web';
 import { Button, colors, common } from '../ui';
 
 /** Số giây còn lại của lượt, tính theo đồng hồ server */
-function useSecondsLeft(endsAt: number | null, offset: number): number {
-  const calc = () => (endsAt ? Math.max(0, Math.ceil((endsAt - (Date.now() + offset)) / 1000)) : 0);
-  const [left, setLeft] = useState(calc);
+function useSecondsLeft(endsAt: number | null, offset: number, max: number): number {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    setLeft(calc());
     if (!endsAt) return;
-    const t = setInterval(() => setLeft(calc()), 250);
+    const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
-  }, [endsAt, offset]);
-  return left;
+  }, [endsAt]);
+  if (!endsAt) return 0;
+  return Math.min(max, Math.max(0, Math.ceil((endsAt - (now + offset)) / 1000)));
 }
 
 export function GameScreen({ game, room }: { game: Game; room: RoomState }) {
-  const [text, setText] = useState('');
+  const myTurn = room.currentPlayerId === game.me;
+  const word = room.currentWord ?? '';
+  const last = word.split(' ')[1] ?? '';
+  const prefill = myTurn ? last + ' ' : '';
+
+  const [text, setText] = useState(prefill);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
-  const names = useMemo(() => new Map(room.players.map((p) => [p.id, p.name])), [room.players]);
-  const myTurn = room.currentPlayerId === game.me;
-  const meEliminated = room.players.find((p) => p.id === game.me)?.eliminated ?? false;
-  const word = room.currentWord ?? '';
-  const last = word.split(' ')[1] ?? '';
-  const left = useSecondsLeft(room.turnEndsAt, game.clockOffset);
-
-  // tới lượt mình: điền sẵn chữ cuối để chỉ cần gõ thêm chữ thứ hai
-  useEffect(() => {
+  // sang lượt mới: điền sẵn chữ cuối để chỉ cần gõ thêm chữ thứ hai
+  // (cập nhật ngay trong lúc render theo khuyến nghị của React, không dùng effect)
+  const turnKey = `${room.currentPlayerId}|${word}`;
+  const [prevTurnKey, setPrevTurnKey] = useState(turnKey);
+  if (prevTurnKey !== turnKey) {
+    setPrevTurnKey(turnKey);
+    setText(prefill);
     setError(null);
-    if (myTurn) {
-      setText(last + ' ');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else setText('');
+  }
+
+  // tới lượt mình: rung nhẹ và đưa con trỏ vào ô nhập
+  useEffect(() => {
+    if (!myTurn) return;
+    vibrate();
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
   }, [myTurn, word]);
+
+  const names = useMemo(() => new Map(room.players.map((p) => [p.id, p.name])), [room.players]);
+  const meEliminated = room.players.find((p) => p.id === game.me)?.eliminated ?? false;
+  const left = useSecondsLeft(room.turnEndsAt, game.clockOffset, room.turnSeconds);
 
   const submit = async () => {
     if (!text.trim() || sending) return;

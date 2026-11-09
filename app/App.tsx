@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useGame } from './src/useGame';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -8,13 +8,16 @@ import { GameScreen } from './src/screens/GameScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { colors } from './src/ui';
 
+// Trên web, vùng tai thỏ/thanh home đã được xử lý bằng CSS env(safe-area-inset-*) trong public/index.html
+const Screen = Platform.OS === 'web' ? View : SafeAreaView;
+
 export default function App() {
   const game = useGame();
   const { room } = game;
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen style={{ flex: 1, backgroundColor: colors.bg }}>
         <StatusBar style="dark" />
         {room && game.status !== 'online' && (
           <View style={{ backgroundColor: colors.danger, padding: 6 }}>
@@ -30,7 +33,7 @@ export default function App() {
         ) : (
           <ResultScreen game={game} room={room} />
         )}
-      </SafeAreaView>
+      </Screen>
     </SafeAreaProvider>
   );
 }

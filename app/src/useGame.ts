@@ -6,6 +6,7 @@ import type {
 import { SERVER_URL } from './config';
 import { storage } from './storage';
 import { errorText } from './messages';
+import { clearInviteParam } from './web';
 
 type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 export type ConnStatus = 'connecting' | 'online' | 'offline';
@@ -108,6 +109,7 @@ export function useGame(): Game {
       if (!res) return 'Không kết nối được tới server, thử lại nhé.';
       if (!res.ok) return errorText[res.error];
       await remember(res.code, res.playerId, name);
+      clearInviteParam();
       return null;
     },
     [call, remember],
