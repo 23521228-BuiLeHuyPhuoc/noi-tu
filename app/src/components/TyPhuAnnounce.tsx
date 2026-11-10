@@ -111,7 +111,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
             </T>
             <T style={[styles.sub, { color: '#C0EBD0' }]}>{a.amount ? a.title : a.sub}</T>
             {a.amount && a.sub ? <T style={[styles.sub2, { color: '#8FD1AA' }]}>{a.sub}</T> : null}
-            {portrait && <View style={{ marginTop: 6, opacity: 0.85 }}>{portrait}</View>}
+            {portrait && H >= 500 && <View style={{ marginTop: 6, opacity: 0.85 }}>{portrait}</View>}
           </>
         )}
         {a.kind === 'build' && (
@@ -128,7 +128,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
               <T style={[styles.stampTxt, { color: '#6B2B2B', fontSize: 30 }]}>PHÁ SẢN</T>
             </View>
             <T style={[styles.sub, { color: '#E9D8D8' }]}>{a.title}</T>
-            {portrait && <View style={{ marginTop: 6, opacity: 0.7 }}>{portrait}</View>}
+            {portrait && H >= 500 && <View style={{ marginTop: 6, opacity: 0.7 }}>{portrait}</View>}
           </>
         )}
       </View>
