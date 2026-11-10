@@ -7,6 +7,7 @@ import {
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
 } from '../../shared/src/types';
+import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { HpBoard } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
@@ -35,6 +36,8 @@ interface Player {
   avatarUrl?: string;
   character: CharacterConfig;
   account: boolean;
+  /** người chơi đã tự chỉnh nhân vật trong phòng: không tự đổi theo avatar tài khoản nữa */
+  characterCustom?: boolean;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -108,7 +111,8 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    const character: CharacterConfig = {
+    const preset = account ? this.presetFor(profile?.avatar) : undefined;
+    const character: CharacterConfig = preset ?? {
       gender: CHARACTER_GENDERS[this.players.length % CHARACTER_GENDERS.length],
       age: CHARACTER_AGES[this.players.length % CHARACTER_AGES.length],
       hair: CHARACTER_HAIRS[this.players.length % CHARACTER_HAIRS.length],
@@ -147,6 +151,7 @@ export class Room {
       next.color = c;
     }
     p.character = next;
+    p.characterCustom = true;
     this.changed();
     return { ok: true };
   }
@@ -166,6 +171,10 @@ export class Room {
       const old = p.avatar;
       p.avatar = -1;
       p.avatar = this.freeAvatar(avatar, old);
+      if (p.account && !p.characterCustom) {
+        const preset = this.presetFor(avatar, p.id);
+        if (preset) p.character = preset;
+      }
     }
     this.changed();
   }
@@ -370,9 +379,22 @@ export class Room {
     return avatar;
   }
 
-  /** màu sắc nhân vật chưa ai dùng trong phòng */
-  private freeColor(wanted?: number): number {
-    const used = new Set(this.players.map((p) => p.character.color));
+  /** nhân vật mẫu theo avatar tài khoản; màu trùng thì lấy màu trống kế tiếp, giữ nguyên giới tính/tuổi/tóc */
+  private presetFor(avatar?: number, exceptId?: string): CharacterConfig | undefined {
+    if (avatar === undefined || !Number.isInteger(avatar) || avatar < 0 || avatar >= AVATAR_PRESETS.length) return undefined;
+    const preset = AVATAR_PRESETS[avatar];
+    return { ...preset, color: this.freeColor(preset.color, exceptId, true) };
+  }
+
+  /** màu sắc nhân vật chưa ai dùng trong phòng (nextFree: nếu `wanted` bị chiếm thì lấy màu trống ngay sau nó) */
+  private freeColor(wanted?: number, exceptId?: string, nextFree = false): number {
+    const used = new Set(this.players.filter((p) => p.id !== exceptId).map((p) => p.character.color));
+    if (nextFree && wanted !== undefined) {
+      for (let k = 0; k < PLAYER_COLORS.length; k++) {
+        const c = (wanted + k) % PLAYER_COLORS.length;
+        if (!used.has(c)) return c;
+      }
+    }
     const count = PLAYER_COLORS.length;
     if (wanted !== undefined && Number.isInteger(wanted) && wanted >= 0 && wanted < count && !used.has(wanted)) {
       return wanted;

@@ -110,12 +110,12 @@ it('clears a removed uploaded avatar from the live room profile', () => {
 it('normalizes definition lookup and explicitly marks missing definitions', () => {
   const dictionary = new Dictionary(['học sinh'],new Set(),{'học sinh':{text:'Source text',source:'local fixture'}});
   expect(dictionary.definition(' HỌC  SINH ')).toEqual({text:'Source text',source:'local fixture'});
-  expect(dictionary.definition('không có')).toEqual({text:'Chưa có giải nghĩa',source:null});
+  expect(dictionary.definition('không có')).toBeUndefined();
 });
 
 
 it('loads the attributed offline seed alongside the full dictionary', () => {
   const dictionary = Dictionary.load(fileURLToPath(new URL('../data/', import.meta.url)));
-  expect(dictionary.definition('HỌC SINH').source).toContain('CC BY-SA 4.0');
-  expect(dictionary.definition('học sinh').text).toBe('Trẻ em học tập ở nhà trường.');
+  expect(dictionary.definition('HỌC SINH')?.source).toContain('CC BY-SA 4.0');
+  expect(dictionary.definition('học sinh')?.text).toBe('Trẻ em học tập ở nhà trường.');
 });

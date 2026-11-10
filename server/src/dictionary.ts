@@ -63,9 +63,10 @@ export class Dictionary {
     return new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned, definitions);
   }
 
-  definition(raw: string): WordDefinition {
+  /** Nghĩa của từ; không có thì trả undefined (client ẩn khung giải nghĩa). */
+  definition(raw: string): WordDefinition | undefined {
     const word = normalizeWord(raw);
-    return (word && this.definitions.get(word)) || { text: "Chưa có giải nghĩa", source: null };
+    return (word && this.definitions.get(word)) || undefined;
   }
 
   get size(): number {

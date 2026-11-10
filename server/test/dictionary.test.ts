@@ -57,11 +57,11 @@ describe('Dictionary', () => {
       'bàn ghế': src('Xemloa là một từ'),
       'mèo con': src('Con mèo nhỏ'),
     });
-    expect(d.definition('cái bàn').source).toBeNull();
-    expect(d.definition('con mèo').source).toBeNull();
-    expect(d.definition('quả cam').source).toBeNull();
-    expect(d.definition('bàn ghế').source).toBe('t');
-    expect(d.definition('mèo con').text).toBe('Con mèo nhỏ');
+    expect(d.definition('cái bàn')).toBeUndefined();
+    expect(d.definition('con mèo')).toBeUndefined();
+    expect(d.definition('quả cam')).toBeUndefined();
+    expect(d.definition('bàn ghế')?.source).toBe('t');
+    expect(d.definition('mèo con')?.text).toBe('Con mèo nhỏ');
   });
 
   it('load: words.txt + extra − banned, bỏ dòng chú thích', () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setup, startWordChain, TURN, wc } from './helpers';
+import { AVATAR_PRESETS } from '../../shared/src/avatars';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -119,5 +120,45 @@ describe('Room — phòng chờ', () => {
     room.start(ids[0]);
     expect(room.action(ids[0], null)).toEqual({ ok: false, reason: 'bad_action' });
     expect(room.action(ids[0], { type: 'roll' })).toEqual({ ok: false, reason: 'bad_action' });
+  });
+});
+
+describe('nhân vật theo avatar tài khoản', () => {
+  const acct = (room: ReturnType<typeof setup>['room'], name: string, avatar: number, n: number) =>
+    room.addPlayer(name, `u-${String(n).padStart(24, '0')}`, { avatar, account: true });
+
+  it('tài khoản vào phòng: nhân vật lấy từ mẫu avatar, khách vẫn ngẫu nhiên', () => {
+    const { room } = setup([]);
+    expect(acct(room, 'An', 6, 1).ok).toBe(true);
+    const c = room.toPublic().players[0].character!;
+    expect({ gender: c.gender, age: c.age, hair: c.hair }).toEqual({
+      gender: AVATAR_PRESETS[6].gender, age: AVATAR_PRESETS[6].age, hair: AVATAR_PRESETS[6].hair,
+    });
+    expect(c.color).toBe(AVATAR_PRESETS[6].color);
+  });
+
+  it('màu mẫu bị chiếm thì lấy màu trống kế tiếp, giữ giới tính/tuổi/tóc', () => {
+    const { room } = setup([]);
+    acct(room, 'An', 0, 1);
+    acct(room, 'Bình', 15, 2); // mẫu 15 cùng màu với mẫu 0
+    const [a, b] = room.toPublic().players.map((p) => p.character!);
+    expect(AVATAR_PRESETS[15].color).toBe(AVATAR_PRESETS[0].color);
+    expect(b.color).not.toBe(a.color);
+    expect({ gender: b.gender, age: b.age, hair: b.hair }).toMatchObject({
+      gender: AVATAR_PRESETS[15].gender, age: AVATAR_PRESETS[15].age, hair: AVATAR_PRESETS[15].hair,
+    });
+  });
+
+  it('đổi avatar trong phòng chờ thì nhân vật đổi theo, trừ khi đã tự chỉnh', () => {
+    const { room } = setup([]);
+    const r = acct(room, 'An', 1, 1);
+    if (!r.ok) throw new Error('join');
+    room.updateProfile(r.playerId, 'An', 4);
+    expect(room.toPublic().players[0].character).toMatchObject({
+      gender: AVATAR_PRESETS[4].gender, age: AVATAR_PRESETS[4].age, hair: AVATAR_PRESETS[4].hair,
+    });
+    room.customize(r.playerId, { hair: 'xoan' });
+    room.updateProfile(r.playerId, 'An', 7);
+    expect(room.toPublic().players[0].character?.hair).toBe('xoan');
   });
 });
