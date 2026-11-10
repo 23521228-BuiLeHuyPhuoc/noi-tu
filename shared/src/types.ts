@@ -5,13 +5,14 @@ export const MAX_NAME = 24;
 
 // ================= Phòng =================
 
-export type GameType = 'wordchain' | 'ludo' | 'baucua';
+export type GameType = 'wordchain' | 'ludo' | 'baucua' | 'typhu';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
   wordchain: { name: 'Nối từ', min: 1, max: 6 },
   ludo: { name: 'Cờ cá ngựa', min: 2, max: 4 },
   baucua: { name: 'Bầu cua', min: 1, max: 6 },
+  typhu: { name: 'Cờ tỷ phú', min: 2, max: 6 },
 };
 
 export interface RoomSettings {
@@ -55,7 +56,7 @@ export interface RoomState {
   result: GameResult | null;
 }
 
-export type GameView = WordChainView | LudoView | BauCuaView;
+export type GameView = WordChainView | LudoView | BauCuaView | TyPhuView;
 
 // ================= Nối từ =================
 
@@ -156,6 +157,36 @@ export interface BauCuaView {
   names: Record<string, string>;
 }
 
+// ================= Cờ tỷ phú =================
+
+export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'start' | 'build' | 'tax' | 'info';
+
+export interface TyPhuView {
+  type: 'typhu';
+  order: string[];
+  names: Record<string, string>;
+  cash: Record<string, number>;
+  pos: Record<string, number>;
+  /** số lượt đã ngồi tù (chỉ có khi đang ở tù) */
+  jail: Record<string, number>;
+  bankrupt: string[];
+  /** chủ của từng ô đất (theo chỉ số ô) */
+  owners: Record<number, string>;
+  houses: Record<number, number>;
+  currentPlayerId: string | null;
+  step: 'roll' | 'buy' | 'manage' | 'wait';
+  dice: [number, number] | null;
+  rollId: number;
+  /** ô đang chờ quyết định mua */
+  pendingBuy: number | null;
+  turnEndsAt: number | null;
+  turnSeconds: number;
+  /** các dòng diễn biến gần nhất, mới nhất ở cuối */
+  log: { id: number; kind: TyPhuLogKind; text: string }[];
+  /** thẻ cơ hội vừa rút */
+  card: { id: number; text: string } | null;
+}
+
 // ================= Hành động trong game =================
 
 export type GameAction =
@@ -167,6 +198,11 @@ export type GameAction =
   | { type: 'clearBets' }
   | { type: 'shake' }
   | { type: 'loan' }
+  | { type: 'buy' }
+  | { type: 'skip' }
+  | { type: 'build'; cell: number }
+  | { type: 'endTurn' }
+  | { type: 'payJail' }
   | { type: 'end' };
 
 export type ActionError =
@@ -188,7 +224,10 @@ export type ActionError =
   // bầu cua
   | 'not_betting'
   | 'insufficient'
-  | 'loan_denied';
+  | 'loan_denied'
+  // cờ tỷ phú
+  | 'cannot_build'
+  | 'no_money';
 
 export type ActionResult = { ok: true; hint?: string } | { ok: false; reason: ActionError };
 

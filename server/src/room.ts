@@ -9,6 +9,7 @@ import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
 import { LudoGame } from './games/ludo';
 import { BauCuaGame } from './games/baucua';
+import { TyPhuGame } from './games/typhu';
 
 export interface RoomOptions {
   /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
@@ -205,6 +206,8 @@ export class Room {
         return new LudoGame(ctx);
       case 'baucua':
         return new BauCuaGame(ctx);
+      case 'typhu':
+        return new TyPhuGame(ctx);
       default:
         return new WordChainGame(ctx);
     }
