@@ -95,6 +95,14 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       ack(room.configure(session.playerId, p.gameType, p.settings));
     });
 
+    socket.on('player:customize', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
+      ack(room.customize(session.playerId, p));
+    });
+
     socket.on('game:start', (ack) => {
       if (typeof ack !== 'function') return;
       const room = currentRoom();

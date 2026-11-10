@@ -21,7 +21,7 @@ export interface StripOptions {
 
 /** Khung chung cho mọi màn trong phòng: thanh trên, hàng avatar, nội dung, vùng nút dưới cùng */
 export function Shell({
-  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false,
+  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false,
 }: {
   game: Game;
   room: RoomState;
@@ -33,6 +33,8 @@ export function Shell({
   overlay?: ReactNode;
   /** Cho các bàn chơi ngang như Cờ Tỷ Phú dùng toàn bộ chiều rộng khả dụng. */
   wide?: boolean;
+  /** Chế độ toàn màn hình cho bàn Cờ tỷ phú: gọn thanh trên để bàn cờ choán trọn màn hình. */
+  fullscreen?: boolean;
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -45,7 +47,7 @@ export function Shell({
   const [muted, setMutedState] = useState(isMuted());
   const feed = useFeed();
   const { width, height } = useWindowDimensions();
-  const compactLandscape = wide && width >= 700 && height < 520;
+  const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
 
   const players = strip.order
     ? strip.order.map((id) => room.players.find((p) => p.id === id)).filter((p): p is PublicPlayer => !!p)
@@ -53,7 +55,11 @@ export function Shell({
   // người đã rời phòng giữa ván không còn trong room.players; người mới (nếu có) thêm vào cuối
   for (const p of room.players) if (!players.includes(p)) players.push(p);
 
-  const content = <View style={[styles.content, compactLandscape && styles.contentLandscape]}>{children}</View>;
+  const content = (
+    <View style={[styles.content, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen]}>
+      {children}
+    </View>
+  );
   const stripItems = players.map((p) => (
     <View key={p.id} style={compactLandscape ? styles.avatarCompact : undefined}>
       <Avatar
@@ -70,7 +76,7 @@ export function Shell({
   ));
 
   return (
-    <View style={[styles.root, wide && styles.rootWide]}>
+    <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
       <View style={[styles.top, compactLandscape && styles.topLandscape]}>
         <Button
           testID="room-chip"
@@ -141,19 +147,21 @@ export function Shell({
 const styles = StyleSheet.create({
   root: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center' },
   rootWide: { maxWidth: 1120 },
+  rootFullscreen: { maxWidth: '100%' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4 },
-  topLandscape: { paddingTop: 4, paddingBottom: 2, gap: 6 },
+  topLandscape: { paddingTop: 3, paddingBottom: 2, paddingHorizontal: 8, gap: 6 },
   chip: { marginBottom: 0 },
   gameName: { flex: 1, color: C.onSon, fontWeight: '800', fontSize: 15 },
   gameNameLandscape: { flex: 0, marginRight: 4 },
   // ScrollView ngang trên web mặc định giãn hết chiều cao còn lại -> chặn lại
   stripScroll: { flexGrow: 0, flexShrink: 0 },
-  stripScrollLandscape: { flex: 1, flexGrow: 1, maxHeight: 58 },
+  stripScrollLandscape: { flex: 1, flexGrow: 1, maxHeight: 54 },
   strip: { paddingHorizontal: 10, paddingTop: 14, paddingBottom: 8, gap: 2 },
   stripLandscape: { alignItems: 'center', paddingVertical: 0, gap: 0 },
-  avatarCompact: { transform: [{ scale: 0.58 }], marginHorizontal: -12, marginVertical: -18 },
+  avatarCompact: { transform: [{ scale: 0.56 }], marginHorizontal: -12, marginVertical: -18 },
   content: { flex: 1, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
   contentLandscape: { paddingBottom: 4, gap: 6 },
+  contentFullscreen: { paddingHorizontal: 4, paddingBottom: 4, gap: 4 },
   badge: {
     position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.gold,
     borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,

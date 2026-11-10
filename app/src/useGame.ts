@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
-  Ack, ActionResult, AuthAck, ChatMsg, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
+  Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
   PublicUser, RoomSettings, RoomState, ServerToClientEvents, StickerId,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
@@ -33,6 +33,7 @@ export interface Game {
   createRoom(name: string, gameType: GameType): Promise<string | null>;
   joinRoom(code: string, name: string): Promise<string | null>;
   configure(p: { gameType?: GameType; settings?: Partial<RoomSettings> }): Promise<string | null>;
+  customize(p: Partial<CharacterConfig>): Promise<string | null>;
   start(): Promise<string | null>;
   act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
@@ -255,6 +256,7 @@ export function useGame(): Game {
     createRoom: (name, gameType) => enter('create', name, '', gameType),
     joinRoom: (code, name) => enter('join', name, code),
     configure: (p) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:config', p)),
+    customize: (p) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('player:customize', p)),
     start: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')),
     restart: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')),
     act: async (a) => {

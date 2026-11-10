@@ -5,12 +5,25 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('Room — phòng chờ', () => {
-  it('người đầu tiên là chủ phòng, trùng tên được đánh số, avatar không trùng', () => {
+  it('người đầu tiên là chủ phòng, trùng tên được đánh số, avatar và màu nhân vật không trùng', () => {
     const { room, ids } = setup(['Phước', 'phước', 'An', 'B', 'C', 'D']);
     const s = room.toPublic();
     expect(s.hostId).toBe(ids[0]);
     expect(s.players.map((p) => p.name).slice(0, 3)).toEqual(['Phước', 'phước 2', 'An']);
     expect(new Set(s.players.map((p) => p.avatar)).size).toBe(6);
+    expect(new Set(s.players.map((p) => p.character?.color)).size).toBe(6);
+  });
+
+  it('tùy chỉnh hình tượng nhân vật (tóc tai, độ tuổi, giới tính) và chặn trùng màu trong phòng', () => {
+    const { room, ids } = setup(['A', 'B']);
+    const colorB = room.toPublic().players[1].character!.color;
+    expect(room.customize(ids[0], { gender: 'nu', age: 'trung', hair: 'xoan' })).toEqual({ ok: true });
+    expect(room.toPublic().players[0].character).toMatchObject({ gender: 'nu', age: 'trung', hair: 'xoan' });
+    // không được chọn màu đang thuộc về người chơi B
+    expect(room.customize(ids[0], { color: colorB })).toEqual({ ok: false, error: 'color_taken' });
+    // chọn màu trống thì thành công
+    expect(room.customize(ids[0], { color: 7 })).toEqual({ ok: true });
+    expect(room.toPublic().players[0].character?.color).toBe(7);
   });
 
   it('cho phép tên dài tới 24 ký tự', () => {

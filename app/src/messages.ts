@@ -9,6 +9,7 @@ export const errorText: Record<ErrorCode, string> = {
   not_in_room: 'Bạn không còn ở trong phòng.',
   too_many_players: 'Game này không chơi được với nhiều người như vậy.',
   too_few_players: 'Chưa đủ người để chơi game này.',
+  color_taken: 'Màu này đã có người trong phòng chọn rồi.',
   bad_request: 'Có lỗi xảy ra, thử lại nhé.',
 };
 

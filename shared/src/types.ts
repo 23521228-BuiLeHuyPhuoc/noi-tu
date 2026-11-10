@@ -23,6 +23,33 @@ export interface RoomSettings {
   baucuaRounds?: number;
 }
 
+export type CharacterGender = 'nam' | 'nu' | 'khac';
+export type CharacterAge = 'nhi' | 'tre' | 'trung' | 'lao';
+export type CharacterHair = 'ngan' | 'han' | 'xoan' | 'dai' | 'bui' | 'undercut';
+
+export const CHARACTER_GENDERS: CharacterGender[] = ['nam', 'nu', 'khac'];
+export const CHARACTER_AGES: CharacterAge[] = ['nhi', 'tre', 'trung', 'lao'];
+export const CHARACTER_HAIRS: CharacterHair[] = ['ngan', 'han', 'xoan', 'dai', 'bui', 'undercut'];
+
+export const PLAYER_COLORS = [
+  { id: 0, hex: '#E5383B', light: '#FFE3E3', name: 'Đỏ Sơn' },
+  { id: 1, hex: '#1D6FE8', light: '#D8ECFF', name: 'Xanh Dương' },
+  { id: 2, hex: '#1F9D55', light: '#D8F8E3', name: 'Xanh Ngọc' },
+  { id: 3, hex: '#F59F00', light: '#FFF3BF', name: 'Vàng Hoàng Gia' },
+  { id: 4, hex: '#8E3CCB', light: '#F3D9FA', name: 'Tím Huế' },
+  { id: 5, hex: '#F76707', light: '#FFE8CC', name: 'Cam Lửa' },
+  { id: 6, hex: '#0CA678', light: '#C3FAE8', name: 'Ngọc Lam' },
+  { id: 7, hex: '#D6336C', light: '#FCC2D7', name: 'Hồng Sen' },
+] as const;
+
+export interface CharacterConfig {
+  gender: CharacterGender;
+  age: CharacterAge;
+  hair: CharacterHair;
+  /** chỉ số màu trong PLAYER_COLORS (0..7), không trùng trong phòng */
+  color: number;
+}
+
 export interface PublicPlayer {
   id: string;
   name: string;
@@ -30,6 +57,8 @@ export interface PublicPlayer {
   /** chỉ số avatar (thú + màu), không trùng trong phòng */
   avatar: number;
   avatarUrl?: string;
+  /** hình tượng nhân vật tùy chỉnh (tóc tai, độ tuổi, giới tính, màu sắc không trùng) */
+  character?: CharacterConfig;
   /** đã đăng nhập tài khoản (có lưu thành tích) */
   account?: boolean;
 }
@@ -338,6 +367,7 @@ export type ErrorCode =
   | 'not_in_room'
   | 'too_many_players'
   | 'too_few_players'
+  | 'color_taken'
   | 'bad_request';
 
 export type Ack<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
@@ -354,6 +384,7 @@ export interface ClientToServerEvents {
   ) => void;
   'room:join': (p: { code: string; name: string; playerId?: string }, ack: (r: Ack<JoinResult>) => void) => void;
   'room:config': (p: { gameType?: GameType; settings?: Partial<RoomSettings> }, ack: (r: Ack) => void) => void;
+  'player:customize': (p: Partial<CharacterConfig>, ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   'game:restart': (ack: (r: Ack) => void) => void;

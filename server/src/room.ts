@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, type BauCuaRounds,
+  CHARACTER_AGES, CHARACTER_GENDERS, CHARACTER_HAIRS, PLAYER_COLORS,
+  type CharacterAge, type CharacterConfig, type CharacterGender, type CharacterHair,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
@@ -31,6 +33,7 @@ interface Player {
   connected: boolean;
   avatar: number;
   avatarUrl?: string;
+  character: CharacterConfig;
   account: boolean;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
@@ -101,10 +104,47 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, account });
+    const character: CharacterConfig = {
+      gender: CHARACTER_GENDERS[this.players.length % CHARACTER_GENDERS.length],
+      age: CHARACTER_AGES[this.players.length % CHARACTER_AGES.length],
+      hair: CHARACTER_HAIRS[this.players.length % CHARACTER_HAIRS.length],
+      color: this.freeColor(),
+    };
+    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
+  }
+
+  /** Tùy chỉnh hình tượng nhân vật (giới tính, độ tuổi, kiểu tóc, màu sắc không trùng trong phòng) */
+  customize(playerId: string, partial: Partial<CharacterConfig>): Result {
+    const p = this.find(playerId);
+    if (!p) return { ok: false, error: 'not_in_room' };
+    if (!partial || typeof partial !== 'object') return { ok: false, error: 'bad_request' };
+    const next: CharacterConfig = { ...p.character };
+    if (partial.gender !== undefined) {
+      if (!CHARACTER_GENDERS.includes(partial.gender as CharacterGender)) return { ok: false, error: 'bad_request' };
+      next.gender = partial.gender;
+    }
+    if (partial.age !== undefined) {
+      if (!CHARACTER_AGES.includes(partial.age as CharacterAge)) return { ok: false, error: 'bad_request' };
+      next.age = partial.age;
+    }
+    if (partial.hair !== undefined) {
+      if (!CHARACTER_HAIRS.includes(partial.hair as CharacterHair)) return { ok: false, error: 'bad_request' };
+      next.hair = partial.hair;
+    }
+    if (partial.color !== undefined) {
+      const c = partial.color;
+      if (!Number.isInteger(c) || c < 0 || c >= PLAYER_COLORS.length) return { ok: false, error: 'bad_request' };
+      if (this.players.some((other) => other.id !== p.id && other.character.color === c)) {
+        return { ok: false, error: 'color_taken' };
+      }
+      next.color = c;
+    }
+    p.character = next;
+    this.changed();
+    return { ok: true };
   }
 
   /** Đổi tên/ảnh đại diện (khi người chơi sửa hồ sơ tài khoản) — chỉ khi chưa vào ván */
@@ -246,6 +286,7 @@ export class Room {
         connected: p.connected,
         avatar: p.avatar,
         ...(p.avatarUrl ? { avatarUrl: p.avatarUrl } : {}),
+        character: p.character,
         ...(p.account ? { account: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,
@@ -321,6 +362,19 @@ export class Room {
     let avatar = Math.floor(this.rng() * AVATAR_COUNT);
     while (used.has(avatar)) avatar = (avatar + 1) % AVATAR_COUNT;
     return avatar;
+  }
+
+  /** màu sắc nhân vật chưa ai dùng trong phòng */
+  private freeColor(wanted?: number): number {
+    const used = new Set(this.players.map((p) => p.character.color));
+    const count = PLAYER_COLORS.length;
+    if (wanted !== undefined && Number.isInteger(wanted) && wanted >= 0 && wanted < count && !used.has(wanted)) {
+      return wanted;
+    }
+    for (let i = 0; i < count; i++) {
+      if (!used.has(i)) return i;
+    }
+    return 0;
   }
 
   private uniqueName(name: string): string {

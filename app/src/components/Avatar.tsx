@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicPlayer } from '../../../shared/src/types';
-import { avatarOf } from '../avatars';
+import { avatarOf, characterSvgUri, playerColorOf } from '../avatars';
 import { C, FONT } from '../theme';
 
 export function Avatar({
@@ -19,6 +19,9 @@ export function Avatar({
   ring?: string;
 }) {
   const a = avatarOf(player.avatar);
+  const charColor = player.character ? playerColorOf(player.character) : null;
+  const imgUri = player.avatarUrl ?? (player.character ? characterSvgUri(player.character) : undefined);
+  const borderCol = ring ?? charColor?.hex ?? C.ink;
   return (
     <Pressable
       onPress={onPress}
@@ -32,14 +35,15 @@ export function Avatar({
         style={[
           styles.circle,
           {
-            width: size, height: size, borderRadius: size / 2, backgroundColor: a.bg,
-            borderColor: ring ?? C.ink, borderWidth: ring ? 4 : 2.5,
+            width: size, height: size, borderRadius: size / 2,
+            backgroundColor: charColor ? charColor.light : a.bg,
+            borderColor: borderCol, borderWidth: ring || charColor ? 3.5 : 2.5,
           },
           active && styles.active,
         ]}
       >
-        {player.avatarUrl ? (
-          <Image source={{ uri: player.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+        {imgUri ? (
+          <Image source={{ uri: imgUri }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
         ) : (
           <Text style={{ fontSize: size * 0.55 }}>{a.emoji}</Text>
         )}
