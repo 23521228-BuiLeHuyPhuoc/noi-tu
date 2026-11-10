@@ -8,7 +8,7 @@ import { GAME_META } from '../messages';
 import { C } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { Avatar } from './Avatar';
-import { ChatSheet, FunLayer, ThrowSheet } from './Fun';
+import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
 import { Sheet } from './Sheet';
 
 export interface StripOptions {
@@ -162,6 +162,7 @@ export function Shell({
 
       {overlay}
       <FunLayer game={game} players={room.players} chat={game.chat} />
+      <TrollLayer game={game} players={room.players} />
       {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
       {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
       {leaving && (

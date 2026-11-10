@@ -101,6 +101,105 @@ check(await feedHas(a, 'máu'), 'đánh nhau: người bị chưởng thấy tr�
 await a.page.waitForTimeout(150);
 await shot(a, 's4-hit');
 
+// ---------------- Bong bóng chat dưới đúng avatar, chọc mất dạy (3 người) ----------------
+await b.page.keyboard.press('Escape');
+const cc = await phone('Cường');
+await cc.t('name-input').fill('Cường');
+await cc.t('code-input').fill(code);
+await cc.t('join-btn').click();
+await cc.t('room-code').waitFor();
+await a.page.waitForFunction(() => document.querySelectorAll('[data-testid^="avatar-"]').length === 3);
+const ids3 = await a.page.locator('[data-testid^="avatar-"]').evaluateAll((els) => els.map((e) => e.dataset.testid.slice(7)));
+const cId = ids3[2];
+check(ids3[0] === aId && ids3[1] === bId, 'ba người trong phòng, đúng thứ tự avatar');
+// đóng mọi sheet đang mở trên máy a và b
+for (const p of [a, b]) {
+  await p.page.mouse.click(195, 60);
+  await p.page.waitForTimeout(100);
+}
+const sendChat = async (p, text) => {
+  await p.t('chat-open').click();
+  await p.t('chat-input').fill(text);
+  await p.t('chat-send').click();
+  await p.page.mouse.click(195, 60); // bấm nền để đóng sheet
+};
+await sendChat(b, 'Bình nói một câu khá là dài để thử cắt hai dòng nhé cả nhà ơi');
+await sendChat(cc, 'Cường đây, vô lẹ đi!');
+await a.page.getByTestId(`bubble-${bId}`).waitFor({ timeout: 4000 });
+await a.page.getByTestId(`bubble-${cId}`).waitFor({ timeout: 4000 });
+await a.page.waitForTimeout(250);
+const geo = await a.page.evaluate(({ bId, cId, aId }) => {
+  const box = (id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: (r.left + r.right) / 2 };
+  };
+  return { bb: box(`bubble-${bId}`), cb: box(`bubble-${cId}`), ba: box(`avatar-${bId}`), ca: box(`avatar-${cId}`), vw: window.innerWidth, nb: document.querySelectorAll(`[data-testid="bubble-${bId}"]`).length, nc: document.querySelectorAll(`[data-testid="bubble-${cId}"]`).length };
+}, { bId, cId, aId });
+const inside = (x) => x.l >= 0 && x.r <= geo.vw;
+const near = (bub, av) => bub.l - 1 <= av.cx && av.cx <= bub.r + 1 && bub.t >= av.b - 2;
+check(geo.nb === 1 && geo.nc === 1, 'mỗi người gửi chỉ có một bong bóng');
+check(inside(geo.bb) && inside(geo.cb), 'bong bóng không bị cắt ở mép màn hình');
+check(near(geo.bb, geo.ba) && near(geo.cb, geo.ca), 'bong bóng nằm dưới đúng avatar người gửi (phủ tâm avatar)');
+const overlap = !(geo.bb.r <= geo.cb.l || geo.cb.r <= geo.bb.l || geo.bb.b <= geo.cb.t || geo.cb.b <= geo.bb.t);
+check(!overlap, 'bong bóng của hai người không đè lên nhau');
+await shot(a, 's2b-bubbles-3');
+await sendChat(b, 'Tin mới thay tin cũ');
+await a.page.getByTestId(`bubble-${bId}`).getByText('Tin mới thay tin cũ').waitFor({ timeout: 4000 });
+check((await a.page.locator(`[data-testid="bubble-${bId}"]`).count()) === 1, 'tin mới của cùng người thay bong bóng cũ');
+
+// vẽ bậy: người thứ ba cũng thấy hình vẽ trên avatar của a
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-doodle').click();
+await shot(b, 's7-target-sheet');
+await b.t('doodle-ria').click();
+await cc.page.getByTestId(`doodle-${aId}`).waitFor({ timeout: 4000 });
+check(true, 'vẽ bậy: người khác thấy ria vẽ lên avatar của người bị chọc');
+await shot(cc, 's8-doodle');
+// biệt danh
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-nick').click();
+await b.t('nick-game').click();
+await cc.page.getByTestId(`nick-${aId}`).waitFor({ timeout: 4000 });
+check((await cc.page.getByTestId(`nick-${aId}`).textContent()).includes('Gà Mờ'), 'biệt danh hiện dưới avatar cho mọi người');
+// thả gián: hiện trên màn hình người bị chọc
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-roach').click();
+await a.page.getByTestId('roach').first().waitFor({ timeout: 4000 });
+await a.page.waitForTimeout(500);
+const roaches = await a.page.getByTestId('roach').count();
+check(roaches >= 2, `thả gián: ${roaches} con bò trên màn hình người bị chọc`);
+check((await cc.page.getByTestId('roach').count()) === 0, 'người khác không thấy gián trên màn hình của họ');
+check(await feedHas(cc, 'thả gián'), 'người khác thấy thông báo thả gián');
+await shot(a, 's9-roach');
+await a.page.getByTestId('roach').first().click({ force: true });
+await a.page.waitForTimeout(200);
+check((await a.page.getByTestId('roach').count()) < roaches, 'chạm vào gián để đập');
+// gián/mực bị giới hạn: chiêu phủ màn hình thứ hai ngay sau đó bị chặn
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-ink').click();
+await a.page.waitForTimeout(600);
+check((await a.page.getByTestId('ink-splash').count()) === 0, 'tạt mực ngay sau gián bị chặn (1 lần / 8 giây mỗi người)');
+await a.page.waitForTimeout(8200);
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-ink').click();
+await a.page.getByTestId('ink-splash').waitFor({ timeout: 4000 });
+await a.page.waitForTimeout(300);
+const ink = await a.page.getByTestId('ink-splash').boundingBox();
+check(ink.x + ink.width < 180 || ink.x > 210, 'vệt mực ở góc, không che giữa màn hình');
+await shot(a, 's10-ink');
+await a.page.getByTestId('ink-splash').click({ force: true });
+await a.page.waitForFunction(() => document.querySelectorAll('[data-testid="ink-splash"]').length === 0, null, { timeout: 2000 });
+check(true, 'chạm để lau mực');
+// bật loa
+await b.page.getByTestId(`avatar-${aId}`).click();
+await b.t('troll-honk').click();
+check(await feedHas(a, 'bật loa'), 'bật loa: người bị chọc nhận thông báo');
+await cc.t('leave-open').click();
+await cc.t('leave-confirm').click();
+await a.page.waitForFunction(() => document.querySelectorAll('[data-testid^="avatar-"]').length === 2);
+
 // ---------------- Nối từ: chữ đầu khóa + xin duyệt từ ----------------
 await a.t('start-btn').click();
 for (const p of [a, b]) await p.t('current-word').waitFor();
