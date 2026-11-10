@@ -114,7 +114,7 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
   canThrow: boolean;
   onThrow: (impulse?: ThrowImpulse) => void;
 }) {
-  const S = Math.max(26, Math.min(width / (2 * TRAY_HX + 0.5), height / 2.6));
+  const S = Math.max(26, Math.min(width / (2 * TRAY_HX + 0.9), height / 2.5));
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x0: number; y0: number; pts: { x: number; y: number; t: number }[] } | null>(null);
   const live = useRef({ offset: clockOffset, canThrow, onThrow, values });
@@ -207,11 +207,11 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
       onPointerUp={up}
       onPointerCancel={() => { drag.current = null; restPoseOn(root.current, S, live.current.values); }}
       style={{
-        position: 'relative', width, height, perspective: `${Math.round(width * 1.5)}px`, perspectiveOrigin: '50% 20%',
+        position: 'relative', width, height, perspective: `${Math.round(width * 2.4)}px`, perspectiveOrigin: '50% 20%',
         touchAction: 'none', userSelect: 'none', cursor: canThrow ? 'grab' : 'default',
       }}
     >
-      <div style={{ position: 'absolute', left: '50%', top: '56%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: 'rotateX(50deg)' }}>
+      <div style={{ position: 'absolute', left: '50%', top: '56%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: 'rotateX(46deg)' }}>
         <div
           style={{
             position: 'absolute', left: -TRAY_HX * S - 6, top: -TRAY_HZ * S - 6, width: 2 * TRAY_HX * S + 12, height: 2 * TRAY_HZ * S + 12, boxSizing: 'border-box',

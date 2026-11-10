@@ -19,7 +19,10 @@ export function sanitizeImpulse(v: unknown): ThrowImpulse {
 /** Kích thước khay (nửa chiều rộng/sâu) theo đơn vị mô phỏng; cạnh xúc xắc = 1 */
 export const TRAY_HX = 2.9;
 export const TRAY_HZ = 1.55;
+/** tần số khung mô phỏng (mỗi khung = 1/30 giây mô phỏng) */
 export const DICE_FPS = 30;
+/** tần số phát lại: chậm hơn mô phỏng 1,5 lần (quay chậm nhẹ) để cú lăn kéo dài đủ ~1,6-2 s mà vẫn nhìn rõ */
+export const DICE_PLAY_FPS = 20;
 /** 7 số mỗi xúc xắc mỗi khung: x, y, z, qx, qy, qz, qw */
 export const DICE_FRAME_STRIDE = 14;
 

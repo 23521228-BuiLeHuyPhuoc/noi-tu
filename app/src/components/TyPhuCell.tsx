@@ -114,7 +114,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   }
 
   // ô cạnh: dải màu quay vào tâm bàn
-  const bt = compactTB ? 13 : Math.max(7, Math.min(11, Math.min(p.w, p.h) * 0.2));
+  const bt = compactTB ? 11 : Math.max(7, Math.min(11, Math.min(p.w, p.h) * 0.2));
   const bandStyle =
     p.side === 'top' ? { top: 0, left: 0, right: 0, height: bt }
     : p.side === 'bottom' ? { bottom: 0, left: 0, right: 0, height: bt }
@@ -129,7 +129,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const lines = rowLayout ? 1 : wrapLines(name, f, availW);
   const iconSize = rowLayout
     ? Math.max(16, Math.min(p.h - 6 - (p.side === 'top' || p.side === 'bottom' ? bt : 0), 24))
-    : Math.max(15, Math.min(p.w - 8, 30, p.h - (p.side === 'top' || p.side === 'bottom' ? bt : 0) - lines * (compact ? f : f + 1) - (compactTB ? 0 : compact ? 11 : 14) - 4));
+    : Math.max(compactTB ? 12 : 15, Math.min(p.w - 8, 30, p.h - (p.side === 'top' || p.side === 'bottom' ? bt : 0) - lines * (compact ? f : f + 1) - (compactTB ? 0 : compact ? 11 : 14) - 4));
   return (
     <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
       <View style={[styles.band, bandStyle, { backgroundColor: group }, compactTB && styles.bandRow]}>
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   innerRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3, gap: 3 },
   name: { color: C.ink, fontWeight: '800', textAlign: 'center', letterSpacing: -0.2 },
   bandRow: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 1 },
-  bandPrice: { color: '#fff', fontWeight: '900', fontSize: 10, lineHeight: 12, textShadowColor: C.ink, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
+  bandPrice: { color: '#fff', fontWeight: '900', fontSize: 10, lineHeight: 11, textShadowColor: C.ink, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   priceBare: { color: C.ink, fontWeight: '900', fontSize: 10, lineHeight: 11, backgroundColor: C.gold, borderRadius: 4, paddingHorizontal: 3 },
   price: {
     backgroundColor: C.gold, borderRadius: 7, borderWidth: 1, borderColor: C.ink,

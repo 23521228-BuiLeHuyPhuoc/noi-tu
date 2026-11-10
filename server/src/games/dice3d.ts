@@ -11,7 +11,7 @@
  * Hàm nhận `rng` để test có thể tiêm nhiễu xác định.
  */
 import {
-  DICE_FACES, DICE_FPS, TRAY_HX, TRAY_HZ, sanitizeImpulse, type ThrowImpulse,
+  DICE_FACES, DICE_FPS, DICE_PLAY_FPS, TRAY_HX, TRAY_HZ, sanitizeImpulse, type ThrowImpulse,
 } from '../../../shared/src/dice';
 import { TYPHU_ROLL_MAX_MS, TYPHU_ROLL_MIN_MS } from '../../../shared/src/typhu';
 
@@ -193,14 +193,14 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
     for (const b of bodies) frames.push(q3(b.p[0]), q3(b.p[1]), q3(b.p[2]), q3(b.q[0]), q3(b.q[1]), q3(b.q[2]), q3(b.q[3]));
   };
   record();
-  const maxFrames = Math.round((TYPHU_ROLL_MAX_MS / 1000) * DICE_FPS) - 6;
+  const maxFrames = Math.round((TYPHU_ROLL_MAX_MS / 1000) * DICE_PLAY_FPS) - 6;
   let calm = 0;
   let nFrames = 1;
   let restFrame = -1;
   for (let step = 1; nFrames < maxFrames; step++) {
     const t = step * DT;
     // sau ~0,9s tăng dần ma sát để chắc chắn đứng yên trong thời gian cho phép (~1,6-2 s)
-    const extra = t > 0.9 ? Math.min(10, (t - 0.9) * 9) : 0;
+    const extra = t > 0.55 ? Math.min(16, (t - 0.55) * 16) : 0;
     for (const b of bodies) {
       b.v = [b.v[0] * (1 - 0.15 * DT), b.v[1] + GRAVITY * DT, b.v[2] * (1 - 0.15 * DT)];
       const damp = 1 - (0.6 + extra) * DT;
@@ -224,7 +224,7 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
 
   // chốt kết quả: mặt trên của mỗi viên, rồi xoay nhẹ cho nằm phẳng đúng mặt đó ở vài khung cuối
   const faces = bodies.map((b) => topFace(b.q));
-  const SNAP = 8;
+  const SNAP = 6;
   const flat = bodies.map((b, i) => {
     const up = qRot(b.q, DICE_FACES[faces[i]].n);
     return qNorm(qMul(qFromTo(up, [0, 1, 0]), b.q));
@@ -241,9 +241,9 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
     });
   }
   // giữ khung cuối để tổng thời lượng ≥ TYPHU_ROLL_MIN_MS
-  const minFrames = Math.round((TYPHU_ROLL_MIN_MS / 1000) * DICE_FPS);
+  const minFrames = Math.round((TYPHU_ROLL_MIN_MS / 1000) * DICE_PLAY_FPS);
   const lastFrame = frames.slice(frames.length - stride);
   while (frames.length / stride < minFrames) frames.push(...lastFrame);
-  const ms = Math.round((frames.length / stride / DICE_FPS) * 1000);
-  return { dice: [DICE_FACES[faces[0]].v, DICE_FACES[faces[1]].v], frames, ms, fps: DICE_FPS };
+  const ms = Math.round((frames.length / stride / DICE_PLAY_FPS) * 1000);
+  return { dice: [DICE_FACES[faces[0]].v, DICE_FACES[faces[1]].v], frames, ms, fps: DICE_PLAY_FPS };
 }
