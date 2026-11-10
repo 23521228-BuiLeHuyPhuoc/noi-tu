@@ -8,6 +8,8 @@
  *   Viet74K.txt               duyet/vietnamese-wordlist (Hồ Ngọc Đức, GPL)
  *   vntk_dictionary.json      vntk/dictionary (Từ điển tiếng Việt thông dụng)
  *   uts_*.txt                 undertheseanlp/dictionary (Hồ Ngọc Đức + Từ điển TV + Wiktionary, JSONL)
+ *   vietphap/vietduc/vietnga/vietnhat/viethan.tab   Việt–Pháp/Đức/Nga/Nhật/Hàn (Việt–Trung không có trên upstream nên bỏ)
+ *   phapviet/ducviet/ngaviet/nhatviet/hanviet/trungviet.tab   giải nghĩa Pháp/Đức/Nga/Nhật/Hàn/Trung–Việt
  *   vietviet.tab              catusf/tudien: Từ điển Việt–Việt (StarDict)
  *   vietanh.tab, spdict_vietanh.tab, viettbn.tab, viet_anh.xml   từ điển Việt–Anh / Việt–Tây Ban Nha (mục từ tiếng Việt)
  *   anhviet.tab, anhvietbeta.tab   từ điển Anh–Việt: lấy các cụm 2 chữ đứng riêng trong phần giải nghĩa tiếng Việt
@@ -105,7 +107,6 @@ function loadSources(dir: string): { headword: Source[]; gloss: Source[] } {
     ['vietnga.tab', 'Việt–Nga'],
     ['vietnhat.tab', 'Việt–Nhật'],
     ['viethan.tab', 'Việt–Hàn'],
-    ['viettrung.tab', 'Việt–Trung'],
   ] as const) {
     if (has(f)) headword.push({ name, entries: headwordsTab(join(dir, f)) });
   }
@@ -183,7 +184,7 @@ function main() {
       if (w && looksLikePhrase(w)) freq.set(w, (freq.get(w) ?? 0) + 1);
     }
   }
-  const MIN_GLOSS = 1;
+  const MIN_GLOSS = 2;
   let before = words.size;
   for (const [w, n] of freq) if (n >= MIN_GLOSS) words.add(w);
   stats.push(`${'cụm trong lời giải nghĩa'.padEnd(28)} ${String(freq.size).padStart(7)} cụm, ≥${MIN_GLOSS} lần: mới thêm ${words.size - before}`);
@@ -213,13 +214,13 @@ function main() {
     }
   }
   // mở rộng cụm danh từ/động từ có nghĩa theo đúng nhóm danh từ đã phân loại trong Wiktionary
-  const ANIMALS_PRE = ['chú', 'đàn', 'bầy', 'nuôi', 'bắt', 'mỗi', 'mấy', 'vài', 'nhiều'];
+  const ANIMALS_PRE = ['chú', 'đàn', 'bầy', 'nuôi', 'bắt'];
   const ANIMALS_SUF = ['con', 'mẹ', 'đực', 'cái', 'nhỏ', 'lớn', 'to', 'rừng', 'nhà', 'hoang', 'này', 'kia', 'đó', 'ấy', 'nào', 'khác'];
-  const OBJECTS_CLS = new Set(['cái', 'chiếc', 'bộ', 'căn', 'ngôi', 'tờ', 'quyển', 'cuốn', 'bức', 'tấm', 'cây']);
-  const OBJECTS_PRE = ['mua', 'bán', 'sửa', 'dùng', 'mỗi', 'mấy', 'vài', 'nhiều', 'từng'];
+  const OBJECTS_CLS = new Set(['cái', 'chiếc', 'bộ', 'căn', 'ngôi', 'tờ', 'quyển', 'cuốn', 'bức', 'tấm']);
+  const OBJECTS_PRE = ['mua', 'bán', 'sửa', 'dùng'];
   const OBJECTS_SUF = ['mới', 'cũ', 'nhỏ', 'lớn', 'to', 'đẹp', 'tốt', 'hỏng', 'này', 'kia', 'đó', 'ấy', 'nào', 'khác', 'riêng', 'chung'];
-  const PLANTS_CLS = new Set(['bông', 'đóa', 'quả', 'trái', 'hạt', 'hột', 'củ']);
-  const PLANTS_PRE = ['trồng', 'hái', 'mùa', 'vườn', 'mua', 'bán', 'mỗi', 'mấy', 'vài', 'nhiều'];
+  const PLANTS_CLS = new Set(['bông', 'đóa', 'quả', 'trái', 'hạt', 'hột', 'củ', 'cây']);
+  const PLANTS_PRE = ['trồng', 'hái', 'mùa', 'vườn', 'mua', 'bán'];
   const PLANTS_SUF = ['tươi', 'khô', 'chín', 'xanh', 'non', 'rừng', 'vườn', 'nhỏ', 'lớn', 'to', 'đẹp', 'thơm', 'này', 'kia', 'đó', 'nào', 'khác'];
   for (const l of clsLines) {
     const w = acceptEntry(l);
@@ -237,6 +238,17 @@ function main() {
     }
   }
   stats.push(`${'lượng từ + danh từ'.padEnd(28)} ${''.padStart(7)}       mới thêm ${words.size - before}`);
+
+  // luôn giữ mọi từ đã có giải nghĩa
+  before = words.size;
+  const defPath = join(DATA_DIR, 'definitions.json');
+  if (existsSync(defPath)) {
+    for (const k of Object.keys(JSON.parse(readFileSync(defPath, 'utf8')))) {
+      const w = acceptEntry(k);
+      if (w) words.add(w);
+    }
+  }
+  stats.push(`${'từ có giải nghĩa (giữ lại)'.padEnd(28)} ${''.padStart(7)}       mới thêm ${words.size - before}`);
 
   const sorted = [...words].sort((a, b) => a.localeCompare(b, 'vi'));
   for (const w of sorted) {
