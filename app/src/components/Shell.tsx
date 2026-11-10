@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GAME_INFO, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { isMuted, setMuted } from '../sound';
 import { copyText } from '../web';
+import { GAME_META } from '../messages';
 import { C } from '../theme';
-import { Button, IconButton, T, useFeed } from '../ui';
+import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet } from './Fun';
 import { Sheet } from './Sheet';
@@ -15,6 +16,8 @@ export interface StripOptions {
   active?: string | null;
   dim?: (p: PublicPlayer) => boolean;
   ring?: (p: PublicPlayer) => string | undefined;
+  /** hạng hiển thị thành huy hiệu ở góc avatar */
+  rank?: (p: PublicPlayer) => number | undefined;
   /** thứ tự hiển thị (vd: theo lượt chơi) */
   order?: string[];
 }
@@ -46,8 +49,13 @@ export function Shell({
   const [leaving, setLeaving] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
   const feed = useFeed();
+  const setFeedInset = useFeedInset();
+  useEffect(() => () => setFeedInset(16), [setFeedInset]);
   const { width, height } = useWindowDimensions();
+  const shortScreen = height < 700 && !(fullscreen || (wide && width >= 700));
+  const iconOnly = width < 440 || fullscreen;
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
+  const inlineStrip = compactLandscape && width >= 700;
 
   const players = strip.order
     ? strip.order.map((id) => room.players.find((p) => p.id === id)).filter((p): p is PublicPlayer => !!p)
@@ -62,7 +70,7 @@ export function Shell({
     </View>
   );
   const stripItems = players.map((p) => (
-    <View key={p.id} style={compactLandscape ? styles.avatarCompact : undefined}>
+    <View key={p.id} style={compactLandscape ? (inlineStrip ? styles.avatarCompact : styles.avatarRow) : undefined}>
       <Avatar
         player={p}
         me={p.id === game.me}
@@ -71,6 +79,8 @@ export function Shell({
         dim={strip.dim?.(p) || p.spectator}
         sub={p.spectator ? '👀 Đang xem' : strip.sub?.(p)}
         ring={strip.ring?.(p)}
+        rank={p.spectator ? undefined : strip.rank?.(p)}
+        size={shortScreen ? 42 : 52}
         onPress={p.id === game.me || meIsSpectator ? undefined : () => setTarget(p)}
       />
     </View>
@@ -87,8 +97,14 @@ export function Shell({
           style={styles.chip}
           onPress={async () => (await copyText(room.code)) && feed('Đã sao chép mã phòng')}
         />
-        <T numberOfLines={1} style={[styles.gameName, compactLandscape && styles.gameNameLandscape]}>{GAME_INFO[room.gameType].name}</T>
-        {compactLandscape && (
+        {iconOnly ? (
+          <T accessibilityLabel={GAME_INFO[room.gameType].name} style={[styles.gameIcon, compactLandscape && { flex: 0 }]}>
+            {GAME_META[room.gameType].emoji}
+          </T>
+        ) : (
+          <T style={[styles.gameName, compactLandscape && styles.gameNameLandscape]}>{GAME_INFO[room.gameType].name}</T>
+        )}
+        {inlineStrip && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
             {stripItems}
           </ScrollView>
@@ -118,9 +134,15 @@ export function Shell({
         </ScrollView>
       )}
 
+      {compactLandscape && !inlineStrip && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollRow} contentContainerStyle={styles.stripLandscape}>
+          {stripItems}
+        </ScrollView>
+      )}
+
       {meIsSpectator && (
         <View testID="spectator-banner" style={styles.spectatorBanner}>
-          <T style={styles.spectatorText}>👀 Ván đang diễn ra — bạn đang ở chế độ xem (chờ ván sau để tham gia)</T>
+          <T style={styles.spectatorText}>👀 Bạn đang xem ván này. Ván sau sẽ được chơi!</T>
         </View>
       )}
 
@@ -132,7 +154,11 @@ export function Shell({
         <View style={{ flex: 1 }}>{content}</View>
       )}
 
-      {bottom && <View style={styles.bottom}>{bottom}</View>}
+      {bottom ? (
+        <View style={styles.bottom} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
+      ) : (
+        <View onLayout={() => setFeedInset(12)} />
+      )}
 
       {overlay}
       <FunLayer game={game} players={room.players} chat={game.chat} />
@@ -159,12 +185,15 @@ const styles = StyleSheet.create({
   topLandscape: { paddingTop: 3, paddingBottom: 2, paddingHorizontal: 8, gap: 6 },
   chip: { marginBottom: 0 },
   gameName: { flex: 1, color: C.onSon, fontWeight: '800', fontSize: 15 },
+  gameIcon: { flex: 1, fontSize: 24, textAlign: 'center' },
   gameNameLandscape: { flex: 0, marginRight: 4 },
   // ScrollView ngang trên web mặc định giãn hết chiều cao còn lại -> chặn lại
   stripScroll: { flexGrow: 0, flexShrink: 0 },
+  stripScrollRow: { flexGrow: 0, flexShrink: 0, maxHeight: 68, minHeight: 68 },
   stripScrollLandscape: { flex: 1, flexGrow: 1, maxHeight: 54 },
-  strip: { paddingHorizontal: 10, paddingTop: 14, paddingBottom: 8, gap: 2 },
+  strip: { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 6, gap: 2 },
   stripLandscape: { alignItems: 'center', paddingVertical: 0, gap: 0 },
+  avatarRow: { transform: [{ scale: 0.78 }], marginHorizontal: -7, marginVertical: -9 },
   avatarCompact: { transform: [{ scale: 0.56 }], marginHorizontal: -12, marginVertical: -18 },
   content: { flex: 1, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
   contentLandscape: { paddingBottom: 4, gap: 6 },

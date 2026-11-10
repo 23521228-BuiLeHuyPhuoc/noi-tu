@@ -47,7 +47,7 @@ export function Button({
       ]}
       {...rest}
     >
-      <Text numberOfLines={1} style={[styles.btnText, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
+      <Text numberOfLines={small ? 2 : 1} style={[styles.btnText, small && { textAlign: 'center' }, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
         {icon ? `${icon}  ` : ''}
         {title}
       </Text>
@@ -95,25 +95,32 @@ interface FeedItem {
 
 const FeedCtx = createContext<(text: string, tone?: FeedItem['tone']) => void>(() => {});
 export const useFeed = () => useContext(FeedCtx);
+/** Shell báo chiều cao vùng nút dưới cùng để thông báo nổi nằm ngay phía trên, không đè bàn chơi */
+const FeedInsetCtx = createContext<(h: number) => void>(() => {});
+export const useFeedInset = () => useContext(FeedInsetCtx);
+const FEED_DEFAULT_INSET = 16;
 
 export function FeedProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const seq = useRef(0);
+  const [inset, setInset] = useState(FEED_DEFAULT_INSET);
   const push = useCallback((text: string, tone: FeedItem['tone'] = 'info') => {
     const id = ++seq.current;
-    setItems((xs) => [...xs.slice(-2), { id, text, tone }]);
+    setItems((xs) => [...xs.slice(-1), { id, text, tone }]);
     setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 3200);
   }, []);
   return (
     <FeedCtx.Provider value={push}>
+     <FeedInsetCtx.Provider value={setInset}>
       {children}
-      <View pointerEvents="none" style={styles.feed}>
+      <View pointerEvents="none" style={[styles.feed, { bottom: inset + 6 }]}>
         {items.map((it) => (
           <View key={it.id} style={[styles.feedItem, sticker(3), { backgroundColor: FEED_BG[it.tone] }]}>
             <Text testID="feed" style={[styles.feedText, it.tone === 'bad' && { color: '#fff' }]}>{it.text}</Text>
           </View>
         ))}
       </View>
+     </FeedInsetCtx.Provider>
     </FeedCtx.Provider>
   );
 }
@@ -137,7 +144,7 @@ const styles = StyleSheet.create({
   },
   iconText: { fontSize: 20 },
   card: { backgroundColor: C.paper, borderRadius: 20, padding: 16 },
-  feed: { position: 'absolute', top: 150, left: 12, right: 12, alignItems: 'center', gap: 6, zIndex: 50 },
-  feedItem: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 440 },
-  feedText: { fontFamily: FONT, fontWeight: '700', fontSize: 15, color: C.ink, textAlign: 'center' },
+  feed: { position: 'absolute', left: 12, right: 12, alignItems: 'center', gap: 4, zIndex: 50 },
+  feedItem: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5, maxWidth: 440 },
+  feedText: { fontFamily: FONT, fontWeight: '700', fontSize: 13, color: C.ink, textAlign: 'center' },
 });

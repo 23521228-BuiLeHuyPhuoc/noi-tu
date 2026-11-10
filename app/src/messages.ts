@@ -100,7 +100,7 @@ export const THROWS: { item: ThrowItem; emoji: string; name: string }[] = [
   { item: 'dep', emoji: '🩴', name: 'Dép' },
   { item: 'cachua', emoji: '🍅', name: 'Cà chua' },
   { item: 'trung', emoji: '🥚', name: 'Trứng' },
-  { item: 'phan', emoji: '💩', name: 'Bãi…' },
+  { item: 'phan', emoji: '💩', name: 'Bãi bậy' },
   { item: 'hoa', emoji: '🌹', name: 'Hoa' },
   { item: 'tim', emoji: '💖', name: 'Thả tim' },
 ];
