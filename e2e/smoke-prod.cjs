@@ -75,6 +75,21 @@ const check = (ok, msg) => {
   check(bg.step === 'result' && bg.dice.length === 3, `mở bát: ${bg.dice && bg.dice.join(', ')}, B ${bg.lastDeltas && bg.lastDeltas[j3.playerId]} xu`);
   await a.emitWithAck('room:leave');
   await b.emitWithAck('room:leave');
+
+  // Cờ tỷ phú
+  const c4 = await a.emitWithAck('room:create', { name: 'A', gameType: 'typhu' });
+  await b.emitWithAck('room:join', { code: c4.code, name: 'B' });
+  check((await a.emitWithAck('game:start')).ok, 'bắt đầu Cờ tỷ phú');
+  await wait(400);
+  const tg = a.state.game;
+  check(tg.type === 'typhu' && tg.cash[c4.playerId] === 1500, 'mỗi người 1.500 xu');
+  const tcur = tg.currentPlayerId === c4.playerId ? a : b;
+  check((await tcur.emitWithAck('game:action', { type: 'roll' })).ok, 'đổ 2 xúc xắc');
+  await wait(400);
+  const tg2 = a.state.game;
+  check(tg2.dice && tg2.dice.length === 2, `xúc xắc ra ${tg2.dice && tg2.dice.join(' + ')}, bước: ${tg2.step}`);
+  await a.emitWithAck('room:leave');
+  await b.emitWithAck('room:leave');
   a.close();
   b.close();
   console.log(fails ? `\n${fails} kiểm tra THẤT BẠI` : '\nTẤT CẢ ĐỀU QUA');
