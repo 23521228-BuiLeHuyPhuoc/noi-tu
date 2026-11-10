@@ -129,7 +129,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const lines = rowLayout ? 1 : wrapLines(name, f, availW);
   const iconSize = rowLayout
     ? Math.max(16, Math.min(p.h - 6 - (p.side === 'top' || p.side === 'bottom' ? bt : 0), 24))
-    : Math.max(compactTB ? 12 : 15, Math.min(p.w - 8, 30, p.h - (p.side === 'top' || p.side === 'bottom' ? bt : 0) - lines * (compact ? f : f + 1) - (compactTB ? 0 : compact ? 11 : 14) - 4));
+    : Math.max(compactTB ? 10 : 15, Math.min(p.w - 8, 30, p.h - (p.side === 'top' || p.side === 'bottom' ? bt : 0) - lines * (compact ? f : f + 1) - (compactTB ? 0 : compact ? 11 : 14) - 4));
   return (
     <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
       <View style={[styles.band, bandStyle, { backgroundColor: group }, compactTB && styles.bandRow]}>

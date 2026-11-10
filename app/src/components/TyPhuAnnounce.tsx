@@ -73,7 +73,8 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
       )}
       {loss && <Fog now={now} W={W} H={H} />}
 
-      {/* nội dung giữa */}
+      {a.kind === 'reward' && <CoinBurst now={now} a={a} W={W} cy={cy} />}
+      {/* nội dung giữa (nằm trên xu bay để chữ luôn đọc được) */}
       <View style={{ position: 'absolute', left: 0, right: 0, top: cy - 140, height: 280, justifyContent: 'center', alignItems: 'center', transform: [{ scale: scale * k }] }}>
         {a.kind === 'buy' && (
           <>
@@ -132,7 +133,6 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
         )}
       </View>
 
-      {a.kind === 'reward' && <CoinBurst now={now} a={a} W={W} cy={cy} />}
       {bank && <Bills now={now} a={a} W={W} H={H} />}
     </View>
   );
