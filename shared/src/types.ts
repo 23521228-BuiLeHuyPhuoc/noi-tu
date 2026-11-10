@@ -1,3 +1,4 @@
+import type { TyPhuMovement } from './typhu';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
 
 export const MAX_PLAYERS = 6;
@@ -26,6 +27,7 @@ export interface PublicPlayer {
   connected: boolean;
   /** chỉ số avatar (thú + màu), không trùng trong phòng */
   avatar: number;
+  avatarUrl?: string;
   /** đã đăng nhập tài khoản (có lưu thành tích) */
   account?: boolean;
 }
@@ -65,13 +67,15 @@ export type GameView = WordChainView | LudoView | BauCuaView | TyPhuView;
 export const WORD_SYLLABLES = 2;
 export const TURN_SECONDS = 30;
 
+export interface WordDefinition { text: string; source: string | null }
+
 export type WordHistoryItem =
-  | { kind: 'start'; word: string }
-  | { kind: 'word'; word: string; playerId: string; name: string }
+  | { kind: 'start'; word: string; definition?: WordDefinition }
+  | { kind: 'word'; word: string; playerId: string; name: string; definition?: WordDefinition }
   | { kind: 'eliminated'; playerId: string; name: string; reason: 'timeout' | 'left' }
-  | { kind: 'newWord'; word: string }
+  | { kind: 'newWord'; word: string; definition?: WordDefinition }
   | { kind: 'hint'; playerId: string; name: string }
-  | { kind: 'vote'; word: string; playerId: string; name: string; approved: boolean };
+  | { kind: 'vote'; word: string; playerId: string; name: string; approved: boolean; definition?: WordDefinition };
 
 export interface WordChainView {
   type: 'wordchain';
@@ -82,6 +86,7 @@ export interface WordChainView {
   words: Record<string, number>;
   hintUsed: string[];
   currentWord: string;
+  currentDefinition?: WordDefinition;
   currentPlayerId: string | null;
   turnEndsAt: number | null;
   turnSeconds: number;
@@ -183,6 +188,7 @@ export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'star
 
 export interface TyPhuView {
   type: 'typhu';
+  movement: TyPhuMovement | null;
   order: string[];
   names: Record<string, string>;
   cash: Record<string, number>;
@@ -275,13 +281,16 @@ export type FunSend =
 /** sự kiện phát cho cả phòng; đánh nhau thì kèm sát thương và máu còn lại (máu ảo, không ảnh hưởng game) */
 export type FunEvent = FunSend & { id: number; from: string; damage?: number; hp?: number; ko?: boolean };
 
-export interface ChatMsg {
-  id: number;
-  from: string;
-  name: string;
-  text: string;
-  at: number;
-}
+export const STICKER_IDS = [
+  'quynh-01', 'quynh-02', 'quynh-03', 'quynh-04', 'quynh-05',
+  'quynh-06', 'quynh-07', 'quynh-08', 'quynh-09',
+] as const;
+export type StickerId = (typeof STICKER_IDS)[number];
+export type ChatSend = { kind?: 'text'; text: string } | { kind: 'sticker'; stickerId: StickerId };
+export type ChatMsg = { id: number; from: string; name: string; at: number } & (
+  | { kind?: 'text'; text: string; stickerId?: never }
+  | { kind: 'sticker'; stickerId: StickerId; text?: never }
+);
 export const CHAT_MAX = 200;
 
 // ================= Tài khoản =================
@@ -296,6 +305,7 @@ export interface PublicUser {
   username: string;
   displayName: string;
   avatar: number;
+  avatarUrl?: string;
   stats: Partial<Record<GameType, GameStat>>;
 }
 
@@ -343,7 +353,7 @@ export interface ClientToServerEvents {
   'game:restart': (ack: (r: Ack) => void) => void;
   'room:leave': (ack: (r: Ack) => void) => void;
   'fun:send': (f: FunSend, ack: (r: { ok: boolean }) => void) => void;
-  'chat:send': (p: { text: string }, ack: (r: { ok: boolean }) => void) => void;
+  'chat:send': (p: ChatSend, ack: (r: { ok: boolean }) => void) => void;
   'auth:register': (p: { username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;
   'auth:resume': (p: { token: string }, ack: (r: AuthAck) => void) => void;

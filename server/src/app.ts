@@ -1,3 +1,5 @@
+import express from 'express';
+import { attachAvatarRoute, cloudinaryUploader, type AvatarUploader } from './avatar';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '../../shared/src/types';
@@ -19,21 +21,26 @@ export interface GameServer {
 export interface GameServerOptions extends Omit<RoomManagerOptions, 'onRoomChange'> {
   /** nơi lưu tài khoản và từ mới; mặc định lưu trong bộ nhớ */
   store?: Store;
+  avatarUploader?: AvatarUploader;
 }
 
 export function createGameServer(dict: Dictionary, opts: GameServerOptions = {}): GameServer {
   const store = opts.store ?? new MemoryStore();
   const logErr = (what: string) => (e: unknown) => console.error(what, e);
 
-  const http = createServer((req, res) => {
-    if (req.url === '/health') {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, words: dict.size, rooms: manager.size, db: store.kind }));
-      return;
-    }
-    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('Nối Từ server đang chạy');
+  const auth = new Auth(store);
+  const app = express();
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+    next();
   });
+  attachAvatarRoute(app, store, auth, opts.avatarUploader ?? cloudinaryUploader());
+  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, rooms: manager.size, db: store.kind }));
+  app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
+  const http = createServer(app);
 
   const io: GameServer['io'] = new Server(http, { cors: { origin: '*' } });
   const manager: RoomManager = new RoomManager(dict, {
@@ -54,7 +61,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });
-  attachSocketHandlers(io, manager, new Auth(store));
+  attachSocketHandlers(io, manager, auth);
 
   return {
     http,

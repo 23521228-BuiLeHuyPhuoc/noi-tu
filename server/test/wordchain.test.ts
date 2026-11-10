@@ -79,7 +79,7 @@ describe('Nối từ', () => {
     expect(g.eliminated).toEqual([order[2]]);
     expect(g.currentPlayerId).toBe(order[0]);
     expect(g.currentWord).not.toBe('cụt lủn');
-    expect(g.history.at(-1)).toEqual({ kind: 'newWord', word: g.currentWord });
+    expect(g.history.at(-1)).toEqual({ kind: 'newWord', word: g.currentWord, definition: { text: 'Chưa có giải nghĩa', source: null } });
   });
 
   it('quyền cứu trợ: chỉ người đang tới lượt, mỗi người 1 lần, trả về từ nối được', () => {

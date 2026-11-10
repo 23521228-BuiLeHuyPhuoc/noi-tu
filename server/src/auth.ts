@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import type { AuthAck, AuthError } from '../../shared/src/types';
 import { cleanName } from './room';
@@ -35,6 +36,7 @@ const fail = (error: AuthError): AuthAck => ({ ok: false, error });
 
 /** Các thao tác tài khoản; trả về kết quả gửi cho app kèm bản ghi người dùng (nếu thành công) */
 export class Auth {
+  readonly profiles = new EventEmitter().setMaxListeners(0);
   constructor(private readonly store: Store) {}
 
   async register(p: { username?: unknown; password?: unknown; displayName?: unknown; avatar?: unknown }) {

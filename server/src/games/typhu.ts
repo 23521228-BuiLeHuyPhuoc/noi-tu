@@ -11,7 +11,7 @@
  */
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
-  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf,
+  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent, TYPHU_MOVE_STEP_MS, TYPHU_ROLL_MS, type TyPhuMovement,
 } from '../../../shared/src/typhu';
 import type { ActionResult, GameAction, TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
@@ -41,11 +41,16 @@ export const TYPHU_CARDS: Card[] = [
   { text: 'Về thẳng Xuất phát', goto: 0 },
   { text: 'Đua xe bị tóm! Vào tù', jail: true },
   { text: 'Quên ví, lùi lại 3 ô', move: -3 },
-  { text: 'Bay ra Hà Nội ăn phở', goto: 26 },
+  { text: 'Bay ra Hà Nội ăn phở', goto: 37 },
   { text: 'Sửa nhà mùa mưa: mỗi căn nhà 25 xu', perHouse: 25 },
   { text: 'Nhặt được ví, trả lại được thưởng 50 xu', money: 50 },
 ];
 
+export const TYPHU_COMMUNITY_CARDS: Card[] = [
+ { text: 'Được hoàn thuế 100 xu', money: 100 }, { text: 'Viện phí 50 xu', money: -50 },
+ { text: 'Sinh nhật bạn! Mỗi người mừng bạn 30 xu', each: 30 }, { text: 'Nhận học bổng 150 xu', money: 150 },
+ { text: 'Về thẳng Xuất phát', goto: 0 }, { text: 'Vào tù theo lệnh tòa', jail: true },
+];
 interface TPlayer extends EnginePlayer {
   cash: number;
   pos: number;
@@ -65,6 +70,8 @@ export class TyPhuGame implements GameEngine {
   private dice: [number, number] | null = null;
   private rolledDouble = false;
   private rollId = 0;
+  private movement: TyPhuMovement | null = null;
+  private movementSeq = 0;
   private pendingBuy: number | null = null;
   private turnEndsAt: number | null = null;
   private log: TyPhuView['log'] = [];
@@ -87,6 +94,7 @@ export class TyPhuGame implements GameEngine {
 
   action(playerId: string, a: GameAction): ActionResult {
     if (this.over) return { ok: false, reason: 'not_playing' };
+    if (this.movement) return { ok: false, reason: 'bad_action' };
     if (a.type === 'end') {
       if (playerId !== this.ctx.hostId()) return { ok: false, reason: 'not_host' };
       this.end(null);
@@ -110,7 +118,7 @@ export class TyPhuGame implements GameEngine {
       case 'buy': {
         if (this.step !== 'buy' || this.pendingBuy === null) return { ok: false, reason: 'bad_action' };
         const c = TYPHU_BOARD[this.pendingBuy];
-        if (c.kind !== 'land' || me.cash < c.price) return { ok: false, reason: 'no_money' };
+        if (!isTyPhuProperty(c) || me.cash < c.price) return { ok: false, reason: 'no_money' };
         me.cash -= c.price;
         this.owners[this.pendingBuy] = me.id;
         this.addLog('buy', `${me.name} mua ${c.name} giá ${fmt(c.price)} xu`);
@@ -143,10 +151,11 @@ export class TyPhuGame implements GameEngine {
     else this.ctx.changed();
   }
 
-  view(): TyPhuView {
+  view(): TyPhuView & { movement: TyPhuMovement | null } {
     const by = <T,>(f: (p: TPlayer) => T) => Object.fromEntries(this.players.map((p) => [p.id, f(p)]));
     return {
       type: 'typhu',
+      movement: this.movement ? { ...this.movement, path: [...this.movement.path] } : null,
       order: this.players.map((p) => p.id),
       names: this.names,
       cash: by((p) => p.cash),
@@ -157,13 +166,13 @@ export class TyPhuGame implements GameEngine {
       houses: { ...this.houses },
       currentPlayerId: this.over ? null : this.players[this.current]?.id ?? null,
       step: this.step,
-      dice: this.dice,
+      dice: this.dice ? [...this.dice] : null,
       rollId: this.rollId,
       pendingBuy: this.step === 'buy' ? this.pendingBuy : null,
       turnEndsAt: this.over ? null : this.turnEndsAt,
       turnSeconds: this.turnMs / 1000,
-      log: this.log,
-      card: this.card,
+      log: this.log.map((entry) => ({ ...entry })),
+      card: this.card ? { ...this.card } : null,
     };
   }
 
@@ -240,19 +249,24 @@ export class TyPhuGame implements GameEngine {
     this.moveBy(d1 + d2);
   }
 
-  private moveBy(steps: number): void {
-    const me = this.players[this.current];
-    const to = (((me.pos + steps) % TYPHU_SIZE) + TYPHU_SIZE) % TYPHU_SIZE;
-    if (steps > 0 && to < me.pos) this.passStart(me);
-    me.pos = to;
-    this.land(true);
+  private moveBy(steps: number, allowCard = true, kind: TyPhuMovement['kind'] = 'roll'): void {
+    const me = this.players[this.current], from = me.pos;
+    const path = Array.from({ length: Math.abs(steps) }, (_, i) => ((from + Math.sign(steps) * (i + 1)) % TYPHU_SIZE + TYPHU_SIZE) % TYPHU_SIZE);
+    const startedAt = Date.now();
+    const duration = (kind === 'roll' ? TYPHU_ROLL_MS : 0) + Math.max(1, path.length) * TYPHU_MOVE_STEP_MS;
+    this.movement = { id: ++this.movementSeq, playerId: me.id, from, to: path.at(-1) ?? from, path, startedAt, endsAt: startedAt + duration, kind };
+    me.pos = this.movement.to;
+    this.step = 'wait'; this.pendingBuy = null; this.turnEndsAt = this.movement.endsAt;
+    this.timer.set(duration, () => {
+      this.movement = null;
+      if (steps > 0 && from + steps >= TYPHU_SIZE) this.passStart(me);
+      this.land(allowCard);
+    });
+    this.ctx.changed();
   }
-
   private moveTo(cell: number): void {
     const me = this.players[this.current];
-    if (cell <= me.pos) this.passStart(me);
-    me.pos = cell;
-    this.land(false);
+    this.moveBy((cell - me.pos + TYPHU_SIZE) % TYPHU_SIZE || TYPHU_SIZE, false, 'card');
   }
 
   private passStart(me: TPlayer): void {
@@ -265,7 +279,9 @@ export class TyPhuGame implements GameEngine {
     const me = this.players[this.current];
     const c = TYPHU_BOARD[me.pos];
     switch (c.kind) {
-      case 'land': {
+      case 'land':
+      case 'station':
+      case 'utility': {
         const owner = this.owners[me.pos];
         if (!owner) {
           if (me.cash >= c.price) {
@@ -278,7 +294,8 @@ export class TyPhuGame implements GameEngine {
           this.addLog('info', `${me.name} không đủ tiền mua ${c.name}`);
         } else if (owner !== me.id) {
           const o = this.players.find((p) => p.id === owner)!;
-          const rent = rentOf(me.pos, this.houses[me.pos] ?? 0, this.ownsGroup(owner, me.pos));
+          const count = Object.entries(this.owners).filter(([i, id]) => id === owner && TYPHU_BOARD[Number(i)].kind === c.kind).length;
+          const rent = c.kind === 'station' ? stationRent(count) : c.kind === 'utility' ? utilityRent(count, (this.dice?.[0] ?? 0) + (this.dice?.[1] ?? 0)) : rentOf(me.pos, this.houses[me.pos] ?? 0, this.ownsGroup(owner, me.pos));
           const paid = this.charge(me, rent, o, `tiền thuê ${c.name}`);
           this.addLog('rent', `${me.name} trả ${fmt(paid)} xu tiền thuê ${c.name} cho ${o.name}`);
         }
@@ -292,7 +309,8 @@ export class TyPhuGame implements GameEngine {
         this.sendToJail(me, 'bị tóm');
         return this.wait(() => this.nextPlayer());
       case 'chance':
-        if (allowCard) return this.drawCard();
+      case 'community':
+        if (allowCard) return this.drawCard(c.kind === 'community');
         break;
       default:
         break;
@@ -300,9 +318,10 @@ export class TyPhuGame implements GameEngine {
     this.afterLanding();
   }
 
-  private drawCard(): void {
+  private drawCard(community = false): void {
     const me = this.players[this.current];
-    const card = TYPHU_CARDS[Math.floor(this.ctx.rng() * TYPHU_CARDS.length)];
+    const deck = community ? TYPHU_COMMUNITY_CARDS : TYPHU_CARDS;
+    const card = deck[Math.floor(this.ctx.rng() * deck.length)];
     this.card = { id: ++this.logSeq, text: card.text };
     this.addLog('card', `${me.name} rút thẻ: ${card.text}`);
     if (card.money) {
@@ -326,11 +345,7 @@ export class TyPhuGame implements GameEngine {
       return this.wait(() => this.nextPlayer());
     }
     if (card.goto !== undefined) return this.moveTo(card.goto);
-    if (card.move) {
-      const me2 = this.players[this.current];
-      me2.pos = (((me2.pos + card.move) % TYPHU_SIZE) + TYPHU_SIZE) % TYPHU_SIZE;
-      return this.land(false);
-    }
+    if (card.move) return this.moveBy(card.move, false, 'card');
     this.afterLanding();
   }
 
@@ -389,7 +404,7 @@ export class TyPhuGame implements GameEngine {
 
   /** Bán dần nhà rồi đất (rẻ trước) cho ngân hàng với nửa giá tới khi đủ `need` */
   private liquidate(p: TPlayer, need: number): void {
-    const mine = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && this.owners[i] === p.id ? [i] : []));
+    const mine = TYPHU_BOARD.flatMap((c, i) => (isTyPhuProperty(c) && this.owners[i] === p.id ? [i] : []));
     const byValue = (i: number) => (TYPHU_BOARD[i] as { price: number }).price;
     for (const i of [...mine].sort((a, b) => byValue(a) - byValue(b))) {
       while (p.cash < need && (this.houses[i] ?? 0) > 0) {
@@ -443,6 +458,7 @@ export class TyPhuGame implements GameEngine {
   }
 
   private beginRoll(): void {
+    this.movement = null;
     this.step = 'roll';
     this.pendingBuy = null;
     this.armTimer(() => this.roll());
@@ -469,7 +485,7 @@ export class TyPhuGame implements GameEngine {
     for (const [i, owner] of Object.entries(this.owners)) {
       if (owner !== p.id) continue;
       const c = TYPHU_BOARD[Number(i)];
-      if (c.kind === 'land') w += c.price + (this.houses[Number(i)] ?? 0) * TYPHU_GROUPS[c.group].house;
+      if (isTyPhuProperty(c)) w += c.price + (c.kind === 'land' ? (this.houses[Number(i)] ?? 0) * TYPHU_GROUPS[c.group].house : 0);
     }
     return w;
   }
@@ -477,6 +493,7 @@ export class TyPhuGame implements GameEngine {
   private end(winner: TPlayer | null): void {
     if (this.over) return;
     this.over = true;
+    this.movement = null;
     this.timer.clear();
     const ranked = [...this.players].sort((a, b) => {
       if (a.bankrupt !== b.bankrupt) return a.bankrupt ? 1 : -1;

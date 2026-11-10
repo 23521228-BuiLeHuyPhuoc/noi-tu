@@ -1,6 +1,7 @@
 /** Đăng nhập / tạo tài khoản / sửa hồ sơ (lưu thành tích trên server) */
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { GAME_INFO, type GameType, type PublicUser } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { AVATARS, avatarOf } from '../avatars';
@@ -8,7 +9,7 @@ import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Sheet } from './Sheet';
 
-function AvatarPicker({ value, onChange }: { value: number; onChange: (i: number) => void }) {
+function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
   return (
     <View style={styles.avatars}>
       {AVATARS.map((a, i) => (
@@ -16,13 +17,27 @@ function AvatarPicker({ value, onChange }: { value: number; onChange: (i: number
           key={i}
           testID={`avatar-pick-${i}`}
           accessibilityRole="button"
-          accessibilityState={{ selected: value === i }}
+          accessibilityState={{ selected: value === i, disabled }}
+          disabled={disabled}
           onPress={() => onChange(i)}
-          style={[styles.pick, { backgroundColor: a.bg }, value === i && styles.pickOn]}
+          style={[styles.pick, { backgroundColor: a.bg }, value === i && styles.pickOn, disabled && { opacity: 0.45 }]}
         >
           <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+function UserAvatar({ avatar, avatarUrl, size = 60 }: { avatar: number; avatarUrl?: string; size?: number }) {
+  const fallback = avatarOf(avatar);
+  return (
+    <View style={[styles.userAvatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: fallback.bg }]}>
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+      ) : (
+        <Text style={{ fontSize: size * 0.56 }}>{fallback.emoji}</Text>
+      )}
     </View>
   );
 }
@@ -128,23 +143,74 @@ export function ProfileSheet({ game, user, onClose }: { game: Game; user: Public
   const [avatar, setAvatar] = useState(user.avatar);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(user.avatarUrl);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const save = async () => {
     setBusy(true);
-    const err = await game.updateProfile({ displayName: displayName.trim(), avatar });
+    let err = removePhoto ? await game.removeAvatar() : null;
+    if (!err) err = await game.updateProfile({ displayName: displayName.trim(), avatar });
     setBusy(false);
     if (err) setError(err);
     else onClose();
   };
+  const choosePhoto = async () => {
+    setError(null);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setUploading(true);
+    const err = await game.uploadAvatar({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      file: asset.file,
+    });
+    setUploading(false);
+    if (err) setError(err);
+    else {
+      setAvatarPreview(asset.uri);
+      setRemovePhoto(false);
+    }
+  };
   return (
     <Sheet title="Sửa hồ sơ" onClose={onClose}>
       <Field testID="profile-name" label="Tên hiển thị" value={displayName} onChangeText={setDisplayName} autoCapitalize="words" maxLength={24} />
-      <AvatarPicker value={avatar} onChange={setAvatar} />
+      <View style={styles.photoRow}>
+        <UserAvatar avatar={avatar} avatarUrl={avatarPreview} size={72} />
+        <View style={{ flex: 1, gap: 4 }}>
+          <Button
+            testID="avatar-upload"
+            small
+            variant="paper"
+            title={uploading ? 'Đang tải ảnh…' : 'Chọn ảnh của bạn'}
+            disabled={uploading || busy}
+            onPress={choosePhoto}
+          />
+          <T style={styles.photoNote}>JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh được cắt vuông.</T>
+        </View>
+      </View>
+      <T style={styles.label}>Hoặc dùng mặt đại diện có sẵn</T>
+      <AvatarPicker disabled={uploading || busy} value={avatar} onChange={(value) => {
+        setAvatar(value);
+        if (avatarPreview) {
+          setAvatarPreview(undefined);
+          setRemovePhoto(true);
+        }
+      }} />
+      {removePhoto && <T style={styles.photoNote}>Ảnh đã tải sẽ được bỏ khi bạn nhấn Lưu.</T>}
       {error && <T style={styles.error}>{error}</T>}
-      <Button testID="profile-save" title="Lưu" disabled={busy || !displayName.trim()} onPress={save} />
+      <Button testID="profile-save" title="Lưu" disabled={busy || uploading || !displayName.trim()} onPress={save} />
       <Button
         testID="logout-btn"
         title="Đăng xuất"
         variant="paper"
+        disabled={busy || uploading}
         onPress={async () => {
           await game.logout();
           onClose();
@@ -157,15 +223,12 @@ export function ProfileSheet({ game, user, onClose }: { game: Game; user: Public
 const ORDER: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
 
 export function ProfileCard({ user, onEdit }: { user: PublicUser; onEdit: () => void }) {
-  const a = avatarOf(user.avatar);
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);
   const won = Object.values(user.stats).reduce((s, x) => s + (x?.won ?? 0), 0);
   return (
     <Card style={{ gap: 10 }}>
       <View testID="profile-card" style={styles.profileRow}>
-        <View style={[styles.bigAvatar, { backgroundColor: a.bg }]}>
-          <Text style={{ fontSize: 34 }}>{a.emoji}</Text>
-        </View>
+        <UserAvatar avatar={user.avatar} avatarUrl={user.avatarUrl} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <T numberOfLines={1} style={styles.pname}>{user.displayName}</T>
           <T numberOfLines={1} style={styles.puser}>@{user.username}</T>
@@ -203,6 +266,9 @@ const styles = StyleSheet.create({
   pickOn: { ...sticker(2), transform: [{ scale: 1.12 }] },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bigAvatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink },
+  userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink, overflow: 'hidden' },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  photoNote: { fontSize: 11, color: C.muted, lineHeight: 15 },
   pname: { fontSize: 20, fontWeight: '900' },
   puser: { fontSize: 13, color: C.muted, fontWeight: '600' },
   pstat: { fontSize: 13, color: C.jade, fontWeight: '800' },

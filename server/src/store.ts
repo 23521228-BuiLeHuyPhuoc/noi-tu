@@ -12,6 +12,8 @@ export interface UserRecord {
   username: string;
   displayName: string;
   avatar: number;
+  avatarUrl?: string;
+  avatarPublicId?: string;
   passHash: string;
   salt: string;
   stats: Partial<Record<GameType, GameStat>>;
@@ -22,7 +24,7 @@ export interface Store {
   createUser(u: Omit<UserRecord, 'id' | 'stats'>): Promise<UserRecord | null>;
   userByName(username: string): Promise<UserRecord | null>;
   userById(id: string): Promise<UserRecord | null>;
-  updateUser(id: string, patch: { displayName?: string; avatar?: number }): Promise<UserRecord | null>;
+  updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }): Promise<UserRecord | null>;
   createSession(userId: string): Promise<string>;
   userBySession(token: string): Promise<UserRecord | null>;
   deleteSession(token: string): Promise<void>;
@@ -35,7 +37,7 @@ export interface Store {
 }
 
 export function toPublic(u: UserRecord): PublicUser {
-  return { id: u.id, username: u.username, displayName: u.displayName, avatar: u.avatar, stats: u.stats ?? {} };
+  return { id: u.id, username: u.username, displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {} };
 }
 
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
@@ -64,10 +66,15 @@ export class MemoryStore implements Store {
     const u = this.users.get(id);
     return u ? { ...u, stats: { ...u.stats } } : null;
   }
-  async updateUser(id: string, patch: { displayName?: string; avatar?: number }) {
+  async updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }) {
     const u = this.users.get(id);
     if (!u) return null;
-    Object.assign(u, patch);
+    if (patch.displayName !== undefined) u.displayName = patch.displayName;
+    if (patch.avatar !== undefined) u.avatar = patch.avatar;
+    if (patch.avatarUrl === null) delete u.avatarUrl;
+    else if (patch.avatarUrl !== undefined) u.avatarUrl = patch.avatarUrl;
+    if (patch.avatarPublicId === null) delete u.avatarPublicId;
+    else if (patch.avatarPublicId !== undefined) u.avatarPublicId = patch.avatarPublicId;
     return { ...u };
   }
   async createSession(userId: string) {
@@ -109,6 +116,8 @@ interface UserDoc {
   username: string;
   displayName: string;
   avatar: number;
+  avatarUrl?: string;
+  avatarPublicId?: string;
   passHash: string;
   salt: string;
   stats?: Partial<Record<GameType, GameStat>>;
@@ -120,6 +129,8 @@ const fromDoc = (d: UserDoc): UserRecord => ({
   username: d.username,
   displayName: d.displayName,
   avatar: d.avatar,
+  avatarUrl: d.avatarUrl,
+  avatarPublicId: d.avatarPublicId,
   passHash: d.passHash,
   salt: d.salt,
   stats: d.stats ?? {},
@@ -168,9 +179,21 @@ export class MongoStore implements Store {
     const d = await this.users.findOne({ _id: new ObjectId(id) });
     return d ? fromDoc(d) : null;
   }
-  async updateUser(id: string, patch: { displayName?: string; avatar?: number }) {
+  async updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }) {
     if (!ObjectId.isValid(id)) return null;
-    const d = await this.users.findOneAndUpdate({ _id: new ObjectId(id) }, { $set: patch }, { returnDocument: 'after' });
+    const setPatch: { displayName?: string; avatar?: number; avatarUrl?: string; avatarPublicId?: string } = {};
+    const unsetPatch: { avatarUrl?: ''; avatarPublicId?: '' } = {};
+    if (patch.displayName !== undefined) setPatch.displayName = patch.displayName;
+    if (patch.avatar !== undefined) setPatch.avatar = patch.avatar;
+    if (patch.avatarUrl === null) unsetPatch.avatarUrl = '';
+    else if (patch.avatarUrl !== undefined) setPatch.avatarUrl = patch.avatarUrl;
+    if (patch.avatarPublicId === null) unsetPatch.avatarPublicId = '';
+    else if (patch.avatarPublicId !== undefined) setPatch.avatarPublicId = patch.avatarPublicId;
+    const d = await this.users.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: setPatch, $unset: unsetPatch },
+      { returnDocument: 'after' },
+    );
     return d ? fromDoc(d) : null;
   }
   async createSession(userId: string) {

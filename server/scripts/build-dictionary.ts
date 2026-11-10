@@ -115,6 +115,28 @@ function loadSources(dir: string): { headword: Source[]; gloss: Source[] } {
   return { headword, gloss };
 }
 
+// Retain source text verbatim apart from markup/whitespace; never derive definitions from headwords.
+export function extractDefinitions(dir: string): Record<string, { text: string; source: string }> {
+  const definitions: Record<string, { text: string; source: string }> = {};
+  const add = (raw: string, text: unknown, source: string) => {
+    const word = acceptEntry(raw);
+    if (!word || typeof text !== 'string') return;
+    const clean = text.replace(/<[^>]*>/g, ' ').replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim();
+    if (clean && !definitions[word]) definitions[word] = { text: clean.slice(0, 400), source };
+  };
+  const tab = join(dir, 'vietviet.tab');
+  if (existsSync(tab)) for (const line of lines(tab)) {
+    const [word, ...parts] = line.split('\t');
+    add(word, parts.join(' '), 'catusf/tudien: vietviet.tab');
+  }
+  const json = join(dir, 'vntk_dictionary.json');
+  if (existsSync(json)) for (const [word, value] of Object.entries(JSON.parse(readFileSync(json, 'utf8')))) {
+    if (typeof value === 'string') add(word, value, 'vntk/dictionary');
+    else if (Array.isArray(value)) for (const text of value) add(word, text, 'vntk/dictionary');
+  }
+  return definitions;
+}
+
 function main() {
   const dir = process.argv[2];
   if (!dir || !existsSync(dir)) {
@@ -176,6 +198,9 @@ function main() {
   if (sorted.length < 40000) throw new Error(`Kho từ quá ít (${sorted.length}), kiểm tra lại thư mục nguồn`);
 
   writeFileSync(join(DATA_DIR, 'words.txt'), sorted.join('\n') + '\n');
+  const definitionsPath = join(DATA_DIR, 'definitions.json');
+  const previous = existsSync(definitionsPath) ? JSON.parse(readFileSync(definitionsPath, 'utf8')) : {};
+  writeFileSync(definitionsPath, JSON.stringify({ ...previous, ...extractDefinitions(dir) }, null, 2) + '\n');
   const header = (title: string) =>
     `# ${title}\n# Mỗi dòng một từ 2 chữ. Dòng bắt đầu bằng # bị bỏ qua. Khởi động lại server để áp dụng.\n`;
   const extra = join(DATA_DIR, 'extra-words.txt');

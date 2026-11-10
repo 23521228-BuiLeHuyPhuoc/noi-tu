@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
-  CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
+  STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
 } from '../../shared/src/types';
@@ -29,6 +29,7 @@ interface Player {
   name: string;
   connected: boolean;
   avatar: number;
+  avatarUrl?: string;
   account: boolean;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
@@ -84,7 +85,7 @@ export class Room {
   // ---------- người chơi ----------
 
   /** Vào phòng. Nếu `existingId` đã có trong phòng thì coi như vào lại (kể cả khi đang chơi). */
-  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; account?: boolean }): Result<{ playerId: string }> {
+  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean }): Result<{ playerId: string }> {
     const account = profile?.account === true;
     // khách không được mạo danh id tài khoản
     if (existingId?.startsWith(ACCOUNT_PREFIX) && !account) existingId = undefined;
@@ -99,16 +100,19 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), account });
+    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, account });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
   }
 
   /** Đổi tên/ảnh đại diện (khi người chơi sửa hồ sơ tài khoản) — chỉ khi chưa vào ván */
-  updateProfile(playerId: string, name?: string, avatar?: number): void {
+  updateProfile(playerId: string, name?: string, avatar?: number, avatarUrl?: string): void {
     const p = this.find(playerId);
-    if (!p || this.phase === 'playing') return;
+    if (!p) return;
+    // Callers pass the complete public profile, so undefined explicitly clears a removed upload.
+    p.avatarUrl = avatarUrl;
+    if (this.phase === 'playing') { this.changed(); return; }
     if (name && name !== p.name) {
       p.name = '';
       p.name = this.uniqueName(name);
@@ -124,10 +128,21 @@ export class Room {
   /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ */
   addChat(playerId: string, raw: unknown): ChatMsg | null {
     const p = this.find(playerId);
-    if (!p || typeof raw !== 'string') return null;
-    const text = raw.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
-    if (!text) return null;
-    const msg: ChatMsg = { id: ++this.chatSeq, from: p.id, name: p.name, text, at: Date.now() };
+    if (!p) return null;
+    const input = typeof raw === 'string' ? { text: raw } : raw as Record<string, unknown> | null;
+    if (!input || typeof input !== 'object') return null;
+    const base = { id: this.chatSeq + 1, from: p.id, name: p.name, at: Date.now() };
+    let msg: ChatMsg;
+    if ('kind' in input && input.kind === 'sticker') {
+      if (!STICKER_IDS.includes(input.stickerId as StickerId)) return null;
+      msg = { ...base, kind: 'sticker', stickerId: input.stickerId as StickerId };
+    } else {
+      if (('kind' in input && input.kind !== undefined && input.kind !== 'text') || typeof input.text !== 'string') return null;
+      const text = input.text.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+      if (!text) return null;
+      msg = { ...base, kind: 'text', text };
+    }
+    this.chatSeq++;
     this.chat.push(msg);
     if (this.chat.length > CHAT_KEEP) this.chat.shift();
     return msg;
@@ -225,6 +240,7 @@ export class Room {
         name: p.name,
         connected: p.connected,
         avatar: p.avatar,
+        ...(p.avatarUrl ? { avatarUrl: p.avatarUrl } : {}),
         ...(p.account ? { account: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,

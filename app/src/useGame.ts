@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, ChatMsg, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
-  PublicUser, RoomSettings, RoomState, ServerToClientEvents,
+  PublicUser, RoomSettings, RoomState, ServerToClientEvents, StickerId,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
@@ -13,6 +13,14 @@ type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 export type ConnStatus = 'connecting' | 'online' | 'offline';
 
 const ACK_TIMEOUT = 8000;
+
+export interface AvatarUploadAsset {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  /** Expo ImagePicker provides this on web. */
+  file?: Blob;
+}
 
 export interface Game {
   status: ConnStatus;
@@ -39,10 +47,13 @@ export interface Game {
   register(p: { username: string; password: string; displayName: string; avatar?: number }): Promise<string | null>;
   login(username: string, password: string): Promise<string | null>;
   updateProfile(p: { displayName?: string; avatar?: number }): Promise<string | null>;
+  uploadAvatar(asset: AvatarUploadAsset): Promise<string | null>;
+  removeAvatar(): Promise<string | null>;
   logout(): Promise<void>;
   /** tin nhắn trong phòng */
   chat: ChatMsg[];
   sendChat(text: string): Promise<boolean>;
+  sendSticker(stickerId: StickerId): Promise<boolean>;
 }
 
 export function useGame(): Game {
@@ -178,6 +189,63 @@ export function useGame(): Game {
     [call],
   );
 
+  const uploadAvatar = useCallback(async (asset: AvatarUploadAsset): Promise<string | null> => {
+    const token = await storage.getToken();
+    if (!token) return 'Bạn cần đăng nhập trước khi tải ảnh đại diện.';
+    const form = new FormData();
+    if (asset.file) form.append('avatar', asset.file, asset.fileName ?? 'avatar.jpg');
+    else {
+      form.append('avatar', {
+        uri: asset.uri,
+        name: asset.fileName ?? 'avatar.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+      } as unknown as Blob);
+    }
+    try {
+      const response = await fetch(`${SERVER_URL.replace(/\/$/, '')}/api/avatar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; user?: PublicUser; error?: string } | null;
+      if (response.ok && payload?.ok && payload.user) {
+        if ((await storage.getToken()) !== token) return 'Phiên đăng nhập đã thay đổi; ảnh đã lưu vào tài khoản trước đó.';
+        setUser(payload.user);
+        return null;
+      }
+      if (response.status === 413) return 'Ảnh lớn quá, hãy chọn ảnh dưới 5 MB.';
+      if (response.status === 415) return 'Chỉ nhận ảnh JPG, PNG hoặc WebP.';
+      if (response.status === 503) return 'Máy chủ chưa cấu hình kho ảnh Cloudinary.';
+      if (response.status === 429) return 'Bạn vừa tải ảnh lên; chờ vài giây rồi thử lại nhé.';
+      if (response.status === 401) return 'Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.';
+      return payload?.error === 'avatar_upload_failed' ? 'Tải ảnh chưa thành công, thử lại nhé.' : 'Không lưu được ảnh đại diện.';
+    } catch {
+      return 'Không kết nối được máy chủ để tải ảnh.';
+    }
+  }, []);
+
+  const removeAvatar = useCallback(async (): Promise<string | null> => {
+    const token = await storage.getToken();
+    if (!token) return 'Bạn cần đăng nhập trước khi đổi ảnh đại diện.';
+    try {
+      const response = await fetch(`${SERVER_URL.replace(/\/$/, '')}/api/avatar`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; user?: PublicUser } | null;
+      if (response.ok && payload?.ok && payload.user) {
+        if ((await storage.getToken()) !== token) return 'Phiên đăng nhập đã thay đổi.';
+        setUser(payload.user);
+        return null;
+      }
+      if (response.status === 401) return 'Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.';
+      if (response.status === 429) return 'Ảnh đang được xử lý; chờ một chút rồi thử lại nhé.';
+      return 'Không bỏ được ảnh đại diện, thử lại nhé.';
+    } catch {
+      return 'Không kết nối được máy chủ để đổi ảnh đại diện.';
+    }
+  }, []);
+
   return {
     status,
     room,
@@ -211,6 +279,8 @@ export function useGame(): Game {
     register: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:register', p)),
     login: (username, password) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:login', { username, password })),
     updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
+    uploadAvatar,
+    removeAvatar,
     logout: async () => {
       await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:logout'));
       setUser(null);
@@ -220,6 +290,10 @@ export function useGame(): Game {
     chat,
     sendChat: async (text) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { text }));
+      return !!res?.ok;
+    },
+    sendSticker: async (stickerId) => {
+      const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { kind: 'sticker', stickerId }));
       return !!res?.ok;
     },
   };

@@ -4,10 +4,10 @@
  */
 import type { BauCuaSymbol } from '../../shared/src/types';
 
-const INK = '#2A0A10';
+const INK = '#583326';
 
 const wrap = (body: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g stroke="${INK}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><pattern id="paper" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0 3h2M5 7h1" stroke="#AD8D53" stroke-opacity=".14" stroke-width=".5"/></pattern></defs><circle cx="60" cy="60" r="57" fill="#F7E9C4" stroke="#D6AD69" stroke-width="2"/><circle cx="60" cy="60" r="53" fill="url(#paper)" stroke="#B78443" stroke-width=".7"/><g fill="#A83B2B" opacity=".65"><path d="M5 60l5-3 3 3-3 3zM107 60l3-3 5 3-5 3zM60 5l3 5-3 3-3-3zM60 107l3 3-3 5-3-3z"/></g><g stroke="${INK}" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`;
 
 /** chân/càng: vẽ nét mực dày rồi tô màu lên trên cho có viền */
 const limb = (d: string, color: string, w = 6) =>
@@ -80,24 +80,24 @@ const CA = wrap(`
 `);
 
 const CUA = wrap(`
-  ${limb('M36 70 L20 72 L12 84', '#E53935', 4)}
-  ${limb('M38 77 L24 84 L18 96', '#E53935', 4)}
-  ${limb('M44 83 L34 94 L32 106', '#E53935', 4)}
-  ${limb('M84 70 L100 72 L108 84', '#E53935', 4)}
-  ${limb('M82 77 L96 84 L102 96', '#E53935', 4)}
-  ${limb('M76 83 L86 94 L88 106', '#E53935', 4)}
-  ${limb('M38 60 L26 46', '#E53935', 6)}
-  ${limb('M82 60 L94 46', '#E53935', 6)}
-  <path d="M15 40 C12 27 23 20 31 26 L25 33 L33 35 C31 44 19 48 15 40 Z" fill="#E53935"/>
-  <path d="M105 40 C108 27 97 20 89 26 L95 33 L87 35 C89 44 101 48 105 40 Z" fill="#E53935"/>
-  ${limb('M52 50 L49 38', '#E53935', 3)}
-  ${limb('M68 50 L71 38', '#E53935', 3)}
+  ${limb('M36 70 L20 72 L12 84', '#377B8A', 4)}
+  ${limb('M38 77 L24 84 L18 96', '#377B8A', 4)}
+  ${limb('M44 83 L34 94 L32 106', '#377B8A', 4)}
+  ${limb('M84 70 L100 72 L108 84', '#377B8A', 4)}
+  ${limb('M82 77 L96 84 L102 96', '#377B8A', 4)}
+  ${limb('M76 83 L86 94 L88 106', '#377B8A', 4)}
+  ${limb('M38 60 L26 46', '#377B8A', 6)}
+  ${limb('M82 60 L94 46', '#377B8A', 6)}
+  <path d="M15 40 C12 27 23 20 31 26 L25 33 L33 35 C31 44 19 48 15 40 Z" fill="#377B8A"/>
+  <path d="M105 40 C108 27 97 20 89 26 L95 33 L87 35 C89 44 101 48 105 40 Z" fill="#377B8A"/>
+  ${limb('M52 50 L49 38', '#377B8A', 3)}
+  ${limb('M68 50 L71 38', '#377B8A', 3)}
   <circle cx="49" cy="36" r="4" fill="${INK}"/>
   <circle cx="71" cy="36" r="4" fill="${INK}"/>
-  <path d="M30 66 C30 52 44 46 60 46 C76 46 90 52 90 66 C90 80 76 88 60 88 C44 88 30 80 30 66 Z" fill="#E53935"/>
-  <path d="M42 60 C50 54 70 54 78 60" fill="none" stroke="#9E1F1A" stroke-width="2.5"/>
-  <path d="M46 70 C52 74 68 74 74 70" fill="none" stroke="#9E1F1A" stroke-width="2.5"/>
-  <g stroke="none" fill="#FF8A80"><circle cx="50" cy="64" r="2.5"/><circle cx="60" cy="62" r="2.5"/><circle cx="70" cy="64" r="2.5"/></g>
+  <path d="M30 66 C30 52 44 46 60 46 C76 46 90 52 90 66 C90 80 76 88 60 88 C44 88 30 80 30 66 Z" fill="#377B8A"/>
+  <path d="M42 60 C50 54 70 54 78 60" fill="none" stroke="#254E65" stroke-width="2.5"/>
+  <path d="M41 68l5-4 5 4 5-4 5 4 5-4 5 4 5-4 4 4" fill="none" stroke="#D0DED0" stroke-width="1.5"/><path d="M46 70 C52 74 68 74 74 70" fill="none" stroke="#254E65" stroke-width="2.5"/>
+  <g stroke="none" fill="#A8D4CB"><circle cx="50" cy="64" r="2.5"/><circle cx="60" cy="62" r="2.5"/><circle cx="70" cy="64" r="2.5"/></g>
 `);
 
 const TOM = wrap(`
@@ -126,3 +126,10 @@ export const ART: Record<BauCuaSymbol, string> = Object.fromEntries(
 
 /** mã SVG gốc (dùng để xem thử / kiểm tra) */
 export const ART_SVG = SVG;
+
+// A carved repeat around each lacquer card, shared by all six illustrations.
+const frameDiamonds = [
+  ...Array.from({ length: 12 }, (_, i) => `<path d="M${5 + i * 10} 3l3 3-3 3-3-3zM${5 + i * 10} 151l3 3-3 3-3-3z"/>`),
+  ...Array.from({ length: 14 }, (_, i) => `<path d="M3 ${13 + i * 10}l3 3-3 3-3-3zM114 ${13 + i * 10}l3 3-3 3-3-3z"/>`),
+].join('');
+export const CARD_FRAME = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" preserveAspectRatio="none"><rect width="120" height="160" rx="7" fill="#A32F25"/><rect x="8" y="10" width="104" height="140" rx="3" fill="none" stroke="#E4BA6A" stroke-width=".8"/><g fill="#E2B160">${frameDiamonds}</g></svg>`)}`;

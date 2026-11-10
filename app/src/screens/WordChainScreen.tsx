@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
-import type { RoomState, WordChainView, WordHistoryItem, WordVote } from '../../../shared/src/types';
+import type { RoomState, WordChainView, WordDefinition, WordHistoryItem, WordVote } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { actionText, quip } from '../messages';
 import { useOnNew, useSecondsLeft } from '../hooks';
@@ -141,6 +141,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
         <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
           {first} <T style={styles.last}>{last}</T>
         </T>
+        <Definition definition={g.currentDefinition} current />
         <T testID="next-count" style={styles.count}>
           Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
         </T>
@@ -267,19 +268,45 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
   );
 }
 
+function Definition({ definition, current = false }: { definition?: WordDefinition; current?: boolean }) {
+  const text = definition?.text.trim();
+  const source = definition?.source?.trim();
+  return (
+    <View style={[styles.definition, current && styles.currentDefinition]} testID={current ? 'current-definition' : 'history-definition'}>
+      <T style={[styles.definitionText, !text && styles.definitionMissing]}>
+        {text || 'Chưa có giải nghĩa'}
+      </T>
+      {source && <T style={styles.definitionSource}>Nguồn: {source}</T>}
+    </View>
+  );
+}
+
 function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) => boolean; names: Map<string, string> }) {
   switch (item.kind) {
     case 'start':
-      return <T style={styles.sys}>Từ mở đầu: {item.word}</T>;
+      return (
+        <View style={styles.historyEntry}>
+          <T style={styles.sys}>Từ mở đầu: {item.word}</T>
+          <Definition definition={item.definition} />
+        </View>
+      );
     case 'newWord':
-      return <T style={styles.sys}>Đổi từ mới: {item.word}</T>;
+      return (
+        <View style={styles.historyEntry}>
+          <T style={styles.sys}>Đổi từ mới: {item.word}</T>
+          <Definition definition={item.definition} />
+        </View>
+      );
     case 'hint':
       return <T style={styles.sys}>{isMe(item.playerId) ? 'Bạn' : item.name} đã gọi cứu trợ 🆘</T>;
     case 'vote':
       return (
-        <T style={[styles.sys, { color: item.approved ? C.jade : C.danger }]}>
-          {item.approved ? `✅ Cả phòng duyệt “${item.word}” (từ mới)` : `❌ “${item.word}” không được duyệt`}
-        </T>
+        <View style={styles.historyEntry}>
+          <T style={[styles.sys, { color: item.approved ? C.jade : C.danger }]}>
+            {item.approved ? `✅ Cả phòng duyệt “${item.word}” (từ mới)` : `❌ “${item.word}” không được duyệt`}
+          </T>
+          <Definition definition={item.definition} />
+        </View>
       );
     case 'eliminated':
       return (
@@ -289,9 +316,12 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
       );
     case 'word':
       return (
-        <View style={styles.wordRow}>
-          <T style={styles.wordText}>{item.word}</T>
-          <T numberOfLines={1} style={styles.by}>{isMe(item.playerId) ? 'Bạn' : item.name}</T>
+        <View style={styles.historyEntry}>
+          <View style={styles.wordRow}>
+            <T style={styles.wordText}>{item.word}</T>
+            <T numberOfLines={1} style={styles.by}>{isMe(item.playerId) ? 'Bạn' : item.name}</T>
+          </View>
+          <Definition definition={item.definition} />
         </View>
       );
   }
@@ -329,8 +359,14 @@ const styles = StyleSheet.create({
   voteNote: { fontSize: 12, color: C.muted, textAlign: 'center' },
   error: { color: C.ink, backgroundColor: C.gold, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
   history: { gap: 2, paddingVertical: 10 },
+  historyEntry: { paddingVertical: 7, gap: 2, minWidth: 0 },
+  definition: { gap: 3, minWidth: 0, alignSelf: 'stretch' },
+  currentDefinition: { backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  definitionText: { color: C.ink, fontSize: 14, lineHeight: 21 },
+  definitionMissing: { color: C.muted, fontStyle: 'italic' },
+  definitionSource: { color: C.muted, fontSize: 12, lineHeight: 18, flexShrink: 1 },
   wordRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 3 },
-  wordText: { fontSize: 18, fontWeight: '800' },
+  wordText: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
   by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right' },
   sys: { color: C.muted, fontSize: 14, fontStyle: 'italic', paddingVertical: 3 },
 });

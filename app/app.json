@@ -3,7 +3,7 @@
     "name": "Xóm Lầy",
     "slug": "noi-tu",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
@@ -23,6 +23,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Xóm Lầy chọn ảnh làm avatar."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "6f9fb2b3-7eb6-4fc9-b47f-998754cc2555"

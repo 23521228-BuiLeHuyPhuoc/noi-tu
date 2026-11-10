@@ -1,15 +1,21 @@
 // Chạy giống play.mjs (server với TURN_SECONDS=8, bản web ở cổng 8081): node games.mjs
 // E2E Cờ cá ngựa, Bầu cua và tính năng ném/khịa/hối.
 import { chromium } from 'playwright-core';
+import { existsSync } from 'node:fs';
 
-const WEB = 'http://localhost:8081';
+const WEB = process.env.E2E_WEB ?? 'http://localhost:8081';
 let failures = 0;
 const check = (cond, msg) => {
   console.log(cond ? 'OK  ' : 'FAIL', msg);
   if (!cond) failures++;
 };
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+const executablePath = process.env.E2E_BROWSER ?? [
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/usr/bin/google-chrome', '/usr/bin/chromium',
+].find(existsSync);
+const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
 async function phone(name) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
@@ -116,8 +122,8 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   check((await a.t('shake-btn').count()) + (await b.t('shake-btn').count()) === 0, 'không còn nút Lắc, máy tự lắc');
   await a.page.getByText('Máy đang lắc bát').waitFor({ timeout: 12000 });
   check(true, 'hết giờ cược: máy tự lắc bát');
-  await b.t('bc-reveal').waitFor({ timeout: 6000 });
-  check((await b.page.locator('[data-testid="reveal-die"]').count()) === 3, 'mở bát toàn màn hình với 3 con');
+  await b.page.waitForFunction(() => document.querySelector('[data-testid="bc-bowl-stage"]')?.getAttribute('aria-label') === 'Bát đã mở, ba xúc xắc trên đĩa', null, { timeout: 6000 });
+  check((await b.t('bc-bowl-stage').getByTestId('bc-die').count()) === 3, 'mở bát trên bàn với 3 con');
   await b.t('bc-delta').waitFor({ timeout: 6000 });
   const delta = await b.t('bc-delta').textContent();
   check(/xu/.test(delta), `mở bát, Bình thấy kết quả: ${delta}`);

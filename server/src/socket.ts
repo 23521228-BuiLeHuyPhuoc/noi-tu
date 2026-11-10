@@ -54,7 +54,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       const displayName = user ? user.displayName : name;
       // vào socket room trước để nhận được room:state ngay sau khi thêm người chơi
       socket.join(room.code);
-      const res = room.addPlayer(displayName, wanted, user ? { avatar: user.avatar, account: true } : undefined);
+      const res = room.addPlayer(displayName, wanted, user ? { avatar: user.avatar, avatarUrl: user.avatarUrl, account: true } : undefined);
       if (!res.ok) {
         socket.leave(room.code);
         return res;
@@ -139,7 +139,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       const room = currentRoom();
       if (!room || !session || !p || typeof p !== 'object') return reply({ ok: false });
       if (!chatLimiter.take()) return reply({ ok: false });
-      const msg = room.addChat(session.playerId, p.text);
+      const msg = room.addChat(session.playerId, p);
       if (!msg) return reply({ ok: false });
       io.to(room.code).emit('chat:msg', msg);
       reply({ ok: true });
@@ -189,7 +189,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
         (r) => {
           const room = currentRoom();
           if (r.ack.ok && room && session?.playerId === ACCOUNT_PREFIX + uid) {
-            room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar);
+            room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar, r.ack.user.avatarUrl);
           }
         },
       );
@@ -206,6 +206,14 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       else done();
     });
 
-    socket.on('disconnect', () => detach(false));
+    const profileChanged = (updated: UserRecord) => {
+      if (user?.id !== updated.id) return;
+      user = updated;
+      const room = currentRoom();
+      if (room && session?.playerId === ACCOUNT_PREFIX + updated.id)
+        room.updateProfile(session.playerId, updated.displayName, updated.avatar, updated.avatarUrl);
+    };
+    auth.profiles.on('updated', profileChanged);
+    socket.on('disconnect', () => { auth.profiles.off('updated', profileChanged); detach(false); });
   });
 }

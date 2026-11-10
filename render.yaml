@@ -14,6 +14,13 @@ services:
         sync: false
       - key: DATABASE_NAME
         value: xomlay
+      # Cloudinary: nhập riêng trong Render, KHÔNG ghi API secret vào repo
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
   # Bản web của app: mở link là chơi được trên mọi điện thoại (kể cả iPhone)
   - type: web

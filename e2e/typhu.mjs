@@ -1,9 +1,9 @@
 // Chạy giống play.mjs (server với TURN_SECONDS=8, bản web ở cổng 8081): node typhu.mjs [thư-mục-ảnh]
 // E2E Cờ tỷ phú: 3 người chơi vài vòng (đổ xúc xắc, mua đất, xong lượt), xem chi tiết ô, tổng kết.
 import { chromium } from 'playwright-core';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 
-const WEB = 'http://localhost:8081';
+const WEB = process.env.E2E_WEB ?? 'http://localhost:8081';
 const SHOTS = process.argv[2] ?? '/tmp/typhu';
 mkdirSync(SHOTS, { recursive: true });
 let failures = 0;
@@ -12,7 +12,12 @@ const check = (cond, msg) => {
   if (!cond) failures++;
 };
 
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+const executablePath = process.env.E2E_BROWSER ?? [
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/usr/bin/google-chrome', '/usr/bin/chromium',
+].find(existsSync);
+const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
 async function phone(name) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
@@ -40,7 +45,7 @@ await ps[0].page.waitForFunction(() => document.querySelectorAll('[data-testid^=
 await ps[0].page.screenshot({ path: `${SHOTS}/1-lobby.png` });
 await ps[0].t('start-btn').click();
 for (const p of ps) await p.t('cell-0').waitFor();
-check((await ps[0].page.locator('[data-testid^="cell-"]').count()) === 28, 'bàn cờ có 28 ô');
+check((await ps[0].page.locator('[data-testid^="cell-"]').count()) === 40, 'bàn cờ có 40 ô');
 check((await ps[0].page.locator('[data-testid^="token-"]').count()) === 3, '3 quân cờ ở ô Xuất phát');
 await ps[0].page.screenshot({ path: `${SHOTS}/2-start.png` });
 
@@ -83,7 +88,7 @@ check(owned >= 1, `bàn cờ tô màu chủ đất (${owned} ô)`);
 await ps[1].page.screenshot({ path: `${SHOTS}/4-board.png` });
 
 // xem chi tiết một ô đất
-await ps[2].t('cell-27').click();
+await ps[2].t('cell-39').click();
 await ps[2].page.getByText('Thành phố lớn').waitFor();
 check((await ps[2].page.getByText('Khách sạn').count()) > 0, 'chạm ô Sài Gòn: hiện bảng giá thuê đến khách sạn');
 await ps[2].page.screenshot({ path: `${SHOTS}/5-detail.png` });

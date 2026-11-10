@@ -205,11 +205,12 @@ export class WordChainGame implements GameEngine {
       words: Object.fromEntries(this.players.map((p) => [p.id, p.words])),
       hintUsed: this.players.filter((p) => p.hintUsed).map((p) => p.id),
       currentWord: this.currentWord,
+      currentDefinition: this.ctx.dict.definition(this.currentWord),
       currentPlayerId: this.over ? null : this.currentId,
       turnEndsAt: this.over ? null : this.turnEndsAt,
       turnSeconds: this.turnMs / 1000,
       nextCount: this.ctx.dict.countNext(lastSyllable(this.currentWord), this.used),
-      history: this.history,
+      history: this.history.map((item) => 'word' in item ? { ...item, definition: this.ctx.dict.definition(item.word) } : item),
       totalWords: this.totalWords,
       vote: this.over ? null : this.vote,
     };

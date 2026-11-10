@@ -1,17 +1,23 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { normalizeWord, firstSyllable, lastSyllable } from '../../shared/src/vi';
-import { WORD_SYLLABLES } from '../../shared/src/types';
+import { type WordDefinition, WORD_SYLLABLES } from '../../shared/src/types';
 
 export type Rng = () => number;
 
 export class Dictionary {
+  private readonly definitions = new Map<string, WordDefinition>();
   private readonly words = new Set<string>();
   private readonly byFirst = new Map<string, string[]>();
   /** các từ có thể dùng làm từ mở đầu (chữ cuối có ít nhất vài từ nối tiếp) */
   private starters: string[] = [];
 
-  constructor(words: Iterable<string>, private readonly banned: ReadonlySet<string> = new Set()) {
+  constructor(words: Iterable<string>, private readonly banned: ReadonlySet<string> = new Set(), definitions: Record<string, WordDefinition> = {}) {
+    for (const [raw, value] of Object.entries(definitions)) {
+      const word = normalizeWord(raw);
+      if (word && value && typeof value.text === "string" && value.text.trim() && typeof value.source === "string" && value.source.trim())
+        this.definitions.set(word, { text: value.text.trim().slice(0, 400), source: value.source.trim() });
+    }
     for (const raw of words) this.insert(raw);
     this.starters = [...this.words].filter((w) => (this.byFirst.get(lastSyllable(w))?.length ?? 0) >= 3);
   }
@@ -43,7 +49,14 @@ export class Dictionary {
         .filter((l) => l && !l.startsWith('#'));
     };
     const banned = new Set(read('banned-words.txt').map((w) => normalizeWord(w)).filter((w): w is string => !!w));
-    return new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned);
+    const path = join(dataDir, 'definitions.json');
+    const definitions = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+    return new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned, definitions);
+  }
+
+  definition(raw: string): WordDefinition {
+    const word = normalizeWord(raw);
+    return (word && this.definitions.get(word)) || { text: "Chưa có giải nghĩa", source: null };
   }
 
   get size(): number {

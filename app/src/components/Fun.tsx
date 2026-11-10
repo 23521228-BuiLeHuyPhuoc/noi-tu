@@ -3,7 +3,7 @@
  * bị hối thì rung máy + lắc màn hình, pháo giấy khi thắng.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CHAT_MAX, EMOJIS, MAX_HP, type ChatMsg, type FunEvent, type HitMove, type PublicPlayer, type ThrowItem } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { HITS, TAUNTS, THROWS } from '../messages';
@@ -14,6 +14,7 @@ import { C, FONT, sticker } from '../theme';
 import { avatarOf } from '../avatars';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
+import { STICKERS, stickerOf } from '../stickers';
 
 // ---------- Lắc màn hình ----------
 
@@ -102,11 +103,14 @@ function Splat({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => v
   );
 }
 
-function Bubble({ text, at, onDone, chat }: { text: string; at: Rect; onDone: () => void; chat?: boolean }) {
+function Bubble({ text, at, onDone, chat, stickerId }: { text: string; at: Rect; onDone: () => void; chat?: boolean; stickerId?: ChatMsg['stickerId'] }) {
+  const done = useRef(onDone);
+  useEffect(() => { done.current = onDone; }, [onDone]);
   useEffect(() => {
-    const id = setTimeout(onDone, chat ? 3800 : 2600);
+    const id = setTimeout(() => done.current(), chat ? 6000 : 4500);
     return () => clearTimeout(id);
-  }, [onDone, chat]);
+  }, [chat]);
+  const asset = stickerId ? stickerOf(stickerId) : undefined;
   return (
     <View
       style={[
@@ -118,7 +122,7 @@ function Bubble({ text, at, onDone, chat }: { text: string; at: Rect; onDone: ()
       ]}
     >
       <View style={[styles.tail, chat && { backgroundColor: C.ink }]} />
-      <Text numberOfLines={3} style={[styles.bubbleText, chat && { color: C.gold }]}>{text}</Text>
+      {asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.bubbleSticker} resizeMode="contain" /> : <Text numberOfLines={3} style={[styles.bubbleText, chat && { color: C.gold }]}>{text}</Text>}
     </View>
   );
 }
@@ -127,9 +131,13 @@ function Bubble({ text, at, onDone, chat }: { text: string; at: Rect; onDone: ()
 function Float({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
   const [dx] = useState(() => (Math.random() - 0.5) * 50);
+  const done = useRef(onDone);
+  useEffect(() => { done.current = onDone; }, [onDone]);
   useEffect(() => {
-    Animated.timing(t, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: false }).start(onDone);
-  }, [t, onDone]);
+    const animation = Animated.timing(t, { toValue: 1, duration: 4000, easing: Easing.out(Easing.quad), useNativeDriver: false });
+    animation.start(({ finished }) => { if (finished) done.current(); });
+    return () => animation.stop();
+  }, [t]);
   return (
     <Animated.Text
       style={[
@@ -195,7 +203,7 @@ function Impact({ at, damage, hp, ko, onDone }: { at: Rect; damage: number; hp: 
 type FxIn =
   | { kind: 'fly'; emoji: string; from: Rect; to: Rect; after?: () => void; fast?: boolean }
   | { kind: 'splat'; emoji: string; at: Rect }
-  | { kind: 'bubble'; text: string; at: Rect; chat?: boolean }
+  | { kind: 'bubble'; text: string; at: Rect; chat?: boolean; stickerId?: ChatMsg['stickerId'] }
   | { kind: 'float'; emoji: string; at: Rect }
   | { kind: 'impact'; at: Rect; damage: number; hp: number; ko: boolean };
 type Fx = FxIn & { id: number };
@@ -212,7 +220,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   }, [players]);
 
   const add = useCallback((f: FxIn) => {
-    setFx((xs) => [...xs.slice(-16), { ...f, id: ++seq.current }]);
+    setFx((xs) => [...xs.slice(-15), { ...f, id: ++seq.current }]);
   }, []);
   const remove = useCallback((id: number) => setFx((xs) => xs.filter((x) => x.id !== id)), []);
   const origin = () => (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
@@ -221,7 +229,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   useOnNew(chat, (m) => {
     if (m.from !== game.me) play('chat');
     const at = rectOf(`avatar-${m.from}`, origin());
-    if (at) add({ kind: 'bubble', text: m.text, at, chat: true });
+    if (at) add({ kind: 'bubble', text: m.kind === 'sticker' ? (stickerOf(m.stickerId)?.alt ?? 'Nhãn dán') : m.text, stickerId: m.stickerId, at, chat: true });
   });
 
   useEffect(() => {
@@ -299,7 +307,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         ) : f.kind === 'impact' ? (
           <Impact key={f.id} at={f.at} damage={f.damage} hp={f.hp} ko={f.ko} onDone={() => remove(f.id)} />
         ) : (
-          <Bubble key={f.id} text={f.text} at={f.at} chat={f.chat} onDone={() => remove(f.id)} />
+          <Bubble key={f.id} text={f.text} at={f.at} chat={f.chat} stickerId={f.stickerId} onDone={() => remove(f.id)} />
         ),
       )}
     </View>
@@ -360,15 +368,18 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
 export function ChatSheet({ game, players, onClose }: { game: Game; players: PublicPlayer[]; onClose: () => void }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
   const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const me = game.me;
   const send = async () => {
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
-    const ok = await game.sendChat(t);
-    setSending(false);
-    if (ok) setText('');
+    try {
+      if (await game.sendChat(t)) setText('');
+    } finally {
+      setSending(false);
+    }
   };
   const avatar = (id: string) => avatarOf(players.find((p) => p.id === id)?.avatar ?? 0);
   return (
@@ -401,6 +412,15 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           />
         ))}
       </ScrollView>
+      <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán Quỳnh Aka' : 'Nhãn dán Quỳnh Aka · 9'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />
+      {showStickers && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
+        {STICKERS.map((item) => <Pressable key={item.id} testID={`sticker-${item.id}`} accessibilityRole="button" accessibilityLabel={`Gửi nhãn dán ${item.alt}`} disabled={sending} style={[styles.stickerOption, sending && { opacity: 0.5 }]} onPress={async () => {
+          if (sending) return;
+          setSending(true);
+          try { if (await game.sendSticker(item.id)) setShowStickers(false); }
+          finally { setSending(false); }
+        }}><Image source={item.source} accessibilityLabel={item.alt} style={styles.stickerThumb} resizeMode="contain" /></Pressable>)}
+      </ScrollView>}
       <ScrollView
         ref={listRef}
         testID="chat-list"
@@ -412,14 +432,16 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
         {game.chat.map((m) => {
           const mine = m.from === me;
           const a = avatar(m.from);
+          const avatarUrl = players.find((p) => p.id === m.from)?.avatarUrl;
+          const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
           return (
             <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
               <View style={[styles.msgAvatar, { backgroundColor: a.bg }]}>
-                <Text style={{ fontSize: 16 }}>{a.emoji}</Text>
+                <>{avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Text style={{ fontSize: 16 }}>{a.emoji}</Text>}</>
               </View>
               <View style={[styles.msg, mine ? styles.msgMine : null]}>
                 {!mine && <T style={styles.msgName}>{m.name}</T>}
-                <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>
+                {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>}
               </View>
             </View>
           );
@@ -490,6 +512,12 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
+  stickerRow: { gap: 8, paddingVertical: 4 },
+  stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 12 },
+  stickerThumb: { width: 80, height: 84 },
+  messageSticker: { width: 130, height: 130 },
+  bubbleSticker: { width: 130, height: 110 },
+  avatarImage: { width: 25, height: 25, borderRadius: 13 },
   fly: { position: 'absolute', fontSize: 44, zIndex: 90 },
   splat: { position: 'absolute', fontSize: 80, zIndex: 90 },
   bubble: {

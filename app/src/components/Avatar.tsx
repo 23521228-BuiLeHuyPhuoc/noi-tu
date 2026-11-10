@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicPlayer } from '../../../shared/src/types';
 import { avatarOf } from '../avatars';
 import { C, FONT } from '../theme';
@@ -38,7 +38,11 @@ export function Avatar({
           active && styles.active,
         ]}
       >
-        <Text style={{ fontSize: size * 0.55 }}>{a.emoji}</Text>
+        {player.avatarUrl ? (
+          <Image source={{ uri: player.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+        ) : (
+          <Text style={{ fontSize: size * 0.55 }}>{a.emoji}</Text>
+        )}
         {host && <Text style={styles.crown}>👑</Text>}
         {!player.connected && <Text style={styles.off}>💤</Text>}
       </View>
