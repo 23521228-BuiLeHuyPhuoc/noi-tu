@@ -11,7 +11,7 @@
  */
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
-  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent, TYPHU_MOVE_STEP_MS, type TyPhuMovement,
+  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent, TYPHU_MOVE_STEP_MS, TYPHU_ROLL_MIN_MS, type TyPhuMovement,
 } from '../../../shared/src/typhu';
 import type { ActionResult, GameAction, TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
 import { DICE_DEFAULT_IMPULSE, sanitizeImpulse, type DiceRollView, type ThrowImpulse } from '../../../shared/src/dice';
@@ -218,7 +218,14 @@ export class TyPhuGame implements GameEngine {
   /** Tung xúc xắc: server mô phỏng vật lý rồi đọc mặt ngửa; client chỉ phát lại các khung hình. */
   private roll(impulse: ThrowImpulse = DICE_DEFAULT_IMPULSE): void {
     const me = this.players[this.current];
-    const res = (this.ctx.rollDice ?? simulateThrow)(impulse, this.ctx.rng);
+    let res: ReturnType<typeof simulateThrow>;
+    try {
+      res = (this.ctx.rollDice ?? simulateThrow)(impulse, this.ctx.rng);
+    } catch (err) {
+      // phòng hờ: mô phỏng lỗi thì không để sập server, rơi về đổ ngẫu nhiên (client tự hiện hoạt hình)
+      console.error('[typhu] mô phỏng xúc xắc lỗi, dùng kết quả ngẫu nhiên', err);
+      res = { dice: [1 + Math.floor(this.ctx.rng() * 6), 1 + Math.floor(this.ctx.rng() * 6)], frames: [], ms: TYPHU_ROLL_MIN_MS, fps: 30 };
+    }
     const [d1, d2] = res.dice;
     this.dice = [d1, d2];
     this.rollId++;

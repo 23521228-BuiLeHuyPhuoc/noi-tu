@@ -85,10 +85,10 @@ export interface TyPhuMovement {
   delay: number;
   kind: 'roll' | 'card' | 'jail';
 }
-/** mỗi ô quân cờ đi mất ~400ms; xúc xắc lăn 1,6-2,6s tuỳ mô phỏng vật lý */
+/** mỗi ô quân cờ đi mất ~400ms; xúc xắc lăn 1,6-2,1s tuỳ mô phỏng vật lý */
 export const TYPHU_MOVE_STEP_MS = 400;
 export const TYPHU_ROLL_MIN_MS = 1600;
-export const TYPHU_ROLL_MAX_MS = 2600;
+export const TYPHU_ROLL_MAX_MS = 2100;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
   return cell.kind === 'land' || cell.kind === 'station' || cell.kind === 'utility';
 }

@@ -199,8 +199,8 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
   let restFrame = -1;
   for (let step = 1; nFrames < maxFrames; step++) {
     const t = step * DT;
-    // sau ~1,5s tăng dần ma sát để chắc chắn đứng yên trong thời gian cho phép
-    const extra = t > 1.5 ? Math.min(7, (t - 1.5) * 8) : 0;
+    // sau ~0,9s tăng dần ma sát để chắc chắn đứng yên trong thời gian cho phép (~1,6-2 s)
+    const extra = t > 0.9 ? Math.min(10, (t - 0.9) * 9) : 0;
     for (const b of bodies) {
       b.v = [b.v[0] * (1 - 0.15 * DT), b.v[1] + GRAVITY * DT, b.v[2] * (1 - 0.15 * DT)];
       const damp = 1 - (0.6 + extra) * DT;
