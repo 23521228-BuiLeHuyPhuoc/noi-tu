@@ -35,6 +35,35 @@ describe('Dictionary', () => {
     expect(d.randomStart(new Set())).toBeNull();
   });
 
+  it('randomStart ưu tiên từ có giải nghĩa', () => {
+    const words = ['ăn cơm', 'cơm nếp', 'cơm tấm', 'cơm hến', 'hến ăn', 'bàn cơm', 'bàn ghế'];
+    const d = new Dictionary(words, new Set(), { 'bàn cơm': { text: 'nghĩa hợp lệ', source: 't' } });
+    for (let i = 0; i < 50; i++) expect(d.randomStart(new Set())).toBe('bàn cơm');
+    // từ có nghĩa đã dùng hết thì quay về kho thường
+    expect(d.randomStart(new Set(['bàn cơm']))).not.toBeNull();
+  });
+
+  it('randomStart quay về kho thường khi không có giải nghĩa nào', () => {
+    const d = new Dictionary(['ăn cơm', 'cơm nếp', 'cơm tấm', 'cơm hến']);
+    expect(d.randomStart(new Set())).toBe('ăn cơm');
+  });
+
+  it('bỏ giải nghĩa tham chiếu "Xem ..." hoặc quá ngắn', () => {
+    const src = (text: string) => ({ text, source: 't' });
+    const d = new Dictionary(['cái bàn', 'con mèo', 'quả cam', 'bàn ghế', 'mèo con'], new Set(), {
+      'cái bàn': src('Xem Hòn Chông'),
+      'con mèo': src('  xem mèo mướp'),
+      'quả cam': src('abc'),
+      'bàn ghế': src('Xemloa là một từ'),
+      'mèo con': src('Con mèo nhỏ'),
+    });
+    expect(d.definition('cái bàn').source).toBeNull();
+    expect(d.definition('con mèo').source).toBeNull();
+    expect(d.definition('quả cam').source).toBeNull();
+    expect(d.definition('bàn ghế').source).toBe('t');
+    expect(d.definition('mèo con').text).toBe('Con mèo nhỏ');
+  });
+
   it('load: words.txt + extra − banned, bỏ dòng chú thích', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dict-'));
     writeFileSync(join(dir, 'words.txt'), 'con mèo\nđồ đạc\nđồ vật\n');

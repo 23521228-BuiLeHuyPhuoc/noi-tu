@@ -5,21 +5,30 @@ import { type WordDefinition, WORD_SYLLABLES } from '../../shared/src/types';
 
 export type Rng = () => number;
 
+/** Giải nghĩa dùng được: không phải tham chiếu chéo ("Xem ...") và không quá ngắn */
+export function usableDefinition(text: string): boolean {
+  const t = text.trim();
+  return t.length >= 4 && !/^[Xx]em /.test(t);
+}
+
 export class Dictionary {
   private readonly definitions = new Map<string, WordDefinition>();
   private readonly words = new Set<string>();
   private readonly byFirst = new Map<string, string[]>();
   /** các từ có thể dùng làm từ mở đầu (chữ cuối có ít nhất vài từ nối tiếp) */
   private starters: string[] = [];
+  /** như `starters` nhưng chỉ gồm từ có giải nghĩa dùng được */
+  private definedStarters: string[] = [];
 
   constructor(words: Iterable<string>, private readonly banned: ReadonlySet<string> = new Set(), definitions: Record<string, WordDefinition> = {}) {
     for (const [raw, value] of Object.entries(definitions)) {
       const word = normalizeWord(raw);
-      if (word && value && typeof value.text === "string" && value.text.trim() && typeof value.source === "string" && value.source.trim())
+      if (word && value && typeof value.text === "string" && typeof value.source === "string" && value.source.trim() && usableDefinition(value.text))
         this.definitions.set(word, { text: value.text.trim().slice(0, 400), source: value.source.trim() });
     }
     for (const raw of words) this.insert(raw);
     this.starters = [...this.words].filter((w) => (this.byFirst.get(lastSyllable(w))?.length ?? 0) >= 3);
+    this.definedStarters = this.starters.filter((w) => this.definitions.has(w));
   }
 
   /** Thêm một từ (vd. từ được cả phòng duyệt). Trả về từ đã chuẩn hóa nếu thêm mới, ngược lại null. */
@@ -89,10 +98,14 @@ export class Dictionary {
       const list = this.byFirst.get(lastSyllable(w)) ?? [];
       return list.some((x) => x !== w && !used.has(x));
     };
-    const pool = this.starters.length ? this.starters : [...this.words];
-    for (let i = 0; i < 100 && pool.length; i++) {
-      const w = pool[Math.floor(rng() * pool.length)];
-      if (ok(w)) return w;
+    // ưu tiên từ có giải nghĩa; hết cách mới dùng kho thường
+    const pools = [this.definedStarters, this.starters.length ? this.starters : [...this.words]];
+    for (const pool of pools) {
+      for (let i = 0; i < 100 && pool.length; i++) {
+        const w = pool[Math.floor(rng() * pool.length)];
+        if (ok(w)) return w;
+      }
+      for (const w of pool) if (ok(w)) return w;
     }
     for (const w of this.words) if (ok(w)) return w;
     return null;

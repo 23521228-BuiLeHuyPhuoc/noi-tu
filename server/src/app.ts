@@ -37,8 +37,9 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
     next();
   });
-  attachAvatarRoute(app, store, auth, opts.avatarUploader ?? cloudinaryUploader());
-  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, rooms: manager.size, db: store.kind }));
+  const avatarUploader = opts.avatarUploader ?? cloudinaryUploader();
+  attachAvatarRoute(app, store, auth, avatarUploader);
+  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, rooms: manager.size, db: store.kind, avatarUploads: !!avatarUploader }));
   app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
   const http = createServer(app);
 

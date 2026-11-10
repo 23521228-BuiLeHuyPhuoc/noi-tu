@@ -31,6 +31,12 @@ describe('avatar upload', () => {
     const {url,token} = await setup();
     expect((await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`}})).status).toBe(503);
   });
+  it('/health báo avatarUploads theo cấu hình uploader', async () => {
+    const off = await setup();
+    expect((await (await fetch(off.url.replace('/api/avatar', '/health'))).json()).avatarUploads).toBe(false);
+    const on = await setup({upload:async () => ({secure_url:'https://example.test/a.png',public_id:'x'})});
+    expect((await (await fetch(on.url.replace('/api/avatar', '/health'))).json()).avatarUploads).toBe(true);
+  });
   it('persists uploaded profile and retains numeric fallback across resume', async () => {
     let calls=0;
     let uploadedFor = '';
