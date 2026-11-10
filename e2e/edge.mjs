@@ -65,10 +65,13 @@ const secs = async (p) => Number((await p.t('seconds-left').textContent()).repla
   await a.page.getByText('Chi đã rời phòng').waitFor({ timeout: 5000 });
   check(true, 'người còn lại thấy "Chi đã rời phòng" trong lịch sử');
 
-  await c.t('code-input').fill(code);
-  await c.t('join-btn').click();
-  await c.t('home-error').waitFor();
-  check((await c.t('home-error').textContent()).includes('đang chơi'), 'vào phòng đang chơi bị từ chối');
+  // người lạ vào giữa ván: vào được với tư cách người xem (banner chế độ xem)
+  const d = await phone('Dũng');
+  await d.t('code-input').fill(code);
+  await d.t('join-btn').click();
+  await d.t('spectator-banner').waitFor();
+  check(true, 'người mới vào phòng đang chơi: thành người xem, có banner chế độ xem');
+  check((await d.page.getByText('Bạn đang xem').count()) === 1, 'thông báo chế độ xem chỉ hiện một lần');
 
   for (const p of [a, b]) await p.t('result-title').waitFor({ timeout: 30000 });
   check(true, 'ván 2 người còn lại kết thúc');
