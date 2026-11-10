@@ -8,7 +8,7 @@ import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 
-const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua'];
+const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua', 'typhu'];
 
 export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);
@@ -124,11 +124,14 @@ const styles = StyleSheet.create({
   code: { fontSize: 46, fontWeight: '900', letterSpacing: 8, textAlign: 'center', color: C.son, lineHeight: 52 },
   hint: { color: C.muted, fontSize: 14, textAlign: 'center' },
   section: { color: C.onSon, fontWeight: '800', fontSize: 15 },
-  games: { flexDirection: 'row', gap: 10 },
-  pick: { flex: 1, backgroundColor: C.paper, borderRadius: 16, paddingVertical: 12, alignItems: 'center', gap: 2 },
+  games: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  pick: {
+    width: '48%', backgroundColor: C.paper, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
   pickOn: { backgroundColor: C.gold },
-  pickEmoji: { fontSize: 34 },
-  pickName: { fontSize: 14, fontWeight: '800' },
+  pickEmoji: { fontSize: 30 },
+  pickName: { fontSize: 15, fontWeight: '800', flexShrink: 1 },
   chosen: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   chosenName: { fontSize: 22, fontWeight: '900' },
   h3: { fontSize: 16, fontWeight: '800' },

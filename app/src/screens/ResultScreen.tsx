@@ -11,7 +11,7 @@ import { Shell } from '../components/Shell';
 import { Confetti } from '../components/Fun';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua'];
+const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua', 'typhu'];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const r = room.result!;
@@ -41,7 +41,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                   small
                   variant="paper"
                   title={`${GAME_META[g].emoji} ${GAME_INFO[g].name}`}
-                  style={{ flex: 1 }}
+                  style={{ flexGrow: 1, flexBasis: '30%' }}
                   onPress={async () => setError(await game.configure({ gameType: g }))}
                 />
               ))}
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   av: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   name: { fontWeight: '800', fontSize: 17 },
   detail: { color: C.muted, fontSize: 14 },
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
   error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
 });

@@ -1,6 +1,6 @@
 # Xóm Lầy
 
-Ba game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Cờ cá ngựa**, **Bầu cua**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
+Bốn game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Cờ cá ngựa**, **Bầu cua**, **Cờ tỷ phú**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
@@ -14,7 +14,7 @@ Ba game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối
 noi-tu/
   shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt (dùng chung app & server)
   server/   Node.js + Socket.IO, trọng tài của mọi ván chơi
-    src/games/   wordchain.ts, ludo.ts, baucua.ts (luật từng game)
+    src/games/   wordchain.ts, ludo.ts, baucua.ts, typhu.ts (luật từng game)
   app/      giao diện (React Native Web qua Expo), xuất ra trang web cho điện thoại
   e2e/      test giao diện tự động (nhiều trình duyệt chơi thật với nhau)
   docs/     thiết kế
@@ -37,6 +37,14 @@ noi-tu/
 - Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây; chủ phòng bấm **Lắc!** để lắc sớm.
 - Mở bát 3 con: trúng mấy con ăn gấp bấy nhiêu lần tiền cược, trượt thì mất.
 - Cháy túi thì **vay nóng** 500 xu (bị ghi nợ). Chủ phòng bấm **Tổng kết** để xếp hạng theo xu trừ nợ.
+
+**Cờ tỷ phú** (2–6 người)
+- Bàn 28 ô, đất là các tỉnh thành (Cà Mau → Sài Gòn), chia 6 bộ màu. Mỗi người 1.500 xu.
+- Đổ 2 xúc xắc. Dừng ở đất trống thì mua hoặc bỏ qua; dừng ở đất người khác thì trả tiền thuê (gấp đôi nếu họ có đủ bộ màu).
+- Có đủ bộ màu thì chạm vào ô đất để xây nhà (tối đa 3 nhà + khách sạn), tiền thuê tăng mạnh.
+- Đi qua Xuất phát nhận 200 xu. Ô Cơ hội rút thẻ, ô Thuế nộp tiền, ô Vào tù thì vào tù (đổ đôi hoặc nộp 50 xu để ra).
+- Đổ đôi được đổ tiếp, 3 lần đôi liên tiếp thì vào tù. Hết tiền tự bán nhà/đất, vẫn thiếu thì phá sản.
+- Người trụ lại cuối cùng thắng; chủ phòng có thể **Tổng kết** sớm (xếp theo tổng tài sản).
 
 ---
 
@@ -84,11 +92,11 @@ Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Vi
 ## 4. Test
 
 ```bash
-cd server && npm test        # 66 test: chuẩn hóa, từ điển, luật 3 game, phòng, Socket.IO
+cd server && npm test        # 82 test: chuẩn hóa, từ điển, luật 4 game, phòng, Socket.IO
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Cờ cá ngựa, Bầu cua, ném/khịa/hối). Xem đầu file `play.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Cờ cá ngựa, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú). Xem đầu file `play.mjs` để biết cách chạy.
 
 ## Cấu hình server (biến môi trường)
 | Biến | Mặc định | Ý nghĩa |

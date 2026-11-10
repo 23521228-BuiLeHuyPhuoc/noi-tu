@@ -8,6 +8,7 @@ import { WordChainScreen } from './src/screens/WordChainScreen';
 import { LudoScreen } from './src/screens/LudoScreen';
 import { BauCuaScreen } from './src/screens/BauCuaScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
+import { TyPhuScreen } from './src/screens/TyPhuScreen';
 import { ShakeProvider } from './src/components/Fun';
 import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
@@ -25,6 +26,7 @@ export default function App() {
   else if (room.phase === 'finished' && room.result) body = <ResultScreen game={game} room={room} />;
   else if (room.game?.type === 'ludo') body = <LudoScreen game={game} room={room} />;
   else if (room.game?.type === 'baucua') body = <BauCuaScreen game={game} room={room} />;
+  else if (room.game?.type === 'typhu') body = <TyPhuScreen game={game} room={room} />;
   else if (room.game?.type === 'wordchain') body = <WordChainScreen game={game} room={room} />;
   else body = <HomeScreen game={game} />;
 

@@ -28,12 +28,15 @@ export const actionText: Record<ActionError, string> = {
   not_betting: 'Đã hết giờ đặt cược.',
   insufficient: 'Không đủ xu để đặt thêm.',
   loan_denied: 'Còn xu thì chưa được vay đâu.',
+  cannot_build: 'Chưa xây được ở đây (cần đủ bộ màu và đủ tiền).',
+  no_money: 'Không đủ tiền.',
 };
 
 export const GAME_META: Record<GameType, { emoji: string; tagline: string; players: string }> = {
   wordchain: { emoji: '🔤', tagline: 'con mèo → mèo mướp → mướp đắng…', players: '1–6 người' },
   ludo: { emoji: '🐴', tagline: 'Đổ xúc xắc, đá ngựa nhau về chuồng', players: '2–4 người' },
   baucua: { emoji: '🦀', tagline: 'Đặt cược, lắc bát, mở bát. Xu ảo thôi!', players: '1–6 người' },
+  typhu: { emoji: '🏦', tagline: 'Mua đất Sài Gòn, Hà Nội, xây khách sạn, thu tiền thuê', players: '2–6 người' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -51,6 +54,11 @@ export const RULES: Record<GameType, string[]> = {
     'Mỗi người có 1.000 xu ảo. Chạm vào con vật để đặt cược.',
     'Mở bát ra 3 con: trúng mấy con thì ăn gấp bấy nhiêu lần.',
     'Cháy túi thì vay nóng 500 xu, nhưng bị gắn mác con nợ.',
+  ],
+  typhu: [
+    'Mỗi người 1.500 xu. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',
+    'Dừng ở đất người khác phải trả tiền thuê. Có đủ bộ màu thì xây nhà, lên khách sạn.',
+    'Đi qua Xuất phát nhận 200 xu. Hết tiền là phá sản, người trụ lại cuối cùng thắng.',
   ],
 };
 

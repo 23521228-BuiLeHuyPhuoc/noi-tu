@@ -8,7 +8,7 @@ import { GAME_META } from '../messages';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 
-const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua'];
+const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua', 'typhu'];
 
 export function HomeScreen({ game }: { game: Game }) {
   const [name, setName] = useState('');
