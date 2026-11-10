@@ -5,8 +5,8 @@ export const TYPHU_SHORT_NAMES: Record<string, string> = {
   'Ga miền Trung': 'Ga Trung',
   'Ga miền Bắc': 'Ga Bắc',
   'Ga miền Nam': 'Ga Nam',
-  'Công ty điện': 'Cty điện',
-  'Công ty nước': 'Cty nước',
+  'Công ty điện': 'Điện',
+  'Công ty nước': 'Nước',
   'Thuế thu nhập': 'Thuế',
   'Thuế xa xỉ': 'Thuế xa xỉ',
 };

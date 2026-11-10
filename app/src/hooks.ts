@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { useWindowDimensions, type View } from 'react-native';
 import { subscribeKeyboard } from './web';
 
@@ -82,12 +82,15 @@ export function useKeyboardLift(ref: React.RefObject<ComponentRef<typeof View> |
  * chiều cao tụt ~300px khi gõ chữ, làm cả màn hình tính lại bố cục (avatar co lại, ô co dãn...).
  * Hook này bỏ qua đợt tụt chiều cao lớn mà chiều rộng không đổi (chỉ có thể là bàn phím).
  */
+export const ViewportContext = createContext<{ width: number; height: number; rotated: boolean } | null>(null);
+
 export function useStableWindow(): { width: number; height: number } {
+  const forced = useContext(ViewportContext);
   const dims = useWindowDimensions();
   const [stable, setStable] = useState({ width: dims.width, height: dims.height });
   const keyboardDrop = dims.width === stable.width && stable.height - dims.height > 150;
   if (!keyboardDrop && (stable.width !== dims.width || stable.height !== dims.height)) {
     setStable({ width: dims.width, height: dims.height });
   }
-  return stable;
+  return forced ?? stable;
 }

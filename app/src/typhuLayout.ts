@@ -13,24 +13,23 @@ export interface BoardGeo {
 
 /** Bàn 11×11 nhưng ô góc và ô cạnh khác kích thước: ô cạnh hẹp-cao trên màn dọc, rộng-thấp trên màn ngang. */
 export function makeGeo(W: number, H: number): BoardGeo {
-  const portrait = W < H;
-  const cw = Math.round(W * (portrait ? 0.12 : 0.125));
-  const ch = Math.round(portrait ? Math.max(H * 0.088, Math.min(48, H * 0.1)) : H * 0.15);
-  const wm = (W - 2 * cw) / 9;
-  const hm = (H - 2 * ch) / 9;
-  const colX = (c: number) => (c === 0 ? 0 : c === 10 ? cw + 9 * wm : cw + (c - 1) * wm);
-  const colW = (c: number) => (c === 0 || c === 10 ? cw : wm);
-  const rowY = (r: number) => (r === 0 ? 0 : r === 10 ? ch + 9 * hm : ch + (r - 1) * hm);
-  const rowH = (r: number) => (r === 0 || r === 10 ? ch : hm);
+  const cw = Math.round(W * 0.13);
+  const ch = Math.round(H * 0.17);
+  const wm = (W - 2 * cw) / 7;
+  const hm = (H - 2 * ch) / 7;
+  const colX = (c: number) => (c === 0 ? 0 : c === 8 ? cw + 7 * wm : cw + (c - 1) * wm);
+  const colW = (c: number) => (c === 0 || c === 8 ? cw : wm);
+  const rowY = (r: number) => (r === 0 ? 0 : r === 8 ? ch + 7 * hm : ch + (r - 1) * hm);
+  const rowH = (r: number) => (r === 0 || r === 8 ? ch : hm);
   const rect: Rect[] = [];
   const side: BandSide[] = [];
   for (let i = 0; i < 40; i++) {
     const [r, c] = typhuCellPos(i);
     rect.push({ x: colX(c), y: rowY(r), w: colW(c), h: rowH(r) });
-    const corner = (r === 0 || r === 10) && (c === 0 || c === 10);
-    side.push(corner ? 'corner' : r === 10 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
+    const corner = (r === 0 || r === 8) && (c === 0 || c === 8);
+    side.push(corner ? 'corner' : r === 8 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
   }
-  return { W, H, cw, ch, wm, hm, rect, side, center: { x: cw, y: ch, w: 9 * wm, h: 9 * hm } };
+  return { W, H, cw, ch, wm, hm, rect, side, center: { x: cw, y: ch, w: 7 * wm, h: 7 * hm } };
 }
 
 export interface CenterLayout {

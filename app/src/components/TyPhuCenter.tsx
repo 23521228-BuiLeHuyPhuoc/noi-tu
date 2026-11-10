@@ -49,9 +49,6 @@ export interface CenterProps {
   reducedMotion: boolean;
   error: string | null;
   isHost: boolean;
-  canRotate: boolean;
-  rotated: boolean;
-  onRotate: () => void;
   onEnd: () => void;
   onAct: (a: 'roll' | 'buy' | 'skip' | 'endTurn' | 'payJail') => void;
   onCell: (i: number) => void;
@@ -206,13 +203,8 @@ export function TyPhuCenter(p: CenterProps) {
       {/* đầu: tên game + nút phụ */}
       <View style={[abs(L.header), styles.head]}>
         <Image source={{ uri: FX_ICON.bag }} style={{ width: 18, height: 18 }} />
-        <T numberOfLines={1} style={styles.logo}>TỶ PHÚ</T>
+        <T numberOfLines={1} style={styles.logo}>TỶ PHÚ XÓM LẦY</T>
         <View style={{ flex: 1 }} />
-        {p.canRotate && (
-          <Pressable testID="rotate-toggle" accessibilityRole="button" onPress={p.onRotate} style={styles.miniBtn}>
-            <T style={styles.miniTxt}>{p.rotated ? '↩ Dọc' : '↻ Xoay 90°'}</T>
-          </Pressable>
-        )}
         {p.isHost && (
           <Pressable testID="end-open" accessibilityRole="button" onPress={p.onEnd} hitSlop={8} style={[styles.miniBtn, { backgroundColor: C.paper }]}>
             <T style={styles.miniTxt}>Tổng kết</T>

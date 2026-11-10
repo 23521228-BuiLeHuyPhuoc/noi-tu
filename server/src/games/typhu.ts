@@ -43,7 +43,7 @@ export const TYPHU_CARDS: Card[] = [
   { text: 'Về thẳng Xuất phát', goto: 0 },
   { text: 'Đua xe bị tóm! Vào tù', jail: true },
   { text: 'Quên ví, lùi lại 3 ô', move: -3 },
-  { text: 'Bay ra Hà Nội ăn phở', goto: 37 },
+  { text: 'Bay ra Hà Nội ăn phở', goto: 29 },
   { text: 'Sửa nhà mùa mưa: mỗi căn nhà 25 xu', perHouse: 25 },
   { text: 'Nhặt được ví, trả lại được thưởng 50 xu', money: 50 },
 ];

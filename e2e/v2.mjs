@@ -17,7 +17,7 @@ const pageErrors = [];
 let failed = 0;
 
 async function player(name) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+  const context = await browser.newContext({ viewport: { width: Number(process.env.VW || 390), height: Number(process.env.VH || 844) }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(`${name}: ${error.message}`));
   page.setDefaultTimeout(10000);
@@ -152,10 +152,10 @@ try {
     for (const die of await b.t('bc-die').all()) assert.ok(await die.getAttribute('aria-label'));
   }));
 
-  await suite('Ty Phu 40 cells, dice and movement lock', () => room('typhu', async (a, b) => {
+  await suite('Ty Phu 32 cells, dice and movement lock', () => room('typhu', async (a, b) => {
     await a.t('start-btn').click();
-    await a.t('cell-39').waitFor();
-    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 40);
+    await a.t('cell-31').waitFor();
+    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 32);
     assert.equal(await a.page.locator('[data-testid^="token-"]').count(), 2);
     const active = await a.t('roll-btn').count() ? a : b;
     const other = active === a ? b : a;
@@ -183,7 +183,7 @@ try {
     const buy = active.t('buy-btn');
     if (await buy.count()) await buy.click();
     if (await active.t('end-turn').count()) await active.t('end-turn').click();
-    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 40);
+    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 32);
   }));
   assert.deepEqual(pageErrors, [], 'No browser runtime errors');
 } catch (error) { failed++; console.error(error); }

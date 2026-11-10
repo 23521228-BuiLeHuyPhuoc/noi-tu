@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Image, StyleSheet, View } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, isTyPhuProperty, stationRent, utilityRent,
+  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, isTyPhuProperty, stationRent, utilityRent,
   TYPHU_HOUSE_MULT, TYPHU_MAX_HOUSES, groupCells, rentOf,
 } from '../../../shared/src/typhu';
 import type { Game } from '../useGame';
@@ -12,7 +12,8 @@ import { TYPHU_PHOTOS } from '../typhuArt';
 import { ICON_BY_CELL } from '../typhuCellIcons';
 import type { DiceRollView } from '../../../shared/src/dice';
 import { makeCenterLayout, makeGeo, type Rect } from '../typhuLayout';
-import { useOnChange, useSecondsLeft } from '../hooks';
+import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
+import { Rotator } from '../components/Rotator';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, sticker } from '../theme';
@@ -31,17 +32,20 @@ const fmt = (n: number) => n.toLocaleString('vi-VN');
 /** đồng hồ gọi trong callback sự kiện (không gọi lúc render) */
 const clockNow = () => Date.now();
 
-export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
+export function TyPhuScreen(props: { game: Game; room: RoomState }) {
+  return <Rotator><TyPhuBody {...props} /></Rotator>;
+}
+
+function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as TyPhuView;
   const me = game.me ?? '';
   const isHost = room.hostId === me;
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useStableWindow();
   const feed = useFeed();
   const shake = useShake();
   const [detail, setDetail] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
-  const [forceRotate, setForceRotate] = useState(false);
   const [throwAt, setThrowAt] = useState<string | null>(null);
   const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -69,12 +73,10 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const left = useSecondsLeft(g.turnEndsAt, game.clockOffset, g.turnSeconds);
   const inJail = me in g.jail;
 
-  const isPortrait = height > width;
-  const rotated = isPortrait && forceRotate;
   const availW = stageSize && stageSize.w > 200 ? stageSize.w - 4 : Math.max(320, width - 12);
-  const availH = stageSize && stageSize.h > 200 ? stageSize.h - 12 : Math.max(260, height - (isPortrait ? 190 : 68));
-  const boardW = Math.floor(rotated ? availH : availW);
-  const boardH = Math.floor(rotated ? availW : availH);
+  const availH = stageSize && stageSize.h > 200 ? stageSize.h - 8 : Math.max(220, height - 60);
+  const boardW = Math.floor(availW);
+  const boardH = Math.floor(availH);
   const geo = useMemo(() => makeGeo(boardW, boardH), [boardW, boardH]);
   const hasCard = !!g.card;
   const layout = useMemo(
@@ -135,9 +137,12 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   // quân cờ đứng ở phần trên/trái của ô (che icon, chừa tên và giá cho dễ đọc)
   const cellMid = (i: number) => {
     const r = geo.rect[i];
-    if (geo.side[i] === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.34 };
-    if (r.w >= 56 && r.h <= 56) return { x: r.x + r.w * 0.24, y: r.y + r.h * 0.6 };
-    return { x: r.x + r.w / 2, y: r.y + r.h * 0.36 };
+    const sd = geo.side[i];
+    if (sd === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.5 };
+    if (sd === 'top') return { x: r.x + r.w / 2, y: r.y + r.h * 0.3 };
+    if (sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h * 0.7 };
+    if (sd === 'left') return { x: r.x + r.w * 0.14, y: r.y + r.h / 2 };
+    return { x: r.x + r.w * 0.86, y: r.y + r.h / 2 };
   };
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
     const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
@@ -257,7 +262,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
         announce('loss', t0 + msUntilArrive(), { title: l.text.replace(`${g.names[who] ?? ''} `, ''), amount: d ?? 0, portrait: portraitUriOf(who), color: colorOf(who) });
       } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
         const delay = msUntilArrive();
-        adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: 10 });
+        adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: TYPHU_JAIL });
         announce('loss', t0 + delay, { title: 'VÀO TÙ!', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
         later(delay, () => play('siren'));
         feed(l.text, 'bad');
@@ -330,7 +335,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     : `Lượt của ${curName}`;
 
   const d = detail !== null ? TYPHU_BOARD[detail] : null;
-  const landscape = !isPortrait;
+  const landscape = true;
   const buyable = !moving && myTurn && g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending : null;
 
   const activeAnn = reducedMotion ? null : announces.find((x) => now >= x.start && now < x.end) ?? null;
@@ -358,7 +363,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     <Shell
       wide
       fullscreen
-      hideStrip={height < 700}
+      hideStrip
       overlay={activeAnn ? <TyPhuAnnounce a={activeAnn} now={now} W={width} H={height} /> : undefined}
       scroll={false}
       game={game}
@@ -384,7 +389,6 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
             styles.board,
             sticker(5),
             { width: boardW, height: boardH },
-            rotated && { transform: [{ rotate: '90deg' }] },
           ]}
         >
           {/* 40 ô (memo: chỉ vẽ lại khi ô đó đổi) */}
@@ -442,9 +446,6 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
                 reducedMotion={reducedMotion}
                 error={error}
                 isHost={isHost}
-                canRotate={isPortrait}
-                rotated={rotated}
-                onRotate={() => setForceRotate((v) => !v)}
                 onEnd={() => setEnding(true)}
                 onAct={(a) => void act({ type: a })}
                 onCell={setDetail}
@@ -594,7 +595,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
 
 const styles = StyleSheet.create({
   stageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  board: { backgroundColor: '#FFFDF5', borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  board: { backgroundColor: '#DDF1E6', borderRadius: 14, overflow: 'hidden', position: 'relative' },
   center: {
     position: 'absolute', backgroundColor: '#FFE9B5', borderRadius: 14, borderWidth: 2.5, borderColor: C.ink, zIndex: 4,
   },

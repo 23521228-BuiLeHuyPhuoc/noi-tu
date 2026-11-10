@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
+import { ViewportContext } from '../hooks';
 import { Platform, View } from 'react-native';
 import { DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, type DiceRollView, type ThrowImpulse } from '../../../shared/src/dice';
 import { TyPhuDie } from './TyPhuFx';
@@ -115,6 +116,9 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
   onThrow: (impulse?: ThrowImpulse) => void;
 }) {
   const S = Math.max(26, Math.min(width / (2 * TRAY_HX + 0.9), height / 2.5));
+  const rotated = useContext(ViewportContext)?.rotated ?? false;
+  /** vector vuốt theo màn hình -> khung đã xoay 90° của giao diện */
+  const toLocal = (dx: number, dy: number): [number, number] => (rotated ? [dy, -dx] : [dx, dy]);
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x0: number; y0: number; pts: { x: number; y: number; t: number }[] } | null>(null);
   const live = useRef({ offset: clockOffset, canThrow, onThrow, values });
@@ -180,7 +184,8 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
     if (!d) return;
     d.pts.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
     if (d.pts.length > 8) d.pts.shift();
-    hold(Math.max(-1.5, Math.min(1.5, (e.clientX - d.x0) / S)), Math.max(-0.8, Math.min(0.8, (e.clientY - d.y0) / S)));
+    const [lx, ly] = toLocal(e.clientX - d.x0, e.clientY - d.y0);
+    hold(Math.max(-1.5, Math.min(1.5, lx / S)), Math.max(-0.8, Math.min(0.8, ly / S)));
   };
   const up = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -190,8 +195,7 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
     const first = d.pts[0];
     const last = d.pts[d.pts.length - 1];
     const dt = Math.max(16, last.t - first.t);
-    const vx = last.x - first.x;
-    const vy = last.y - first.y;
+    const [vx, vy] = toLocal(last.x - first.x, last.y - first.y);
     const speed = Math.hypot(vx, vy) / dt; // px/ms
     if (total < 14 || speed < 0.05) return live.current.onThrow(undefined);
     const l = Math.hypot(vx, vy) || 1;
