@@ -8,7 +8,7 @@ import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 
-const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua', 'typhu'];
+const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
 
 export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);

@@ -1,12 +1,14 @@
 # Xóm Lầy
 
-Bốn game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Cờ cá ngựa**, **Bầu cua**, **Cờ tỷ phú**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
+Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Bầu cua**, **Cờ tỷ phú** (và **Cờ cá ngựa**). Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
-- Nhập tên → chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
+- Nhập tên (chơi khách) hoặc **tạo tài khoản** để giữ tên, mặt đại diện và thành tích các ván đã chơi.
+- Chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
 - Chủ phòng đổi game được ngay trong phòng chờ hoặc sau mỗi ván.
-- Chạm vào avatar bạn bè để **ném** 🩴🍅🥚💩🌹💖 hoặc **hối** (rung máy họ). Nút 💬 để khịa cả phòng.
+- Nút 💬: **trò chuyện**, thả emoji bay lên, câu khịa có sẵn. Tin nhắn hiện thành bong bóng dưới avatar người gửi.
+- Chạm vào avatar bạn bè để **đánh nhau** (tát 🖐️, đấm 👊, đá 🦶, chưởng 🌀; máu ảo, K.O. thì hồi đầy, không ảnh hưởng ván chơi), **ném** 🩴🍅🥚💩🌹💖 hoặc **hối** (rung máy họ).
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
 - Lần đầu mở sau một lúc không ai chơi, server miễn phí cần khoảng 1 phút để thức dậy.
 
@@ -24,8 +26,11 @@ noi-tu/
 
 **Nối từ** (1–6 người)
 - Mỗi từ gồm đúng 2 chữ. Chữ đầu của từ mới phải trùng chữ cuối của từ trước. Không dùng lại từ đã dùng.
+- Chữ đầu được điền sẵn và khóa lại, chỉ cần gõ chữ thứ hai.
 - Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bị loại; người còn lại cuối cùng thắng.
 - Màn hình hiện số từ còn nối được. Mỗi người có 1 quyền **Cứu trợ** xem gợi ý.
+- Từ có nghĩa mà kho từ chưa có: bấm **Xin cả phòng duyệt** (mỗi lượt 1 lần). Đồng hồ tạm dừng 12 giây cho mọi người bỏ phiếu; đồng ý nhiều hơn phản đối thì từ được tính, thêm vào kho từ và lưu vào CSDL cho các ván sau.
+- Kho từ ~79.600 từ 2 chữ, gộp từ 13 nguồn (từ điển Việt–Việt, Việt–Anh, Wiktionary, lời giải nghĩa Anh–Việt, lượng từ + danh từ như "cái bàn", "quả cam"). Xem `server/scripts/build-dictionary.ts`.
 - Gõ dấu kiểu cũ hay mới đều được (hoà = hòa, thuỷ = thủy).
 
 **Cờ cá ngựa** (2–4 người, chọn 2 hoặc 4 ngựa)
@@ -34,8 +39,8 @@ noi-tu/
 - Về đích phải đổ vừa đủ. Ai đưa hết ngựa về đích trước thì thắng. Hết giờ (15 giây) thì máy tự đi thay.
 
 **Bầu cua** (1–6 người, xu ảo)
-- Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây; chủ phòng bấm **Lắc!** để lắc sớm.
-- Mở bát 3 con: trúng mấy con ăn gấp bấy nhiêu lần tiền cược, trượt thì mất.
+- Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây. Tiền của mọi người vun thành chồng xu trên từng ô (mỗi người một màu). Hết giờ **máy tự lắc**, không ai lắc tay.
+- Mở bát 3 con hiện to giữa màn hình. Con nào trúng ô mình đặt thì bay vào ô đó và ô sáng lên; trật hết thì… mưa rơi. Trúng mấy con ăn gấp bấy nhiêu lần tiền cược, trượt thì mất.
 - Cháy túi thì **vay nóng** 500 xu (bị ghi nợ). Chủ phòng bấm **Tổng kết** để xếp hạng theo xu trừ nợ.
 
 **Cờ tỷ phú** (2–6 người)
@@ -70,6 +75,15 @@ Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SE
 3. Deploy xong sẽ có địa chỉ dạng `https://noi-tu-server.onrender.com`. Mở `/health` trên địa chỉ đó để kiểm tra, kết quả có dạng `{"ok":true,"words":45570,...}`.
 
 Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng. Người đầu tiên mở app sẽ phải chờ khoảng 1 phút, app có hiện thông báo trong lúc chờ. Trong lúc đang có người chơi, server không ngủ.
+
+## Tài khoản & cơ sở dữ liệu (MongoDB)
+
+Server đọc chuỗi kết nối MongoDB từ biến môi trường `DATABASE` (tên CSDL: biến `DATABASE_NAME`, mặc định `xomlay`). Trong đó có 3 bảng: `users` (mật khẩu băm scrypt), `sessions` (tự hết hạn sau 180 ngày), `words` (từ được người chơi duyệt).
+
+- **Không** ghi chuỗi kết nối vào code hay file trong repo (repo đang public). Trên Render: **noi-tu-server → Environment → Add Environment Variable**, key `DATABASE`, value là chuỗi `mongodb://...` → Save, Render tự khởi động lại.
+- MongoDB Atlas: mục **Network Access** phải cho phép IP của Render (đơn giản nhất là `0.0.0.0/0`), và nên dùng mật khẩu mạnh.
+- Kiểm tra: `/health` trả về `"db":"mongo"`. Nếu thấy `"db":"memory"` nghĩa là chưa đặt biến hoặc không kết nối được (xem log), tài khoản chỉ lưu tạm và mất khi server khởi động lại.
+- Chạy thử trên máy: `DATABASE='mongodb://...' npm run dev` trong thư mục `server`.
 
 ## 3. Thêm hoặc bớt từ
 

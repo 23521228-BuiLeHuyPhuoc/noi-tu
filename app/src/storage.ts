@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEYS = { name: 'noitu.name', playerId: 'noitu.playerId', room: 'noitu.room' } as const;
+const KEYS = { name: 'noitu.name', playerId: 'noitu.playerId', room: 'noitu.room', token: 'xomlay.token' } as const;
 
 async function get(key: string): Promise<string | null> {
   try {
@@ -28,4 +28,7 @@ export const storage = {
   /** mã phòng đang chơi dở */
   getRoom: () => get(KEYS.room),
   setRoom: (v: string | null) => set(KEYS.room, v),
+  /** phiên đăng nhập tài khoản */
+  getToken: () => get(KEYS.token),
+  setToken: (v: string | null) => set(KEYS.token, v),
 };

@@ -3,13 +3,15 @@
  * bị hối thì rung máy + lắc màn hình, pháo giấy khi thắng.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import type { FunEvent, PublicPlayer, ThrowItem } from '../../../shared/src/types';
+import { Animated, Easing, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CHAT_MAX, EMOJIS, MAX_HP, type ChatMsg, type FunEvent, type HitMove, type PublicPlayer, type ThrowItem } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { TAUNTS, THROWS } from '../messages';
+import { HITS, TAUNTS, THROWS } from '../messages';
+import { useOnNew } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
+import { avatarOf } from '../avatars';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 
@@ -34,9 +36,10 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
 
 // ---------- Vị trí avatar trên màn hình ----------
 
-type Rect = { x: number; y: number; w: number; h: number };
+export type Rect = { x: number; y: number; w: number; h: number };
 
-function rectOf(testId: string, origin: DOMRect | null): Rect | null {
+/** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` */
+export function rectOf(testId: string, origin: DOMRect | null): Rect | null {
   if (typeof document === 'undefined' || !origin) return null;
   const el = document.querySelector(`[data-testid="${testId}"]`);
   if (!el) return null;
@@ -49,11 +52,11 @@ const emojiOf = (item: ThrowItem) => THROWS.find((t) => t.item === item)?.emoji 
 
 // ---------- Các hiệu ứng đơn lẻ ----------
 
-function Flying({ emoji, from, to, onDone }: { emoji: string; from: Rect; to: Rect; onDone: () => void }) {
+function Flying({ emoji, from, to, onDone, fast }: { emoji: string; from: Rect; to: Rect; onDone: () => void; fast?: boolean }) {
   const t = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
-    Animated.timing(t, { toValue: 1, duration: 650, easing: Easing.in(Easing.quad), useNativeDriver: false }).start(onDone);
-  }, [t, onDone]);
+    Animated.timing(t, { toValue: 1, duration: fast ? 320 : 650, easing: Easing.in(Easing.quad), useNativeDriver: false }).start(onDone);
+  }, [t, onDone, fast]);
   const fx = from.x + from.w / 2 - 22;
   const fy = from.y + from.h / 2 - 22;
   const tx = to.x + to.w / 2 - 22;
@@ -64,9 +67,11 @@ function Flying({ emoji, from, to, onDone }: { emoji: string; from: Rect; to: Re
         styles.fly,
         {
           left: t.interpolate({ inputRange: [0, 1], outputRange: [fx, tx] }),
-          // bay theo đường vòng cung
-          top: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, Math.min(fy, ty) - 90, ty] }),
-          transform: [{ rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
+          // bay theo đường vòng cung (cú đấm thì bay thẳng)
+          top: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, fast ? (fy + ty) / 2 : Math.min(fy, ty) - 90, ty] }),
+          transform: fast
+            ? [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.6] }) }]
+            : [{ rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
         },
       ]}
     >
@@ -97,14 +102,90 @@ function Splat({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => v
   );
 }
 
-function Bubble({ text, at, onDone }: { text: string; at: Rect; onDone: () => void }) {
+function Bubble({ text, at, onDone, chat }: { text: string; at: Rect; onDone: () => void; chat?: boolean }) {
   useEffect(() => {
-    const id = setTimeout(onDone, 2600);
+    const id = setTimeout(onDone, chat ? 3800 : 2600);
     return () => clearTimeout(id);
-  }, [onDone]);
+  }, [onDone, chat]);
   return (
-    <View style={[styles.bubble, sticker(3), { left: Math.max(6, at.x + at.w / 2 - 80), top: Math.max(4, at.y - 48) }]}>
-      <Text numberOfLines={2} style={styles.bubbleText}>{text}</Text>
+    <View
+      style={[
+        styles.bubble,
+        sticker(3),
+        chat && styles.chatBubble,
+        // bong bóng nằm dưới avatar để không bị cắt ở mép trên màn hình
+        { left: Math.max(6, at.x + at.w / 2 - 80), top: at.y + at.h + 22 },
+      ]}
+    >
+      <View style={[styles.tail, chat && { backgroundColor: C.ink }]} />
+      <Text numberOfLines={3} style={[styles.bubbleText, chat && { color: C.gold }]}>{text}</Text>
+    </View>
+  );
+}
+
+/** emoji bay lên từ avatar rồi tan */
+function Float({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => void }) {
+  const t = useState(() => new Animated.Value(0))[0];
+  const [dx] = useState(() => (Math.random() - 0.5) * 50);
+  useEffect(() => {
+    Animated.timing(t, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: false }).start(onDone);
+  }, [t, onDone]);
+  return (
+    <Animated.Text
+      style={[
+        styles.float,
+        {
+          left: t.interpolate({ inputRange: [0, 1], outputRange: [at.x + at.w / 2 - 22, at.x + at.w / 2 - 22 + dx] }),
+          top: t.interpolate({ inputRange: [0, 1], outputRange: [at.y, at.y + 160] }),
+          opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
+          transform: [{ scale: t.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.4, 1.5, 1.1] }) }],
+        },
+      ]}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+}
+
+/** cú đánh trúng: chữ "BỤP!", sát thương, thanh máu ảo, K.O. */
+function Impact({ at, damage, hp, ko, onDone }: { at: Rect; damage: number; hp: number; ko: boolean; onDone: () => void }) {
+  const t = useState(() => new Animated.Value(0))[0];
+  const [word] = useState(() => (ko ? 'K.O.!' : ['BỤP!', 'BỐP!', 'CHÁT!', 'HỰ!', 'ÚI!'][Math.floor(Math.random() * 5)]));
+  useEffect(() => {
+    Animated.timing(t, { toValue: 1, duration: ko ? 2200 : 1400, useNativeDriver: false }).start(onDone);
+  }, [t, onDone, ko]);
+  const cx = at.x + at.w / 2;
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: cx - 70, top: at.y + at.h / 2 - 22, width: 140, alignItems: 'center', zIndex: 95 }}>
+      <Animated.Text
+        style={[
+          styles.pow,
+          ko && styles.ko,
+          {
+            opacity: t.interpolate({ inputRange: [0, 0.75, 1], outputRange: [1, 1, 0] }),
+            transform: [
+              { scale: t.interpolate({ inputRange: [0, 0.12, 0.25, 1], outputRange: [0.2, 1.6, 1, 1] }) },
+              { rotate: ko ? '-8deg' : '6deg' },
+            ],
+          },
+        ]}
+      >
+        {word}
+      </Animated.Text>
+      <Animated.Text
+        style={[
+          styles.dmg,
+          {
+            opacity: t.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] }),
+            transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }],
+          },
+        ]}
+      >
+        -{damage}
+      </Animated.Text>
+      <Animated.View style={[styles.hpTrack, { opacity: t.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] }) }]}>
+        <View style={[styles.hpFill, { width: `${(hp / MAX_HP) * 100}%`, backgroundColor: hp > 50 ? C.jade : hp > 20 ? C.gold : C.danger }]} />
+      </Animated.View>
     </View>
   );
 }
@@ -112,12 +193,14 @@ function Bubble({ text, at, onDone }: { text: string; at: Rect; onDone: () => vo
 // ---------- Lớp hiệu ứng ----------
 
 type FxIn =
-  | { kind: 'fly'; emoji: string; from: Rect; to: Rect; after?: () => void }
+  | { kind: 'fly'; emoji: string; from: Rect; to: Rect; after?: () => void; fast?: boolean }
   | { kind: 'splat'; emoji: string; at: Rect }
-  | { kind: 'bubble'; text: string; at: Rect };
+  | { kind: 'bubble'; text: string; at: Rect; chat?: boolean }
+  | { kind: 'float'; emoji: string; at: Rect }
+  | { kind: 'impact'; at: Rect; damage: number; hp: number; ko: boolean };
 type Fx = FxIn & { id: number };
 
-export function FunLayer({ game, players }: { game: Game; players: PublicPlayer[] }) {
+export function FunLayer({ game, players, chat }: { game: Game; players: PublicPlayer[]; chat: ChatMsg[] }) {
   const [fx, setFx] = useState<Fx[]>([]);
   const layer = useRef<ComponentRef<typeof View>>(null);
   const seq = useRef(0);
@@ -129,9 +212,17 @@ export function FunLayer({ game, players }: { game: Game; players: PublicPlayer[
   }, [players]);
 
   const add = useCallback((f: FxIn) => {
-    setFx((xs) => [...xs.slice(-12), { ...f, id: ++seq.current }]);
+    setFx((xs) => [...xs.slice(-16), { ...f, id: ++seq.current }]);
   }, []);
   const remove = useCallback((id: number) => setFx((xs) => xs.filter((x) => x.id !== id)), []);
+  const origin = () => (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+
+  // tin nhắn mới: bong bóng dưới avatar người gửi
+  useOnNew(chat, (m) => {
+    if (m.from !== game.me) play('chat');
+    const at = rectOf(`avatar-${m.from}`, origin());
+    if (at) add({ kind: 'bubble', text: m.text, at, chat: true });
+  });
 
   useEffect(() => {
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
@@ -171,6 +262,27 @@ export function FunLayer({ game, players }: { game: Game; players: PublicPlayer[
           play('turn');
           feed(`⏰ ${from} đang hối bạn đó!`, 'bad');
         } else feed(`⏰ ${from} đang hối ${nameOf(e.to)}`, 'fun');
+      } else if (e.kind === 'emoji') {
+        play('pop');
+        if (fromR) add({ kind: 'float', emoji: e.emoji, at: fromR });
+        else feed(`${from}: ${e.emoji}`, 'fun');
+      } else if (e.kind === 'hit') {
+        const move = HITS.find((h) => h.move === e.move) ?? HITS[0];
+        const toR = rectOf(`avatar-${e.to}`, origin);
+        const damage = e.damage ?? 0;
+        const land = () => {
+          play(e.ko ? 'ko' : 'punch');
+          if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
+          if (toMe) {
+            vibrate(e.ko ? [200, 80, 300] : 150);
+            shake();
+          }
+          if (e.ko) feed(`💥 ${from} hạ đo ván ${toMe ? 'bạn' : nameOf(e.to)}! (hồi đầy máu)`, toMe ? 'bad' : 'fun');
+          else if (toMe) feed(`${from} ${move.name.toLowerCase()} bạn ${move.emoji} -${damage} máu`, 'bad');
+        };
+        play('whoosh');
+        if (fromR && toR) add({ kind: 'fly', emoji: move.emoji, from: fromR, to: toR, after: land, fast: true });
+        else land();
       }
     });
   }, [game, add, feed, shake]);
@@ -179,11 +291,15 @@ export function FunLayer({ game, players }: { game: Game; players: PublicPlayer[
     <View ref={layer} pointerEvents="none" style={StyleSheet.absoluteFill}>
       {fx.map((f) =>
         f.kind === 'fly' ? (
-          <Flying key={f.id} emoji={f.emoji} from={f.from} to={f.to} onDone={() => { remove(f.id); f.after?.(); }} />
+          <Flying key={f.id} emoji={f.emoji} from={f.from} to={f.to} fast={f.fast} onDone={() => { remove(f.id); f.after?.(); }} />
         ) : f.kind === 'splat' ? (
           <Splat key={f.id} emoji={f.emoji} at={f.at} onDone={() => remove(f.id)} />
+        ) : f.kind === 'float' ? (
+          <Float key={f.id} emoji={f.emoji} at={f.at} onDone={() => remove(f.id)} />
+        ) : f.kind === 'impact' ? (
+          <Impact key={f.id} at={f.at} damage={f.damage} hp={f.hp} ko={f.ko} onDone={() => remove(f.id)} />
         ) : (
-          <Bubble key={f.id} text={f.text} at={f.at} onDone={() => remove(f.id)} />
+          <Bubble key={f.id} text={f.text} at={f.at} chat={f.chat} onDone={() => remove(f.id)} />
         ),
       )}
     </View>
@@ -193,8 +309,22 @@ export function FunLayer({ game, players }: { game: Game; players: PublicPlayer[
 // ---------- Bảng chọn đồ để ném / hối ----------
 
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
+  const hit = (move: HitMove) => {
+    game.sendFun({ kind: 'hit', to: target.id, move });
+    onClose();
+  };
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
+      <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
+      <View style={styles.hits}>
+        {HITS.map((h) => (
+          <View key={h.move} style={styles.hitCell}>
+            <Button testID={`hit-${h.move}`} title={h.emoji} big variant="ink" onPress={() => hit(h.move)} />
+            <T style={styles.cellLabel}>{h.name}</T>
+          </View>
+        ))}
+      </View>
+      <T style={styles.sectionLabel}>Ném đồ</T>
       <View style={styles.grid}>
         {THROWS.map((t) => (
           <View key={t.item} style={styles.cell}>
@@ -226,10 +356,37 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
   );
 }
 
-export function TauntSheet({ game, onClose }: { game: Game; onClose: () => void }) {
+/** Trò chuyện: emoji thả nhanh, câu khịa có sẵn và tin nhắn tự gõ */
+export function ChatSheet({ game, players, onClose }: { game: Game; players: PublicPlayer[]; onClose: () => void }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const me = game.me;
+  const send = async () => {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    const ok = await game.sendChat(t);
+    setSending(false);
+    if (ok) setText('');
+  };
+  const avatar = (id: string) => avatarOf(players.find((p) => p.id === id)?.avatar ?? 0);
   return (
-    <Sheet title="Nói gì đó cho cả phòng" onClose={onClose}>
-      <View style={styles.taunts}>
+    <Sheet title="Tám chuyện" onClose={onClose}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
+        {EMOJIS.map((e, i) => (
+          <Button
+            key={e}
+            testID={`emoji-${i}`}
+            title={e}
+            small
+            variant="paper"
+            style={styles.emojiBtn}
+            onPress={() => game.sendFun({ kind: 'emoji', emoji: e })}
+          />
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.taunts}>
         {TAUNTS.map((t) => (
           <Button
             key={t.id}
@@ -237,13 +394,51 @@ export function TauntSheet({ game, onClose }: { game: Game; onClose: () => void 
             small
             variant="paper"
             title={t.text}
-            style={styles.taunt}
             onPress={() => {
               game.sendFun({ kind: 'taunt', taunt: t.id });
               onClose();
             }}
           />
         ))}
+      </ScrollView>
+      <ScrollView
+        ref={listRef}
+        testID="chat-list"
+        style={styles.chatList}
+        contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+      >
+        {game.chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
+        {game.chat.map((m) => {
+          const mine = m.from === me;
+          const a = avatar(m.from);
+          return (
+            <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.msgAvatar, { backgroundColor: a.bg }]}>
+                <Text style={{ fontSize: 16 }}>{a.emoji}</Text>
+              </View>
+              <View style={[styles.msg, mine ? styles.msgMine : null]}>
+                {!mine && <T style={styles.msgName}>{m.name}</T>}
+                <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+      <View style={styles.chatInputRow}>
+        <TextInput
+          testID="chat-input"
+          style={styles.chatInput}
+          value={text}
+          onChangeText={setText}
+          placeholder="Nhắn gì đó…"
+          placeholderTextColor={C.muted}
+          maxLength={CHAT_MAX}
+          returnKeyType="send"
+          onSubmitEditing={send}
+          blurOnSubmit={false}
+        />
+        <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
       </View>
     </Sheet>
   );
@@ -302,9 +497,37 @@ const styles = StyleSheet.create({
     width: 160, zIndex: 90,
   },
   bubbleText: { fontFamily: FONT, fontWeight: '800', fontSize: 14, color: C.ink, textAlign: 'center' },
+  chatBubble: { backgroundColor: C.ink },
+  tail: { position: 'absolute', top: -7, left: 72, width: 12, height: 12, backgroundColor: C.paper, transform: [{ rotate: '45deg' }] },
+  float: { position: 'absolute', fontSize: 44, zIndex: 92 },
+  pow: {
+    fontFamily: FONT, fontSize: 26, fontWeight: '900', color: C.gold, textShadowColor: C.ink,
+    textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 0,
+  },
+  ko: { fontSize: 40, color: C.danger, textShadowColor: '#fff' },
+  dmg: { fontFamily: FONT, fontSize: 18, fontWeight: '900', color: '#fff', textShadowColor: C.ink, textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 0 },
+  hpTrack: { width: 70, height: 9, borderRadius: 5, borderWidth: 2, borderColor: C.ink, backgroundColor: C.mist, overflow: 'hidden', marginTop: 2 },
+  hpFill: { height: '100%' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 },
   cell: { width: '31%', alignItems: 'stretch' },
   cellLabel: { textAlign: 'center', fontSize: 13, fontWeight: '700', color: C.muted },
-  taunts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  taunt: { flexGrow: 1 },
+  sectionLabel: { fontSize: 14, fontWeight: '800', color: C.muted, marginBottom: -6 },
+  hits: { flexDirection: 'row', justifyContent: 'space-between' },
+  hitCell: { width: '23%', alignItems: 'stretch' },
+  taunts: { gap: 8, paddingRight: 8 },
+  emojiRow: { gap: 6, paddingRight: 8 },
+  emojiBtn: { minWidth: 48, paddingHorizontal: 6 },
+  chatList: { maxHeight: 230, minHeight: 90, backgroundColor: C.mist, borderRadius: 14, paddingHorizontal: 8 },
+  empty: { color: C.muted, textAlign: 'center', paddingVertical: 20 },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  msgAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.ink },
+  msg: { maxWidth: '78%', backgroundColor: C.paper, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1.5, borderColor: C.ink },
+  msgMine: { backgroundColor: C.ink },
+  msgName: { fontSize: 12, fontWeight: '800', color: C.son },
+  msgText: { fontSize: 15, fontWeight: '600' },
+  chatInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  chatInput: {
+    flex: 1, minWidth: 0, fontFamily: FONT, backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, height: 46,
+    fontSize: 16, color: C.ink, borderWidth: 2, borderColor: C.ink,
+  },
 });

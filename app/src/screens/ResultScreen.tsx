@@ -11,7 +11,7 @@ import { Shell } from '../components/Shell';
 import { Confetti } from '../components/Fun';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const GAMES: GameType[] = ['wordchain', 'ludo', 'baucua', 'typhu'];
+const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const r = room.result!;

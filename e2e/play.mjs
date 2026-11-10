@@ -111,12 +111,15 @@ let word = await currentWord(A);
 used.add(word);
 check(p !== null, `từ mở đầu "${word}", tới lượt ${p?.name}`);
 const last0 = word.split(' ')[1];
-check((await tid(p, 'word-input').inputValue()) === last0 + ' ', 'ô nhập điền sẵn chữ cuối');
+check(
+  (await tid(p, 'word-prefix').textContent()).includes(last0) && (await tid(p, 'word-input').inputValue()) === '',
+  'chữ đầu được khóa sẵn, ô nhập chỉ để gõ chữ thứ hai',
+);
 const shown = Number((await tid(p, 'next-count').textContent()).match(/Còn\s*(\d+)/)[1]);
 const expected = (byFirst.get(last0) ?? []).filter((w) => !used.has(w)).length;
 check(shown === expected, `hiện "còn ${shown} từ có thể nối" (kho từ: ${expected})`);
 
-await tid(p, 'word-input').fill(last0 + ' xyzt');
+await tid(p, 'word-input').fill('xyzt');
 await tid(p, 'submit-btn').click();
 await tid(p, 'word-error').waitFor();
 check(true, `báo lỗi từ sai: "${await tid(p, 'word-error').textContent()}"`);

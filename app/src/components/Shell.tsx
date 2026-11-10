@@ -7,7 +7,7 @@ import { copyText } from '../web';
 import { C } from '../theme';
 import { Button, IconButton, T, useFeed } from '../ui';
 import { Avatar } from './Avatar';
-import { FunLayer, TauntSheet, ThrowSheet } from './Fun';
+import { ChatSheet, FunLayer, ThrowSheet } from './Fun';
 import { Sheet } from './Sheet';
 
 export interface StripOptions {
@@ -21,7 +21,7 @@ export interface StripOptions {
 
 /** Khung chung cho mọi màn trong phòng: thanh trên, hàng avatar, nội dung, vùng nút dưới cùng */
 export function Shell({
-  game, room, strip = {}, children, bottom, scroll = true,
+  game, room, strip = {}, children, bottom, scroll = true, overlay,
 }: {
   game: Game;
   room: RoomState;
@@ -29,9 +29,16 @@ export function Shell({
   children: ReactNode;
   bottom?: ReactNode;
   scroll?: boolean;
+  /** lớp phủ toàn màn hình (vd: hiệu ứng mở bát) */
+  overlay?: ReactNode;
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
-  const [taunt, setTaunt] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  // tin nhắn chưa đọc: chỉ đếm tin mới sau khi vào màn hình
+  const lastId = game.chat.at(-1)?.id ?? 0;
+  const [seenId, setSeenId] = useState(lastId);
+  if (chatOpen && seenId !== lastId) setSeenId(lastId);
+  const unread = game.chat.filter((m) => m.id > seenId && m.from !== game.me).length;
   const [leaving, setLeaving] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
   const feed = useFeed();
@@ -56,7 +63,14 @@ export function Shell({
           onPress={async () => (await copyText(room.code)) && feed('Đã sao chép mã phòng')}
         />
         <T numberOfLines={1} style={styles.gameName}>{GAME_INFO[room.gameType].name}</T>
-        <IconButton testID="taunt-open" icon="💬" label="Khịa cả phòng" onPress={() => setTaunt(true)} />
+        <View>
+          <IconButton testID="chat-open" icon="💬" label="Trò chuyện" onPress={() => setChatOpen(true)} />
+          {unread > 0 && (
+            <View testID="chat-badge" pointerEvents="none" style={styles.badge}>
+              <T style={styles.badgeText}>{unread > 9 ? '9+' : unread}</T>
+            </View>
+          )}
+        </View>
         <IconButton
           icon={muted ? '🔇' : '🔊'}
           label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
@@ -94,9 +108,10 @@ export function Shell({
 
       {bottom && <View style={styles.bottom}>{bottom}</View>}
 
-      <FunLayer game={game} players={room.players} />
+      {overlay}
+      <FunLayer game={game} players={room.players} chat={game.chat} />
       {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
-      {taunt && <TauntSheet game={game} onClose={() => setTaunt(false)} />}
+      {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
       {leaving && (
         <Sheet title="Rời phòng?" onClose={() => setLeaving(false)}>
           <T style={{ color: C.muted }}>
@@ -119,5 +134,10 @@ const styles = StyleSheet.create({
   stripScroll: { flexGrow: 0, flexShrink: 0 },
   strip: { paddingHorizontal: 10, paddingTop: 14, paddingBottom: 8, gap: 2 },
   content: { flex: 1, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
+  badge: {
+    position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.gold,
+    borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  badgeText: { fontSize: 11, fontWeight: '900' },
   bottom: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, gap: 8, borderTopWidth: 2, borderTopColor: C.sonDark },
 });

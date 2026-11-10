@@ -9,6 +9,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # chuỗi kết nối MongoDB: nhập trong Render (Environment), KHÔNG ghi vào file này
+      - key: DATABASE
+        sync: false
+      - key: DATABASE_NAME
+        value: xomlay
 
   # Bản web của app: mở link là chơi được trên mọi điện thoại (kể cả iPhone)
   - type: web

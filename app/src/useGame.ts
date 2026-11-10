@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
-  Ack, ActionResult, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
-  RoomSettings, RoomState, ServerToClientEvents,
+  Ack, ActionResult, AuthAck, ChatMsg, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
+  PublicUser, RoomSettings, RoomState, ServerToClientEvents,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
-import { errorText } from './messages';
+import { authText, errorText } from './messages';
 import { clearInviteParam } from './web';
 
 type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -32,6 +32,17 @@ export interface Game {
   sendFun(f: FunSend): void;
   /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
   onFun(cb: (e: FunEvent) => void): () => void;
+  /** tài khoản đang đăng nhập (null = chơi khách) */
+  user: PublicUser | null;
+  /** đã thử khôi phục phiên đăng nhập xong chưa */
+  authReady: boolean;
+  register(p: { username: string; password: string; displayName: string; avatar?: number }): Promise<string | null>;
+  login(username: string, password: string): Promise<string | null>;
+  updateProfile(p: { displayName?: string; avatar?: number }): Promise<string | null>;
+  logout(): Promise<void>;
+  /** tin nhắn trong phòng */
+  chat: ChatMsg[];
+  sendChat(text: string): Promise<boolean>;
 }
 
 export function useGame(): Game {
@@ -40,6 +51,9 @@ export function useGame(): Game {
   const [me, setMe] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
+  const [user, setUser] = useState<PublicUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [chat, setChat] = useState<ChatMsg[]>([]);
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
@@ -53,6 +67,7 @@ export function useGame(): Game {
   const forget = useCallback(async () => {
     roomCodeRef.current = null;
     setRoom(null);
+    setChat([]);
     await storage.setRoom(null);
   }, []);
 
@@ -62,6 +77,21 @@ export function useGame(): Game {
 
     socket.on('connect', async () => {
       setStatus('online');
+      // khôi phục đăng nhập trước, để vào lại phòng bằng đúng tài khoản
+      const token = await storage.getToken();
+      if (token) {
+        try {
+          const r: AuthAck = await socket.timeout(ACK_TIMEOUT).emitWithAck('auth:resume', { token });
+          if (r.ok) setUser(r.user);
+          else if (r.error === 'session_expired') {
+            setUser(null);
+            await storage.setToken(null);
+          }
+        } catch {
+          // server chậm: giữ nguyên, lần kết nối sau thử lại
+        }
+      }
+      setAuthReady(true);
       // vào lại phòng đang chơi dở (sau khi rớt mạng hoặc mở lại trang)
       const code = roomCodeRef.current ?? (await storage.getRoom());
       const playerId = await storage.getPlayerId();
@@ -88,6 +118,8 @@ export function useGame(): Game {
     socket.on('fun:event', (e) => {
       for (const cb of funListeners.current) cb(e);
     });
+    socket.on('chat:history', (ms) => setChat(ms));
+    socket.on('chat:msg', (m) => setChat((xs) => [...xs.slice(-79), m]));
 
     storage.getPlayerId().then((id) => id && setMe(id));
     return () => {
@@ -122,6 +154,19 @@ export function useGame(): Game {
       return null;
     },
     [call, remember],
+  );
+
+  const authCall = useCallback(
+    async (fn: (s: GameSocket) => Promise<AuthAck>): Promise<string | null> => {
+      const res = await call<AuthAck>(fn);
+      if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
+      if (!res.ok) return authText[res.error];
+      setUser(res.user);
+      await storage.setToken(res.token);
+      if (res.user.displayName) await storage.setName(res.user.displayName);
+      return null;
+    },
+    [call],
   );
 
   const simple = useCallback(
@@ -160,6 +205,22 @@ export function useGame(): Game {
       return () => {
         funListeners.current.delete(cb);
       };
+    },
+    user,
+    authReady,
+    register: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:register', p)),
+    login: (username, password) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:login', { username, password })),
+    updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
+    logout: async () => {
+      await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:logout'));
+      setUser(null);
+      await storage.setToken(null);
+      await forget();
+    },
+    chat,
+    sendChat: async (text) => {
+      const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { text }));
+      return !!res?.ok;
     },
   };
 }

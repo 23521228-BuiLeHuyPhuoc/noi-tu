@@ -1,4 +1,4 @@
-import type { ActionError, BauCuaSymbol, ErrorCode, GameType, TauntId, ThrowItem } from '../../shared/src/types';
+import type { ActionError, AuthError, BauCuaSymbol, ErrorCode, GameType, HitMove, TauntId, ThrowItem } from '../../shared/src/types';
 
 export const errorText: Record<ErrorCode, string> = {
   invalid_name: 'Tên phải từ 1 đến 24 ký tự.',
@@ -12,6 +12,17 @@ export const errorText: Record<ErrorCode, string> = {
   bad_request: 'Có lỗi xảy ra, thử lại nhé.',
 };
 
+export const authText: Record<AuthError, string> = {
+  invalid_username: 'Tên đăng nhập 3–20 ký tự: chữ không dấu, số, dấu chấm hoặc gạch dưới.',
+  invalid_password: 'Mật khẩu từ 6 đến 72 ký tự.',
+  invalid_name: 'Tên hiển thị từ 1 đến 24 ký tự.',
+  username_taken: 'Tên đăng nhập này có người dùng rồi.',
+  wrong_credentials: 'Sai tên đăng nhập hoặc mật khẩu.',
+  session_expired: 'Phiên đăng nhập đã hết, đăng nhập lại nhé.',
+  rate_limited: 'Thử nhiều quá, đợi vài giây rồi thử lại.',
+  server_error: 'Server đang trục trặc, thử lại sau nhé.',
+};
+
 export const actionText: Record<ActionError, string> = {
   not_playing: 'Ván chơi đã kết thúc.',
   not_your_turn: 'Chưa tới lượt bạn.',
@@ -20,10 +31,13 @@ export const actionText: Record<ActionError, string> = {
   format: 'Từ phải gồm đúng 2 chữ tiếng Việt.',
   chain: 'Chưa nối đúng chữ cuối.',
   used: 'Từ này đã có người dùng rồi.',
-  not_in_dictionary: 'Từ này không có trong từ điển.',
+  not_in_dictionary: 'Từ này chưa có trong từ điển.',
   timeout: 'Hết giờ mất rồi!',
   hint_used: 'Bạn đã dùng quyền cứu trợ rồi.',
   no_hint: 'Hết đường rồi, cứu trợ cũng chịu.',
+  cannot_appeal: 'Không xin duyệt được từ này (mỗi lượt chỉ xin 1 lần, và từ phải nối đúng).',
+  no_voters: 'Không còn ai online để bỏ phiếu.',
+  not_voting: 'Cuộc bỏ phiếu đã kết thúc.',
   illegal_move: 'Con ngựa này không đi được.',
   not_betting: 'Đã hết giờ đặt cược.',
   insufficient: 'Không đủ xu để đặt thêm.',
@@ -32,10 +46,17 @@ export const actionText: Record<ActionError, string> = {
   no_money: 'Không đủ tiền.',
 };
 
+export const HITS: { move: HitMove; emoji: string; name: string }[] = [
+  { move: 'tat', emoji: '🖐️', name: 'Tát' },
+  { move: 'dam', emoji: '👊', name: 'Đấm' },
+  { move: 'da', emoji: '🦶', name: 'Đá' },
+  { move: 'chuong', emoji: '🌀', name: 'Chưởng' },
+];
+
 export const GAME_META: Record<GameType, { emoji: string; tagline: string; players: string }> = {
   wordchain: { emoji: '🔤', tagline: 'con mèo → mèo mướp → mướp đắng…', players: '1–6 người' },
   ludo: { emoji: '🐴', tagline: 'Đổ xúc xắc, đá ngựa nhau về chuồng', players: '2–4 người' },
-  baucua: { emoji: '🦀', tagline: 'Đặt cược, lắc bát, mở bát. Xu ảo thôi!', players: '1–6 người' },
+  baucua: { emoji: '🦀', tagline: 'Đặt cược, máy lắc bát, mở bát. Xu ảo thôi!', players: '1–6 người' },
   typhu: { emoji: '🏦', tagline: 'Mua đất Sài Gòn, Hà Nội, xây khách sạn, thu tiền thuê', players: '2–6 người' },
 };
 
@@ -44,6 +65,7 @@ export const RULES: Record<GameType, string[]> = {
     'Nối từ 2 chữ: chữ đầu phải trùng chữ cuối của từ trước.',
     'Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bay màu.',
     'Mỗi người có 1 quyền Cứu trợ để xem gợi ý.',
+    'Từ đúng mà từ điển chưa có? Bấm "Xin duyệt", cả phòng đồng ý là được tính và lưu luôn.',
   ],
   ludo: [
     'Đổ 1 hoặc 6 mới được ra quân. Đổ 6 được đổ thêm.',
@@ -51,7 +73,7 @@ export const RULES: Record<GameType, string[]> = {
     'Về đích phải đổ vừa đủ. Ai đưa hết ngựa về trước thì thắng.',
   ],
   baucua: [
-    'Mỗi người có 1.000 xu ảo. Chạm vào con vật để đặt cược.',
+    'Mỗi người có 1.000 xu ảo. Chạm vào con vật để đặt cược. Hết 20 giây máy tự lắc.',
     'Mở bát ra 3 con: trúng mấy con thì ăn gấp bấy nhiêu lần.',
     'Cháy túi thì vay nóng 500 xu, nhưng bị gắn mác con nợ.',
   ],

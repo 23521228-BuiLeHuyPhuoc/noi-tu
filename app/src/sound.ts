@@ -1,5 +1,5 @@
 /** Âm thanh tổng hợp bằng Web Audio (không cần file). Tắt/bật được, nhớ trong máy. */
-type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose';
+type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko';
 
 const KEY = 'xomlay.muted';
 let ctx: AudioContext | null = null;
@@ -94,6 +94,24 @@ export function play(sfx: Sfx): void {
       case 'win':
         [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'square', 0.07, i * 0.12));
         return tone(1047, 0.4, 'triangle', 0.08, 0.5);
+      case 'reveal':
+        // tiếng chiêng mở bát
+        tone(196, 1.2, 'sine', 0.18, 0, 180);
+        tone(392, 0.9, 'triangle', 0.06);
+        return noise(0.12, 0.1);
+      case 'sad':
+        // "oát oát oát oaaa"
+        [392, 370, 349].forEach((f, i) => tone(f, 0.32, 'sawtooth', 0.05, i * 0.36, f * 0.96));
+        return tone(330, 0.9, 'sawtooth', 0.05, 1.08, 250);
+      case 'punch':
+        noise(0.08, 0.25);
+        return tone(110, 0.12, 'sine', 0.2, 0, 50);
+      case 'ko':
+        noise(0.2, 0.25);
+        tone(90, 0.5, 'sine', 0.22, 0, 40);
+        return [880, 660, 440].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0.25 + i * 0.1));
+      case 'chat':
+        return tone(1200, 0.05, 'sine', 0.06, 0, 1500);
     }
   } catch {
     // trình duyệt chặn âm thanh: bỏ qua

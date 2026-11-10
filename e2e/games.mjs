@@ -45,7 +45,7 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   await b.page.getByTestId(`avatar-${aId}`).click();
   await b.t('throw-cachua').click();
   check(await feedHas(a, 'ném 🍅 vào mặt bạn'), 'bị ném cà chua: người bị ném thấy thông báo');
-  await b.t('taunt-open').click();
+  await b.t('chat-open').click();
   await b.t('taunt-ga').click();
   await a.page.getByText('Gà quá 🐔').first().waitFor({ timeout: 3000 });
   check(true, 'khịa: bong bóng "Gà quá 🐔" hiện trên màn hình người khác');
@@ -112,11 +112,12 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   await b.page.waitForTimeout(300);
   check((await b.t('mybet-cua').textContent()) === '200', 'đặt cược cộng dồn: Cua 200');
   check((await b.t('mybet-ga').textContent()) === '50', 'đổi chip: Gà 50');
-  check((await c.page.getByText('Cả phòng: 200').count()) === 1, 'người khác thấy tổng cược cả phòng');
-  check((await b.t('shake-btn').count()) === 0, 'chỉ chủ phòng có nút Lắc');
-  await a.t('shake-btn').click();
-  await a.page.getByText('Đang lắc bát').waitFor();
-  check(true, 'chủ phòng lắc bát');
+  check(/250|200/.test(await c.t('pile-cua').textContent()), 'người khác thấy tiền vun trên ô Cua');
+  check((await a.t('shake-btn').count()) + (await b.t('shake-btn').count()) === 0, 'không còn nút Lắc, máy tự lắc');
+  await a.page.getByText('Máy đang lắc bát').waitFor({ timeout: 12000 });
+  check(true, 'hết giờ cược: máy tự lắc bát');
+  await b.t('bc-reveal').waitFor({ timeout: 6000 });
+  check((await b.page.locator('[data-testid="reveal-die"]').count()) === 3, 'mở bát toàn màn hình với 3 con');
   await b.t('bc-delta').waitFor({ timeout: 6000 });
   const delta = await b.t('bc-delta').textContent();
   check(/xu/.test(delta), `mở bát, Bình thấy kết quả: ${delta}`);

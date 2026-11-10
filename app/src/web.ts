@@ -49,7 +49,7 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 /** Rung nhẹ (Android). iPhone không hỗ trợ thì bỏ qua. */
-export function vibrate(ms = 120): void {
+export function vibrate(ms: number | number[] = 120): void {
   if (isWeb && 'vibrate' in navigator) {
     try {
       navigator.vibrate(ms);
