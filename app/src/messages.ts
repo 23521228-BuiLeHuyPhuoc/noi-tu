@@ -1,4 +1,4 @@
-import type { ActionError, AuthError, BauCuaSymbol, ErrorCode, GameType, HitMove, TauntId, ThrowItem } from '../../shared/src/types';
+import type { ActionError, AuthError, BauCuaSymbol, DoodleKind, ErrorCode, GameType, HitMove, NicknameId, TauntId, ThrowItem } from '../../shared/src/types';
 
 export const errorText: Record<ErrorCode, string> = {
   invalid_name: 'Tên phải từ 1 đến 24 ký tự.',
@@ -116,19 +116,70 @@ export const TAUNTS: { id: TauntId; text: string }[] = [
   { id: 'cuu', text: 'Cứu tui với 🆘' },
   { id: 'denlai', text: 'Đền lại đây 😤' },
   { id: 'gg', text: 'GG 🤝' },
+  { id: 'xiu', text: 'Xỉu ngang 🥱' },
+  { id: 'bayma', text: 'Bay màu nha 👋' },
+  { id: 'tuoi', text: 'Tuổi gì chơi với tui 😏' },
+  { id: 'ngoan', text: 'Ngoan, anh thương 🥰' },
+  { id: 'chaybai', text: 'Chạy đi con trai 🏃' },
+  { id: 'hetthuoc', text: 'Hết thuốc chữa 🤡' },
+];
+
+/** Biệt danh tạm thời (60 giây): chọn từ danh sách vui và vô hại */
+export const NICK_TEXT: Record<NicknameId, string> = {
+  game: 'Gà Mờ 🐔',
+  nho: 'Thánh Nhọ 🍀',
+  lidon: 'Vua Lì Đòn 🛡️',
+  hexe: 'Chúa Hề 🤡',
+  amvon: 'Đại Gia Âm Vốn 💸',
+  anhoi: 'Thần Ăn Hôi 🍗',
+  ruabo: 'Rùa Bò Hạng Nhất 🐢',
+  ngugat: 'Chúa Tể Ngủ Gật 😴',
+  khocnhe: 'Thánh Khóc Nhè 😭',
+  angian: 'Vua Ăn Gian 🕵️',
+  nhaybom: 'Trùm Nhây 🤪',
+  tuonglai: 'Tỷ Phú Tương Lai 🤑',
+};
+export const nickText = (n: NicknameId) => NICK_TEXT[n] ?? '';
+export const NICK_IDS = Object.keys(NICK_TEXT) as NicknameId[];
+
+export const DOODLE_OPTIONS: { doodle: DoodleKind; emoji: string; name: string }[] = [
+  { doodle: 'ria', emoji: '👨', name: 'Vẽ ria' },
+  { doodle: 'sung', emoji: '😈', name: 'Vẽ sừng' },
+  { doodle: 'muihe', emoji: '🤡', name: 'Mũi hề' },
+  { doodle: 'mattim', emoji: '😍', name: 'Mắt tim' },
 ];
 
 const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
 /** Câu bình luận "lầy" cho các sự kiện */
 export const quip = {
-  eliminated: (n: string) => pick([`${n} đã bay màu 💨`, `${n} cạn chữ, về quê nuôi cá 🐟`, `${n} ra đê rồi 🌾`, `${n} tắt điện 🔌`]),
-  left: (n: string) => `${n} đã chuồn khỏi phòng 🏃`,
-  capture: (a: string, b: string) => pick([`${a} đá ngựa ${b} về chuồng 🦵`, `${b} bị ${a} tiễn về quê 🚌`, `${a} vừa "chào hỏi" ngựa của ${b} 👋`]),
-  threeSixes: (n: string) => `${n} đổ 3 lần 6, tham quá mất lượt 🤡`,
-  finish: (n: string) => `Một con ngựa của ${n} đã về đích 🏁`,
-  bigWin: (n: string, x: string) => pick([`${n} húp đậm ${x} xu 🤑`, `${n} trúng mánh ${x} xu 💰`]),
-  broke: (n: string) => pick([`${n} cháy túi rồi 🔥`, `${n} trắng tay, về đi bộ 🚶`]),
-  loan: (n: string) => `${n} vừa vay nóng, chính thức thành con nợ 💸`,
-  hint: (n: string) => `${n} gọi cứu trợ 🆘`,
+  eliminated: (n: string) => pick([
+    `${n} đã bay màu 💨`, `${n} cạn chữ, về quê nuôi cá 🐟`, `${n} ra đê rồi 🌾`, `${n} tắt điện 🔌`,
+    `${n} hết pin, xin phép đi sạc 🔋`, `${n} out trình, mời ngồi ghế dự bị 🪑`, `${n} bị "ủa alo" đuổi khỏi sân 📞`,
+    `${n} đã hóa thành meme 🫠`, `${n} ngã ngựa, đứng dậy rồi lại ngã 🐴`,
+  ]),
+  left: (n: string) => pick([`${n} đã chuồn khỏi phòng 🏃`, `${n} bỏ chạy, để lại đôi dép 🩴`, `${n} đi mua đồ ăn, không bao giờ trở lại 🍜`]),
+  capture: (a: string, b: string) => pick([
+    `${a} đá ngựa ${b} về chuồng 🦵`, `${b} bị ${a} tiễn về quê 🚌`, `${a} vừa "chào hỏi" ngựa của ${b} 👋`,
+    `${a} ra đòn, ngựa ${b} bay màu 🚀`, `Ngựa ${b} bị ${a} gửi về cho mẹ 📦`, `${a} đạp đổ giấc mơ của ${b} 💔`,
+  ]),
+  threeSixes: (n: string) => pick([`${n} đổ 3 lần 6, tham quá mất lượt 🤡`, `${n} tham thì thâm: 3 lần 6 thành 0 🎲`]),
+  finish: (n: string) => pick([`Một con ngựa của ${n} đã về đích 🏁`, `Ngựa nhà ${n} về tới đích, nhanh hơn xe ôm 🏍️`]),
+  bigWin: (n: string, x: string) => pick([
+    `${n} húp đậm ${x} xu 🤑`, `${n} trúng mánh ${x} xu 💰`, `${n} ăn ${x} xu, cả xóm nghe tiếng cười 😏`,
+    `${n} hốt ${x} xu, chuẩn bị bao cả phòng trà sữa 🧋`, `${n} ngủ dậy được thần tài gõ cửa: +${x} xu 🍀`,
+  ]),
+  broke: (n: string) => pick([
+    `${n} cháy túi rồi 🔥`, `${n} trắng tay, về đi bộ 🚶`, `${n} sạch túi, còn mỗi cái nết 🫥`,
+    `${n} tay trắng, đi vay nóng đi 💸`, `Ví ${n} giờ chỉ còn mạng nhện 🕸️`,
+  ]),
+  loan: (n: string) => pick([`${n} vừa vay nóng, chính thức thành con nợ 💸`, `${n} cắm cả cái nết để vay 500 xu 🏦`]),
+  hint: (n: string) => pick([`${n} gọi cứu trợ 🆘`, `${n} phải hỏi đáp án, thôi cho qua 🙈`]),
+  roach: (a: string, b: string) => `🪳→ ${a} thả gián vào máy ${b}`,
+  ink: (a: string, b: string) => `🦑 ${a} tạt mực vào mặt ${b}`,
+  doodle: (a: string, b: string, what: string) => `🖍️ ${a} vẽ bậy ${what} lên mặt ${b}`,
+  nick: (a: string, b: string, nick: string) => `🏷️ ${a} đặt biệt danh cho ${b}: ${nick}`,
+  honk: (a: string, b: string) => `📢 ${a} bật loa vào máy ${b}`,
+  cry: (a: string, b: string) => `😭 ${a} khóc thuê hộ ${b}`,
+  charm: (a: string) => `✨ ${a} xin vía, đang tỏa hào quang`,
 };

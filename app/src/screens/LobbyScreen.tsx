@@ -5,7 +5,7 @@ import {
   type CharacterConfig, type GameType, type RoomState,
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { AGE_OPTIONS, GENDER_OPTIONS, HAIR_OPTIONS, characterSvgUri, playerColorOf } from '../avatars';
+import { ACCESSORY_OPTIONS, AGE_OPTIONS, GENDER_OPTIONS, HAIR_OPTIONS, characterSvgUri, playerColorOf } from '../avatars';
 import { shareInvite } from '../web';
 import { GAME_META, RULES } from '../messages';
 import { C, sticker } from '../theme';
@@ -214,6 +214,27 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                   style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                 >
                   <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Phụ kiện lầy 😎</T>
+          <View style={styles.chipRow}>
+            {ACCESSORY_OPTIONS.map((opt) => {
+              const active = (myChar.accessory ?? 'none') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-acc-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ accessory: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
                 </Pressable>
               );
             })}

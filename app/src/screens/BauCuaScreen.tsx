@@ -17,6 +17,7 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { compactXu } from '../format';
 import { rectOf, type Rect } from '../components/Fun';
+import { setMood } from '../funState';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const PAPER = '#F7E7C1';
@@ -440,6 +441,9 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
       setReveal(g.round);
       if (g.lastDeltas) {
         for (const [id, d] of Object.entries(g.lastDeltas)) {
+          // mặt mũi đổi theo vận may: ăn lớn thì cười đểu, trắng tay thì khóc
+          if (d >= 300) setMood(id, 'smug', 4500);
+          else if (d < 0 && (g.balances[id] ?? 0) <= 0) setMood(id, 'cry', 4500);
           if (id === me) continue; // người chơi đã thấy kết quả trên màn mở bát
           if (d >= 300) feed(quip.bigWin(nameOf(id), fmt(d)), 'good');
           else if (d < 0 && (g.balances[id] ?? 0) <= 0) feed(quip.broke(nameOf(id)), 'bad');

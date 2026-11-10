@@ -1,5 +1,5 @@
 /** Âm thanh tổng hợp bằng Web Audio (không cần file). Tắt/bật được, nhớ trong máy. */
-type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko';
+type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle';
 
 const KEY = 'xomlay.muted';
 let ctx: AudioContext | null = null;
@@ -112,6 +112,25 @@ export function play(sfx: Sfx): void {
         return [880, 660, 440].forEach((f, i) => tone(f, 0.12, 'square', 0.05, 0.25 + i * 0.1));
       case 'chat':
         return tone(1200, 0.05, 'sine', 0.06, 0, 1500);
+      case 'honk':
+        // còi xe hề: "pe-pe"
+        tone(420, 0.14, 'sawtooth', 0.1, 0, 380);
+        return tone(330, 0.26, 'sawtooth', 0.1, 0.16, 300);
+      case 'fart':
+        // tiếng "bruuut" tổng hợp, chỉ là âm thanh vui
+        tone(95, 0.55, 'sawtooth', 0.14, 0, 45);
+        tone(70, 0.5, 'square', 0.06, 0.02, 38);
+        return noise(0.45, 0.07);
+      case 'boing':
+        return tone(180, 0.45, 'sine', 0.2, 0, 700);
+      case 'squash':
+        noise(0.1, 0.22);
+        return tone(220, 0.1, 'square', 0.1, 0, 60);
+      case 'inksplash':
+        noise(0.25, 0.18);
+        return tone(300, 0.2, 'sine', 0.12, 0, 80);
+      case 'sparkle':
+        return [1319, 1568, 2093].forEach((f, i) => tone(f, 0.12, 'triangle', 0.06, i * 0.07));
     }
   } catch {
     // trình duyệt chặn âm thanh: bỏ qua
