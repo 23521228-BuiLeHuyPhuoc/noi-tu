@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_ROLL_MS, isTyPhuProperty, stationRent, utilityRent,
-  TYPHU_HOUSE_MULT, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, groupCells, rentOf, typhuCellPos,
+  TYPHU_HOUSE_MULT, TYPHU_MAX_HOUSES, groupCells, rentOf,
 } from '../../../shared/src/typhu';
 import type { Game } from '../useGame';
 import { actionText } from '../messages';
 import { characterSvgUri, playerColorOf, shortName } from '../avatars';
 import { TYPHU_PHOTOS } from '../typhuArt';
+import { ICON_BY_CELL } from '../typhuCellIcons';
+import { makeCenterLayout, makeGeo, type Rect } from '../typhuLayout';
 import { useOnChange, useOnNew, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
@@ -16,39 +18,16 @@ import { C, sticker } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
-import { TimerBar } from '../components/TimerBar';
-import { Dice } from '../components/Dice';
 import { TyPhuCell } from '../components/TyPhuCell';
-import { useShake } from '../components/Fun';
-import { compactXu } from '../format';
+import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
+import { Pawn, TyPhuFxLayer, fxEnd, type Fx } from '../components/TyPhuFx';
+import { ThrowSheet, useShake } from '../components/Fun';
 
 /** màu dự phòng theo thứ tự lượt nếu người chơi chưa có character */
 export const TOKEN_COLORS = PLAYER_COLORS.map((c) => c.hex);
-const CORNER_ICON: Record<string, string> = {
-  start: '🏁', jail: '🚔', rest: '☕', gotojail: '👮',
-  chance: '❓', community: '🎁', station: '🚆', utility: '⚡', tax: '💸',
-};
 const fmt = (n: number) => n.toLocaleString('vi-VN');
-
-interface CashFx {
-  delta: number;
-  at: number;
-}
-
-interface CellFx {
-  cell: number;
-  label: string;
-  color: string;
-  at: number;
-}
-
-function houseBadgeInfo(houses: number, ownerHex: string): { text: string; bg: string; border: string } {
-  if (houses >= TYPHU_MAX_HOUSES) return { text: '🏨 KS', bg: '#E03131', border: '#FFD43B' };
-  if (houses === 3) return { text: '🏘️ C3', bg: '#7950F2', border: '#E5DBFF' };
-  if (houses === 2) return { text: '🏠 C2', bg: '#1D6FE8', border: '#D0EBFF' };
-  if (houses === 1) return { text: '🏠 C1', bg: '#0CA678', border: '#C3FAE8' };
-  return { text: 'ĐẤT', bg: ownerHex, border: '#FFFFFF' };
-}
+/** đồng hồ gọi trong callback sự kiện (không gọi lúc render) */
+const clockNow = () => Date.now();
 
 export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as TyPhuView;
@@ -61,6 +40,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
   const [forceRotate, setForceRotate] = useState(false);
+  const [throwAt, setThrowAt] = useState<string | null>(null);
   const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
 
   const myTurn = g.currentPlayerId === me;
@@ -90,21 +70,27 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const isPortrait = height > width;
   const rotated = isPortrait && forceRotate;
   const availW = stageSize && stageSize.w > 200 ? stageSize.w - 4 : Math.max(320, width - 12);
-  const availH = stageSize && stageSize.h > 200 ? stageSize.h - 4 : Math.max(260, height - (isPortrait ? 96 : 68));
-  const boardW = rotated ? availH : availW;
-  const boardH = rotated ? availW : availH;
-  const cellW = boardW / 11;
-  const cellH = boardH / 11;
-  const minCell = Math.min(cellW, cellH);
+  const availH = stageSize && stageSize.h > 200 ? stageSize.h - 12 : Math.max(260, height - (isPortrait ? 190 : 68));
+  const boardW = Math.floor(rotated ? availH : availW);
+  const boardH = Math.floor(rotated ? availW : availH);
+  const geo = useMemo(() => makeGeo(boardW, boardH), [boardW, boardH]);
+  const hasCard = !!g.card;
+  const layout = useMemo(
+    () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
+    [geo, g.order.length, hasCard],
+  );
+  const pawnBase = Math.max(24, Math.min(34, geo.wm * 0.95, geo.hm * 0.7));
 
   const [now, setNow] = useState(() => Date.now());
   const [localRoll, setLocalRoll] = useState<{ id: number; startedAt: number; endsAt: number } | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [cashFx, setCashFx] = useState<Record<string, CashFx>>({});
-  const [cellFx, setCellFx] = useState<CellFx | null>(null);
+  const [fx, setFx] = useState<Fx[]>([]);
+  const [cardFx, setCardFx] = useState<CardFx | null>(null);
   const prevCashRef = useRef<Record<string, number>>({ ...g.cash });
   const prevOwnersRef = useRef<Record<number, string>>({ ...g.owners });
   const prevHousesRef = useRef<Record<number, number>>({ ...g.houses });
+  const lastLogRef = useRef(g.log.at(-1)?.id ?? 0);
+  const fxSeq = useRef(1);
 
   useEffect(() => {
     let mounted = true;
@@ -112,46 +98,6 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
     return () => { mounted = false; sub.remove(); };
   }, []);
-
-  const cashSignature = g.order.map((id) => `${id}:${g.cash[id] ?? 0}`).join('|');
-  useOnChange(cashSignature, () => {
-    const prev = prevCashRef.current;
-    const updates: Record<string, CashFx> = {};
-    const t = room.serverNow - game.clockOffset;
-    for (const id of g.order) {
-      const cur = g.cash[id] ?? 0;
-      const old = prev[id];
-      if (old !== undefined && cur !== old) {
-        updates[id] = { delta: cur - old, at: t };
-      }
-      prev[id] = cur;
-    }
-    if (Object.keys(updates).length > 0) {
-      setCashFx((old) => ({ ...old, ...updates }));
-      setNow(t);
-    }
-  });
-
-  const boardSignature = TYPHU_BOARD.map((_, i) => `${g.owners[i] ?? ''}:${g.houses[i] ?? 0}`).join('|');
-  useOnChange(boardSignature, () => {
-    const prevO = prevOwnersRef.current;
-    const prevH = prevHousesRef.current;
-    const t = room.serverNow - game.clockOffset;
-    for (let i = 0; i < TYPHU_BOARD.length; i++) {
-      const owner = g.owners[i];
-      const houses = g.houses[i] ?? 0;
-      if (owner && prevO[i] !== owner) {
-        setCellFx({ cell: i, label: '✨ MUA ĐẤT!', color: colorOf(owner), at: t });
-        setNow(t);
-      } else if (owner && houses > (prevH[i] ?? 0)) {
-        const lbl = houses >= TYPHU_MAX_HOUSES ? '🏨 LÊN KHÁCH SẠN!' : `🏠 NHÀ CẤP ${houses}!`;
-        setCellFx({ cell: i, label: lbl, color: '#FFD43B', at: t });
-        setNow(t);
-      }
-      if (owner) prevO[i] = owner;
-      prevH[i] = houses;
-    }
-  });
 
   const serverNow = now + game.clockOffset;
   const movement = g.movement;
@@ -161,36 +107,40 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     : localRoll?.id === g.rollId ? localRoll.startedAt : null;
   const rollElapsed = rollStartedAt === null ? TYPHU_ROLL_MS : serverNow - rollStartedAt;
   const diceAnimating = !reducedMotion && rollStartedAt !== null && rollElapsed >= 0 && rollElapsed < TYPHU_ROLL_MS;
-  const dicePhase = diceAnimating
+  const dicePhase: 'roll' | 'bounce' | 'reveal' = diceAnimating
     ? rollElapsed < 400 ? 'roll' : rollElapsed < 540 ? 'bounce' : 'reveal'
     : 'reveal';
   const fxEndsAt = Math.max(
-    cellFx ? cellFx.at + 2200 : 0,
-    ...Object.values(cashFx).map((x) => x.at + 2200),
+    0,
+    ...fx.map(fxEnd),
+    cardFx ? cardFx.at + 3600 : 0,
   );
   const animationEndsAt = reducedMotion ? 0 : Math.max(
     movement?.endsAt ?? 0,
     localRoll?.id === g.rollId ? localRoll.endsAt : 0,
   );
-  const animating = serverNow < animationEndsAt || now < fxEndsAt;
+  const animating = serverNow < animationEndsAt || (!reducedMotion && now < fxEndsAt);
   useEffect(() => {
-    if (!animating || reducedMotion) return;
+    if (!animating) return;
     const tick = setInterval(() => setNow(Date.now()), 32);
     return () => clearInterval(tick);
-  }, [animating, animationEndsAt, fxEndsAt, reducedMotion]);
+  }, [animating, animationEndsAt, fxEndsAt]);
 
-  const tokenMoveState = (id: string): { pos: [number, number]; hop: number; activeStepCell: number | null; trail: Set<number> } => {
-    const emptyTrail = new Set<number>();
-    if (reducedMotion && movement?.playerId === id) {
-      return { pos: typhuCellPos(g.pos[id]), hop: 0, activeStepCell: null, trail: emptyTrail };
-    }
-    if (!movement || movement.playerId !== id || serverNow >= movement.endsAt) {
-      return { pos: typhuCellPos(g.pos[id]), hop: 0, activeStepCell: null, trail: emptyTrail };
-    }
+  /** Vị trí quân cờ theo pixel trên bàn (giữa ô); đang đi thì nội suy giữa hai ô liên tiếp và nhảy vòm. */
+  // quân cờ đứng ở phần trên/trái của ô (che icon, chừa tên và giá cho dễ đọc)
+  const cellMid = (i: number) => {
+    const r = geo.rect[i];
+    if (geo.side[i] === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.34 };
+    if (r.w >= 56 && r.h <= 56) return { x: r.x + r.w * 0.24, y: r.y + r.h * 0.6 };
+    return { x: r.x + r.w / 2, y: r.y + r.h * 0.36 };
+  };
+  const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
+    const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
+    if (!movement || movement.playerId !== id || serverNow >= movement.endsAt || reducedMotion) return still();
     const delay = movement.kind === 'roll' ? TYPHU_ROLL_MS : 0;
     const elapsed = serverNow - movement.startedAt - delay;
     if (elapsed <= 0 || !movement.path.length) {
-      return { pos: typhuCellPos(movement.from), hop: 0, activeStepCell: movement.from, trail: new Set([movement.from]) };
+      return { ...cellMid(movement.from), hop: 0, active: true, stepCell: movement.from, trail: new Set([movement.from]) };
     }
     const duration = Math.max(1, movement.endsAt - movement.startedAt - delay);
     const progress = Math.min(movement.path.length, (elapsed / duration) * movement.path.length);
@@ -198,20 +148,107 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     const sub = progress - step;
     const from = step === 0 ? movement.from : movement.path[step - 1];
     const to = movement.path[Math.min(step, movement.path.length - 1)];
-    const [fr, fc] = typhuCellPos(from);
-    const [tr, tc] = typhuCellPos(to);
-    const hop = Math.sin(sub * Math.PI) * 14;
-    const trail = new Set<number>([movement.from, ...movement.path.slice(0, Math.min(movement.path.length, step + 1))]);
+    const a = cellMid(from);
+    const b = cellMid(to);
     return {
-      pos: [fr + (tr - fr) * sub, fc + (tc - fc) * sub],
-      hop,
-      activeStepCell: to,
-      trail,
+      x: a.x + (b.x - a.x) * sub, y: a.y + (b.y - a.y) * sub,
+      hop: Math.sin(sub * Math.PI) * 15, active: true, stepCell: to,
+      trail: new Set<number>([movement.from, ...movement.path.slice(0, Math.min(movement.path.length, step + 1))]),
     };
   };
-
   const activeMovementState = movement && moving ? tokenMoveState(movement.playerId) : null;
 
+  // ---- hiệu ứng theo sự kiện: so sánh ảnh chụp trạng thái mới với lần trước ----
+  const wealthRectOf = (id: string): Rect => {
+    const r = layout.wealth[Math.max(0, g.order.indexOf(id))] ?? layout.wealth[0];
+    return { x: geo.center.x + 3 + r.x, y: geo.center.y + 3 + r.y, w: r.w, h: r.h };
+  };
+  const msUntilArrive = () => (movement ? Math.max(0, movement.endsAt - (clockNow() + game.clockOffset)) : 0);
+  const msUntilReach = (cell: number) => {
+    if (!movement) return 0;
+    const idx = movement.path.indexOf(cell);
+    if (idx < 0) return msUntilArrive();
+    const delay = movement.kind === 'roll' ? TYPHU_ROLL_MS : 0;
+    const reach = movement.startedAt + delay + ((idx + 1) / movement.path.length) * (movement.endsAt - movement.startedAt - delay);
+    return Math.max(0, reach - (clockNow() + game.clockOffset));
+  };
+  const snapKey = `${g.log.at(-1)?.id ?? 0}|${g.order.map((id) => `${id}:${g.cash[id] ?? 0}`).join(',')}|${TYPHU_BOARD.map((_, i) => `${g.owners[i] ?? ''}:${g.houses[i] ?? 0}`).join(',')}|${g.card?.id ?? 0}`;
+  useOnChange(snapKey, () => {
+    const t0 = clockNow();
+    const seqId = () => fxSeq.current++;
+    const adds: Fx[] = [];
+    const later = (ms: number, fn: () => void) => { if (ms <= 0) fn(); else setTimeout(fn, ms); };
+    // tiền
+    const deltas: Record<string, number> = {};
+    for (const id of g.order) {
+      const cur = g.cash[id] ?? 0;
+      const old = prevCashRef.current[id];
+      if (old !== undefined && cur !== old) deltas[id] = cur - old;
+      prevCashRef.current[id] = cur;
+    }
+    const consumed = new Set<string>();
+    const newLogs = g.log.filter((l) => l.id > lastLogRef.current);
+    if (newLogs.length) lastLogRef.current = newLogs[newLogs.length - 1].id;
+    const bankruptNow = newLogs.some((l) => l.kind === 'bankrupt');
+    // đất & nhà
+    for (let i = 0; i < TYPHU_BOARD.length; i++) {
+      const owner = g.owners[i];
+      const houses = g.houses[i] ?? 0;
+      if (owner && prevOwnersRef.current[i] !== owner && !bankruptNow) {
+        adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: 'ĐÃ MUA!', color: colorOf(owner) });
+        play('stamp');
+      } else if (owner && houses > (prevHousesRef.current[i] ?? 0)) {
+        adds.push({ k: 'build', id: seqId(), at: t0, cell: i, level: houses });
+        play('cash');
+      }
+      prevOwnersRef.current[i] = owner ?? '';
+      prevHousesRef.current[i] = houses;
+    }
+    for (const l of newLogs) {
+      const mine = l.text.startsWith(g.names[me] ?? '\u0000');
+      if (l.kind === 'rent') {
+        const ids = Object.keys(deltas);
+        const payer = ids.find((id) => deltas[id] < 0);
+        const taker = ids.find((id) => deltas[id] > 0);
+        const delay = msUntilArrive();
+        if (payer && taker) {
+          consumed.add(payer); consumed.add(taker);
+          adds.push({ k: 'rent', id: seqId(), at: t0 + delay, from: wealthRectOf(payer), to: wealthRectOf(taker), fromId: payer, toId: taker, amount: deltas[taker] });
+          later(delay, () => play(mine ? 'lose' : 'cash'));
+        }
+      } else if (l.kind === 'start') {
+        const delay = msUntilReach(0);
+        adds.push({ k: 'start', id: seqId(), at: t0 + delay });
+        later(delay, () => play('cash'));
+      } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
+        const delay = msUntilArrive();
+        adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: 10 });
+        later(delay, () => play('siren'));
+        feed(l.text, 'bad');
+        if (mine) shake();
+      } else if (l.kind === 'bankrupt') {
+        const nm = Object.keys(g.names).find((id) => l.text.startsWith(g.names[id])) ;
+        adds.push({ k: 'bankrupt', id: seqId(), at: t0 + msUntilArrive(), name: nm ? nameOf(nm) : '' });
+        later(msUntilArrive(), () => play('boom'));
+        play('lose');
+        feed(l.text, 'bad');
+      } else if (l.kind === 'tax') {
+        play('coin');
+      }
+    }
+    for (const [id, delta] of Object.entries(deltas)) {
+      if (consumed.has(id)) continue;
+      adds.push({ k: 'float', id: seqId(), at: t0 + msUntilArrive(), at2: wealthRectOf(id), who: id, delta });
+    }
+    if (g.card && g.card.id !== (cardFx?.id ?? 0)) {
+      const kindCell = TYPHU_BOARD[movement?.kind === 'card' ? movement.from : g.pos[g.currentPlayerId ?? ''] ?? 0];
+      const delay = msUntilArrive();
+      setCardFx({ id: g.card.id, text: g.card.text, title: kindCell?.kind === 'community' ? 'KHÍ VẬN' : 'CƠ HỘI', at: t0 + delay });
+      later(delay, () => play('flip'));
+    }
+    if (adds.length && !reducedMotion) setFx((old) => [...old.filter((f) => fxEnd(f) > t0), ...adds]);
+    setNow(t0);
+  });
   useOnChange(g.rollId, (id) => {
     const startedAt = Date.now() + game.clockOffset;
     setLocalRoll({ id, startedAt, endsAt: startedAt + TYPHU_ROLL_MS });
@@ -225,27 +262,8 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     }
   });
   useOnNew(g.log, (l) => {
-    const mine = l.text.startsWith(g.names[me] ?? '\u0000');
-    if (l.kind === 'buy' || l.kind === 'start') play('coin');
-    if (l.kind === 'rent') {
-      play(mine ? 'lose' : 'coin');
-      if (!mine) feed(l.text, 'fun');
-    }
-    if (l.kind === 'jail' && l.text.includes('vào tù')) {
-      play('error');
-      feed(l.text, 'bad');
-      if (mine) shake();
-    }
-    if (l.kind === 'bankrupt') {
-      play('lose');
-      feed(l.text, 'bad');
-    }
-    if (l.kind === 'build') {
-      play('coin');
-      if (!mine) feed(l.text, 'info');
-    }
+    if (l.kind === 'buy') play('coin');
   });
-  useOnChange(g.card?.id, (id) => id && play('pop'));
 
   const act = async (a: Parameters<Game['act']>[0]) => {
     if (moving) return false;
@@ -284,45 +302,34 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
           : 'Chờ chút…'
     : `Lượt của ${curName}`;
 
-  const recent = g.log.slice(-2).reverse();
   const d = detail !== null ? TYPHU_BOARD[detail] : null;
-  const activeCellFx = cellFx && now - cellFx.at < 2200 ? cellFx : null;
-
   const landscape = !isPortrait;
-  const stacked = isPortrait && !rotated ? true : false;
-  const diceSize = Math.max(34, Math.min(48, minCell * 0.78));
   const buyable = !moving && myTurn && g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending : null;
-  const controls = (
-    <>
-      {!stacked && (
-        <T testID="typhu-status" style={[styles.status, myTurn && { color: C.gold }]}>
-          {status}
-        </T>
-      )}
-      {!moving && myTurn && g.step === 'roll' ? (
-        <View style={styles.row}>
-          {inJail && (
-            <Button testID="pay-jail" small variant="paper" title={`Nộp ${TYPHU_JAIL_FINE} xu`} style={{ flex: 1 }} onPress={() => act({ type: 'payJail' })} />
-          )}
-          <Button testID="roll-btn" small title="🎲 Đổ xúc xắc" style={{ flex: 1.2 }} onPress={() => act({ type: 'roll' })} />
-        </View>
-      ) : buyable ? (
-        <View style={styles.row}>
-          <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => act({ type: 'skip' })} />
-          <Button testID="buy-btn" small title="Mua" style={{ flex: 1 }} onPress={() => act({ type: 'buy' })} />
-        </View>
-      ) : !moving && myTurn && g.step === 'manage' ? (
-        <Button testID="end-turn" small title="✓ Xong lượt" variant="gold" onPress={() => act({ type: 'endTurn' })} />
-      ) : null}
-      <TimerBar left={left} total={g.turnSeconds} />
-      {error && <T style={styles.error}>{error}</T>}
-    </>
-  );
+
+  // thẻ tài sản nháy xanh/đỏ khi vừa nhận/mất tiền
+  const flash: Record<string, 'gain' | 'loss'> = {};
+  for (const f of fx) {
+    if (now < f.at || now > f.at + 1100) continue;
+    if (f.k === 'rent') { flash[f.fromId] = 'loss'; flash[f.toId] = 'gain'; }
+    if (f.k === 'float') flash[f.who] = f.delta > 0 ? 'gain' : 'loss';
+  }
+
+  // quân cờ: chia chỗ khi nhiều người chung một ô
+  const alive = g.order.filter((id) => !g.bankrupt.includes(id));
+  const offsetsFor = (n: number, size: number, cellW: number): [number, number][] => {
+    const dx = Math.min(size * 0.5, cellW * 0.32);
+    const dy = size * 0.3;
+    if (n === 1) return [[0, 0]];
+    if (n === 2) return [[-dx, 0], [dx, 0]];
+    if (n === 3) return [[-dx, -dy], [dx, -dy], [0, dy]];
+    return [[-dx, -dy], [dx, -dy], [-dx, dy], [dx, dy]];
+  };
 
   return (
     <Shell
       wide
       fullscreen
+      hideStrip={height < 700}
       scroll={false}
       game={game}
       room={room}
@@ -332,25 +339,9 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
         dim: (p) => g.bankrupt.includes(p.id),
         ring: (p) => (g.order.includes(p.id) ? colorOf(p.id) : undefined),
         sub: (p) =>
-          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${compactXu(g.cash[p.id])} xu${p.id in g.jail ? ' 🚔' : ''}` : undefined,
+          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${fmt(g.cash[p.id])} xu${p.id in g.jail ? ' (tù)' : ''}` : undefined,
       }}
     >
-      {isPortrait && (
-        <View style={styles.rotateBar}>
-          <T style={styles.rotateHint}>
-            📱 Xoay ngang cho bàn cờ to hơn
-          </T>
-          <Pressable
-            testID="rotate-toggle"
-            accessibilityRole="button"
-            onPress={() => setForceRotate((v) => !v)}
-            style={styles.rotateBtn}
-          >
-            <T style={styles.rotateBtnText}>{forceRotate ? '↩ Khung dọc' : '🔄 Xoay 90°'}</T>
-          </Pressable>
-        </View>
-      )}
-
       <View
         style={styles.stageWrap}
         onLayout={(e) => {
@@ -366,231 +357,94 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
             rotated && { transform: [{ rotate: '90deg' }] },
           ]}
         >
-          {/* 40 ô xung quanh bàn cờ (memo: chỉ vẽ lại khi ô đó đổi) */}
-          {TYPHU_BOARD.map((c, i) => {
-            const [r, col] = typhuCellPos(i);
+          {/* 40 ô (memo: chỉ vẽ lại khi ô đó đổi) */}
+          {TYPHU_BOARD.map((_, i) => {
             const owner = g.owners[i];
-            const badge = owner ? houseBadgeInfo(g.houses[i] ?? 0, colorOf(owner)) : null;
-            const fx = activeCellFx?.cell === i ? activeCellFx : null;
+            const r = geo.rect[i];
             return (
               <TyPhuCell
                 key={i}
                 index={i}
-                name={c.name}
-                bandColor={c.kind === 'land' ? TYPHU_GROUPS[c.group].color : null}
-                icon={c.kind === 'land' ? null : CORNER_ICON[c.kind]}
-                price={isTyPhuProperty(c) ? c.price : null}
-                top={r * cellH}
-                left={col * cellW}
-                w={cellW}
-                h={cellH}
-                minCell={minCell}
+                x={r.x}
+                y={r.y}
+                w={r.w}
+                h={r.h}
+                side={geo.side[i]}
                 ownerName={owner ? nameOf(owner) : null}
                 ownerHex={owner ? colorOf(owner) : null}
                 ownerLight={owner ? lightColorOf(owner) : null}
                 ownerPortrait={owner ? portraitUriOf(owner) : null}
-                badgeText={badge?.text ?? null}
-                badgeBg={badge?.bg ?? null}
-                badgeBorder={badge?.border ?? null}
+                houses={g.houses[i] ?? 0}
                 here={g.pendingBuy === i}
                 isTrail={activeMovementState?.trail.has(i) ?? false}
-                isStepTarget={activeMovementState?.activeStepCell === i}
-                fxLabel={fx?.label ?? null}
-                fxColor={fx?.color ?? null}
+                isStepTarget={activeMovementState?.stepCell === i}
                 onPress={setDetail}
               />
             );
           })}
 
-          {/* Quân cờ nhân vật chạy từng bước có hiệu ứng nhảy vòm & vòng sáng */}
-          {g.order.filter((id) => !g.bankrupt.includes(id)).map((id) => {
-            const moveState = tokenMoveState(id);
-            const [r, col] = moveState.pos;
-            const isMovingMe = moving && movement?.playerId === id;
-            const k = g.order.filter((other) => !g.bankrupt.includes(other) && g.pos[other] === g.pos[id]).indexOf(id);
-            const size = Math.max(20, Math.min(38, minCell * 0.56));
-            const topPos = r * cellH + cellH * 0.42 - Math.floor(k / 3) * size * 0.5 - moveState.hop;
-            const leftPos = col * cellW + cellW * 0.14 + (k % 3) * size * 0.52;
+          {/* TRUNG TÂM: người đang chơi, xúc xắc, nút, tài sản, đất của tôi, diễn biến */}
+          <View style={[styles.center, { left: geo.center.x + 1.5, top: geo.center.y + 1.5, width: geo.center.w - 3, height: geo.center.h - 3 }]}>
+            <View style={{ position: 'absolute', left: 3, top: 3, width: geo.center.w - 9, height: geo.center.h - 9 }}>
+              <TyPhuCenter
+                layout={layout}
+                size={{ w: geo.center.w - 6, h: geo.center.h - 6 }}
+                g={g}
+                me={me}
+                now={now}
+                nameOf={nameOf}
+                colorOf={colorOf}
+                lightColorOf={lightColorOf}
+                portraitUriOf={portraitUriOf}
+                status={status}
+                myTurn={myTurn}
+                moving={moving}
+                inJail={inJail}
+                buyable={buyable ? { name: buyable.name, price: buyable.price } : null}
+                left={left}
+                dice={{ phase: dicePhase, animating: diceAnimating, elapsed: rollElapsed, tick: now }}
+                flash={flash}
+                card={cardFx}
+                reducedMotion={reducedMotion}
+                error={error}
+                isHost={isHost}
+                canRotate={isPortrait}
+                rotated={rotated}
+                onRotate={() => setForceRotate((v) => !v)}
+                onEnd={() => setEnding(true)}
+                onAct={(a) => void act({ type: a })}
+                onCell={setDetail}
+                onPlayer={(id) => { if (id !== me) setThrowAt(id); }}
+              />
+            </View>
+          </View>
 
+          {/* quân cờ */}
+          {alive.map((id) => {
+            const st = tokenMoveState(id);
+            const here = alive.filter((o) => g.pos[o] === g.pos[id]);
+            const stacked = !st.active && here.length > 1;
+            const size = pawnBase * (stacked ? 0.84 : 1);
+            const off = stacked ? offsetsFor(Math.min(4, here.length), size, geo.rect[g.pos[id]].w)[Math.min(3, here.indexOf(id))] : [0, 0];
             return (
-              <View
+              <Pawn
                 key={id}
                 testID={`token-${id}`}
-                pointerEvents="none"
-                accessibilityLabel={`${nameOf(id)}, ô ${g.pos[id] + 1}`}
-                style={[
-                  styles.token,
-                  {
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    top: topPos,
-                    left: leftPos,
-                    backgroundColor: lightColorOf(id),
-                    borderColor: colorOf(id),
-                  },
-                  id === g.currentPlayerId && styles.tokenActive,
-                  isMovingMe && styles.tokenMoving,
-                ]}
-              >
-                <Image
-                  source={{ uri: portraitUriOf(id) }}
-                  style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
-                />
-                {isMovingMe && <View style={[styles.tokenGlowRing, { borderColor: colorOf(id) }]} />}
-              </View>
+                label={`${nameOf(id)}, ô ${g.pos[id] + 1}`}
+                uri={portraitUriOf(id)}
+                color={colorOf(id)}
+                light={lightColorOf(id)}
+                x={st.x + off[0]}
+                y={st.y + off[1]}
+                size={size}
+                hop={st.hop}
+                active={id === g.currentPlayerId}
+                moving={st.active}
+              />
             );
           })}
 
-          {/* TRUNG TÂM BÀN CỜ: Bảng tài sản trực quan + Xúc xắc + Nút điều khiển + Diễn biến */}
-          <View
-            style={[
-              styles.center,
-              {
-                top: cellH * 1.02,
-                left: cellW * 1.02,
-                width: cellW * 8.96,
-                height: cellH * 8.96,
-              },
-            ]}
-          >
-            {/* Thanh tiêu đề trung tâm */}
-            <View style={styles.centerHead}>
-              <View style={styles.brandRow}>
-                <T style={styles.logo}>🏛️ ĐẠI GIA ĐẤT VIỆT</T>
-                <View style={styles.legendPills}>
-                  <View style={[styles.lvlLegend, { backgroundColor: '#0CA678' }]}><T style={styles.lvlLegendTxt}>🏠C1</T></View>
-                  <View style={[styles.lvlLegend, { backgroundColor: '#1D6FE8' }]}><T style={styles.lvlLegendTxt}>🏠C2</T></View>
-                  <View style={[styles.lvlLegend, { backgroundColor: '#7950F2' }]}><T style={styles.lvlLegendTxt}>🏘️C3</T></View>
-                  <View style={[styles.lvlLegend, { backgroundColor: '#E03131' }]}><T style={styles.lvlLegendTxt}>🏨KS</T></View>
-                </View>
-              </View>
-              {isHost && (
-                <Pressable testID="end-open" accessibilityRole="button" onPress={() => setEnding(true)} hitSlop={8} style={styles.endBtn}>
-                  <T style={styles.endLink}>🏆 Tổng kết</T>
-                </Pressable>
-              )}
-            </View>
-
-            {/* BẢNG TÀI SẢN NGƯỜI CHƠI Ở CHÍNH GIỮA BÀN CỜ */}
-            <View style={styles.wealthGrid}>
-              {g.order.map((id) => {
-                const isCur = id === g.currentPlayerId;
-                const isBankrupt = g.bankrupt.includes(id);
-                const pColor = colorOf(id);
-                const ownedCells = Object.entries(g.owners)
-                  .filter(([, ownerId]) => ownerId === id)
-                  .map(([cellIdx]) => Number(cellIdx));
-                const houseCount = ownedCells.reduce((acc, idx) => acc + ((g.houses[idx] ?? 0) < TYPHU_MAX_HOUSES ? (g.houses[idx] ?? 0) : 0), 0);
-                const hotelCount = ownedCells.reduce((acc, idx) => acc + ((g.houses[idx] ?? 0) >= TYPHU_MAX_HOUSES ? 1 : 0), 0);
-                const fx = cashFx[id];
-                const showCashFx = fx && now - fx.at < 2200;
-                const isGain = (fx?.delta ?? 0) > 0;
-
-                return (
-                  <View
-                    key={id}
-                    testID={`wealth-card-${id}`}
-                    style={[
-                      styles.wealthCard,
-                      {
-                        borderColor: pColor,
-                        opacity: isBankrupt ? 0.42 : 1,
-                      },
-                      isCur && styles.wealthCardActive,
-                      showCashFx && (isGain ? styles.wealthCardGain : styles.wealthCardLoss),
-                    ]}
-                  >
-                    <View style={[styles.wealthAvatarWrap, { borderColor: pColor, backgroundColor: lightColorOf(id) }]}>
-                      <Image source={{ uri: portraitUriOf(id) }} style={styles.wealthAvatar} />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={styles.wealthNameRow}>
-                        <T numberOfLines={1} style={styles.wealthName}>
-                          {nameOf(id)}
-                        </T>
-                        {isCur && <T style={styles.turnDot}>🎲</T>}
-                        {id in g.jail && <T style={styles.turnDot}>🚔</T>}
-                      </View>
-                      <T numberOfLines={1} style={styles.wealthCash}>
-                        {isBankrupt ? '💀 Phá sản' : `${fmt(g.cash[id] ?? 0)} xu`}
-                      </T>
-                      <T numberOfLines={1} style={styles.wealthProps}>
-                        {ownedCells.length} đất{houseCount > 0 ? ` · ${houseCount} nhà` : ''}{hotelCount > 0 ? ` · ${hotelCount} KS` : ''}
-                      </T>
-                    </View>
-
-                    {/* Hiệu ứng ánh sáng +xu / -xu bay lên khi có tiền hoặc mất tiền */}
-                    {showCashFx && (
-                      <View
-                        pointerEvents="none"
-                        style={[
-                          styles.cashDeltaBadge,
-                          isGain ? styles.cashDeltaGain : styles.cashDeltaLoss,
-                        ]}
-                      >
-                        <T style={styles.cashDeltaText}>
-                          {isGain ? `+${fmt(fx.delta)} xu 💰` : `${fmt(fx.delta)} xu 💸`}
-                        </T>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* KHU VỰC XÚC XẮC & NÚT HÀNH ĐỘNG TRUNG TÂM */}
-            <View style={[styles.actionHub, stacked && styles.actionHubStacked]}>
-              <View style={[styles.hubTop, !stacked && { flex: 1 }]}>
-                <View
-                  testID={`dice-phase-${dicePhase}`}
-                  accessibilityLabel={`Xúc xắc: ${dicePhase}`}
-                  style={[
-                    styles.diceArena,
-                    diceAnimating && styles.diceArenaGlow,
-                    !reducedMotion && dicePhase === 'roll' && { transform: [{ rotate: `${rollElapsed * 1.8}deg` }, { scale: 1.1 }] },
-                    !reducedMotion && dicePhase === 'bounce' && { transform: [{ translateY: -Math.sin(((rollElapsed - 400) / 140) * Math.PI) * 10 }, { scale: 1.08 }] },
-                  ]}
-                >
-                  <Dice
-                    testID="die-1"
-                    value={dicePhase === 'roll' ? (Math.floor(now / 65) % 6) + 1 : g.dice?.[0] ?? null}
-                    rollId={diceAnimating ? g.rollId : 0}
-                    size={diceSize}
-                  />
-                  <Dice
-                    testID="die-2"
-                    value={dicePhase === 'roll' ? (Math.floor(now / 83) % 6) + 1 : g.dice?.[1] ?? null}
-                    rollId={diceAnimating ? g.rollId : 0}
-                    size={diceSize}
-                  />
-                </View>
-                {stacked && (
-                  <T testID="typhu-status" style={[styles.status, styles.statusStacked, myTurn && { color: C.gold }]}>
-                    {status}
-                  </T>
-                )}
-                {!stacked && (
-                  <View style={styles.controlsCol}>{controls}</View>
-                )}
-              </View>
-              {stacked && <View style={styles.controlsCol}>{controls}</View>}
-            </View>
-
-            {/* Thẻ Cơ hội / Khí vận & dòng sự kiện */}
-            <View style={styles.bottomTicker}>
-              {g.card && (
-                <View testID="typhu-card" style={styles.card}>
-                  <T numberOfLines={1} style={styles.cardText}>🎴 {g.card.text}</T>
-                </View>
-              )}
-              {recent.map((l, i) => (
-                <T key={l.id} numberOfLines={1} style={[styles.log, i > 0 && { opacity: 0.65 }]}>
-                  {l.text}
-                </T>
-              ))}
-            </View>
-          </View>
+          <TyPhuFxLayer fx={reducedMotion ? [] : fx} now={now} cells={geo.rect} W={boardW} H={boardH} center={geo.center} />
         </View>
       </View>
 
@@ -605,6 +459,10 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
               />
             )}
             <View style={[{ gap: 8 }, landscape && { flex: 1 }]}>
+              <View style={styles.detailIconRow}>
+                <Image source={{ uri: ICON_BY_CELL[detail] }} style={styles.detailIcon} />
+                <T style={styles.detailKind}>{d.kind === 'land' ? 'Địa danh' : d.kind === 'station' ? 'Nhà ga' : d.kind === 'utility' ? 'Tiện ích' : d.kind === 'tax' ? 'Thuế' : d.kind === 'chance' ? 'Cơ hội' : d.kind === 'community' ? 'Khí vận' : 'Ô đặc biệt'}</T>
+              </View>
           {d.kind === 'land' ? (
             <View style={{ gap: 6 }}>
               <View style={[styles.detailBand, { backgroundColor: TYPHU_GROUPS[d.group].color }]}>
@@ -678,9 +536,14 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
               {d.kind === 'tax' && `Nộp ${fmt(d.amount)} xu cho ngân hàng.`}
             </T>
           )}
+              <T style={styles.credit}>Nguồn icon/ảnh: icon Twemoji (CC-BY 4.0, jdecked/twemoji); ảnh địa danh từ Wikimedia Commons / Wikipedia.</T>
             </View>
           </View>
         </Sheet>
+      )}
+
+      {throwAt && playerById.get(throwAt) && (
+        <ThrowSheet game={game} target={playerById.get(throwAt)!} onClose={() => setThrowAt(null)} />
       )}
 
       {ending && (
@@ -694,236 +557,24 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   );
 }
 
+
 const styles = StyleSheet.create({
-  rotateBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1E1510', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 8,
-  },
-  rotateHint: { flex: 1, fontSize: 11, color: '#FFE066', fontWeight: '700' },
-  rotateBtn: {
-    backgroundColor: C.gold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-    borderWidth: 1.5, borderColor: C.ink,
-  },
-  rotateBtnText: { fontSize: 11, fontWeight: '900', color: C.ink },
   stageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  board: {
-    backgroundColor: '#0F2E22', borderRadius: 14, overflow: 'hidden', position: 'relative',
-  },
-  cell: {
-    position: 'absolute', backgroundColor: '#FFFFFF', borderWidth: 0.8, borderColor: '#2B2118',
-    alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden',
-  },
-  cellPhoto: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', opacity: 0.84,
-  },
-  cellScrim: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(12, 16, 20, 0.22)',
-  },
-  cellTrail: {
-    borderWidth: 2.5, borderColor: '#FFD43B',
-    shadowColor: '#FFD43B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 6,
-  } as object,
-  cellStepTarget: {
-    borderWidth: 3, borderColor: '#FFF3BF',
-  },
-  cellHere: {
-    borderWidth: 3.5, borderColor: C.gold,
-  },
-  band: {
-    alignSelf: 'stretch', borderBottomWidth: 1.2, borderColor: '#1A1412', zIndex: 2,
-  },
-  cornerBadge: {
-    marginTop: 1, backgroundColor: 'rgba(255, 255, 255, 0.86)', borderRadius: 6, paddingHorizontal: 3, zIndex: 2,
-  },
-  cellNamePill: {
-    backgroundColor: 'rgba(15, 20, 26, 0.72)', borderRadius: 4, paddingHorizontal: 2.5, paddingVertical: 0.5,
-    maxWidth: '96%', zIndex: 2,
-  },
-  cellName: {
-    color: '#FFFFFF', fontWeight: '900', textAlign: 'center',
-  },
-  pricePill: {
-    backgroundColor: 'rgba(255, 212, 59, 0.94)', borderRadius: 4, paddingHorizontal: 3, marginBottom: 1,
-    borderWidth: 0.8, borderColor: '#1A1412', zIndex: 2,
-  },
-  price: {
-    color: '#1A1412', fontWeight: '900', lineHeight: 11,
-  },
-  ownerBar: {
-    alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 2, paddingHorizontal: 2, borderTopWidth: 1.2, zIndex: 3,
-  },
-  ownerImage: {
-    borderRadius: 99, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#FFFFFF',
-  },
-  levelText: {
-    color: '#FFFFFF', fontWeight: '900', letterSpacing: -0.2,
-  },
-  cellBurstOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 3,
-    backgroundColor: 'rgba(255, 212, 59, 0.28)', alignItems: 'center', justifyContent: 'center', zIndex: 8,
-  },
-  cellBurstPill: {
-    paddingHorizontal: 4, paddingVertical: 1.5, borderRadius: 6, borderWidth: 1.5, borderColor: '#1A1412',
-  },
-  cellBurstText: {
-    color: '#1A1412', fontWeight: '900', fontSize: 8.5, textAlign: 'center',
-  },
-  token: {
-    position: 'absolute', borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', zIndex: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.45, shadowRadius: 3,
-  } as object,
-  tokenActive: {
-    zIndex: 12, transform: [{ scale: 1.18 }],
-  },
-  tokenMoving: {
-    zIndex: 15, transform: [{ scale: 1.28 }],
-    shadowColor: '#FFD43B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 8,
-  } as object,
-  tokenGlowRing: {
-    position: 'absolute', top: -5, left: -5, right: -5, bottom: -5, borderRadius: 99,
-    borderWidth: 2.5, opacity: 0.85,
-  },
+  board: { backgroundColor: '#FFFDF5', borderRadius: 14, overflow: 'hidden', position: 'relative' },
   center: {
-    position: 'absolute', backgroundColor: '#102A20', borderRadius: 12,
-    borderWidth: 2.5, borderColor: '#D4AF37', paddingHorizontal: 8, paddingVertical: 6,
-    justifyContent: 'space-between', zIndex: 4,
-  },
-  centerHead: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-  },
-  brandRow: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, flex: 1,
-  },
-  logo: {
-    fontWeight: '900', fontSize: 14, color: '#FFD43B', letterSpacing: 0.4,
-  },
-  legendPills: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-  },
-  lvlLegend: {
-    paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4,
-  },
-  lvlLegendTxt: {
-    color: '#FFFFFF', fontSize: 9, fontWeight: '900',
-  },
-  endBtn: {
-    backgroundColor: 'rgba(255, 212, 59, 0.18)', borderWidth: 1, borderColor: '#FFD43B',
-    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
-  },
-  endLink: {
-    color: '#FFD43B', fontWeight: '900', fontSize: 11,
-  },
-  wealthGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'space-between', alignItems: 'stretch',
-  },
-  wealthCard: {
-    width: '49%', backgroundColor: 'rgba(20, 48, 36, 0.95)', borderRadius: 9,
-    borderWidth: 1.5, borderLeftWidth: 5, paddingHorizontal: 6, paddingVertical: 4,
-    flexDirection: 'row', alignItems: 'center', gap: 6, position: 'relative', overflow: 'visible',
-  },
-  wealthCardActive: {
-    backgroundColor: 'rgba(42, 78, 56, 0.98)',
-    shadowColor: '#FFD43B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 6,
-  } as object,
-  wealthCardGain: {
-    backgroundColor: 'rgba(18, 110, 66, 0.96)', borderColor: '#51CF66',
-  },
-  wealthCardLoss: {
-    backgroundColor: 'rgba(128, 30, 30, 0.96)', borderColor: '#FF6B6B',
-  },
-  wealthAvatarWrap: {
-    width: 30, height: 30, borderRadius: 15, borderWidth: 2, overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  wealthAvatar: {
-    width: '100%', height: '100%',
-  },
-  wealthNameRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-  },
-  wealthName: {
-    color: '#FFFFFF', fontWeight: '900', fontSize: 12, flexShrink: 1,
-  },
-  turnDot: {
-    fontSize: 11,
-  },
-  wealthCash: {
-    color: '#FFD43B', fontWeight: '900', fontSize: 13, lineHeight: 15,
-  },
-  wealthProps: {
-    color: '#B2F2BB', fontWeight: '700', fontSize: 10, lineHeight: 12,
-  },
-  cashDeltaBadge: {
-    position: 'absolute', top: -8, right: 4, paddingHorizontal: 6, paddingVertical: 1.5,
-    borderRadius: 8, borderWidth: 1.5, zIndex: 20,
-  },
-  cashDeltaGain: {
-    backgroundColor: '#2B8A3E', borderColor: '#FFD43B',
-  },
-  cashDeltaLoss: {
-    backgroundColor: '#C92A2A', borderColor: '#FFC9C9',
-  },
-  cashDeltaText: {
-    color: '#FFFFFF', fontWeight: '900', fontSize: 10,
-  },
-  actionHub: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: 'rgba(10, 26, 19, 0.82)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.35)',
-  },
-  actionHubStacked: { flexDirection: 'column', alignItems: 'stretch', gap: 6 },
-  hubTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusStacked: { flex: 1, textAlign: 'left', fontSize: 14 },
-  diceArena: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 4, borderRadius: 10,
-  },
-  diceArenaGlow: {
-    backgroundColor: 'rgba(255, 212, 59, 0.22)',
-    shadowColor: '#FFD43B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10,
-  } as object,
-  controlsCol: {
-    flex: 1, gap: 4, justifyContent: 'center',
-  },
-  status: {
-    color: '#FFFFFF', fontWeight: '800', fontSize: 12.5, textAlign: 'center',
-  },
-  row: {
-    flexDirection: 'row', gap: 6, alignItems: 'center',
-  },
-  error: {
-    color: C.ink, backgroundColor: C.gold, padding: 4, borderRadius: 6,
-    fontWeight: '700', fontSize: 11, textAlign: 'center',
-  },
-  bottomTicker: {
-    gap: 2, alignItems: 'center',
-  },
-  card: {
-    backgroundColor: '#FFF3BF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1.5, borderColor: '#D4AF37', maxWidth: '98%',
-  },
-  cardText: {
-    fontWeight: '800', fontSize: 11, color: C.ink,
-  },
-  log: {
-    fontSize: 11, textAlign: 'center', color: '#D8F5A2', fontWeight: '700',
+    position: 'absolute', backgroundColor: '#FFE9B5', borderRadius: 14, borderWidth: 2.5, borderColor: C.ink, zIndex: 4,
   },
   detailPhoto: { borderRadius: 12, borderWidth: 2, borderColor: C.ink },
   // ảnh gốc 116x80: chỉ phóng tối đa ~1,7 lần
   detailPhotoTop: { width: 197, height: 136, alignSelf: 'center', marginBottom: 8 },
   detailPhotoSide: { width: 140, height: 97 },
   detailRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
-  detailBand: {
-    borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 2, borderColor: C.ink,
-  },
-  detailGroup: {
-    color: '#fff', fontWeight: '900',
-  },
-  rents: {
-    backgroundColor: C.mist, borderRadius: 12, padding: 10, gap: 3,
-  },
-  rentRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-  },
+  detailIconRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  detailIcon: { width: 44, height: 44 },
+  detailKind: { fontWeight: '800', color: C.muted },
+  credit: { fontSize: 11, color: C.muted, marginTop: 4 },
+  detailBand: { borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 2, borderColor: C.ink },
+  detailGroup: { color: '#fff', fontWeight: '900' },
+  rents: { backgroundColor: C.mist, borderRadius: 12, padding: 10, gap: 3 },
+  rentRow: { flexDirection: 'row', justifyContent: 'space-between' },
 });

@@ -24,7 +24,7 @@ export interface StripOptions {
 
 /** Khung chung cho mọi màn trong phòng: thanh trên, hàng avatar, nội dung, vùng nút dưới cùng */
 export function Shell({
-  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false,
+  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false,
 }: {
   game: Game;
   room: RoomState;
@@ -38,6 +38,8 @@ export function Shell({
   wide?: boolean;
   /** Chế độ toàn màn hình cho bàn Cờ tỷ phú: gọn thanh trên để bàn cờ choán trọn màn hình. */
   fullscreen?: boolean;
+  /** Ẩn hàng avatar (màn thấp: nhường chỗ cho bàn cờ, thông tin người chơi nằm trong bàn) */
+  hideStrip?: boolean;
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -134,7 +136,7 @@ export function Shell({
         </ScrollView>
       )}
 
-      {compactLandscape && !inlineStrip && (
+      {compactLandscape && !inlineStrip && !hideStrip && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollRow} contentContainerStyle={styles.stripLandscape}>
           {stripItems}
         </ScrollView>
