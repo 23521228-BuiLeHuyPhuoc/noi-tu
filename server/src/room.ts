@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, type BauCuaRounds,
-  CHARACTER_ACCESSORIES, CHARACTER_AGES, CHARACTER_GENDERS, CHARACTER_HAIRS, PLAYER_COLORS,
-  type CharacterAccessory, type CharacterAge, type CharacterConfig, type CharacterGender, type CharacterHair,
+  CHARACTER_ACCESSORIES, CHARACTER_AGES, CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_DETAILS, CHARACTER_EYES, CHARACTER_FACES, SKIN_TONES, CHARACTER_GENDERS, CHARACTER_OUTFITS, CHARACTER_HAIRS, PLAYER_COLORS,
+  type CharacterAccessory, type CharacterAge, type CharacterBrows, type CharacterBuild, type CharacterEyes, type CharacterFace, type CharacterConfig, type CharacterDetail, type CharacterOutfit, type CharacterGender, type CharacterHair,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
+import { parseLook } from '../../shared/src/types';
 import { HpBoard, TargetCooldown } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
@@ -47,7 +48,9 @@ const CHAT_KEEP = 40;
 
 type Result<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
 
-const AVATAR_COUNT = 16;
+const AVATAR_COUNT = AVATAR_PRESETS.length;
+/** nhân vật mặc định của khách luân phiên 3 kiểu đầu (không tự gán 'LGBT+' cho ai) */
+const DEFAULT_GENDERS = CHARACTER_GENDERS.slice(0, 3);
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
 
 export function cleanName(raw: unknown): string | null {
@@ -70,6 +73,8 @@ export class Room {
   private chat: ChatMsg[] = [];
   private chatSeq = 0;
   readonly hp: HpBoard;
+  /** hạt giống riêng của phòng để rải đặc điểm nhân vật khách (không dùng this.rng, khỏi làm lệch dãy ngẫu nhiên của ván) */
+  private readonly spreadSeed = Math.floor(Math.random() * 997);
   /** chống dội gián/mực lên màn hình một người */
   readonly screenCooldown = new TargetCooldown();
   private readonly graceMs: number;
@@ -114,16 +119,35 @@ export class Room {
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
     const preset = account ? this.presetFor(profile?.avatar) : undefined;
-    const character: CharacterConfig = preset ?? {
-      gender: CHARACTER_GENDERS[this.players.length % CHARACTER_GENDERS.length],
-      age: CHARACTER_AGES[this.players.length % CHARACTER_AGES.length],
-      hair: CHARACTER_HAIRS[this.players.length % CHARACTER_HAIRS.length],
-      color: this.freeColor(),
-    };
+    const character: CharacterConfig = preset ?? this.spreadCharacter();
     this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
+  }
+
+  /**
+   * Nhân vật mặc định cho khách: mỗi người vào phòng lệch bước ở từng đặc điểm (da, dáng mặt, tóc, mắt…)
+   * nên cả phòng không bao giờ giống hệt nhau. Không tự gán 'LGBT+' hay phụ kiện cầu vồng cho ai.
+   */
+  private spreadCharacter(): CharacterConfig {
+    const n = this.players.length;
+    const r = this.spreadSeed;
+    const accs = CHARACTER_ACCESSORIES.filter((a) => !a.startsWith('pride'));
+    return {
+      gender: DEFAULT_GENDERS[n % DEFAULT_GENDERS.length],
+      age: CHARACTER_AGES[n % CHARACTER_AGES.length],
+      hair: CHARACTER_HAIRS[(n * 5 + r) % CHARACTER_HAIRS.length],
+      color: this.freeColor(),
+      skin: (n * 3 + r) % SKIN_TONES,
+      face: CHARACTER_FACES[(n * 5 + r) % CHARACTER_FACES.length],
+      build: CHARACTER_BUILDS[(n + r) % CHARACTER_BUILDS.length],
+      eyes: CHARACTER_EYES[(n * 3 + r) % CHARACTER_EYES.length],
+      brows: CHARACTER_BROWS[(n * 2 + r) % CHARACTER_BROWS.length],
+      accessory: accs[(n * 7 + r) % accs.length],
+      detail: CHARACTER_DETAILS[(n + r) % CHARACTER_DETAILS.length],
+      outfit: CHARACTER_OUTFITS[(n * 2 + r) % CHARACTER_OUTFITS.length],
+    };
   }
 
   /** Tùy chỉnh hình tượng nhân vật (giới tính, độ tuổi, kiểu tóc, màu sắc không trùng trong phòng) */
@@ -147,6 +171,39 @@ export class Room {
     if (partial.accessory !== undefined) {
       if (!CHARACTER_ACCESSORIES.includes(partial.accessory as CharacterAccessory)) return { ok: false, error: 'bad_request' };
       next.accessory = partial.accessory;
+    }
+    if (partial.skin !== undefined) {
+      if (!Number.isInteger(partial.skin) || partial.skin < 0 || partial.skin >= SKIN_TONES) return { ok: false, error: 'bad_request' };
+      next.skin = partial.skin;
+    }
+    if (partial.face !== undefined) {
+      if (!CHARACTER_FACES.includes(partial.face as CharacterFace)) return { ok: false, error: 'bad_request' };
+      next.face = partial.face;
+    }
+    if (partial.build !== undefined) {
+      if (!CHARACTER_BUILDS.includes(partial.build as CharacterBuild)) return { ok: false, error: 'bad_request' };
+      next.build = partial.build;
+    }
+    if (partial.eyes !== undefined) {
+      if (!CHARACTER_EYES.includes(partial.eyes as CharacterEyes)) return { ok: false, error: 'bad_request' };
+      next.eyes = partial.eyes;
+    }
+    if (partial.brows !== undefined) {
+      if (!CHARACTER_BROWS.includes(partial.brows as CharacterBrows)) return { ok: false, error: 'bad_request' };
+      next.brows = partial.brows;
+    }
+    if (partial.look !== undefined) {
+      const look = parseLook(partial.look);
+      if (!look) return { ok: false, error: 'bad_request' };
+      next.look = look; // thay toàn bộ (client gửi đủ bộ nét)
+    }
+    if (partial.detail !== undefined) {
+      if (!CHARACTER_DETAILS.includes(partial.detail as CharacterDetail)) return { ok: false, error: 'bad_request' };
+      next.detail = partial.detail;
+    }
+    if (partial.outfit !== undefined) {
+      if (!CHARACTER_OUTFITS.includes(partial.outfit as CharacterOutfit)) return { ok: false, error: 'bad_request' };
+      next.outfit = partial.outfit;
     }
     if (partial.color !== undefined) {
       const c = partial.color;

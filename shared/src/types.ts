@@ -23,22 +23,107 @@ export interface RoomSettings {
   baucuaRounds?: number;
 }
 
-export type CharacterGender = 'nam' | 'nu' | 'khac';
+export type CharacterGender = 'nam' | 'nu' | 'khac' | 'lgbt';
 export type CharacterAge = 'nhi' | 'tre' | 'trung' | 'lao';
-export type CharacterHair = 'ngan' | 'han' | 'xoan' | 'dai' | 'bui' | 'undercut';
+export type CharacterHair =
+  | 'ngan' | 'han' | 'xoan' | 'dai' | 'bui' | 'undercut'
+  // thêm: đầu đinh, mohican, búi củ hành, xù/afro, mái bằng, highlight, đầu nấm, dài ngang lưng
+  | 'dinh' | 'mohican' | 'buicu' | 'afro' | 'maibang' | 'highlight' | 'nam' | 'dailung'
+  // thêm: tóc buộc thấp có tóc con, chải ngược phồng cao + lọn xoăn gáy, vuốt lệch phồng trước, rất ngắn dựng chỏm
+  | 'buocthap' | 'chaingoc' | 'vuotlech' | 'dungchom';
 
-export const CHARACTER_GENDERS: CharacterGender[] = ['nam', 'nu', 'khac'];
+export const CHARACTER_GENDERS: CharacterGender[] = ['nam', 'nu', 'khac', 'lgbt'];
 export const CHARACTER_AGES: CharacterAge[] = ['nhi', 'tre', 'trung', 'lao'];
-export const CHARACTER_HAIRS: CharacterHair[] = ['ngan', 'han', 'xoan', 'dai', 'bui', 'undercut'];
+export const CHARACTER_HAIRS: CharacterHair[] = [
+  'ngan', 'han', 'xoan', 'dai', 'bui', 'undercut',
+  'dinh', 'mohican', 'buicu', 'afro', 'maibang', 'highlight', 'nam', 'dailung',
+  'buocthap', 'chaingoc', 'vuotlech', 'dungchom',
+];
+
+/** 11 tông da, từ rất sáng đến nâu sẫm (chỉ số 0..10) */
+export const SKIN_TONES = 11;
+/** dáng mặt: tròn, trái xoan, dài, vuông/hàm bạnh, bầu má phính, cằm nhọn */
+export type CharacterFace = 'tron' | 'xoan' | 'dai' | 'vuong' | 'bau' | 'nhon';
+export const CHARACTER_FACES: CharacterFace[] = ['tron', 'xoan', 'dai', 'vuong', 'bau', 'nhon'];
+/** dáng người ở vai: gầy, vừa, mũm mĩm */
+export type CharacterBuild = 'gay' | 'vua' | 'mum' | 'khoe';
+export const CHARACTER_BUILDS: CharacterBuild[] = ['gay', 'vua', 'mum', 'khoe'];
+/** kiểu mắt: mặc định theo giới, híp, to tròn, một mí */
+export type CharacterEyes = 'macdinh' | 'hip' | 'to' | 'motmi';
+export const CHARACTER_EYES: CharacterEyes[] = ['macdinh', 'hip', 'to', 'motmi'];
+/** kiểu lông mày: mặc định, rậm, lá liễu */
+export type CharacterBrows = 'macdinh' | 'ray' | 'lieu';
+export const CHARACTER_BROWS: CharacterBrows[] = ['macdinh', 'ray', 'lieu'];
 
 /** phụ kiện "lầy" trên mặt nhân vật ('none' = không đeo gì) */
 export type CharacterAccessory =
   | 'none' | 'kinhden' | 'raukem' | 'ria' | 'nonla' | 'nonbh' | 'bangdo'
-  | 'khautrang' | 'muihe' | 'taitho' | 'bangcanhan' | 'troc' | 'mahong';
+  | 'khautrang' | 'muihe' | 'taitho' | 'bangcanhan' | 'troc' | 'mahong'
+  // phụ kiện cầu vồng (LGBT+), ai cũng đeo được: ghim cài áo, mảng tóc, băng đô
+  | 'prideghim' | 'pridetoc' | 'pridebang';
 export const CHARACTER_ACCESSORIES: CharacterAccessory[] = [
   'none', 'kinhden', 'raukem', 'ria', 'nonla', 'nonbh', 'bangdo',
   'khautrang', 'muihe', 'taitho', 'bangcanhan', 'troc', 'mahong',
+  'prideghim', 'pridetoc', 'pridebang',
 ];
+
+/** chi tiết khuôn mặt: nốt ruồi, tàn nhang, lông mày rậm, răng hô, má lúm */
+export type CharacterDetail = 'none' | 'notruoi' | 'tannhang' | 'longmay' | 'ranghe' | 'malum';
+export const CHARACTER_DETAILS: CharacterDetail[] = ['none', 'notruoi', 'tannhang', 'longmay', 'ranghe', 'malum'];
+
+/** trang phục vui ('none' = mặc theo độ tuổi như cũ) */
+export type CharacterOutfit =
+  | 'none' | 'aohoa' | 'dobo' | 'bala' | 'vestbong' | 'aodai' | 'dongphuc' | 'aomua' | 'dayvang'
+  // thêm: áo thun cổ tròn, áo trắng cổ đứng bèo, sơ mi trắng mở cổ, ba lỗ đen khoét chữ U
+  | 'thun' | 'beo' | 'somi' | 'balden';
+export const CHARACTER_OUTFITS: CharacterOutfit[] = [
+  'none', 'aohoa', 'dobo', 'bala', 'vestbong', 'aodai', 'dongphuc', 'aomua', 'dayvang',
+  'thun', 'beo', 'somi', 'balden',
+];
+
+/**
+ * Các nét tinh chỉnh khuôn mặt/tóc/râu/trang phục/hình xăm. Mỗi khóa có danh sách giá trị hợp lệ cố định;
+ * server chỉ nhận đúng các khóa và giá trị này (xem parseLook). Chân dung chỉ vẽ đầu và vai nên nhẫn, đồng hồ, găng,
+ * dáng ngồi được lưu sẵn cho chế độ nửa/toàn thân sau này.
+ */
+export const LOOK_OPTIONS = {
+  // mặt
+  jaw: ['mem', 'ro'], chin: ['bo', 'nho', 'rong'], cheek: ['thon', 'day', 'phinh', 'go'], forehead: ['rong', 'vua'],
+  neck: ['thon', 'vua', 'day'], nepcuoi: ['khong', 'co'], maphan: ['khong', 'co'], tilt: ['thang', 'trai', 'phai'],
+  // mắt & mày
+  eyeshape: ['hanhnhan', 'hanhhep', 'nho', 'tron'], lid: ['mot', 'hai'], open: ['mo', 'tru', 'nheo'], liner: ['khong', 'co'],
+  eyecolor: ['nau', 'den'], gaze: ['thang', 'trai', 'phai'], asym: ['khong', 'co'],
+  browshape: ['ngang', 'cong', 'mem', 'gap'], browthick: ['mong', 'vua', 'day'],
+  // mũi & miệng
+  nose: ['thap', 'vua', 'ro'], nosetip: ['nho', 'tron', 'day'], nostril: ['hep', 'vua', 'rong'],
+  lipthick: ['mong', 'duoi', 'day'], lipcolor: ['hongnau', 'cam', 'do'], mouth: ['khep', 'cuoirang', 'cuoitu', 'he'],
+  molepos: ['moi', 'ma', 'cam'],
+  // tóc
+  haircolor: ['den', 'nauden', 'nau', 'highlight'], part: ['lech', 'khong'], volume: ['sat', 'vua', 'cao'], sides: ['gon', 'sat'], babyhair: ['khong', 'co'],
+  // râu
+  ria: ['khong', 'manh', 'vua'], raucam: ['khong', 'manh', 'vua'], rauham: ['khong', 'manh', 'vua'],
+  // trang phục & phụ kiện
+  outfitcolor: ['mau', 'xanhrung', 'den', 'trang', 'xam', 'do', 'vang'], earring: ['khong', 'da', 'hoa'],
+  ring: ['khong', 'hoa'], watch: ['khong', 'bac', 'toi'], glove: ['khong', 'co'],
+  // hình xăm trừu tượng
+  tattoo: ['khong', 'co'], tattoosize: ['vai', 'vaibap'], tattooside: ['trai', 'phai'],
+  // dáng (lưu cho chế độ nửa/toàn thân)
+  pose: ['thang', 'baochan', 'chongcam', 'chumnguc'],
+} as const;
+export type LookKey = keyof typeof LOOK_OPTIONS;
+export type CharacterLook = { [K in LookKey]?: (typeof LOOK_OPTIONS)[K][number] };
+
+/** Kiểm tra nghiêm ngặt: đúng đối tượng, chỉ khóa/giá trị trong LOOK_OPTIONS. Trả về bản sạch hoặc null. */
+export function parseLook(raw: unknown): CharacterLook | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const allowed = (LOOK_OPTIONS as Record<string, readonly string[]>)[k];
+    if (!Object.prototype.hasOwnProperty.call(LOOK_OPTIONS, k) || !allowed || typeof v !== 'string' || !allowed.includes(v)) return null;
+    out[k] = v;
+  }
+  return out as CharacterLook;
+}
 
 /** biểu cảm trên chân dung, đổi theo sự kiện trong ván */
 export type Mood = 'normal' | 'smug' | 'cry' | 'angry' | 'shock' | 'dizzy';
@@ -63,6 +148,16 @@ export interface CharacterConfig {
   color: number;
   /** phụ kiện (tùy chọn; thiếu = không đeo) */
   accessory?: CharacterAccessory;
+  detail?: CharacterDetail;
+  outfit?: CharacterOutfit;
+  /** tông da 0..SKIN_TONES-1 (thiếu = theo kiểu cũ) */
+  skin?: number;
+  face?: CharacterFace;
+  build?: CharacterBuild;
+  eyes?: CharacterEyes;
+  brows?: CharacterBrows;
+  /** các nét tinh chỉnh thêm (xem LOOK_OPTIONS); thiếu = mặc định */
+  look?: CharacterLook;
 }
 
 export interface PublicPlayer {

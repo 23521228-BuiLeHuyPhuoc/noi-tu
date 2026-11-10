@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { type LudoColor, type LudoView, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { actionText, quip } from '../messages';
-import { useOnChange, useSecondsLeft } from '../hooks';
+import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { BASE, HOME, START_CELL, TRACK, piecePos } from '../ludoBoard';
@@ -18,7 +18,7 @@ const COLOR_NAME: Record<LudoColor, string> = { red: 'Đỏ', green: 'Xanh lá',
 
 export function LudoScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as LudoView;
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useStableWindow();
   const feed = useFeed();
   const shake = useShake();
   const [error, setError] = useState<string | null>(null);

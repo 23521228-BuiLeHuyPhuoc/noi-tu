@@ -11,6 +11,7 @@ import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
+import { KeyboardLift } from '../components/KeyboardLift';
 import { TimerBar } from '../components/TimerBar';
 import { useShake } from '../components/Fun';
 
@@ -157,7 +158,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
       {isSpectator ? null : meOut ? (
         <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
       ) : myTurn ? (
-        <View style={{ gap: 8 }}>
+        <KeyboardLift>
           <View style={styles.inputRow}>
             <View style={[styles.inputBox, voting && { opacity: 0.5 }]}>
               <View testID="word-prefix" style={styles.prefix} accessibilityLabel={`Chữ đầu: ${last}`}>
@@ -203,7 +204,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               <Button testID="hint-btn" small variant="ghost" icon="🆘" title="Cứu trợ (1 lần mỗi ván)" onPress={askHint} />
             )
           )}
-        </View>
+        </KeyboardLift>
       ) : (
         current && (
           <Button

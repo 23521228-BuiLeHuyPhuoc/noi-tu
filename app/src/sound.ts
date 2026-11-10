@@ -1,5 +1,5 @@
 /** Âm thanh tổng hợp bằng Web Audio (không cần file). Tắt/bật được, nhớ trong máy. */
-type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle';
+type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle' | 'clink';
 
 const KEY = 'xomlay.muted';
 let ctx: AudioContext | null = null;
@@ -131,6 +131,11 @@ export function play(sfx: Sfx): void {
         return tone(300, 0.2, 'sine', 0.12, 0, 80);
       case 'sparkle':
         return [1319, 1568, 2093].forEach((f, i) => tone(f, 0.12, 'triangle', 0.06, i * 0.07));
+      case 'clink':
+        // xu kim loại chạm nhau: "keng"
+        tone(2637, 0.08, 'sine', 0.07);
+        tone(3520, 0.16, 'sine', 0.045, 0.02);
+        return tone(1760, 0.12, 'triangle', 0.035, 0.05);
     }
   } catch {
     // trình duyệt chặn âm thanh: bỏ qua

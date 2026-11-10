@@ -12,7 +12,7 @@ import type { Game } from '../useGame';
 import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '../messages';
 import { ROACH_URI } from '../avatars';
 import { setCharm, setDoodle, setMood, setNick } from '../funState';
-import { useOnNew } from '../hooks';
+import { useKeyboardInset, useOnNew } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -662,6 +662,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   const [sending, setSending] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const kb = useKeyboardInset() > 0; // đang gõ: ẩn bớt hàng emoji/câu khịa để danh sách và ô nhập vừa phần trên bàn phím
   const me = game.me;
   const send = async () => {
     const t = text.trim();
@@ -675,7 +676,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   };
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
+      {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
         {EMOJIS.map((e, i) => (
           <Button
             key={e}
@@ -687,8 +688,8 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
             onPress={() => game.sendFun({ kind: 'emoji', emoji: e })}
           />
         ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.taunts}>
+      </ScrollView>}
+      {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.taunts}>
         {TAUNTS.map((t) => (
           <Button
             key={t.id}
@@ -702,8 +703,8 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
             }}
           />
         ))}
-      </ScrollView>
-      <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán Quỳnh Aka' : 'Nhãn dán Quỳnh Aka · 9'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />
+      </ScrollView>}
+      {!kb && <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán Quỳnh Aka' : 'Nhãn dán Quỳnh Aka · 9'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />}
       {showStickers && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
         {STICKERS.map((item) => <Pressable key={item.id} testID={`sticker-${item.id}`} accessibilityRole="button" accessibilityLabel={`Gửi nhãn dán ${item.alt}`} disabled={sending} style={[styles.stickerOption, sending && { opacity: 0.5 }]} onPress={async () => {
           if (sending) return;
@@ -715,7 +716,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
       <ScrollView
         ref={listRef}
         testID="chat-list"
-        style={styles.chatList}
+        style={[styles.chatList, kb && { maxHeight: 130 }]}
         contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
       >

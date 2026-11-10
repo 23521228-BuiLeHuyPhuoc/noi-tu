@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { GAME_INFO, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { isMuted, setMuted } from '../sound';
@@ -7,6 +7,7 @@ import { copyText } from '../web';
 import { GAME_META } from '../messages';
 import { C } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
+import { useStableWindow } from '../hooks';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
 import { Sheet } from './Sheet';
@@ -51,11 +52,12 @@ export function Shell({
   const feed = useFeed();
   const setFeedInset = useFeedInset();
   useEffect(() => () => setFeedInset(16), [setFeedInset]);
-  const { width, height } = useWindowDimensions();
-  const shortScreen = height < 700 && !(fullscreen || (wide && width >= 700));
+  const { width, height } = useStableWindow();
   const iconOnly = width < 440 || fullscreen;
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
   const inlineStrip = compactLandscape && width >= 700;
+  // avatar lớn, rõ mặt; co dần theo chiều cao màn hình, giữ nguyên cỡ cũ ở bàn ngang/toàn màn hình
+  const stripSize = fullscreen || compactLandscape || (wide && width >= 700) ? 52 : height >= 780 ? 62 : height >= 700 ? 56 : 46;
 
   const players = strip.order
     ? strip.order.map((id) => room.players.find((p) => p.id === id)).filter((p): p is PublicPlayer => !!p)
@@ -80,7 +82,7 @@ export function Shell({
         sub={p.spectator ? '👀 Đang xem' : strip.sub?.(p)}
         ring={strip.ring?.(p)}
         rank={p.spectator ? undefined : strip.rank?.(p)}
-        size={shortScreen ? 42 : 52}
+        size={stripSize}
         onPress={p.id === game.me || meIsSpectator ? undefined : () => setTarget(p)}
       />
     </View>

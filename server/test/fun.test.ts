@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cleanFun, isScreenTroll, isTroll, RateLimiter, TargetCooldown, trollExtras } from '../src/fun';
-import { CHARACTER_ACCESSORIES, DOODLES, NICKNAMES } from '../../shared/src/types';
+import { CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_EYES, CHARACTER_FACES, CHARACTER_HAIRS, SKIN_TONES, CHARACTER_ACCESSORIES, CHARACTER_DETAILS, CHARACTER_GENDERS, CHARACTER_OUTFITS, DOODLES, NICKNAMES } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { setup } from './helpers';
 
@@ -69,14 +69,82 @@ describe('phụ kiện nhân vật', () => {
   it('customize chỉ nhận phụ kiện trong danh sách', () => {
     const { room, ids } = setup(['An', 'Bình']);
     for (const a of CHARACTER_ACCESSORIES) expect(room.customize(ids[0], { accessory: a })).toEqual({ ok: true });
-    expect(room.players[0].character.accessory).toBe('mahong');
+    expect(room.players[0].character.accessory).toBe('pridebang');
     expect(room.customize(ids[0], { accessory: 'sungtien' as never })).toEqual({ ok: false, error: 'bad_request' });
     expect(room.customize(ids[0], { accessory: 5 as never })).toEqual({ ok: false, error: 'bad_request' });
-    expect(room.players[0].character.accessory).toBe('mahong');
+    expect(room.players[0].character.accessory).toBe('pridebang');
   });
 
   it('mẫu chân dung có phụ kiện hợp lệ, ít nhất nửa số mẫu đeo phụ kiện', () => {
     expect(AVATAR_PRESETS.every((p) => p.accessory === undefined || CHARACTER_ACCESSORIES.includes(p.accessory))).toBe(true);
     expect(AVATAR_PRESETS.filter((p) => p.accessory && p.accessory !== 'none').length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('giới tính, chi tiết mặt, trang phục, mẫu mở rộng', () => {
+  it('customize whitelist gender (có LGBT+), detail, outfit', () => {
+    const { room, ids } = setup(['An']);
+    expect(CHARACTER_GENDERS).toContain('lgbt');
+    expect(room.customize(ids[0], { gender: 'lgbt' })).toEqual({ ok: true });
+    for (const d of CHARACTER_DETAILS) expect(room.customize(ids[0], { detail: d })).toEqual({ ok: true });
+    for (const o of CHARACTER_OUTFITS) expect(room.customize(ids[0], { outfit: o })).toEqual({ ok: true });
+    expect(room.customize(ids[0], { gender: 'abc' as never })).toEqual({ ok: false, error: 'bad_request' });
+    expect(room.customize(ids[0], { detail: 'sung' as never })).toEqual({ ok: false, error: 'bad_request' });
+    expect(room.customize(ids[0], { outfit: 'bikini' as never })).toEqual({ ok: false, error: 'bad_request' });
+    expect(room.players[0].character).toMatchObject({ gender: 'lgbt', outfit: 'dayvang', detail: 'malum' });
+  });
+
+  it('khách mới không bị tự gán LGBT+', () => {
+    const { room } = setup(['A', 'B', 'C', 'D', 'E']);
+    expect(room.players.every((p) => p.character.gender !== 'lgbt')).toBe(true);
+  });
+
+  it('có 26 mẫu, 16 mẫu đầu giữ nguyên, mẫu mới hợp lệ', () => {
+    expect(AVATAR_PRESETS.length).toBe(26);
+    expect(AVATAR_PRESETS[0]).toMatchObject({ gender: 'nam', age: 'tre', hair: 'han', color: 1 });
+    for (const p of AVATAR_PRESETS) {
+      expect(CHARACTER_GENDERS).toContain(p.gender);
+      expect(CHARACTER_DETAILS).toContain(p.detail ?? 'none');
+      expect(CHARACTER_OUTFITS).toContain(p.outfit ?? 'none');
+    }
+  });
+
+  it('tài khoản chọn mẫu 25 thì nhân vật theo mẫu đó; 26 thì bị bỏ qua', () => {
+    const { room } = setup(['A']);
+    const r = room.addPlayer('Idol', undefined, { avatar: 25, account: true });
+    if (!r.ok) throw new Error('add');
+    expect(room.players.find((p) => p.id === r.playerId)!.character).toMatchObject({ gender: 'lgbt', accessory: 'pridetoc' });
+  });
+});
+
+describe('đa dạng khuôn mặt: da, dáng mặt, dáng người, mắt, mày, tóc', () => {
+  it('customize whitelist chặt từng trường mới', () => {
+    const { room, ids } = setup(['An']);
+    for (let k = 0; k < SKIN_TONES; k++) expect(room.customize(ids[0], { skin: k })).toEqual({ ok: true });
+    for (const f of CHARACTER_FACES) expect(room.customize(ids[0], { face: f })).toEqual({ ok: true });
+    for (const b of CHARACTER_BUILDS) expect(room.customize(ids[0], { build: b })).toEqual({ ok: true });
+    for (const e of CHARACTER_EYES) expect(room.customize(ids[0], { eyes: e })).toEqual({ ok: true });
+    for (const b of CHARACTER_BROWS) expect(room.customize(ids[0], { brows: b })).toEqual({ ok: true });
+    for (const h of CHARACTER_HAIRS) expect(room.customize(ids[0], { hair: h })).toEqual({ ok: true });
+    const bad = (x: object) => expect(room.customize(ids[0], x as never)).toEqual({ ok: false, error: 'bad_request' });
+    bad({ skin: 8 }); bad({ skin: -1 }); bad({ skin: 1.5 }); bad({ skin: '2' });
+    bad({ face: 'vuông' }); bad({ build: 'beo' }); bad({ eyes: 'laser' }); bad({ brows: 'x' }); bad({ hair: 'mullet' });
+    expect(room.players[0].character).toMatchObject({ skin: 7, face: 'nhon', build: 'mum', eyes: 'motmi', brows: 'lieu', hair: 'dailung' });
+  });
+
+  it('khách mặc định trong cùng phòng không giống nhau (không bản sao)', () => {
+    const { room } = setup(['A', 'B', 'C', 'D', 'E', 'F']);
+    const keys = room.players.map((p) => JSON.stringify({ ...p.character, color: 0 }));
+    expect(new Set(keys).size).toBe(6);
+    expect(new Set(room.players.map((p) => p.character.skin)).size).toBeGreaterThanOrEqual(5);
+    expect(new Set(room.players.map((p) => p.character.face)).size).toBeGreaterThanOrEqual(5);
+    expect(room.players.every((p) => !p.character.accessory?.startsWith('pride') && p.character.gender !== 'lgbt')).toBe(true);
+  });
+
+  it('mẫu chân dung đa dạng da, dáng mặt và dáng người', () => {
+    expect(new Set(AVATAR_PRESETS.map((p) => p.skin)).size).toBe(SKIN_TONES);
+    expect(new Set(AVATAR_PRESETS.map((p) => p.face)).size).toBe(CHARACTER_FACES.length);
+    expect(new Set(AVATAR_PRESETS.map((p) => p.build)).size).toBe(CHARACTER_BUILDS.length);
+    expect(AVATAR_PRESETS.every((p) => CHARACTER_HAIRS.includes(p.hair))).toBe(true);
   });
 });

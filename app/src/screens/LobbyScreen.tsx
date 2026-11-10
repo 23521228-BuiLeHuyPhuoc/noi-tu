@@ -5,7 +5,7 @@ import {
   type CharacterConfig, type GameType, type RoomState,
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { ACCESSORY_OPTIONS, AGE_OPTIONS, GENDER_OPTIONS, HAIR_OPTIONS, characterSvgUri, playerColorOf } from '../avatars';
+import { ACCESSORY_OPTIONS, AGE_OPTIONS, BROW_OPTIONS, BUILD_OPTIONS, DETAIL_OPTIONS, EYE_OPTIONS, FACE_OPTIONS, GENDER_OPTIONS, OUTFIT_OPTIONS, SKIN_NAMES, SKIN_PALETTE, HAIR_OPTIONS, characterSvgUri, playerColorOf } from '../avatars';
 import { shareInvite } from '../web';
 import { GAME_META, RULES } from '../messages';
 import { C, sticker } from '../theme';
@@ -214,6 +214,154 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                   style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                 >
                   <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Màu da</T>
+          <View style={styles.colorRow}>
+            {SKIN_PALETTE.map((hex, i) => {
+              const active = myChar.skin === i;
+              return (
+                <Pressable
+                  key={hex}
+                  testID={`char-skin-${i}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Da ${SKIN_NAMES[i]}`}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ skin: i })}
+                  style={[styles.colorSwatch, { backgroundColor: hex }, active && styles.colorSwatchActive]}
+                >
+                  {active && <T style={[styles.swatchMark, i < 3 && { color: C.ink }]}>✓</T>}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Khuôn mặt</T>
+          <View style={styles.chipRow}>
+            {FACE_OPTIONS.map((opt) => {
+              const active = (myChar.face ?? 'xoan') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-face-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ face: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Dáng người</T>
+          <View style={styles.chipRow}>
+            {BUILD_OPTIONS.map((opt) => {
+              const active = (myChar.build ?? 'vua') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-build-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ build: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Kiểu mắt</T>
+          <View style={styles.chipRow}>
+            {EYE_OPTIONS.map((opt) => {
+              const active = (myChar.eyes ?? 'macdinh') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-eyes-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ eyes: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Lông mày</T>
+          <View style={styles.chipRow}>
+            {BROW_OPTIONS.map((opt) => {
+              const active = (myChar.brows ?? 'macdinh') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-brows-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ brows: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Trang phục 👕</T>
+          <View style={styles.chipRow}>
+            {OUTFIT_OPTIONS.map((opt) => {
+              const active = (myChar.outfit ?? 'none') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-outfit-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ outfit: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: 4 }}>
+          <T style={styles.optLabel}>Nét mặt riêng ✨</T>
+          <View style={styles.chipRow}>
+            {DETAIL_OPTIONS.map((opt) => {
+              const active = (myChar.detail ?? 'none') === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  testID={`char-detail-${opt.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => updateChar({ detail: opt.id })}
+                  style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
+                >
+                  <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
                 </Pressable>
               );
             })}
