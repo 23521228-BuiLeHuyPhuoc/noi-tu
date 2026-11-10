@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TyPhuGame, TYPHU_CARDS } from '../src/games/typhu';
 import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
-import { TYPHU_BOARD, rentOf, typhuCellPos, stationRent, utilityRent } from '../../shared/src/typhu';
+import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, rentOf, typhuCellPos, stationRent, utilityRent } from '../../shared/src/typhu';
+import { simulateThrow } from '../src/games/dice3d';
+import { DICE_DEFAULT_IMPULSE, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
 import { smallDict } from './helpers';
 
 const TURN = 20_000;
@@ -23,6 +25,12 @@ function make(names: string[], values: (number | { card: number })[] = [], away:
   const finished: GameResult[] = [];
   const ctx: EngineContext = {
     rng: seq(values),
+    // test: mặt xúc xắc lấy từ dãy giả như trước (bỏ qua mô phỏng vật lý)
+    rollDice: (_i, r) => {
+      const d1 = 1 + Math.floor(r() * 6);
+      const d2 = 1 + Math.floor(r() * 6);
+      return { dice: [d1, d2], frames: [], ms: 0, fps: 30 };
+    },
     dict: smallDict(),
     settings: { ludoPieces: 4 },
     turnMs: TURN,
@@ -119,4 +127,83 @@ describe('Cờ tỷ phú V2', () => {
   const {g,v,settle}=make(['An','Bình','Chi'],[1,2]);g.action('p0',{type:'roll'});g.removePlayer('p0');
   expect(v().movement).toBeNull();expect(v().currentPlayerId).toBe('p1');
  });
+});
+
+describe('Xúc xắc 3D vật lý và nhịp chơi', () => {
+  const noise = (seed: number) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; };
+
+  it('mô phỏng xác định: cùng cú tung + cùng nhiễu cho cùng mặt và cùng khung hình', () => {
+    const a = simulateThrow({ x: 0.9, z: -0.2, p: 0.7 }, noise(7));
+    const b = simulateThrow({ x: 0.9, z: -0.2, p: 0.7 }, noise(7));
+    expect(a.dice).toEqual(b.dice);
+    expect(a.frames).toEqual(b.frames);
+  });
+  it('mặt ra là 1..6, thời gian lăn 1,6-2,6s, khung cuối nằm phẳng trong khay', () => {
+    for (let s = 1; s <= 25; s++) {
+      const r = simulateThrow({ x: Math.cos(s), z: Math.sin(s), p: (s % 10) / 10 + 0.1 }, noise(s * 31));
+      expect(r.dice.every((d) => d >= 1 && d <= 6)).toBe(true);
+      expect(r.ms).toBeGreaterThanOrEqual(1600);
+      expect(r.ms).toBeLessThanOrEqual(2600);
+      expect(r.frames.length / DICE_FRAME_STRIDE).toBe(Math.round((r.ms / 1000) * r.fps));
+      const last = r.frames.slice(-DICE_FRAME_STRIDE);
+      for (const o of [0, 7]) {
+        expect(Math.abs(last[o])).toBeLessThanOrEqual(TRAY_HX);
+        expect(Math.abs(last[o + 2])).toBeLessThanOrEqual(TRAY_HZ);
+        expect(last[o + 1]).toBeCloseTo(0.5, 1);
+      }
+    }
+  });
+  it('nhiễu của server làm kết quả không đoán trước được từ cú tung', () => {
+    const outcomes = new Set<string>();
+    for (let s = 1; s <= 40; s++) outcomes.add(simulateThrow({ x: 0.85, z: -0.3, p: 0.6 }, noise(s * 977)).dice.join(','));
+    expect(outcomes.size).toBeGreaterThan(12);
+  });
+  it('các mặt ra gần đều nhau (không thiên lệch nặng)', () => {
+    const faces = Array(7).fill(0);
+    for (let s = 1; s <= 300; s++) {
+      const r = simulateThrow({ x: 0.85, z: -0.3, p: 0.6 }, noise(s * 7919));
+      faces[r.dice[0]]++; faces[r.dice[1]]++;
+    }
+    for (let f = 1; f <= 6; f++) { expect(faces[f] / 600).toBeGreaterThan(0.1); expect(faces[f] / 600).toBeLessThan(0.24); }
+  });
+  it('cú tung từ client bị kẹp/chuẩn hoá', () => {
+    expect(sanitizeImpulse({ x: 1e9, z: 0, p: 99 })).toEqual({ x: 1, z: 0, p: 1 });
+    expect(sanitizeImpulse({ x: NaN, z: 1, p: 1 })).toEqual(DICE_DEFAULT_IMPULSE);
+    expect(sanitizeImpulse('xxx')).toEqual(DICE_DEFAULT_IMPULSE);
+    expect(sanitizeImpulse({ x: 0, z: 0, p: 0 }).p).toBeGreaterThanOrEqual(0.3);
+    const s = sanitizeImpulse({ x: 30, z: 40, p: 0.5 });
+    expect(Math.hypot(s.x, s.z)).toBeCloseTo(1);
+  });
+  it('server dùng mô phỏng thật: view có khung hình, mặt khớp, quân cờ đi sau khi xúc xắc lăn xong, đồng hồ lượt không bị ăn', () => {
+    const finished: GameResult[] = [];
+    const ctx: EngineContext = {
+      rng: noise(5), dict: smallDict(), settings: { ludoPieces: 4 }, turnMs: TURN, hostId: () => 'p0', isConnected: () => true,
+      changed: vi.fn(), finish: (r) => finished.push(r), learnWord: () => {},
+    };
+    const g = new TyPhuGame(ctx);
+    g.start([{ id: 'p0', name: 'An' }, { id: 'p1', name: 'Bình' }]);
+    const t0 = Date.now();
+    expect(g.action('p0', { type: 'roll', impulse: { x: 1, z: 0, p: 0.8 } }).ok).toBe(true);
+    const v = g.view();
+    expect(v.roll).not.toBeNull();
+    expect(v.roll!.ms).toBeGreaterThanOrEqual(1600);
+    expect(v.roll!.startedAt).toBe(t0);
+    const sim = simulateThrow(sanitizeImpulse({ x: 1, z: 0, p: 0.8 }), noise(5));
+    expect(v.dice).toEqual(sim.dice); // cùng nhiễu giả => cùng kết quả
+    if (v.movement) {
+      expect(v.movement.delay).toBe(v.roll!.ms);
+      expect(v.movement.endsAt - v.movement.startedAt).toBe(v.roll!.ms + v.movement.path.length * TYPHU_MOVE_STEP_MS);
+      expect(TYPHU_MOVE_STEP_MS).toBeGreaterThanOrEqual(350);
+      expect(TYPHU_MOVE_STEP_MS).toBeLessThanOrEqual(450);
+      // đồng hồ lượt chỉ chạy sau khi hoạt ảnh xong
+      vi.advanceTimersByTime(v.movement.endsAt - Date.now() + 1);
+      const after = g.view();
+      expect(after.roll).toBeNull();
+      expect(after.turnEndsAt === null || after.turnEndsAt - Date.now() >= TURN - 100 || after.step === 'wait').toBe(true);
+    }
+  });
+  it('tung bằng impulse không hợp lệ vẫn chạy (dùng cú mặc định)', () => {
+    const { g } = make(['An', 'Bình'], [1, 2]);
+    expect(g.action('p0', { type: 'roll', impulse: { x: NaN, z: 'a', p: -5 } as never }).ok).toBe(true);
+  });
 });

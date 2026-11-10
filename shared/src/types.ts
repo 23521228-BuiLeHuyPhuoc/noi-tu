@@ -1,4 +1,5 @@
 import type { TyPhuMovement } from './typhu';
+import type { DiceRollView, ThrowImpulse } from './dice';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
 
 export const MAX_PLAYERS = 6;
@@ -248,6 +249,8 @@ export interface TyPhuView {
   log: { id: number; kind: TyPhuLogKind; text: string }[];
   /** thẻ cơ hội vừa rút */
   card: { id: number; text: string } | null;
+  /** các khung hình mô phỏng cú lăn xúc xắc đang diễn ra (null khi đã xong) */
+  roll: DiceRollView | null;
 }
 
 // ================= Hành động trong game =================
@@ -257,7 +260,7 @@ export type GameAction =
   | { type: 'hint' }
   | { type: 'appeal'; word: string }
   | { type: 'vote'; yes: boolean }
-  | { type: 'roll' }
+  | { type: 'roll'; impulse?: ThrowImpulse }
   | { type: 'move'; piece: number }
   | { type: 'bet'; symbol: BauCuaSymbol; amount: number }
   | { type: 'clearBets' }

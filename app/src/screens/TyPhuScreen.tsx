@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_ROLL_MS, isTyPhuProperty, stationRent, utilityRent,
+  TYPHU_BOARD, TYPHU_GROUPS, isTyPhuProperty, stationRent, utilityRent,
   TYPHU_HOUSE_MULT, TYPHU_MAX_HOUSES, groupCells, rentOf,
 } from '../../../shared/src/typhu';
 import type { Game } from '../useGame';
@@ -10,8 +10,9 @@ import { actionText } from '../messages';
 import { characterSvgUri, playerColorOf, shortName } from '../avatars';
 import { TYPHU_PHOTOS } from '../typhuArt';
 import { ICON_BY_CELL } from '../typhuCellIcons';
+import type { DiceRollView } from '../../../shared/src/dice';
 import { makeCenterLayout, makeGeo, type Rect } from '../typhuLayout';
-import { useOnChange, useOnNew, useSecondsLeft } from '../hooks';
+import { useOnChange, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, sticker } from '../theme';
@@ -20,6 +21,7 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { TyPhuCell } from '../components/TyPhuCell';
 import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
+import { ANNOUNCE_MS, TyPhuAnnounce, type Announce } from '../components/TyPhuAnnounce';
 import { Pawn, TyPhuFxLayer, fxEnd, type Fx } from '../components/TyPhuFx';
 import { ThrowSheet, useShake } from '../components/Fun';
 
@@ -79,10 +81,13 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(24, Math.min(34, geo.wm * 0.95, geo.hm * 0.7));
+  const pawnBase = Math.max(28, Math.min(44, geo.wm * 1.25, geo.hm * 0.85));
 
   const [now, setNow] = useState(() => Date.now());
-  const [localRoll, setLocalRoll] = useState<{ id: number; startedAt: number; endsAt: number } | null>(null);
+  const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
+  if (g.roll && g.roll.id !== playback?.id) setPlayback(g.roll);
+  const [announces, setAnnounces] = useState<Announce[]>([]);
+  const lastAnnEnd = useRef(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fx, setFx] = useState<Fx[]>([]);
   const [cardFx, setCardFx] = useState<CardFx | null>(null);
@@ -102,22 +107,22 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const serverNow = now + game.clockOffset;
   const movement = g.movement;
   const moving = !!movement && serverNow < movement.endsAt;
-  const rollStartedAt = movement?.kind === 'roll'
-    ? movement.startedAt
-    : localRoll?.id === g.rollId ? localRoll.startedAt : null;
-  const rollElapsed = rollStartedAt === null ? TYPHU_ROLL_MS : serverNow - rollStartedAt;
-  const diceAnimating = !reducedMotion && rollStartedAt !== null && rollElapsed >= 0 && rollElapsed < TYPHU_ROLL_MS;
-  const dicePhase: 'roll' | 'bounce' | 'reveal' = diceAnimating
-    ? rollElapsed < 400 ? 'roll' : rollElapsed < 540 ? 'bounce' : 'reveal'
+  const rollInfo = g.roll ? { startedAt: g.roll.startedAt, ms: g.roll.ms }
+    : movement?.kind === 'roll' ? { startedAt: movement.startedAt, ms: movement.delay } : null;
+  const rollElapsed = rollInfo ? serverNow - rollInfo.startedAt : 1e9;
+  const diceAnimating = !reducedMotion && !!rollInfo && rollElapsed >= 0 && rollElapsed < rollInfo.ms;
+  const dicePhase: 'roll' | 'bounce' | 'reveal' = diceAnimating && rollInfo
+    ? rollElapsed < rollInfo.ms - 600 ? 'roll' : rollElapsed < rollInfo.ms - 180 ? 'bounce' : 'reveal'
     : 'reveal';
   const fxEndsAt = Math.max(
     0,
     ...fx.map(fxEnd),
+    ...announces.map((x) => x.end),
     cardFx ? cardFx.at + 3600 : 0,
   );
   const animationEndsAt = reducedMotion ? 0 : Math.max(
     movement?.endsAt ?? 0,
-    localRoll?.id === g.rollId ? localRoll.endsAt : 0,
+    rollInfo ? rollInfo.startedAt + rollInfo.ms : 0,
   );
   const animating = serverNow < animationEndsAt || (!reducedMotion && now < fxEndsAt);
   useEffect(() => {
@@ -137,7 +142,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
     const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
     if (!movement || movement.playerId !== id || serverNow >= movement.endsAt || reducedMotion) return still();
-    const delay = movement.kind === 'roll' ? TYPHU_ROLL_MS : 0;
+    const delay = movement.delay;
     const elapsed = serverNow - movement.startedAt - delay;
     if (elapsed <= 0 || !movement.path.length) {
       return { ...cellMid(movement.from), hop: 0, active: true, stepCell: movement.from, trail: new Set([movement.from]) };
@@ -163,12 +168,12 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     const r = layout.wealth[Math.max(0, g.order.indexOf(id))] ?? layout.wealth[0];
     return { x: geo.center.x + 3 + r.x, y: geo.center.y + 3 + r.y, w: r.w, h: r.h };
   };
-  const msUntilArrive = () => (movement ? Math.max(0, movement.endsAt - (clockNow() + game.clockOffset)) : 0);
+  const msUntilArrive = () => Math.max(0, movement ? movement.endsAt - (clockNow() + game.clockOffset) : 0, g.roll ? g.roll.startedAt + g.roll.ms - (clockNow() + game.clockOffset) : 0);
   const msUntilReach = (cell: number) => {
     if (!movement) return 0;
     const idx = movement.path.indexOf(cell);
     if (idx < 0) return msUntilArrive();
-    const delay = movement.kind === 'roll' ? TYPHU_ROLL_MS : 0;
+    const delay = movement.delay;
     const reach = movement.startedAt + delay + ((idx + 1) / movement.path.length) * (movement.endsAt - movement.startedAt - delay);
     return Math.max(0, reach - (clockNow() + game.clockOffset));
   };
@@ -190,22 +195,41 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     const newLogs = g.log.filter((l) => l.id > lastLogRef.current);
     if (newLogs.length) lastLogRef.current = newLogs[newLogs.length - 1].id;
     const bankruptNow = newLogs.some((l) => l.kind === 'bankrupt');
+    // thông báo lớn: xếp hàng nối đuôi nhau, không chồng lên nhau
+    const anns: Announce[] = [];
+    const SOUND: Record<Announce['kind'], Parameters<typeof play>[0]> = { buy: 'stamp', reward: 'win', loss: 'sad', build: 'cash', bankrupt: 'boom' };
+    const announce = (kind: Announce['kind'], at: number, data: Omit<Announce, 'id' | 'kind' | 'start' | 'end'>) => {
+      const start = Math.max(at, lastAnnEnd.current);
+      const dur = Math.round(ANNOUNCE_MS[kind] * (start > at + 800 ? 0.72 : 1));
+      lastAnnEnd.current = start + dur + 100;
+      anns.push({ id: seqId(), kind, start, end: start + dur, ...data });
+      later(start - t0, () => play(SOUND[kind]));
+    };
+    const idOfName = (text: string) => Object.keys(g.names).find((id) => text.startsWith(g.names[id]));
+    const cur = g.currentPlayerId ?? '';
     // đất & nhà
     for (let i = 0; i < TYPHU_BOARD.length; i++) {
       const owner = g.owners[i];
       const houses = g.houses[i] ?? 0;
+      const cell = TYPHU_BOARD[i];
       if (owner && prevOwnersRef.current[i] !== owner && !bankruptNow) {
         adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: 'ĐÃ MUA!', color: colorOf(owner) });
-        play('stamp');
+        const price = isTyPhuProperty(cell) ? cell.price : 0;
+        announce('buy', t0, {
+          title: cell.name, sub: `${nameOf(owner)} · ${fmt(price)} xu`, amount: price, portrait: portraitUriOf(owner), color: colorOf(owner), icon: ICON_BY_CELL[i],
+        });
       } else if (owner && houses > (prevHousesRef.current[i] ?? 0)) {
         adds.push({ k: 'build', id: seqId(), at: t0, cell: i, level: houses });
-        play('cash');
+        announce('build', t0, {
+          title: houses >= TYPHU_MAX_HOUSES ? 'Lên khách sạn!' : `Xây nhà cấp ${houses}!`, sub: `${nameOf(owner)} · ${cell.name}`, level: houses, color: colorOf(owner),
+        });
       }
       prevOwnersRef.current[i] = owner ?? '';
       prevHousesRef.current[i] = houses;
     }
     for (const l of newLogs) {
       const mine = l.text.startsWith(g.names[me] ?? '\u0000');
+      const who = idOfName(l.text) ?? cur;
       if (l.kind === 'rent') {
         const ids = Object.keys(deltas);
         const payer = ids.find((id) => deltas[id] < 0);
@@ -214,28 +238,36 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
         if (payer && taker) {
           consumed.add(payer); consumed.add(taker);
           adds.push({ k: 'rent', id: seqId(), at: t0 + delay, from: wealthRectOf(payer), to: wealthRectOf(taker), fromId: payer, toId: taker, amount: deltas[taker] });
-          later(delay, () => play(mine ? 'lose' : 'cash'));
+          const cellName = TYPHU_BOARD[g.pos[payer]]?.name ?? '';
+          if (taker === me) {
+            announce('reward', t0 + delay, { title: `${nameOf(payer)} trả tiền thuê ${cellName}`, amount: deltas[taker], portrait: portraitUriOf(taker), color: colorOf(taker) });
+          } else {
+            announce('loss', t0 + delay, { title: payer === me ? `Bạn trả tiền thuê ${cellName}` : `${nameOf(payer)} trả tiền thuê ${cellName}`, sub: `cho ${nameOf(taker)}`, amount: -deltas[taker], portrait: portraitUriOf(payer), color: colorOf(payer) });
+          }
         }
       } else if (l.kind === 'start') {
-        const delay = msUntilReach(0);
-        adds.push({ k: 'start', id: seqId(), at: t0 + delay });
-        later(delay, () => play('cash'));
+        announce('reward', t0 + msUntilReach(0), { title: `${nameOf(who)} qua Xuất phát`, amount: 200, portrait: portraitUriOf(who), color: colorOf(who) });
+      } else if (l.kind === 'card') {
+        const d = deltas[cur];
+        const text = g.card?.text ?? l.text;
+        if (d > 0) announce('reward', t0 + msUntilArrive() + 900, { title: 'Thẻ may mắn!', sub: text, amount: d, portrait: portraitUriOf(cur), color: colorOf(cur) });
+        else if (d < 0) announce('loss', t0 + msUntilArrive() + 900, { title: 'Thẻ xui xẻo!', sub: text, amount: d, portrait: portraitUriOf(cur), color: colorOf(cur) });
+      } else if (l.kind === 'tax') {
+        const d = deltas[who];
+        announce('loss', t0 + msUntilArrive(), { title: l.text.replace(`${g.names[who] ?? ''} `, ''), amount: d ?? 0, portrait: portraitUriOf(who), color: colorOf(who) });
       } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
         const delay = msUntilArrive();
         adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: 10 });
+        announce('loss', t0 + delay, { title: 'VÀO TÙ!', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
         later(delay, () => play('siren'));
         feed(l.text, 'bad');
         if (mine) shake();
       } else if (l.kind === 'bankrupt') {
-        const nm = Object.keys(g.names).find((id) => l.text.startsWith(g.names[id])) ;
-        adds.push({ k: 'bankrupt', id: seqId(), at: t0 + msUntilArrive(), name: nm ? nameOf(nm) : '' });
-        later(msUntilArrive(), () => play('boom'));
-        play('lose');
+        announce('bankrupt', t0 + msUntilArrive(), { title: l.text, portrait: portraitUriOf(who), color: colorOf(who) });
         feed(l.text, 'bad');
-      } else if (l.kind === 'tax') {
-        play('coin');
       }
     }
+    if (anns.length && !reducedMotion) setAnnounces((old) => [...old.filter((x) => x.end > t0), ...anns]);
     for (const [id, delta] of Object.entries(deltas)) {
       if (consumed.has(id)) continue;
       adds.push({ k: 'float', id: seqId(), at: t0 + msUntilArrive(), at2: wealthRectOf(id), who: id, delta });
@@ -249,10 +281,8 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
     if (adds.length && !reducedMotion) setFx((old) => [...old.filter((f) => fxEnd(f) > t0), ...adds]);
     setNow(t0);
   });
-  useOnChange(g.rollId, (id) => {
-    const startedAt = Date.now() + game.clockOffset;
-    setLocalRoll({ id, startedAt, endsAt: startedAt + TYPHU_ROLL_MS });
-    setNow(Date.now());
+  useOnChange(g.rollId, () => {
+    setNow(clockNow());
     play('dice');
   });
   useOnChange(myTurn && g.step === 'roll', (turnNow) => {
@@ -260,9 +290,6 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
       play('turn');
       vibrate();
     }
-  });
-  useOnNew(g.log, (l) => {
-    if (l.kind === 'buy') play('coin');
   });
 
   const act = async (a: Parameters<Game['act']>[0]) => {
@@ -306,6 +333,8 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const landscape = !isPortrait;
   const buyable = !moving && myTurn && g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending : null;
 
+  const activeAnn = reducedMotion ? null : announces.find((x) => now >= x.start && now < x.end) ?? null;
+
   // thẻ tài sản nháy xanh/đỏ khi vừa nhận/mất tiền
   const flash: Record<string, 'gain' | 'loss'> = {};
   for (const f of fx) {
@@ -330,6 +359,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
       wide
       fullscreen
       hideStrip={height < 700}
+      overlay={activeAnn ? <TyPhuAnnounce a={activeAnn} now={now} W={width} H={height} /> : undefined}
       scroll={false}
       game={game}
       room={room}
@@ -402,7 +432,10 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
                 inJail={inJail}
                 buyable={buyable ? { name: buyable.name, price: buyable.price } : null}
                 left={left}
-                dice={{ phase: dicePhase, animating: diceAnimating, elapsed: rollElapsed, tick: now }}
+                dice={{ phase: dicePhase, animating: diceAnimating, elapsed: rollElapsed }}
+                playback={playback}
+                clockOffset={game.clockOffset}
+                onThrow={(impulse) => void act({ type: 'roll', impulse })}
                 flash={flash}
                 card={cardFx}
                 reducedMotion={reducedMotion}

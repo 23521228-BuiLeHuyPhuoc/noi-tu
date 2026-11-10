@@ -81,10 +81,14 @@ export interface TyPhuMovement {
   path: number[];
   startedAt: number;
   endsAt: number;
+  /** thời gian xúc xắc lăn trước khi quân cờ bắt đầu đi (ms) */
+  delay: number;
   kind: 'roll' | 'card' | 'jail';
 }
-export const TYPHU_MOVE_STEP_MS = 160;
-export const TYPHU_ROLL_MS = 650;
+/** mỗi ô quân cờ đi mất ~400ms; xúc xắc lăn 1,6-2,6s tuỳ mô phỏng vật lý */
+export const TYPHU_MOVE_STEP_MS = 400;
+export const TYPHU_ROLL_MIN_MS = 1600;
+export const TYPHU_ROLL_MAX_MS = 2600;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
   return cell.kind === 'land' || cell.kind === 'station' || cell.kind === 'utility';
 }

@@ -1,5 +1,6 @@
 import type { ActionResult, GameAction, GameResult, GameView, RoomSettings } from '../../../shared/src/types';
 import type { Dictionary, Rng } from '../dictionary';
+import type { ThrowImpulse } from '../../../shared/src/dice';
 
 export interface EnginePlayer {
   id: string;
@@ -21,6 +22,8 @@ export interface EngineContext {
   changed: () => void;
   /** kết thúc ván */
   finish: (result: GameResult) => void;
+  /** thay thế bộ mô phỏng xúc xắc 3D (test dùng để cho ra mặt xác định) */
+  rollDice?: (impulse: ThrowImpulse, rng: Rng) => { dice: [number, number]; frames: number[]; ms: number; fps: number };
   /** cả phòng vừa duyệt một từ mới: thêm vào từ điển và lưu lại */
   learnWord: (word: string, byName: string) => void;
 }

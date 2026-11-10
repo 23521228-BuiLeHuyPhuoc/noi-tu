@@ -8,7 +8,8 @@ import { Button, T } from '../ui';
 import { FX_ICON, ICON_BY_CELL, iconUri } from '../typhuCellIcons';
 import { shortCellName } from '../typhuNames';
 import type { CenterLayout, Rect } from '../typhuLayout';
-import { TyPhuDie } from './TyPhuFx';
+import type { DiceRollView, ThrowImpulse } from '../../../shared/src/dice';
+import { TyPhuDice3D } from './TyPhuDice3D';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const abs = (r: Rect) => ({ position: 'absolute' as const, left: r.x, top: r.y, width: r.w, height: r.h });
@@ -37,7 +38,10 @@ export interface CenterProps {
   inJail: boolean;
   buyable: { name: string; price: number } | null;
   left: number;
-  dice: { phase: 'roll' | 'bounce' | 'reveal'; animating: boolean; elapsed: number; tick: number };
+  dice: { phase: 'roll' | 'bounce' | 'reveal'; animating: boolean; elapsed: number };
+  playback: DiceRollView | null;
+  clockOffset: number;
+  onThrow: (impulse?: ThrowImpulse) => void;
   flash: Record<string, 'gain' | 'loss'>;
   card: CardFx | null;
   reducedMotion: boolean;
@@ -193,13 +197,8 @@ export function TyPhuCenter(p: CenterProps) {
   const timeTotal = Math.max(1, g.turnSeconds);
   const hot = p.left <= 5;
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
-  const ds = L.diceSize;
-  const dieWidth = ds + 6;
-  const diceBlockW = dieWidth * 2 + 8;
-  const btnX = L.action.x + diceBlockW + 12 - 6;
-  const btnRect: Rect = { x: L.action.x + diceBlockW + 8, y: L.action.y, w: L.action.w - diceBlockW - 8, h: L.action.h };
-  void btnX;
-
+  const trayH = L.action.h - 44;
+  const canThrow = showRoll && !p.dice.animating;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* đầu: tên game + nút phụ */}
@@ -237,46 +236,46 @@ export function TyPhuCenter(p: CenterProps) {
         </View>
       </View>
 
-      {/* xúc xắc + nút hành động */}
+      {/* khay xúc xắc 3D + nút hành động */}
       <View style={[abs(L.action), styles.actionBox]}>
         <View
           testID={`dice-phase-${p.dice.phase}`}
           accessibilityLabel={`Xúc xắc: ${p.dice.phase}`}
-          style={[styles.diceArea, { width: diceBlockW }]}
+          style={{ width: L.action.w - 4, height: trayH, borderRadius: 12, overflow: 'hidden', alignSelf: 'center' }}
         >
-          {[0, 1].map((k) => (
-            <TyPhuDie
-              key={k}
-              testID={`die-${k + 1}`}
-              size={ds}
-              phase={p.dice.phase}
-              elapsed={p.dice.elapsed}
-              seed={k}
-              value={p.dice.phase === 'roll' ? (Math.floor(p.dice.tick / (k ? 83 : 65)) % 6) + 1 : g.dice?.[k] ?? null}
-            />
-          ))}
+          <TyPhuDice3D
+            width={L.action.w - 4}
+            height={trayH}
+            roll={p.playback}
+            clockOffset={p.clockOffset}
+            values={g.dice}
+            canThrow={canThrow}
+            onThrow={p.onThrow}
+          />
+          {canThrow && <T style={styles.trayHint}>Vuốt để tung, hoặc chạm</T>}
+          {g.dice && !p.dice.animating && !p.moving && <View style={styles.sumPill}><T style={styles.sumTxt}>{g.dice[0] + g.dice[1]}</T></View>}
         </View>
-        <View style={[styles.btnCol, { width: btnRect.w - 8 }]}>
+        <View style={styles.btnRow}>
           {showRoll ? (
             <>
-              <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
               {p.inJail && <Button testID="pay-jail" small variant="paper" title={`Nộp ${TYPHU_JAIL_FINE} xu ra tù`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
+              <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
           ) : showBuy ? (
             <>
-              <Button testID="buy-btn" small variant="jade" title={`Mua giá ${fmt(p.buyable!.price)}`} style={styles.fillBtn} onPress={() => p.onAct('buy')} />
               <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={styles.fillBtn} onPress={() => p.onAct('skip')} />
+              <Button testID="buy-btn" small variant="jade" title={`Mua giá ${fmt(p.buyable!.price)}`} style={styles.fillBtn} onPress={() => p.onAct('buy')} />
             </>
           ) : showEnd ? (
             <>
+              <T style={[styles.hint, { flex: 1 }]}>Chạm ô đất của bạn để xây nhà</T>
               <Button testID="end-turn" small variant="gold" title="Xong lượt" icon="✓" style={styles.fillBtn} onPress={() => p.onAct('endTurn')} />
-              <T style={styles.hint}>Chạm ô đất của bạn để xây nhà</T>
             </>
           ) : (
-            <T style={styles.hint}>{p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
+            <T style={[styles.hint, { flex: 1 }]}>{p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}
-          {p.error && <T style={styles.error}>{p.error}</T>}
         </View>
+        {p.error && <T style={styles.error}>{p.error}</T>}
       </View>
 
       {g.order.map((id, i) => (
@@ -320,12 +319,16 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.mist, borderWidth: 1.5, borderColor: C.ink, overflow: 'hidden' },
   timerNum: { width: 30, textAlign: 'right', fontWeight: '900', fontSize: 12, color: C.ink },
   actionBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 14,
-    borderWidth: 2, borderColor: '#E8D5B0', borderStyle: 'dashed', paddingHorizontal: 6,
+    gap: 4, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 14, borderWidth: 2, borderColor: '#E8D5B0', padding: 2,
   },
-  diceArea: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  btnCol: { flex: 1, gap: 6, justifyContent: 'center' },
-  fillBtn: { alignSelf: 'stretch', minHeight: 34 },
+  btnRow: { flexDirection: 'row', gap: 6, alignItems: 'center', height: 38, paddingHorizontal: 4 },
+  trayHint: { position: 'absolute', left: 0, right: 0, bottom: 2, textAlign: 'center', fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.9)' },
+  sumPill: {
+    position: 'absolute', right: 6, top: 4, minWidth: 28, height: 24, borderRadius: 12, backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
+  },
+  sumTxt: { fontWeight: '900', fontSize: 14, color: C.ink },
+  fillBtn: { flex: 1, minHeight: 34 },
   hint: { fontSize: 11, fontWeight: '700', color: C.muted, textAlign: 'center' },
   error: { fontSize: 11, fontWeight: '800', color: C.ink, backgroundColor: C.gold, borderRadius: 6, padding: 3, textAlign: 'center' },
   wealth: {

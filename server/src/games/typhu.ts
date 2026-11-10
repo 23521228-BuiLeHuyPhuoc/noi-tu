@@ -11,9 +11,11 @@
  */
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
-  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent, TYPHU_MOVE_STEP_MS, TYPHU_ROLL_MS, type TyPhuMovement,
+  TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent, TYPHU_MOVE_STEP_MS, type TyPhuMovement,
 } from '../../../shared/src/typhu';
 import type { ActionResult, GameAction, TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
+import { DICE_DEFAULT_IMPULSE, sanitizeImpulse, type DiceRollView, type ThrowImpulse } from '../../../shared/src/dice';
+import { simulateThrow } from './dice3d';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const WAIT_MS = 1600;
@@ -70,6 +72,8 @@ export class TyPhuGame implements GameEngine {
   private dice: [number, number] | null = null;
   private rolledDouble = false;
   private rollId = 0;
+  private rollMs = 0;
+  private throwView: DiceRollView | null = null;
   private movement: TyPhuMovement | null = null;
   private movementSeq = 0;
   private pendingBuy: number | null = null;
@@ -105,7 +109,7 @@ export class TyPhuGame implements GameEngine {
     switch (a.type) {
       case 'roll':
         if (this.step !== 'roll') return { ok: false, reason: 'bad_action' };
-        this.roll();
+        this.roll(sanitizeImpulse(a.impulse));
         return { ok: true };
       case 'payJail':
         if (this.step !== 'roll' || me.jail === null) return { ok: false, reason: 'bad_action' };
@@ -173,6 +177,7 @@ export class TyPhuGame implements GameEngine {
       turnSeconds: this.turnMs / 1000,
       log: this.log.map((entry) => ({ ...entry })),
       card: this.card ? { ...this.card } : null,
+      roll: this.throwView,
     };
   }
 
@@ -210,12 +215,15 @@ export class TyPhuGame implements GameEngine {
     return { ok: true };
   }
 
-  private roll(): void {
+  /** Tung xúc xắc: server mô phỏng vật lý rồi đọc mặt ngửa; client chỉ phát lại các khung hình. */
+  private roll(impulse: ThrowImpulse = DICE_DEFAULT_IMPULSE): void {
     const me = this.players[this.current];
-    const d1 = 1 + Math.floor(this.ctx.rng() * 6);
-    const d2 = 1 + Math.floor(this.ctx.rng() * 6);
+    const res = (this.ctx.rollDice ?? simulateThrow)(impulse, this.ctx.rng);
+    const [d1, d2] = res.dice;
     this.dice = [d1, d2];
     this.rollId++;
+    this.rollMs = res.ms;
+    this.throwView = { id: this.rollId, startedAt: Date.now(), ms: res.ms, fps: res.fps, frames: res.frames };
     this.card = null;
     const isDouble = d1 === d2;
     this.rolledDouble = false;
@@ -228,7 +236,7 @@ export class TyPhuGame implements GameEngine {
         me.jail++;
         if (me.jail < 3) {
           this.addLog('jail', `${me.name} vẫn bóc lịch (${me.jail}/3)`);
-          return this.wait(() => this.nextPlayer());
+          return this.wait(() => this.nextPlayer(), this.rollMs);
         }
         me.jail = null;
         this.charge(me, TYPHU_JAIL_FINE, null, 'nộp phạt ra tù');
@@ -242,7 +250,7 @@ export class TyPhuGame implements GameEngine {
       me.doubles++;
       if (me.doubles >= 3) {
         this.sendToJail(me, 'đổ đôi 3 lần liên tiếp, bị nghi gian lận');
-        return this.wait(() => this.nextPlayer());
+        return this.wait(() => this.nextPlayer(), this.rollMs);
       }
       this.rolledDouble = true;
     }
@@ -253,12 +261,14 @@ export class TyPhuGame implements GameEngine {
     const me = this.players[this.current], from = me.pos;
     const path = Array.from({ length: Math.abs(steps) }, (_, i) => ((from + Math.sign(steps) * (i + 1)) % TYPHU_SIZE + TYPHU_SIZE) % TYPHU_SIZE);
     const startedAt = Date.now();
-    const duration = (kind === 'roll' ? TYPHU_ROLL_MS : 0) + Math.max(1, path.length) * TYPHU_MOVE_STEP_MS;
-    this.movement = { id: ++this.movementSeq, playerId: me.id, from, to: path.at(-1) ?? from, path, startedAt, endsAt: startedAt + duration, kind };
+    const delay = kind === 'roll' ? this.rollMs : 0;
+    const duration = delay + Math.max(1, path.length) * TYPHU_MOVE_STEP_MS;
+    this.movement = { id: ++this.movementSeq, playerId: me.id, from, to: path.at(-1) ?? from, path, startedAt, endsAt: startedAt + duration, delay, kind };
     me.pos = this.movement.to;
     this.step = 'wait'; this.pendingBuy = null; this.turnEndsAt = this.movement.endsAt;
     this.timer.set(duration, () => {
       this.movement = null;
+      this.throwView = null;
       if (steps > 0 && from + steps >= TYPHU_SIZE) this.passStart(me);
       this.land(allowCard);
     });
@@ -459,17 +469,19 @@ export class TyPhuGame implements GameEngine {
 
   private beginRoll(): void {
     this.movement = null;
+    this.throwView = null;
     this.step = 'roll';
     this.pendingBuy = null;
     this.armTimer(() => this.roll());
     this.ctx.changed();
   }
 
-  private wait(then: () => void): void {
+  private wait(then: () => void, extraMs = 0): void {
     this.step = 'wait';
     this.pendingBuy = null;
-    this.turnEndsAt = Date.now() + WAIT_MS;
-    this.timer.set(WAIT_MS, then);
+    const ms = WAIT_MS + extraMs;
+    this.turnEndsAt = Date.now() + ms;
+    this.timer.set(ms, () => { this.throwView = null; then(); });
     this.ctx.changed();
   }
 

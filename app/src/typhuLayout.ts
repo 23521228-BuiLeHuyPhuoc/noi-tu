@@ -55,13 +55,13 @@ export function makeCenterLayout(w: number, h: number, n: number, hasCard: boole
     const header: Rect = { x: pad, y: pad, w: inner, h: 26 };
     const banner: Rect = { x: pad, y: header.y + header.h + gap, w: inner, h: 52 };
     const rows = Math.ceil(n / 2);
-    const baseCard = n > 4 ? 36 : 40;
+    const baseCard = n > 4 ? 40 : 46;
     const chipsH = 48;
-    const base = pad * 2 + header.h + banner.h + gap * 4 + 80 + rows * baseCard + (rows - 1) * 4 + chipsH + ROW * 4 + dock;
+    const base = pad * 2 + header.h + banner.h + gap * 4 + 150 + rows * baseCard + (rows - 1) * 4 + chipsH + ROW * 4 + dock;
     const spare = Math.max(0, h - base);
     const cardH = baseCard + Math.min(8, spare * 0.08);
     const wealthH = rows * cardH + (rows - 1) * 4;
-    const actionH = 80 + Math.min(44, spare * 0.4);
+    const actionH = 150 + Math.min(40, spare * 0.4);
     const action: Rect = { x: pad, y: banner.y + banner.h + gap, w: inner, h: actionH };
     const cardW = (inner - gap) / 2;
     const wealth: Rect[] = Array.from({ length: n }, (_, i) => ({
@@ -85,9 +85,9 @@ export function makeCenterLayout(w: number, h: number, n: number, hasCard: boole
   const header: Rect = { x: pad, y: pad, w: lw, h: 26 };
   const banner: Rect = { x: pad, y: header.y + header.h + gap, w: lw, h: 50 };
   const aY = banner.y + banner.h + gap;
-  const action: Rect = { x: pad, y: aY, w: lw, h: Math.max(60, Math.min(100, h - pad - aY)) };
+  const action: Rect = { x: pad, y: aY, w: lw, h: Math.max(110, Math.min(170, h - pad - aY)) };
   const rows = Math.ceil(n / 2);
-  const cardH = n > 4 ? 32 : 36;
+  const cardH = n > 4 ? 36 : 42;
   const cardW = (rw - gap) / 2;
   const wealth: Rect[] = Array.from({ length: n }, (_, i) => ({
     x: rx + (i % 2) * (cardW + gap), y: pad + Math.floor(i / 2) * (cardH + 4), w: cardW, h: cardH,
@@ -100,7 +100,7 @@ export function makeCenterLayout(w: number, h: number, n: number, hasCard: boole
     wide, header, banner, action, wealth, chips, log,
     cardBig: { x: rx, y: pad, w: rw, h: h - 2 * pad },
     cardDock: { x: rx, y: chips.y + chips.h + gap, w: rw, h: dock - 3 },
-    diceSize: Math.round(Math.min(action.h - 14, (lw * 0.46 - 8) / 2, 64)),
+    diceSize: 0,
     logRows: Math.max(0, Math.min(6, Math.floor(log.h / ROW))),
   };
 }
