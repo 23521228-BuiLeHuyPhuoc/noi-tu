@@ -1,5 +1,17 @@
 import {
+  CHARACTER_ACCESSORIES,
+  CHARACTER_AGES,
+  CHARACTER_BROWS,
+  CHARACTER_BUILDS,
+  CHARACTER_DETAILS,
+  CHARACTER_EYES,
+  CHARACTER_FACES,
+  CHARACTER_GENDERS,
+  CHARACTER_HAIRS,
+  CHARACTER_OUTFITS,
+  LOOK_OPTIONS,
   PLAYER_COLORS,
+  SKIN_TONES,
   type CharacterAccessory,
   type CharacterAge,
   type CharacterBrows,
@@ -9,12 +21,14 @@ import {
   type CharacterEyes,
   type CharacterFace,
   type CharacterGender,
-  type CharacterOutfit,
   type CharacterHair,
+  type CharacterLook,
+  type CharacterOutfit,
   type DoodleKind,
+  type LookKey,
   type Mood,
 } from '../../shared/src/types';
-import { AVATAR_PRESETS } from '../../shared/src/avatars';
+import { AVATAR_PRESETS, AVATAR_PRESET_NAMES } from '../../shared/src/avatars';
 
 /** 16 avatar thú, mỗi con một màu nền. Server gán chỉ số không trùng trong phòng. */
 export const AVATARS = [
@@ -64,32 +78,44 @@ export const HAIR_OPTIONS: { id: CharacterHair; label: string }[] = [
   { id: 'dinh', label: 'Đầu đinh' },
   { id: 'mohican', label: 'Mohican' },
   { id: 'buicu', label: 'Búi củ hành' },
-  { id: 'afro', label: 'Tóc xù' },
+  { id: 'afro', label: 'Tóc xù / Afro' },
   { id: 'maibang', label: 'Mái bằng' },
   { id: 'highlight', label: 'Highlight' },
   { id: 'nam', label: 'Đầu nấm' },
   { id: 'dailung', label: 'Dài ngang lưng' },
+  { id: 'buocthap', label: 'Buộc thấp tóc con' },
+  { id: 'chaingoc', label: 'Chải ngược xoăn gáy' },
+  { id: 'vuotlech', label: 'Vuốt lệch phồng' },
+  { id: 'dungchom', label: 'Rất ngắn dựng chỏm' },
 ];
 
 export const FACE_OPTIONS: { id: CharacterFace; label: string }[] = [
   { id: 'tron', label: 'Tròn' },
+  { id: 'ovalngan', label: 'Oval ngắn đầy' },
+  { id: 'oval', label: 'Oval' },
+  { id: 'ovaldai', label: 'Oval dài má đầy' },
+  { id: 'ovalvuong', label: 'Oval pha vuông' },
   { id: 'xoan', label: 'Trái xoan' },
-  { id: 'dai', label: 'Dài' },
-  { id: 'vuong', label: 'Hàm bạnh' },
-  { id: 'bau', label: 'Má phính' },
+  { id: 'bau', label: 'Mặt bầu' },
   { id: 'nhon', label: 'Cằm nhọn' },
+  { id: 'dai', label: 'Mặt dài' },
+  { id: 'vuong', label: 'Hàm vuông' },
 ];
+
 export const BUILD_OPTIONS: { id: CharacterBuild; label: string }[] = [
   { id: 'gay', label: 'Gầy' },
   { id: 'vua', label: 'Vừa' },
   { id: 'mum', label: 'Mũm mĩm' },
+  { id: 'khoe', label: 'Vai rộng cơ bắp' },
 ];
+
 export const EYE_OPTIONS: { id: CharacterEyes; label: string }[] = [
   { id: 'macdinh', label: 'Mặc định' },
   { id: 'hip', label: 'Mắt híp' },
   { id: 'to', label: 'Mắt to tròn' },
   { id: 'motmi', label: 'Một mí' },
 ];
+
 export const BROW_OPTIONS: { id: CharacterBrows; label: string }[] = [
   { id: 'macdinh', label: 'Mặc định' },
   { id: 'ray', label: 'Mày rậm' },
@@ -111,6 +137,7 @@ export const ACCESSORY_OPTIONS: { id: CharacterAccessory; label: string; icon: s
   { id: 'troc', label: 'Đầu trọc bóng', icon: '🥚' },
   { id: 'mahong', label: 'Má hồng', icon: '😊' },
   { id: 'prideghim', label: 'Ghim cầu vồng', icon: '🌈' },
+  { id: 'prideco', label: 'Cờ cầu vồng', icon: '🏳️‍🌈' },
   { id: 'pridetoc', label: 'Tóc cầu vồng', icon: '🌈' },
   { id: 'pridebang', label: 'Băng đô cầu vồng', icon: '🌈' },
 ];
@@ -126,6 +153,10 @@ export const DETAIL_OPTIONS: { id: CharacterDetail; label: string; icon: string 
 
 export const OUTFIT_OPTIONS: { id: CharacterOutfit; label: string; icon: string }[] = [
   { id: 'none', label: 'Theo tuổi', icon: '👕' },
+  { id: 'thun', label: 'Áo thun cổ tròn', icon: '👕' },
+  { id: 'beo', label: 'Áo trắng cổ bèo', icon: '👚' },
+  { id: 'somi', label: 'Sơ mi mở cúc', icon: '👔' },
+  { id: 'balden', label: 'Ba lỗ đen chữ U', icon: '🎽' },
   { id: 'aohoa', label: 'Áo hoa đi biển', icon: '🌺' },
   { id: 'dobo', label: 'Đồ bộ', icon: '🛌' },
   { id: 'bala', label: 'Áo ba lỗ', icon: '🎽' },
@@ -137,6 +168,35 @@ export const OUTFIT_OPTIONS: { id: CharacterOutfit; label: string; icon: string 
 ];
 
 export const MOOD_EMOJI: Record<Mood, string> = { normal: '', smug: '😏', cry: '😭', angry: '😡', shock: '😱', dizzy: '😵‍💫' };
+
+/** 11 tông da tự nhiên từ rất sáng tới nâu sẫm (không ám vàng/hồng quá) */
+export const SKIN_PALETTE = [
+  '#FCECE3', // 0: Rất sáng
+  '#F8DEC8', // 1: Sáng
+  '#F3CFB2', // 2: Sáng ấm
+  '#ECC09E', // 3: Trung bình sáng
+  '#E3AF8E', // 4: Trung bình ấm hơi hồng
+  '#D9A17C', // 5: Be tự nhiên
+  '#C98E67', // 6: Ngăm sáng
+  '#B67952', // 7: Nâu vừa ấm
+  '#9E633E', // 8: Rám nắng
+  '#7E4B2D', // 9: Nâu đậm
+  '#5B351F', // 10: Nâu sẫm
+] as const;
+
+export const SKIN_NAMES = [
+  'Rất sáng',
+  'Sáng',
+  'Sáng ấm',
+  'Trung bình sáng',
+  'Trung bình ấm hồng',
+  'Be tự nhiên',
+  'Ngăm sáng',
+  'Nâu vừa ấm',
+  'Rám nắng',
+  'Nâu đậm',
+  'Nâu sẫm',
+] as const;
 
 export function playerColorOf(c?: CharacterConfig | number) {
   const idx = typeof c === 'number' ? c : c?.color ?? 0;
@@ -162,7 +222,12 @@ const star = (x: number, y: number, r: number) => {
   return `<polygon points="${p.join(' ')}" fill="#FFD43B" stroke="#15110F" stroke-width="1.3" stroke-linejoin="round"/>`;
 };
 
-/** Mắt, mày, miệng của từng tâm trạng (khác "bình thường") + lớp tô màu mặt + vật trang trí phía trên */
+function darken(hex: string, f: number): string {
+  const h = hex.replace('#', '');
+  return '#' + [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - f)).toString(16).padStart(2, '0')).join('');
+}
+
+/** Mắt, mày, miệng của từng tâm trạng sự kiện (khác "normal") */
 function moodFace(mood: Mood, ink: string, skin: string, female: boolean) {
   const lip = female ? '#D6336C' : ink;
   switch (mood) {
@@ -225,13 +290,43 @@ function moodFace(mood: Mood, ink: string, skin: string, female: boolean) {
   }
 }
 
-
 const PRIDE = ['#E03131', '#F76707', '#FFD43B', '#2F9E44', '#1C7ED6', '#7048E8'];
 
-/** Trang phục vui, thay cho áo theo độ tuổi */
-function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string): string {
+const OUTFIT_COLORS: Record<string, string> = {
+  xanhrung: '#1B4332',
+  den: '#212529',
+  trang: '#F8F9FA',
+  xam: '#6C757D',
+  do: '#C92A2A',
+  vang: '#F59F00',
+};
+
+/** Trang phục vui & đời thường */
+function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string, look?: CharacterLook): string {
   const body = (fill: string) => `<path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 Z" fill="${fill}" stroke="${ink}" stroke-width="2.5"/>`;
+  const teeCol = look?.outfitcolor && OUTFIT_COLORS[look.outfitcolor] ? OUTFIT_COLORS[look.outfitcolor] : col;
   switch (o) {
+    case 'thun':
+      return `${body(teeCol)}
+        <path d="M38 71 Q50 81 62 71 Q50 76 38 71 Z" fill="${darken(teeCol, 0.18)}" stroke="${ink}" stroke-width="2"/>
+        <path d="M27 78 L31 98 M73 78 L69 98" stroke="${ink}" stroke-width="1.5" opacity="0.45"/>`;
+    case 'beo':
+      return `${body('#FFFDF9')}
+        <path d="M40 68 L60 68 L61 74 Q50 78 39 74 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M38 74 q3 3 6 0 q3 3 6 0 q3 3 6 0 q3 3 6 0" fill="none" stroke="${ink}" stroke-width="1.6"/>
+        <path d="M16 82 q5 -4 11 0 q5 4 10 0 M84 82 q-5 -4 -11 0 q-5 4 -10 0" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M14 90 q6 -4 13 0 q6 4 11 0 M86 90 q-6 -4 -13 0 q-6 4 -11 0" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <circle cx="50" cy="82" r="1.6" fill="#D0C9B8" stroke="${ink}" stroke-width="1"/><circle cx="50" cy="89" r="1.6" fill="#D0C9B8" stroke="${ink}" stroke-width="1"/>`;
+    case 'somi':
+      return `${body('#FBF9F3')}
+        <path d="M41 71 L50 86 L59 71 Z" fill="${skin}" stroke="${ink}" stroke-width="1.6"/>
+        <path d="M41 70 L33 78 L43 83 L50 86 Z M59 70 L67 78 L57 83 L50 86 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.9" stroke-linejoin="round"/>
+        <line x1="50" y1="86" x2="50" y2="98" stroke="${ink}" stroke-width="1.6"/>
+        <circle cx="50" cy="90" r="1.4" fill="${ink}"/><circle cx="50" cy="95" r="1.4" fill="${ink}"/>
+        <path d="M18 90 L28 88 L29 93 L17 95 Z M82 90 L72 88 L71 93 L83 95 Z" fill="#EDE8DC" stroke="${ink}" stroke-width="1.5"/>`;
+    case 'balden':
+      return `<path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 Z" fill="${skin}" stroke="${ink}" stroke-width="2.5"/>
+        <path d="M27 98 C29 85, 33 77, 35 71 L41 71 C41 86, 59 86, 59 71 L65 71 C67 77, 71 85, 73 98 Z" fill="#18181B" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>`;
     case 'aohoa':
       return `${body('#19B5A5')}
         <path d="M38 71 L50 90 L62 71 Z" fill="${skin}" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
@@ -259,7 +354,6 @@ function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string): 
         <path d="M30 76 l2 -4 l2 4 l4 2 l-4 2 l-2 4 l-2 -4 l-4 -2 Z" fill="#FFF" opacity="0.8"/>`;
     case 'aodai':
       return `${body(col)}
-        <path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 L72 98 Z" fill="none"/>
         <path d="M42 77 L74 92 L76 98" stroke="${ink}" stroke-width="2" fill="none"/>
         <path d="M39 70 Q50 77 61 70 L60 78 Q50 84 40 78 Z" fill="#FFF3BF" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
         <circle cx="62" cy="86" r="1.6" fill="#FFD43B"/><circle cx="68" cy="89" r="1.6" fill="#FFD43B"/>
@@ -288,91 +382,287 @@ function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string): 
   }
 }
 
-/** Chi tiết khuôn mặt (vẽ trên mặt, dưới phụ kiện) */
-function detailSvg(d: CharacterDetail | undefined, ink: string, mood: Mood): string {
-  switch (d) {
-    case 'notruoi':
-      return `<circle cx="62.5" cy="57" r="1.9" fill="#3B231A"/><circle cx="62" cy="56.4" r="0.5" fill="#FFF" opacity="0.6"/>`;
-    case 'tannhang':
-      return [[32, 55], [36, 58], [40, 55.5], [34, 61], [60, 55.5], [64, 58], [68, 55], [66, 61], [46, 53.5], [54, 53.5], [50, 56]]
-        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1" fill="#B8733B"/>`).join('');
-    case 'longmay':
-      return `<path d="M32 42.5 Q38 38.5 45 43" stroke="${ink}" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M55 43 Q62 38.5 68 42.5" stroke="${ink}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
-    case 'ranghe':
-      return mood === 'normal' || mood === 'smug'
-        ? `<path d="M45.5 60.5 L45.5 66 Q45.5 67.2 47.4 67.2 L49.6 67.2 L49.6 60.5 Z M50.4 60.5 L50.4 67.2 L52.6 67.2 Q54.5 67.2 54.5 66 L54.5 60.5 Z" fill="#FFF" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`
-        : '';
-    case 'malum':
-      return `<path d="M37.5 56 Q35 59.5 37.5 63 M62.5 56 Q65 59.5 62.5 63" stroke="#C0865E" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
-    default:
-      return '';
-  }
+/** Hình xăm trừu tượng màu đen xám ám xanh trên vai / bắp tay */
+function tattooSvg(look?: CharacterLook): string {
+  if (look?.tattoo !== 'co') return '';
+  const left = look.tattooside !== 'phai';
+  const big = look.tattoosize === 'vaibap';
+  const x = left ? 22 : 78;
+  const dir = left ? 1 : -1;
+  return `<g stroke="#283E4A" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.78">
+    <path d="M${x} 76 q${4 * dir} 3 ${2 * dir} 8 q${-3 * dir} 4 ${2 * dir} 8"/>
+    <path d="M${x - 3 * dir} 79 q${5 * dir} -2 ${8 * dir} 3 q${-2 * dir} 5 ${-6 * dir} 4"/>
+    <circle cx="${x + 2 * dir}" cy="83" r="1.4" fill="#283E4A"/>
+    ${big ? `<path d="M${x - 2 * dir} 88 q${6 * dir} 3 ${3 * dir} 9 M${x - 5 * dir} 91 l${7 * dir} 4"/>` : ''}
+  </g>`;
 }
 
-
-/** 8 tông da từ rất sáng đến nâu đậm */
-export const SKIN_PALETTE = ['#FFEBDD', '#FAD6B3', '#F2C493', '#DFA775', '#C58854', '#A4693D', '#7B4A29', '#573220'] as const;
-export const SKIN_NAMES = ['Rất sáng', 'Sáng', 'Be', 'Ngăm', 'Rám nắng', 'Nâu', 'Nâu đậm', 'Nâu sẫm'] as const;
-
-function darken(hex: string, f: number): string {
-  const h = hex.replace('#', '');
-  return '#' + [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - f)).toString(16).padStart(2, '0')).join('');
+/** Chi tiết khuôn mặt (nốt ruồi cạnh môi/má/cằm, tàn nhang, răng thỏ, má lúm) */
+function detailSvg(d: CharacterDetail | undefined, ink: string, mood: Mood, look?: CharacterLook): string {
+  const pos = look?.molepos ?? 'moi';
+  const [mx, my] = pos === 'ma' ? [65.5, 53.5] : pos === 'cam' ? [54, 67] : [60.5, 58];
+  const mole = d === 'notruoi' || look?.molepos
+    ? `<circle cx="${mx}" cy="${my}" r="1.8" fill="#3B231A"/><circle cx="${mx - 0.4}" cy="${my - 0.5}" r="0.45" fill="#FFF" opacity="0.6"/>`
+    : '';
+  switch (d) {
+    case 'notruoi':
+      return mole;
+    case 'tannhang':
+      return mole + [[32, 55], [36, 58], [40, 55.5], [34, 61], [60, 55.5], [64, 58], [68, 55], [66, 61], [46, 53.5], [54, 53.5], [50, 56]]
+        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1" fill="#B8733B"/>`).join('');
+    case 'longmay':
+      return mole + `<path d="M32 42.5 Q42 38.5 50 42.5 Q58 38.5 68 42.5" stroke="${ink}" stroke-width="4.8" fill="none" stroke-linecap="round"/>`;
+    case 'ranghe':
+      return mole + (mood === 'normal' || mood === 'smug'
+        ? `<path d="M45.5 60.5 L45.5 66 Q45.5 67.2 47.4 67.2 L49.6 67.2 L49.6 60.5 Z M50.4 60.5 L50.4 67.2 L52.6 67.2 Q54.5 67.2 54.5 66 L54.5 60.5 Z" fill="#FFF" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`
+        : '');
+    case 'malum':
+      return mole + `<path d="M37.5 56 Q35 59.5 37.5 63 M62.5 56 Q65 59.5 62.5 63" stroke="#A66E4E" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
+    default:
+      return mole;
+  }
 }
 
 const HEAD_FILL = (skin: string, ink: string) => `fill="${skin}" stroke="${ink}" stroke-width="2.5"`;
 
-/** Dáng mặt: tròn, trái xoan, dài, vuông, bầu má phính, cằm nhọn (+ vị trí tai) */
-function faceShape(f: CharacterFace | undefined, nhi: boolean, skin: string, ink: string): { head: string; earL: number; earR: number } {
+/** Dáng mặt (10 dáng) + đường hàm, cằm, má, nếp cười, má hồng trang điểm */
+function faceShape(
+  f: CharacterFace | undefined,
+  nhi: boolean,
+  skin: string,
+  skinShadow: string,
+  ink: string,
+  look?: CharacterLook,
+): { head: string; earL: number; earR: number; extras: string } {
   const a = HEAD_FILL(skin, ink);
+  let head = '';
+  let earL = 24;
+  let earR = 76;
   switch (f) {
     case 'tron':
-      return { head: `<ellipse cx="50" cy="47.5" rx="27" ry="${nhi ? 22 : 23.5}" ${a}/>`, earL: 22.5, earR: 77.5 };
+      head = `<ellipse cx="50" cy="47.5" rx="27" ry="${nhi ? 22 : 23.5}" ${a}/>`;
+      earL = 22.5; earR = 77.5;
+      break;
+    case 'ovalngan':
+      head = `<path d="M23.5 46 C23.5 28 35 21 50 21 C65 21 76.5 28 76.5 46 C76.5 62 65 70.5 50 70.5 C35 70.5 23.5 62 23.5 46 Z" ${a}/>`;
+      earL = 23; earR = 77;
+      break;
+    case 'oval':
+      head = `<ellipse cx="50" cy="46.5" rx="23.5" ry="${nhi ? 24 : 26}" ${a}/>`;
+      earL = 25.5; earR = 74.5;
+      break;
+    case 'ovaldai':
+      head = `<path d="M25.5 45 C25.5 26 36 19.5 50 19.5 C64 19.5 74.5 26 74.5 45 C75.5 61 65 74 50 74 C35 74 24.5 61 25.5 45 Z" ${a}/>`;
+      earL = 25; earR = 75;
+      break;
+    case 'ovalvuong':
+      head = `<path d="M25 42 C25 25 36 20.5 50 20.5 C64 20.5 75 25 75 42 L74 57 Q73.5 69.5 61 71.5 L39 71.5 Q26.5 69.5 26 57 Z" ${a}/>`;
+      earL = 24.5; earR = 75.5;
+      break;
     case 'dai':
-      return { head: `<ellipse cx="50" cy="48" rx="21" ry="${nhi ? 26 : 28.5}" ${a}/>`, earL: 28, earR: 72 };
+      head = `<ellipse cx="50" cy="48" rx="21" ry="${nhi ? 26 : 28.5}" ${a}/>`;
+      earL = 28; earR = 72;
+      break;
     case 'vuong':
-      return { head: `<path d="M25.5 32 Q25.5 21 37 21 L63 21 Q74.5 21 74.5 32 L74.5 56 Q74.5 71.5 62 71.5 L38 71.5 Q25.5 71.5 25.5 56 Z" ${a} stroke-linejoin="round"/>`, earL: 25, earR: 75 };
+      head = `<path d="M25.5 32 Q25.5 21 37 21 L63 21 Q74.5 21 74.5 32 L74.5 56 Q74.5 71.5 62 71.5 L38 71.5 Q25.5 71.5 25.5 56 Z" ${a} stroke-linejoin="round"/>`;
+      earL = 25; earR = 75;
+      break;
     case 'bau':
-      return { head: `<path d="M22.5 46 C22 29 36 21 50 21 C64 21 78 29 77.5 46 C79 62 67 71 50 71 C33 71 21 62 22.5 46 Z" ${a}/><ellipse cx="31" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/><ellipse cx="69" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/>`, earL: 21, earR: 79 };
+      head = `<path d="M22.5 46 C22 29 36 21 50 21 C64 21 78 29 77.5 46 C79 62 67 71 50 71 C33 71 21 62 22.5 46 Z" ${a}/><ellipse cx="31" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/><ellipse cx="69" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/>`;
+      earL = 21; earR = 79;
+      break;
     case 'nhon':
-      return { head: `<path d="M26 37 C26 25 37 21 50 21 C63 21 74 25 74 37 C74 52 63 66 50 77.5 C37 66 26 52 26 37 Z" ${a}/>`, earL: 25, earR: 75 };
+      head = `<path d="M26 37 C26 25 37 21 50 21 C63 21 74 25 74 37 C74 52 63 66 50 77.5 C37 66 26 52 26 37 Z" ${a}/>`;
+      earL = 25; earR = 75;
+      break;
     default:
-      return { head: `<ellipse cx="50" cy="46" rx="24" ry="${nhi ? 23 : 25}" ${a}/>`, earL: 24, earR: 76 };
+      head = `<ellipse cx="50" cy="46" rx="24" ry="${nhi ? 23 : 25}" ${a}/>`;
+      earL = 24; earR = 76;
   }
+
+  let extras = '';
+  if (look?.jaw === 'ro') {
+    extras += `<path d="M28 55 L34 65 M72 55 L66 65" stroke="${skinShadow}" stroke-width="2" stroke-linecap="round"/>`;
+  }
+  if (look?.chin === 'rong') {
+    extras += `<path d="M43 68.5 L57 68.5" stroke="${skinShadow}" stroke-width="2.2" stroke-linecap="round"/>`;
+  } else if (look?.chin === 'bo') {
+    extras += `<path d="M45 67.5 Q50 70.5 55 67.5" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+  } else if (look?.chin === 'nho') {
+    extras += `<path d="M47 68 Q50 70 53 68" fill="none" stroke="${skinShadow}" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+  if (look?.cheek === 'thon') {
+    extras += `<path d="M31 52 Q34 57 32 62 M69 52 Q66 57 68 62" fill="none" stroke="${skinShadow}" stroke-width="1.7" stroke-linecap="round"/>`;
+  } else if (look?.cheek === 'phinh') {
+    extras += `<path d="M26 54 Q23 59 29 63 M74 54 Q77 59 71 63" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+  } else if (look?.cheek === 'go') {
+    extras += `<path d="M28 51 Q34 54 37 51 M72 51 Q66 54 63 51" fill="none" stroke="${skinShadow}" stroke-width="1.9" stroke-linecap="round"/>`;
+  } else if (look?.cheek === 'day') {
+    extras += `<ellipse cx="32" cy="55" rx="5" ry="3.2" fill="#FFF" opacity="0.18"/><ellipse cx="68" cy="55" rx="5" ry="3.2" fill="#FFF" opacity="0.18"/>`;
+  }
+  if (look?.nepcuoi === 'co') {
+    extras += `<path d="M42 52 Q38 57 40 62 M58 52 Q62 57 60 62" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+  }
+  if (look?.maphan === 'co') {
+    extras += `<ellipse cx="32" cy="54.5" rx="6.2" ry="3.4" fill="#FF758F" opacity="0.48"/><ellipse cx="68" cy="54.5" rx="6.2" ry="3.4" fill="#FF758F" opacity="0.48"/>`;
+  }
+  return { head, earL, earR, extras };
 }
 
-function eyeSvg(style: CharacterEyes, ink: string, female: boolean): string {
-  switch (style) {
-    case 'hip':
-      return `<path d="M33 49.5 Q39 45 45 49.5 M55 49.5 Q61 45 67 49.5" stroke="${ink}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
-    case 'to':
-      return `<circle cx="39" cy="48" r="6.4" fill="#FFF" stroke="${ink}" stroke-width="1.8"/><circle cx="61" cy="48" r="6.4" fill="#FFF" stroke="${ink}" stroke-width="1.8"/>
-        <circle cx="39.6" cy="48.4" r="3.5" fill="${ink}"/><circle cx="61.6" cy="48.4" r="3.5" fill="${ink}"/>
-        <circle cx="40.8" cy="46.8" r="1.2" fill="#FFF"/><circle cx="62.8" cy="46.8" r="1.2" fill="#FFF"/>`;
-    case 'motmi':
-      return `<ellipse cx="39" cy="48.6" rx="5.4" ry="2.2" fill="${ink}"/><ellipse cx="61" cy="48.6" rx="5.4" ry="2.2" fill="${ink}"/>
-        <path d="M33 46.8 Q39 44.4 45 46.8 M55 46.8 Q61 44.4 67 46.8" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
-    default:
-      return female
-        ? `<ellipse cx="39" cy="48" rx="4.2" ry="4.6" fill="${ink}"/><ellipse cx="61" cy="48" rx="4.2" ry="4.6" fill="${ink}"/>
-           <circle cx="40.5" cy="46.5" r="1.5" fill="#FFF"/><circle cx="62.5" cy="46.5" r="1.5" fill="#FFF"/>
-           <path d="M34 45 L32 43 M66 45 L68 43" stroke="${ink}" stroke-width="2" stroke-linecap="round"/>`
-        : `<circle cx="39" cy="48" r="4" fill="${ink}"/><circle cx="61" cy="48" r="4" fill="${ink}"/>
-           <circle cx="40.3" cy="46.7" r="1.4" fill="#FFF"/><circle cx="62.3" cy="46.7" r="1.4" fill="#FFF"/>`;
+/** Mắt chi tiết: dáng mắt, mí mắt, độ mở, viền + mi, màu mắt, hướng nhìn, lệch tự nhiên */
+function detailedEyesSvg(c: CharacterConfig, ink: string, skin: string): string {
+  const look = c.look;
+  const female = c.gender === 'nu';
+  const shape = look?.eyeshape ?? (c.eyes === 'hip' ? 'hip' : c.eyes === 'to' ? 'tron' : c.eyes === 'motmi' ? 'hanhhep' : 'hanhnhan');
+  const open = look?.open ?? 'mo';
+  const lid = look?.lid ?? (c.eyes === 'motmi' ? 'mot' : 'hai');
+  const liner = look?.liner === 'co' || (female && look?.liner === undefined);
+  const irisCol = look?.eyecolor === 'nau' ? '#422514' : ink;
+  const gx = look?.gaze === 'trai' ? -1.8 : look?.gaze === 'phai' ? 1.8 : 0;
+  const asym = look?.asym === 'co';
+
+  if (shape === 'hip') {
+    return `<path d="M33 49 Q39 44.2 45 49 M55 ${asym ? 49.8 : 49} Q61 ${asym ? 45.2 : 44.2} 67 ${asym ? 49.8 : 49}" stroke="${ink}" stroke-width="${liner ? 3.5 : 3}" fill="none" stroke-linecap="round"/>`;
   }
+
+  const rx = shape === 'tron' ? 5.8 : shape === 'nho' ? 4.4 : 5.4;
+  const baseRy = shape === 'tron' ? 5.4 : shape === 'hanhhep' ? 2.6 : shape === 'nho' ? 2.2 : 3.9;
+  const ry = open === 'nheo' ? baseRy * 0.62 : open === 'tru' ? baseRy * 0.78 : baseRy;
+  const ryR = asym ? ry * 0.86 : ry;
+  const cyR = asym ? 48.6 : 48;
+
+  const drawOne = (cx: number, cy: number, erx: number, ery: number, left: boolean) => {
+    const dir = left ? -1 : 1;
+    const irisR = Math.min(3.5, ery * 0.85 + 0.6);
+    const lidCrease = lid === 'hai'
+      ? `<path d="M${cx - erx + 0.5} ${cy - ery - 1.4} Q${cx} ${cy - ery - 3.2} ${cx + erx - 0.5} ${cy - ery - 1.4}" stroke="${ink}" stroke-width="1.1" fill="none" opacity="0.65" stroke-linecap="round"/>`
+      : '';
+    const droop = open === 'tru'
+      ? `<path d="M${cx - erx - 0.5} ${cy - ery * 0.3} L${cx + erx + 0.5} ${cy - ery * 0.1}" stroke="${ink}" stroke-width="2" stroke-linecap="round"/><rect x="${cx - erx}" y="${cy - ery - 1}" width="${erx * 2}" height="${ery * 0.75}" fill="${skin}"/>`
+      : '';
+    const lash = liner
+      ? `<path d="M${cx - erx} ${cy} Q${cx} ${cy - ery - 1.5} ${cx + erx} ${cy} L${cx + erx + 2.4 * dir} ${cy - 2}" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
+      : '';
+    return `${lidCrease}
+      <ellipse cx="${cx}" cy="${cy}" rx="${erx}" ry="${ery}" fill="#FFFFFF" stroke="${ink}" stroke-width="${liner ? 2.1 : 1.6}"/>
+      <circle cx="${cx + gx}" cy="${cy}" r="${irisR}" fill="${irisCol}"/>
+      <circle cx="${cx + gx}" cy="${cy}" r="${irisR * 0.48}" fill="#090808"/>
+      <circle cx="${cx + gx + 1.1}" cy="${cy - 1.1}" r="1.15" fill="#FFFFFF"/>
+      ${droop}${lash}`;
+  };
+
+  return drawOne(39, 48, rx, ry, true) + drawOne(61, cyR, rx, ryR, false);
 }
 
-function browSvg(style: CharacterBrows, ink: string): string {
-  switch (style) {
-    case 'ray':
-      return `<path d="M31.5 43 Q38 38.5 45 43" stroke="${ink}" stroke-width="5.4" fill="none" stroke-linecap="round"/><path d="M55 43 Q62 38.5 68.5 43" stroke="${ink}" stroke-width="5.4" fill="none" stroke-linecap="round"/>`;
+/** Lông mày: 5 dáng (ngang, cong nhẹ đuôi, cong mềm đuôi thuôn, ngang gấp nhẹ, lá liễu) × 3 độ dày */
+function detailedBrowsSvg(c: CharacterConfig, ink: string): string {
+  const look = c.look;
+  const shape = look?.browshape ?? (c.brows === 'lieu' ? 'lieu' : c.brows === 'ray' ? 'ngang' : c.gender === 'nu' ? 'cong' : 'ngang');
+  const thick = look?.browthick ?? (c.brows === 'ray' ? 'day' : c.brows === 'lieu' ? 'mong' : 'vua');
+  const sw = thick === 'day' ? 4.6 : thick === 'mong' ? 1.8 : 2.8;
+  switch (shape) {
+    case 'cong':
+      return `<path d="M32.5 42.2 Q38.5 38.2 44.5 41.2 M55.5 41.2 Q61.5 38.2 67.5 42.2" stroke="${ink}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+    case 'mem':
+      return `<path d="M44.5 41 C39 39 34 40 31.5 42.8 C34.5 41.2 39.5 41.5 44.5 42.5 Z M55.5 41 C61 39 66 40 68.5 42.8 C65.5 41.2 60.5 41.5 55.5 42.5 Z" fill="${ink}" stroke="${ink}" stroke-width="${sw * 0.55}" stroke-linejoin="round"/>`;
+    case 'gap':
+      return `<path d="M44.5 41.8 L35.5 40.2 L31.5 43 M55.5 41.8 L64.5 40.2 L68.5 43" stroke="${ink}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
     case 'lieu':
-      return `<path d="M33 42.5 Q38.5 37 45 41.5" stroke="${ink}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M55 41.5 Q61.5 37 67 42.5" stroke="${ink}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+      return `<path d="M32 42.5 Q38.5 36.8 45 41.5 M55 41.5 Q61.5 36.8 68 42.5" stroke="${ink}" stroke-width="${Math.min(2.2, sw)}" fill="none" stroke-linecap="round"/>`;
     default:
-      return `<path d="M33 42 L44 43" stroke="${ink}" stroke-width="2.8" stroke-linecap="round"/><path d="M56 43 L67 42" stroke="${ink}" stroke-width="2.8" stroke-linecap="round"/>`;
+      return `<path d="M32.5 41.5 L44.5 42.2 M55.5 42.2 L67.5 41.5" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`;
   }
 }
 
-/** Các kiểu tóc thêm: đầu đinh, mohican, búi củ hành, afro, mái bằng, highlight, đầu nấm, dài ngang lưng */
+/** Mũi: sống mũi thấp/vừa/rõ, đầu mũi nhỏ/tròn/tròn đầy, cánh mũi hẹp/vừa/rộng */
+function noseSvg(look: CharacterLook | undefined, skinShadow: string, ink: string): string {
+  const bridge = look?.nose ?? 'vua';
+  const tip = look?.nosetip ?? 'tron';
+  const nostril = look?.nostril ?? 'vua';
+  const bridgePath =
+    bridge === 'ro'
+      ? `<path d="M49 44 L48.5 52.5" stroke="${skinShadow}" stroke-width="2.2" stroke-linecap="round"/><path d="M50.5 44.5 L50.5 52" stroke="#FFF" stroke-width="1.1" opacity="0.55" stroke-linecap="round"/>`
+      : bridge === 'thap'
+        ? `<path d="M49.2 49.5 L49 52.5" stroke="${skinShadow}" stroke-width="1.6" stroke-linecap="round"/>`
+        : `<path d="M49 47 L48.8 52.5" stroke="${skinShadow}" stroke-width="1.9" stroke-linecap="round"/>`;
+  const tipR = tip === 'day' ? 3.2 : tip === 'nho' ? 1.8 : 2.4;
+  const wingW = nostril === 'rong' ? 5.2 : nostril === 'hep' ? 2.8 : 3.9;
+  return `${bridgePath}
+    <ellipse cx="50" cy="53" rx="${tipR}" ry="${tipR * 0.78}" fill="${skinShadow}" opacity="0.45"/>
+    <path d="M${50 - wingW} 53.2 Q50 ${54.5 + tipR * 0.35} ${50 + wingW} 53.2" stroke="#B68663" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    ${nostril === 'rong' ? `<circle cx="${50 - wingW + 0.8}" cy="53.6" r="1" fill="${ink}" opacity="0.45"/><circle cx="${50 + wingW - 0.8}" cy="53.6" r="1" fill="${ink}" opacity="0.45"/>` : ''}`;
+}
+
+/** Môi & biểu cảm nền: độ dày môi, màu môi, miệng khép/cười lộ răng/cười tươi má nhô/hé đang nói */
+function mouthSvg(c: CharacterConfig, ink: string): string {
+  const look = c.look;
+  const female = c.gender === 'nu';
+  const col =
+    look?.lipcolor === 'do'
+      ? '#DE283B'
+      : look?.lipcolor === 'cam'
+        ? '#D96B4E'
+        : look?.lipcolor === 'hongnau'
+          ? '#BC6C64'
+          : female
+            ? '#D6336C'
+            : '#A85852';
+  const thick = look?.lipthick ?? (female ? 'duoi' : 'mong');
+  const exp = look?.mouth ?? 'khep';
+  const lw = thick === 'day' ? 3.4 : thick === 'duoi' ? 2.6 : 1.9;
+
+  if (exp === 'cuoirang') {
+    return `<path d="M41.5 58.5 Q50 60.5 58.5 58.5 Q57 65.5 50 65.5 Q43 65.5 41.5 58.5 Z" fill="#FFFFFF" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
+      <line x1="43" y1="62" x2="57" y2="62" stroke="${ink}" stroke-width="1" opacity="0.45"/>`;
+  }
+  if (exp === 'cuoitu') {
+    return `<path d="M39.5 58 Q50 60 60.5 58 Q58.5 67 50 67 Q41.5 67 39.5 58 Z" fill="#8C1D2E" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
+      <path d="M41 58.6 Q50 60.2 59 58.6 L58 62 L42 62 Z" fill="#FFFFFF"/>
+      <ellipse cx="50" cy="65.2" rx="4.2" ry="1.8" fill="#FF8FA3"/>
+      <path d="M36.5 56.5 Q38.5 58.5 39.5 60.5 M63.5 56.5 Q61.5 58.5 60.5 60.5" stroke="#B68663" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+  }
+  if (exp === 'he') {
+    return `<ellipse cx="50" cy="61" rx="5.8" ry="3.8" fill="#7A1B2B" stroke="${col}" stroke-width="${lw}"/>
+      <path d="M45.5 58.6 L54.5 58.6 L54 60.6 L46 60.6 Z" fill="#FFFFFF"/>
+      <ellipse cx="50" cy="63.2" rx="3.2" ry="1.4" fill="#FF8FA3"/>`;
+  }
+  // 'khep': miệng khép nhẹ
+  return `${thick === 'day' ? `<path d="M43 59.5 Q47 57.2 50 58.4 Q53 57.2 57 59.5 Q50 63.8 43 59.5 Z" fill="${col}" opacity="0.85"/>` : ''}
+    ${thick === 'duoi' ? `<path d="M44 60 Q50 64.2 56 60" stroke="${col}" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.75"/>` : ''}
+    <path d="M43 59.2 Q50 62.6 57 59.2" stroke="${look?.lipcolor === 'do' ? '#9C1423' : female ? col : ink}" stroke-width="2.3" fill="none" stroke-linecap="round"/>`;
+}
+
+/** Râu vẽ bằng các nét ngắn tự nhiên (không mảng đen): ria mép, râu dưới môi/cằm, râu dọc đường hàm */
+function beardSvg(look: CharacterLook | undefined, ink: string): string {
+  if (!look) return '';
+  let out = '';
+  if (look.ria && look.ria !== 'khong') {
+    const sw = look.ria === 'vua' ? 1.5 : 0.95;
+    const strokes = [-7, -5, -3, -1.5, 1.5, 3, 5, 7]
+      .map((dx) => `<line x1="${50 + dx}" y1="55.2" x2="${50 + dx * 1.12}" y2="57.4" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
+      .join('');
+    out += `<g opacity="0.85">${strokes}</g>`;
+  }
+  if (look.raucam && look.raucam !== 'khong') {
+    const sw = look.raucam === 'vua' ? 1.5 : 0.95;
+    const soul = [-2, 0, 2].map((dx) => `<line x1="${50 + dx}" y1="63.5" x2="${50 + dx}" y2="65.6" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('');
+    const chin = [-6, -4, -2, 0, 2, 4, 6]
+      .map((dx) => `<line x1="${50 + dx}" y1="${68.2 - Math.abs(dx) * 0.15}" x2="${50 + dx * 1.08}" y2="${71 - Math.abs(dx) * 0.15}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
+      .join('');
+    out += `<g opacity="0.85">${soul}${chin}</g>`;
+  }
+  if (look.rauham && look.rauham !== 'khong') {
+    const sw = look.rauham === 'vua' ? 1.45 : 0.9;
+    const pts: [number, number][] = [
+      [27, 54], [28.5, 57.5], [30.5, 61], [33, 64], [36, 66.8], [39.5, 68.8],
+      [73, 54], [71.5, 57.5], [69.5, 61], [67, 64], [64, 66.8], [60.5, 68.8],
+    ];
+    out += `<g opacity="0.8">${pts.map(([x, y]) => `<line x1="${x}" y1="${y}" x2="${x + (x < 50 ? 0.8 : -0.8)}" y2="${y + 2.2}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('')}</g>`;
+  }
+  return out;
+}
+
+/** Các kiểu tóc mở rộng: gồm cả buộc thấp có tóc con, chải ngược phồng + xoăn gáy, vuốt lệch phồng trước, rất ngắn dựng chỏm */
 function extraHair(h: CharacterHair, f: string, ink: string, accent: string): { back: string; front: string } | null {
   const st = `fill="${f}" stroke="${ink}" stroke-width="2.4"`;
   switch (h) {
@@ -392,9 +682,72 @@ function extraHair(h: CharacterHair, f: string, ink: string, accent: string): { 
       return { back: '', front: `<path d="M21 47 C19 21 36 13 50 13 C64 13 81 21 79 47 C75 41 73 35 70 35 C58 38 42 38 30 35 C27 35 25 41 21 47 Z" ${st}/>` };
     case 'dailung':
       return { back: `<path d="M19 44 C10 66 12 90 21 99 L79 99 C88 90 90 66 81 44 Z" ${st}/>`, front: `<path d="M23 44 C22 21, 36 16, 50 16 C64 16, 78 21, 77 44 C71 31, 61 28, 50 30 C39 28, 29 31, 23 44 Z" ${st}/>` };
+    case 'buocthap':
+      return {
+        back: `<ellipse cx="50" cy="64" rx="13" ry="8" ${st}/><path d="M40 60 Q50 64 60 60" stroke="${accent}" stroke-width="3" fill="none"/>`,
+        front: `<path d="M24 42 C23 22, 36 17, 50 17.5 C64 17, 77 22, 76 42 C69 30, 58 26, 50 28 C42 26, 31 30, 24 42 Z" ${st}/>
+          <path d="M27 38 q-3 6 0 11 M73 38 q3 6 0 11 M36 29 q-2 4 1 7 M64 29 q2 4 -1 7" stroke="${f}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+      };
+    case 'chaingoc':
+      return {
+        back: `<path d="M23 55 q-5 5 -1 10 q4 4 0 8 M77 55 q5 5 1 10 q-4 4 0 8" stroke="${f}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
+        front: `<path d="M24 40 C20 18, 35 8, 52 9 C68 10, 79 20, 76 40 C69 27, 57 24, 48 25 C37 25, 29 30, 24 40 Z" ${st}/>
+          <path d="M36 16 Q50 11 64 17" stroke="#FFF" stroke-width="1.6" fill="none" opacity="0.28" stroke-linecap="round"/>`,
+      };
+    case 'vuotlech':
+      return {
+        back: '',
+        front: `<path d="M24 38 L24 31 Q26 24 31 24 M76 38 L76 31 Q74 24 69 24" stroke="${f}" stroke-width="3.5" fill="none" opacity="0.45"/>
+          <path d="M27 35 C27 17, 42 10, 65 14 C75 16, 77 26, 73 35 C63 26, 48 25, 36 31 L34 24 L32 33 Z" ${st}/>`,
+      };
+    case 'dungchom':
+      return {
+        back: '',
+        front: `<path d="M26 38 C26 24, 36 20, 44 20 L46 12 L50 17 L53 10 L56 18 L60 13 L59 20 C67 21, 74 25, 74 38 C66 30, 34 30, 26 38 Z" ${st} stroke-linejoin="round"/>`,
+      };
     default:
       return null;
   }
+}
+
+/** Phụ kiện trang sức (bông tai đá/hoa, nhẫn hoa, đồng hồ bạc/tối, găng tay nhựa trong) & tư thế tay */
+function jewelryAndPoseSvg(look: CharacterLook | undefined, earL: number, earR: number, skin: string, ink: string): string {
+  if (!look) return '';
+  let out = '';
+  if (look.earring === 'da') {
+    for (const x of [earL, earR]) {
+      out += `<g><circle cx="${x}" cy="53.5" r="2.3" fill="#E7F5FF" stroke="${ink}" stroke-width="1"/>
+        <circle cx="${x - 1.2}" cy="55.2" r="1.4" fill="#74C0FC" stroke="${ink}" stroke-width="0.8"/>
+        <circle cx="${x + 1.2}" cy="55.2" r="1.4" fill="#74C0FC" stroke="${ink}" stroke-width="0.8"/></g>`;
+    }
+  } else if (look.earring === 'hoa') {
+    for (const x of [earL, earR]) {
+      out += `<g><circle cx="${x - 1.3}" cy="53.5" r="1.5" fill="#FF8787"/><circle cx="${x + 1.3}" cy="53.5" r="1.5" fill="#FF8787"/>
+        <circle cx="${x}" cy="52" r="1.5" fill="#FF8787"/><circle cx="${x}" cy="55" r="1.5" fill="#FF8787"/>
+        <circle cx="${x}" cy="53.5" r="1.2" fill="#FFD43B" stroke="${ink}" stroke-width="0.7"/></g>`;
+    }
+  }
+  const hasHand = look.pose === 'chongcam' || look.pose === 'chumnguc' || (look.ring && look.ring !== 'khong') || (look.watch && look.watch !== 'khong') || look.glove === 'co';
+  if (hasHand) {
+    const handFill = look.glove === 'co' ? '#E7F5FF' : skin;
+    const handOp = look.glove === 'co' ? '0.82' : '1';
+    const hy = look.pose === 'chongcam' ? 74 : 88;
+    out += `<g opacity="${handOp}">
+      <rect x="56" y="${hy}" width="15" height="9" rx="4.5" fill="${handFill}" stroke="${ink}" stroke-width="1.8"/>
+      ${look.pose === 'chumnguc' ? `<rect x="35" y="${hy}" width="15" height="9" rx="4.5" fill="${handFill}" stroke="${ink}" stroke-width="1.8"/>` : ''}
+      ${look.glove === 'co' ? `<path d="M58 ${hy + 2} L66 ${hy + 2}" stroke="#FFF" stroke-width="1.4" stroke-linecap="round"/>` : ''}
+    </g>`;
+    if (look.ring === 'hoa') {
+      out += `<g><circle cx="61" cy="${hy + 3.5}" r="2.4" fill="#FFD43B" stroke="${ink}" stroke-width="0.9"/><circle cx="61" cy="${hy + 3.5}" r="1" fill="#E03131"/></g>`;
+    }
+    if (look.watch && look.watch !== 'khong') {
+      const wCol = look.watch === 'bac' ? '#DEE2E6' : '#212529';
+      const wFace = look.watch === 'bac' ? '#FFFFFF' : '#343A40';
+      out += `<g><rect x="67" y="${hy - 1}" width="5" height="11" rx="1.5" fill="${wCol}" stroke="${ink}" stroke-width="1.2"/>
+        <circle cx="69.5" cy="${hy + 4.5}" r="3.4" fill="${wFace}" stroke="${ink}" stroke-width="1.2"/></g>`;
+    }
+  }
+  return out;
 }
 
 /** Phụ kiện "lầy": đội trên đầu (vẽ sau tóc) và đeo trên mặt (vẽ sau cùng) */
@@ -463,6 +816,11 @@ function accessoryParts(acc: CharacterAccessory | undefined, hairFill: string, i
         ${PRIDE.map((c, i) => `<rect x="60" y="${80 + i * 1.5}" width="14" height="1.5" fill="${c}"/>`).join('')}
         <circle cx="59" cy="79" r="1.6" fill="#ADB5BD" stroke="${ink}" stroke-width="0.8"/></g>`;
       break;
+    case 'prideco':
+      parts.face = `<g transform="rotate(10 78 78)"><line x1="74" y1="68" x2="74" y2="96" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>
+        <rect x="74" y="68" width="18" height="12" rx="1.5" fill="#FFF" stroke="${ink}" stroke-width="1.5"/>
+        ${PRIDE.map((c, i) => `<rect x="74.8" y="${68.8 + i * 1.8}" width="16.4" height="1.8" fill="${c}"/>`).join('')}</g>`;
+      break;
     case 'pridetoc':
       parts.hat = `<g stroke-linecap="round" fill="none" stroke-width="2.1">${PRIDE.map((c, i) => `<path d="M${27 + i * 2.2} ${22 - i * 0.6} Q${25 + i * 2.2} ${33} ${29 + i * 2.2} ${44 + i}" stroke="${c}"/>`).join('')}</g>`;
       break;
@@ -477,22 +835,35 @@ function accessoryParts(acc: CharacterAccessory | undefined, hairFill: string, i
   return parts;
 }
 
-/** Vẽ chân dung SVG sắc nét theo cấu hình nhân vật (giới tính, độ tuổi, kiểu tóc, màu đại diện, phụ kiện) và tâm trạng. */
+/** Vẽ chân dung SVG sắc nét theo cấu hình nhân vật (đầy đủ nét mặt, da, mắt, mày, mũi, môi, tóc, râu, trang phục, phụ kiện, hình xăm) và tâm trạng. */
 export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): string {
   const c: CharacterConfig = cfg ?? { gender: 'nam', age: 'tre', hair: 'han', color: 0 };
+  const look = c.look;
   const col = playerColorOf(c.color);
-  const hairFill = c.age === 'lao' ? '#CED4DA' : c.gender === 'nu' ? '#3B231A' : '#241814';
+  const hairFill =
+    c.age === 'lao'
+      ? '#CED4DA'
+      : look?.haircolor === 'nau'
+        ? '#5E3A22'
+        : look?.haircolor === 'nauden'
+          ? '#2F1F18'
+          : look?.haircolor === 'den'
+            ? '#181412'
+            : c.gender === 'nu'
+              ? '#3B231A'
+              : '#241814';
   const hairStroke = '#15110F';
   const skin = c.skin !== undefined && SKIN_PALETTE[c.skin] ? SKIN_PALETTE[c.skin] : c.gender === 'nu' ? '#FFE4C9' : '#FAD6B3';
-  const skinShadow = c.skin !== undefined ? darken(skin, 0.1) : '#EAC098';
+  const skinShadow = c.skin !== undefined && SKIN_PALETTE[c.skin] ? darken(skin, 0.14) : '#EAC098';
   const xh = extraHair(c.hair, hairFill, hairStroke, col.hex);
-  const fshape = faceShape(c.face, c.age === 'nhi', skin, hairStroke);
-  const sx = c.build === 'gay' ? 0.84 : c.build === 'mum' ? 1.16 : 1;
+  const fshape = faceShape(c.face, c.age === 'nhi', skin, skinShadow, hairStroke, look);
+  const sx = c.build === 'gay' ? 0.84 : c.build === 'mum' ? 1.15 : c.build === 'khoe' ? 1.24 : 1;
+  const neckW = look?.neck === 'thon' ? 11 : look?.neck === 'day' || c.build === 'khoe' ? 18 : 14;
   const acc = accessoryParts(c.accessory, hairFill, hairStroke, skin);
   const bald = c.accessory === 'troc';
   const mf = moodFace(mood, hairStroke, skin, c.gender === 'nu');
 
-  // Tóc sau lưng (cho tóc dài / xoăn / búi)
+  // Tóc sau lưng
   const backHair = bald ? '' : xh ? xh.back :
     c.hair === 'dai'
       ? `<path d="M22 44 C16 62, 18 85, 25 94 L75 94 C82 85, 84 62, 78 44 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.5"/>`
@@ -502,6 +873,7 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
         : c.hair === 'xoan'
           ? `<circle cx="26" cy="40" r="10" fill="${hairFill}"/><circle cx="74" cy="40" r="10" fill="${hairFill}"/>`
           : '';
+
   // Trang phục theo độ tuổi & màu sắc
   const ageOutfit =
     c.age === 'trung'
@@ -515,33 +887,10 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
         : `<path d="M18 98 C20 77, 33 71, 50 71 C67 71, 80 77, 82 98 Z" fill="${col.hex}" stroke="${hairStroke}" stroke-width="2.5"/>
            <path d="M38 71 Q50 83 62 71" fill="#FFFFFF" stroke="${hairStroke}" stroke-width="2"/>`;
 
-  const outfit = c.outfit && c.outfit !== 'none' ? outfitSvg(c.outfit, col.hex, hairStroke, skin) : ageOutfit;
+  const outfit = c.outfit && c.outfit !== 'none' ? outfitSvg(c.outfit, col.hex, hairStroke, skin, look) : ageOutfit;
+  const muscle = c.build === 'khoe' ? `<path d="M34 71 L42 66 M66 71 L58 66" stroke="${hairStroke}" stroke-width="2" stroke-linecap="round"/>` : '';
 
-  // Mắt & lông mày theo giới tính
-  const normalEyes =
-    c.gender === 'nu'
-      ? `<path d="M33 43 Q39 39 44 42" stroke="${hairStroke}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-         <path d="M56 42 Q61 39 67 43" stroke="${hairStroke}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-         <ellipse cx="39" cy="48" rx="4.2" ry="4.6" fill="${hairStroke}"/>
-         <ellipse cx="61" cy="48" rx="4.2" ry="4.6" fill="${hairStroke}"/>
-         <circle cx="40.5" cy="46.5" r="1.5" fill="#FFF"/>
-         <circle cx="62.5" cy="46.5" r="1.5" fill="#FFF"/>
-         <path d="M34 45 L32 43 M66 45 L68 43" stroke="${hairStroke}" stroke-width="2" stroke-linecap="round"/>`
-      : c.gender === 'khac'
-        ? `<path d="M33 41 L44 43" stroke="${hairStroke}" stroke-width="2.6" stroke-linecap="round"/>
-           <path d="M56 43 L67 41" stroke="${hairStroke}" stroke-width="2.6" stroke-linecap="round"/>
-           <circle cx="39" cy="48" r="4.2" fill="${hairStroke}"/>
-           <path d="M56 48 Q61 44 66 48" stroke="${hairStroke}" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-           <circle cx="40.5" cy="46.5" r="1.5" fill="#FFF"/>
-           <polygon points="70,53 72,56 75,56 72.5,58 73.5,61 70,59 66.5,61 67.5,58 65,56 68,56" fill="${col.hex}"/>`
-        : `<path d="M33 42 L44 43" stroke="${hairStroke}" stroke-width="2.8" stroke-linecap="round"/>
-           <path d="M56 43 L67 42" stroke="${hairStroke}" stroke-width="2.8" stroke-linecap="round"/>
-           <circle cx="39" cy="48" r="4" fill="${hairStroke}"/>
-           <circle cx="61" cy="48" r="4" fill="${hairStroke}"/>
-           <circle cx="40.3" cy="46.7" r="1.4" fill="#FFF"/>
-           <circle cx="62.3" cy="46.7" r="1.4" fill="#FFF"/>`;
-
-  // Phụ kiện độ tuổi (má hồng cho Nhí, kính cho Doanh nhân, râu/kính lão cho Đại gia)
+  // Phụ kiện độ tuổi
   const ageExtra =
     c.age === 'nhi'
       ? `<ellipse cx="32" cy="54" rx="5" ry="2.8" fill="#FF8787" opacity="0.65"/>
@@ -557,13 +906,8 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
               : `<circle cx="24" cy="54" r="3" fill="#FFD43B" stroke="${hairStroke}" stroke-width="1.2"/><circle cx="76" cy="54" r="3" fill="#FFD43B" stroke="${hairStroke}" stroke-width="1.2"/>`)
           : '';
 
-  const normalMouth =
-    c.gender === 'nu'
-      ? `<path d="M44 59 Q50 64 56 59" stroke="#D6336C" stroke-width="2.8" fill="none" stroke-linecap="round"/>`
-      : `<path d="M43 58 Q50 64 57 58" stroke="${hairStroke}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
-
-  // Tóc mái phía trước
-  const frontHair = bald ? '' : xh ? xh.front :
+  // Tóc mái phía trước + chi tiết tóc (độ phồng, ngôi lệch, hai bên mai, tóc con, highlight)
+  const baseFrontHair = bald ? '' : xh ? xh.front :
     c.hair === 'han'
       ? `<path d="M24 42 C22 22, 38 16, 50 18 C62 16, 78 22, 76 42 C70 30, 58 26, 50 35 C42 26, 30 30, 24 42 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
       : c.hair === 'xoan'
@@ -577,31 +921,54 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
               ? `<path d="M28 36 C28 18, 45 12, 68 16 C75 18, 76 28, 72 34 C62 28, 42 28, 28 36 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
               : `<path d="M24 40 C24 21, 36 17, 50 17 C64 17, 76 21, 76 40 C66 31, 34 31, 24 40 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`;
 
-  const customEyes = (c.eyes && c.eyes !== 'macdinh') || (c.brows && c.brows !== 'macdinh');
-  const eyes = mf ? mf.eyes : customEyes ? eyeSvg(c.eyes ?? 'macdinh', hairStroke, c.gender === 'nu') + browSvg(c.brows ?? 'macdinh', hairStroke) : normalEyes;
-  const mouth = mf ? mf.mouth : normalMouth;
+  const hairVolY = look?.volume === 'cao' ? 1.1 : look?.volume === 'sat' ? 0.92 : 1;
+  const foreheadShift = look?.forehead === 'rong' ? -2.2 : 0;
+  const hairExtras = bald ? '' : [
+    look?.part === 'lech' ? `<path d="M39 18 L41 28" stroke="${skin}" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>` : '',
+    look?.sides === 'sat' ? `<path d="M24.5 36 L25.5 44 M75.5 36 L74.5 44" stroke="${hairStroke}" stroke-width="1.4" stroke-dasharray="1.5 2" opacity="0.55"/>` : '',
+    look?.babyhair === 'co' ? `<path d="M28 34 q-2 4 1 6 M35 30 q-1 4 2 5 M65 30 q1 4 -2 5 M72 34 q2 4 -1 6" stroke="${hairFill}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` : '',
+    look?.haircolor === 'highlight' ? `<path d="M34 22 Q37 28 39 34 M62 21 Q65 27 66 33" stroke="${col.hex}" stroke-width="2.8" fill="none" stroke-linecap="round"/>` : '',
+  ].join('');
+  const frontHair = bald
+    ? ''
+    : `<g transform="translate(50 ${30 + foreheadShift}) scale(1 ${hairVolY}) translate(-50 -30)">${baseFrontHair}${hairExtras}</g>`;
+
+  const eyes = mf ? mf.eyes : detailedEyesSvg(c, hairStroke, skin) + detailedBrowsSvg(c, hairStroke);
+  const mouth = mf ? mf.mouth : mouthSvg(c, hairStroke);
+  const tiltDeg = look?.tilt === 'trai' ? -5.5 : look?.tilt === 'phai' ? 5.5 : 0;
+  const headTransform = tiltDeg !== 0 ? `transform="rotate(${tiltDeg} 50 52)"` : '';
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
     <rect width="100" height="100" rx="50" fill="${col.light}"/>
     <circle cx="50" cy="50" r="46" fill="none" stroke="${col.hex}" stroke-width="4" opacity="0.35"/>
-    ${backHair}
-    ${acc.behind}
-    <g transform="translate(50 0) scale(${sx} 1) translate(-50 0)">
-    <rect x="43" y="61" width="14" height="14" rx="5" fill="${skinShadow}" stroke="${hairStroke}" stroke-width="2"/>
-    ${outfit}
+    <g ${headTransform}>
+      ${backHair}
+      ${acc.behind}
     </g>
-    <circle cx="${fshape.earL}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
-    <circle cx="${fshape.earR}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
-    ${fshape.head}
-    ${mf?.tint ?? ''}
-    ${eyes}
-    <path d="M49 50 Q50 53 52 52" stroke="#C89D7C" stroke-width="2" fill="none" stroke-linecap="round"/>
-    ${mouth}
-    ${ageExtra}
-    ${frontHair}
-    ${detailSvg(c.detail, hairStroke, mood)}
-    ${acc.face}
-    ${acc.hat}
-    ${mf?.over ?? ''}
+    <g transform="translate(50 0) scale(${sx} 1) translate(-50 0)">
+      ${muscle}
+      <rect x="${50 - neckW / 2}" y="61" width="${neckW}" height="14" rx="5" fill="${skinShadow}" stroke="${hairStroke}" stroke-width="2"/>
+      ${outfit}
+      ${tattooSvg(look)}
+    </g>
+    <g ${headTransform}>
+      <circle cx="${fshape.earL}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
+      <circle cx="${fshape.earR}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
+      ${fshape.head}
+      ${fshape.extras}
+      ${mf?.tint ?? ''}
+      ${beardSvg(look, hairStroke)}
+      ${eyes}
+      ${noseSvg(look, skinShadow, hairStroke)}
+      ${mouth}
+      ${ageExtra}
+      ${frontHair}
+      ${detailSvg(c.detail, hairStroke, mood, look)}
+      ${jewelryAndPoseSvg(look, fshape.earL, fshape.earR, skin, hairStroke)}
+      ${acc.face}
+      ${acc.hat}
+      ${mf?.over ?? ''}
+    </g>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
@@ -612,14 +979,56 @@ const svgCache = new Map<string, string>();
  * vd Tỷ phú: `portraitUri(p.character, 'smug')` khi giàu lên, `'cry'` khi sạt nghiệp.
  */
 export function portraitUri(character?: CharacterConfig, mood: Mood = 'normal'): string {
-  const k = `${character ? `${character.gender}${character.age}${character.hair}${character.color}${character.accessory ?? ''}${character.detail ?? ''}${character.outfit ?? ''}${character.skin ?? ''}${character.face ?? ''}${character.build ?? ''}${character.eyes ?? ''}${character.brows ?? ''}` : '-'}|${mood}`;
+  const lk = character?.look ? JSON.stringify(character.look) : '';
+  const k = `${character ? `${character.gender}|${character.age}|${character.hair}|${character.color}|${character.accessory ?? ''}|${character.detail ?? ''}|${character.outfit ?? ''}|${character.skin ?? ''}|${character.face ?? ''}|${character.build ?? ''}|${character.eyes ?? ''}|${character.brows ?? ''}|${lk}` : '-'}|${mood}`;
   let u = svgCache.get(k);
   if (!u) {
-    if (svgCache.size > 300) svgCache.clear();
+    if (svgCache.size > 400) svgCache.clear();
     u = characterSvgUri(character, mood);
     svgCache.set(k, u);
   }
   return u;
+}
+
+/** Tạo một cấu hình nhân vật ngẫu nhiên đa dạng (giữ nguyên màu đại diện hiện tại của người chơi) */
+export function randomCharacter(color: number, rng: () => number = Math.random): CharacterConfig {
+  const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
+  const accs = CHARACTER_ACCESSORIES.filter((a) => !a.startsWith('pride') && a !== 'khautrang');
+  const look: CharacterLook = {};
+  const lookKeys: LookKey[] = [
+    'jaw', 'chin', 'cheek', 'forehead', 'neck', 'nepcuoi', 'maphan', 'tilt',
+    'eyeshape', 'lid', 'open', 'liner', 'eyecolor', 'gaze', 'asym',
+    'browshape', 'browthick', 'nose', 'nosetip', 'nostril',
+    'lipthick', 'lipcolor', 'mouth', 'haircolor', 'part', 'volume', 'sides', 'babyhair',
+    'outfitcolor', 'earring',
+  ];
+  for (const k of lookKeys) {
+    const opts = LOOK_OPTIONS[k] as readonly string[];
+    (look as Record<string, string>)[k] = pick(opts);
+  }
+  if (rng() < 0.35) look.ria = pick(['manh', 'vua'] as const);
+  if (rng() < 0.3) look.raucam = pick(['manh', 'vua'] as const);
+  if (rng() < 0.25) look.rauham = pick(['manh', 'vua'] as const);
+  if (rng() < 0.35) {
+    look.tattoo = 'co';
+    look.tattooside = pick(['trai', 'phai'] as const);
+    look.tattoosize = pick(['vai', 'vaibap'] as const);
+  }
+  return {
+    gender: pick(CHARACTER_GENDERS.slice(0, 3)),
+    age: pick(CHARACTER_AGES),
+    hair: pick(CHARACTER_HAIRS),
+    color,
+    skin: Math.floor(rng() * SKIN_TONES),
+    face: pick(CHARACTER_FACES),
+    build: pick(CHARACTER_BUILDS),
+    eyes: pick(CHARACTER_EYES),
+    brows: pick(CHARACTER_BROWS),
+    accessory: rng() < 0.55 ? pick(accs) : 'none',
+    detail: pick(CHARACTER_DETAILS),
+    outfit: pick(CHARACTER_OUTFITS),
+    look,
+  };
 }
 
 const DOODLE_SVG: Record<DoodleKind, string> = {
@@ -653,7 +1062,7 @@ const ROACH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80">
 /** con gián vẽ sẵn (đầu hướng lên), không phụ thuộc font emoji */
 export const ROACH_URI = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(ROACH_SVG)}`;
 
-export { AVATAR_PRESETS };
+export { AVATAR_PRESETS, AVATAR_PRESET_NAMES };
 
 export function presetOf(i: number): CharacterConfig {
   return AVATAR_PRESETS[((i % AVATAR_PRESETS.length) + AVATAR_PRESETS.length) % AVATAR_PRESETS.length];

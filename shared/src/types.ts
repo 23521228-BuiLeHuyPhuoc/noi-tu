@@ -42,10 +42,10 @@ export const CHARACTER_HAIRS: CharacterHair[] = [
 
 /** 11 tông da, từ rất sáng đến nâu sẫm (chỉ số 0..10) */
 export const SKIN_TONES = 11;
-/** dáng mặt: tròn, trái xoan, dài, vuông/hàm bạnh, bầu má phính, cằm nhọn */
-export type CharacterFace = 'tron' | 'xoan' | 'dai' | 'vuong' | 'bau' | 'nhon';
-export const CHARACTER_FACES: CharacterFace[] = ['tron', 'xoan', 'dai', 'vuong', 'bau', 'nhon'];
-/** dáng người ở vai: gầy, vừa, mũm mĩm */
+/** dáng mặt: tròn, oval ngắn đầy, oval, oval dài má đầy, oval pha vuông, trái xoan, dài, vuông/hàm bạnh, bầu má phính, cằm nhọn */
+export type CharacterFace = 'tron' | 'ovalngan' | 'oval' | 'ovaldai' | 'ovalvuong' | 'xoan' | 'dai' | 'vuong' | 'bau' | 'nhon';
+export const CHARACTER_FACES: CharacterFace[] = ['tron', 'ovalngan', 'oval', 'ovaldai', 'ovalvuong', 'xoan', 'dai', 'vuong', 'bau', 'nhon'];
+/** dáng người ở vai: gầy, vừa, mũm mĩm, vai rộng cơ bắp */
 export type CharacterBuild = 'gay' | 'vua' | 'mum' | 'khoe';
 export const CHARACTER_BUILDS: CharacterBuild[] = ['gay', 'vua', 'mum', 'khoe'];
 /** kiểu mắt: mặc định theo giới, híp, to tròn, một mí */
@@ -59,12 +59,12 @@ export const CHARACTER_BROWS: CharacterBrows[] = ['macdinh', 'ray', 'lieu'];
 export type CharacterAccessory =
   | 'none' | 'kinhden' | 'raukem' | 'ria' | 'nonla' | 'nonbh' | 'bangdo'
   | 'khautrang' | 'muihe' | 'taitho' | 'bangcanhan' | 'troc' | 'mahong'
-  // phụ kiện cầu vồng (LGBT+), ai cũng đeo được: ghim cài áo, mảng tóc, băng đô
-  | 'prideghim' | 'pridetoc' | 'pridebang';
+  // phụ kiện cầu vồng (LGBT+), ai cũng đeo được: ghim cài áo, cờ, mảng tóc, băng đô
+  | 'prideghim' | 'prideco' | 'pridetoc' | 'pridebang';
 export const CHARACTER_ACCESSORIES: CharacterAccessory[] = [
   'none', 'kinhden', 'raukem', 'ria', 'nonla', 'nonbh', 'bangdo',
   'khautrang', 'muihe', 'taitho', 'bangcanhan', 'troc', 'mahong',
-  'prideghim', 'pridetoc', 'pridebang',
+  'prideghim', 'prideco', 'pridetoc', 'pridebang',
 ];
 
 /** chi tiết khuôn mặt: nốt ruồi, tàn nhang, lông mày rậm, răng hô, má lúm */
@@ -91,9 +91,9 @@ export const LOOK_OPTIONS = {
   jaw: ['mem', 'ro'], chin: ['bo', 'nho', 'rong'], cheek: ['thon', 'day', 'phinh', 'go'], forehead: ['rong', 'vua'],
   neck: ['thon', 'vua', 'day'], nepcuoi: ['khong', 'co'], maphan: ['khong', 'co'], tilt: ['thang', 'trai', 'phai'],
   // mắt & mày
-  eyeshape: ['hanhnhan', 'hanhhep', 'nho', 'tron'], lid: ['mot', 'hai'], open: ['mo', 'tru', 'nheo'], liner: ['khong', 'co'],
+  eyeshape: ['hanhnhan', 'hanhhep', 'nho', 'tron', 'hip'], lid: ['mot', 'hai'], open: ['mo', 'tru', 'nheo'], liner: ['khong', 'co'],
   eyecolor: ['nau', 'den'], gaze: ['thang', 'trai', 'phai'], asym: ['khong', 'co'],
-  browshape: ['ngang', 'cong', 'mem', 'gap'], browthick: ['mong', 'vua', 'day'],
+  browshape: ['ngang', 'cong', 'mem', 'gap', 'lieu'], browthick: ['mong', 'vua', 'day'],
   // mũi & miệng
   nose: ['thap', 'vua', 'ro'], nosetip: ['nho', 'tron', 'day'], nostril: ['hep', 'vua', 'rong'],
   lipthick: ['mong', 'duoi', 'day'], lipcolor: ['hongnau', 'cam', 'do'], mouth: ['khep', 'cuoirang', 'cuoitu', 'he'],

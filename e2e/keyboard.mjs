@@ -2,14 +2,20 @@
 // Giả lập: Android = navigator.virtualKeyboard (geometrychange), iOS = visualViewport (resize).
 // Chạy: node keyboard.mjs <words.txt> /tmp/fun-shots   (web 8081, server TURN_SECONDS=8)
 import { chromium } from 'playwright-core';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 
 const WEB = process.env.E2E_WEB ?? 'http://localhost:8081';
 const SHOTS = process.argv[3] ?? '/tmp/fun-shots';
 mkdirSync(SHOTS, { recursive: true });
 let failures = 0;
 const check = (c, m) => { console.log(c ? 'OK  ' : 'FAIL', m); if (!c) failures++; };
-const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+const executablePath = process.env.E2E_BROWSER ?? [
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+].find(existsSync);
+const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
 
 const FAKE = {
   android: () => {
@@ -21,9 +27,15 @@ const FAKE = {
   },
   ios: () => {
     const vv = new EventTarget();
-    Object.assign(vv, { height: window.innerHeight, offsetTop: 0, scale: 1, width: window.innerWidth });
+    let kb = 0;
+    Object.defineProperties(vv, {
+      width: { get: () => window.innerWidth, configurable: true },
+      height: { get: () => window.innerHeight - kb, configurable: true },
+      offsetTop: { value: 0, configurable: true },
+      scale: { value: 1, configurable: true },
+    });
     Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
-    window.__kb = (h) => { vv.height = window.innerHeight - h; vv.dispatchEvent(new Event('resize')); };
+    window.__kb = (h) => { kb = h; vv.dispatchEvent(new Event('resize')); };
   },
 };
 

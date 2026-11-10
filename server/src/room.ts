@@ -133,20 +133,32 @@ export class Room {
   private spreadCharacter(): CharacterConfig {
     const n = this.players.length;
     const r = this.spreadSeed;
-    const accs = CHARACTER_ACCESSORIES.filter((a) => !a.startsWith('pride'));
+    const accs = CHARACTER_ACCESSORIES.filter((a) => !a.startsWith('pride') && a !== 'khautrang');
+    const mouths = ['khep', 'cuoirang', 'cuoitu', 'he'] as const;
+    const brows = ['ngang', 'cong', 'mem', 'gap', 'lieu'] as const;
+    const noses = ['thap', 'vua', 'ro'] as const;
+    const vols = ['sat', 'vua', 'cao'] as const;
+    const tilts = ['thang', 'trai', 'phai'] as const;
     return {
       gender: DEFAULT_GENDERS[n % DEFAULT_GENDERS.length],
       age: CHARACTER_AGES[n % CHARACTER_AGES.length],
       hair: CHARACTER_HAIRS[(n * 5 + r) % CHARACTER_HAIRS.length],
       color: this.freeColor(),
       skin: (n * 3 + r) % SKIN_TONES,
-      face: CHARACTER_FACES[(n * 5 + r) % CHARACTER_FACES.length],
+      face: CHARACTER_FACES[(n * 3 + r) % CHARACTER_FACES.length],
       build: CHARACTER_BUILDS[(n + r) % CHARACTER_BUILDS.length],
       eyes: CHARACTER_EYES[(n * 3 + r) % CHARACTER_EYES.length],
       brows: CHARACTER_BROWS[(n * 2 + r) % CHARACTER_BROWS.length],
       accessory: accs[(n * 7 + r) % accs.length],
       detail: CHARACTER_DETAILS[(n + r) % CHARACTER_DETAILS.length],
       outfit: CHARACTER_OUTFITS[(n * 2 + r) % CHARACTER_OUTFITS.length],
+      look: {
+        mouth: mouths[(n * 3 + r) % mouths.length],
+        browshape: brows[(n * 2 + r) % brows.length],
+        nose: noses[(n + r) % noses.length],
+        volume: vols[(n * 2 + r) % vols.length],
+        tilt: tilts[(n + r) % tilts.length],
+      },
     };
   }
 
@@ -195,7 +207,8 @@ export class Room {
     if (partial.look !== undefined) {
       const look = parseLook(partial.look);
       if (!look) return { ok: false, error: 'bad_request' };
-      next.look = look; // thay toàn bộ (client gửi đủ bộ nét)
+      if (Object.keys(look).length === 0) delete next.look;
+      else next.look = look;
     }
     if (partial.detail !== undefined) {
       if (!CHARACTER_DETAILS.includes(partial.detail as CharacterDetail)) return { ok: false, error: 'bad_request' };

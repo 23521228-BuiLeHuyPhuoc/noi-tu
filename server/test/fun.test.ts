@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cleanFun, isScreenTroll, isTroll, RateLimiter, TargetCooldown, trollExtras } from '../src/fun';
-import { CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_EYES, CHARACTER_FACES, CHARACTER_HAIRS, SKIN_TONES, CHARACTER_ACCESSORIES, CHARACTER_DETAILS, CHARACTER_GENDERS, CHARACTER_OUTFITS, DOODLES, NICKNAMES } from '../../shared/src/types';
+import { CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_EYES, CHARACTER_FACES, CHARACTER_HAIRS, SKIN_TONES, CHARACTER_ACCESSORIES, CHARACTER_DETAILS, CHARACTER_GENDERS, CHARACTER_OUTFITS, DOODLES, LOOK_OPTIONS, NICKNAMES, parseLook } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { setup } from './helpers';
 
@@ -91,7 +91,7 @@ describe('giới tính, chi tiết mặt, trang phục, mẫu mở rộng', () =
     expect(room.customize(ids[0], { gender: 'abc' as never })).toEqual({ ok: false, error: 'bad_request' });
     expect(room.customize(ids[0], { detail: 'sung' as never })).toEqual({ ok: false, error: 'bad_request' });
     expect(room.customize(ids[0], { outfit: 'bikini' as never })).toEqual({ ok: false, error: 'bad_request' });
-    expect(room.players[0].character).toMatchObject({ gender: 'lgbt', outfit: 'dayvang', detail: 'malum' });
+    expect(room.players[0].character).toMatchObject({ gender: 'lgbt', outfit: 'balden', detail: 'malum' });
   });
 
   it('khách mới không bị tự gán LGBT+', () => {
@@ -106,6 +106,7 @@ describe('giới tính, chi tiết mặt, trang phục, mẫu mở rộng', () =
       expect(CHARACTER_GENDERS).toContain(p.gender);
       expect(CHARACTER_DETAILS).toContain(p.detail ?? 'none');
       expect(CHARACTER_OUTFITS).toContain(p.outfit ?? 'none');
+      if (p.look) expect(parseLook(p.look)).toEqual(p.look);
     }
   });
 
@@ -117,8 +118,8 @@ describe('giới tính, chi tiết mặt, trang phục, mẫu mở rộng', () =
   });
 });
 
-describe('đa dạng khuôn mặt: da, dáng mặt, dáng người, mắt, mày, tóc', () => {
-  it('customize whitelist chặt từng trường mới', () => {
+describe('đa dạng khuôn mặt: da, dáng mặt, dáng người, mắt, mày, tóc, look', () => {
+  it('customize whitelist chặt từng trường mới và look', () => {
     const { room, ids } = setup(['An']);
     for (let k = 0; k < SKIN_TONES; k++) expect(room.customize(ids[0], { skin: k })).toEqual({ ok: true });
     for (const f of CHARACTER_FACES) expect(room.customize(ids[0], { face: f })).toEqual({ ok: true });
@@ -126,10 +127,17 @@ describe('đa dạng khuôn mặt: da, dáng mặt, dáng người, mắt, mày,
     for (const e of CHARACTER_EYES) expect(room.customize(ids[0], { eyes: e })).toEqual({ ok: true });
     for (const b of CHARACTER_BROWS) expect(room.customize(ids[0], { brows: b })).toEqual({ ok: true });
     for (const h of CHARACTER_HAIRS) expect(room.customize(ids[0], { hair: h })).toEqual({ ok: true });
+    for (const [k, vals] of Object.entries(LOOK_OPTIONS)) {
+      for (const v of vals) expect(room.customize(ids[0], { look: { [k]: v } })).toEqual({ ok: true });
+    }
     const bad = (x: object) => expect(room.customize(ids[0], x as never)).toEqual({ ok: false, error: 'bad_request' });
-    bad({ skin: 8 }); bad({ skin: -1 }); bad({ skin: 1.5 }); bad({ skin: '2' });
+    bad({ skin: SKIN_TONES }); bad({ skin: -1 }); bad({ skin: 1.5 }); bad({ skin: '2' });
     bad({ face: 'vuông' }); bad({ build: 'beo' }); bad({ eyes: 'laser' }); bad({ brows: 'x' }); bad({ hair: 'mullet' });
-    expect(room.players[0].character).toMatchObject({ skin: 7, face: 'nhon', build: 'mum', eyes: 'motmi', brows: 'lieu', hair: 'dailung' });
+    bad({ look: 'bad' }); bad({ look: [] }); bad({ look: { unknownKey: 'co' } }); bad({ look: { jaw: 'vline' } }); bad({ look: { tattoo: 1 } });
+    expect(room.players[0].character).toMatchObject({
+      skin: SKIN_TONES - 1, face: 'nhon', build: 'khoe', eyes: 'motmi', brows: 'lieu', hair: 'dungchom',
+      look: { pose: 'chumnguc' },
+    });
   });
 
   it('khách mặc định trong cùng phòng không giống nhau (không bản sao)', () => {

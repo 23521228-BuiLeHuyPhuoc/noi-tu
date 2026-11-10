@@ -76,10 +76,12 @@ export function subscribeKeyboard(cb: (inset: number) => void): () => void {
     if (vv && vv.scale <= 1.01) inset = Math.max(inset, window.innerHeight - vv.height - vv.offsetTop);
     cb(inset > 80 ? Math.round(inset) : 0);
   };
+  const raf = requestAnimationFrame(read);
   vk?.addEventListener('geometrychange', read);
   vv?.addEventListener('resize', read);
   vv?.addEventListener('scroll', read);
   return () => {
+    cancelAnimationFrame(raf);
     vk?.removeEventListener('geometrychange', read);
     vv?.removeEventListener('resize', read);
     vv?.removeEventListener('scroll', read);

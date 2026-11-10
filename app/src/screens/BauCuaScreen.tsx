@@ -77,20 +77,20 @@ function jitter(seed: string): number {
 }
 
 function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; small: boolean }) {
-  const w = small ? 30 : 36;
-  const h = (w * 40) / 64;
-  const step = small ? 3.4 : 4;
+  const w = small ? 32 : 38;
+  const h = (w * 42) / 64;
+  const step = small ? 3.5 : 4.2;
   return (
     <View pointerEvents="none" style={styles.pileWrap}>
       <T style={styles.pileTotal}>{shortFmt(total)}</T>
       <View style={styles.pileRow}>
         {stakes.map((st, k) => {
           const n = coinsFor(st.amount);
-          const kind = st.mine ? 'gold' : st.color;
+          const kind = st.mine ? `gold|${st.color}` : st.color;
           return (
-            <View key={st.id} style={{ width: w, height: h + (n - 1) * step + 3, marginLeft: k === 0 ? 0 : -w * 0.3, zIndex: st.mine ? 10 : k }}>
+            <View key={st.id} style={{ width: w, height: h + (n - 1) * step + 4, marginLeft: k === 0 ? 0 : -w * 0.28, zIndex: st.mine ? 10 : k }}>
               {/* bóng đổ dưới chân chồng xu */}
-              <View style={[styles.pileShadow, { width: w * 0.95, height: h * 0.45, borderRadius: w, bottom: -1 }]} />
+              <View style={[styles.pileShadow, { width: w * 0.96, height: h * 0.46, borderRadius: w, bottom: -1 }]} />
               {Array.from({ length: n }, (_, i) => {
                 const shade = n === 1 ? 0 : i < n * 0.34 ? 2 : i < n * 0.67 ? 1 : 0;
                 const j = jitter(`${st.id}${i}`);
@@ -99,7 +99,7 @@ function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; sm
                   <Image
                     key={i}
                     source={{ uri: coinTiltedUri(kind, shade) }}
-                    style={{ position: 'absolute', left: j * 5, bottom: i * step + 1, width: w, height: h, transform: [{ rotate: `${j2 * 10}deg` }] }}
+                    style={{ position: 'absolute', left: j * 4.5, bottom: i * step + 1, width: w, height: h, transform: [{ rotate: `${j2 * 9}deg` }] }}
                   />
                 );
               })}
@@ -133,7 +133,7 @@ function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: str
     anim.start(({ finished }) => finished && done.current());
     return () => { clearTimeout(clink); anim.stop(); };
   }, [t, bounce]);
-  const S = 28;
+  const S = 30;
   const fx = from.x + from.w / 2 - S / 2;
   const fy = from.y + from.h / 2 - S / 2;
   const tx = to.x + to.w / 2 - S / 2;
@@ -154,7 +154,7 @@ function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: str
         ],
       }}
     >
-      <Image source={{ uri: coinFrontUri(color === C.gold ? 'gold' : color) }} style={{ width: S, height: S }} />
+      <Image source={{ uri: coinFrontUri(color) }} style={{ width: S, height: S }} />
     </Animated.View>
   );
 }
@@ -453,7 +453,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const available = balance - staked;
   const nameOf = (id: string) => (id === me ? 'Bạn' : g.names[id] ?? '?');
   const playerOf = (id: string): PublicPlayer | undefined => room.players.find((p) => p.id === id);
-  const colorOf = (id: string) => portraitFor(playerOf(id) ?? { avatar: 0 }).light;
+  const colorOf = (id: string) => portraitFor(playerOf(id) ?? { avatar: 0 }).hex;
   const borderColorOf = (id: string) => {
     const p = playerOf(id);
     return p?.character ? portraitFor(p).hex : C.ink;
@@ -505,7 +505,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
           if ((mine[s] ?? 0) > (prev[id]?.[s] ?? 0)) {
             const from = rectOf(`avatar-${id}`, origin);
             const to = rectOf(`sym-${s}`, origin);
-            if (from && to) add.push({ id: ++flySeq.current, from, to, color: id === me ? C.gold : colorOf(id) });
+            const col = colorOf(id);
+            if (from && to) add.push({ id: ++flySeq.current, from, to, color: id === me ? `gold|${col}` : col });
             if (id !== me) play('coin');
           }
         }
@@ -801,7 +802,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E0D14', borderRadius: 18,
   },
   tile: { width: '32%', aspectRatio: 0.82, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
-  tileCompact: { aspectRatio: 1.05 },
+  tileCompact: { aspectRatio: 1.12 },
   tileInner: {
     flex: 1, borderWidth: 1.5, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 2, overflow: 'hidden',

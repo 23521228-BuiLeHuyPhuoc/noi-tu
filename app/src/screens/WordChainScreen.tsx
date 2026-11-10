@@ -158,39 +158,41 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
       {isSpectator ? null : meOut ? (
         <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
       ) : myTurn ? (
-        <KeyboardLift>
-          <View style={styles.inputRow}>
-            <View style={[styles.inputBox, voting && { opacity: 0.5 }]}>
-              <View testID="word-prefix" style={styles.prefix} accessibilityLabel={`Chữ đầu: ${last}`}>
-                <T style={styles.prefixText}>{last}</T>
-                <T style={styles.lock}>🔒</T>
+        <>
+          <KeyboardLift>
+            <View style={styles.inputRow}>
+              <View style={[styles.inputBox, voting && { opacity: 0.5 }]}>
+                <View testID="word-prefix" style={styles.prefix} accessibilityLabel={`Chữ đầu: ${last}`}>
+                  <T style={styles.prefixText}>{last}</T>
+                  <T style={styles.lock}>🔒</T>
+                </View>
+                <TextInput
+                  testID="word-input"
+                  ref={inputRef}
+                  style={styles.input}
+                  value={text}
+                  editable={!voting}
+                  onChangeText={(t) => {
+                    setText(t);
+                    setError(null);
+                    setRejected(null);
+                  }}
+                  placeholder="chữ tiếp…"
+                  placeholderTextColor={C.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="send"
+                  onSubmitEditing={submit}
+                  blurOnSubmit={false}
+                />
               </View>
-              <TextInput
-                testID="word-input"
-                ref={inputRef}
-                style={styles.input}
-                value={text}
-                editable={!voting}
-                onChangeText={(t) => {
-                  setText(t);
-                  setError(null);
-                  setRejected(null);
-                }}
-                placeholder="chữ tiếp…"
-                placeholderTextColor={C.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="send"
-                onSubmitEditing={submit}
-                blurOnSubmit={false}
-              />
+              <Button testID="submit-btn" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 76, marginBottom: 0 }} />
             </View>
-            <Button testID="submit-btn" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 76 }} />
-          </View>
-          {error && <T testID="word-error" style={styles.error}>{error}</T>}
-          {rejected && !voting && (
-            <Button testID="appeal-btn" small icon="🙋" title={`Xin cả phòng duyệt “${rejected}”`} variant="ink" onPress={appeal} />
-          )}
+            {error && <T testID="word-error" style={styles.error}>{error}</T>}
+            {rejected && !voting && (
+              <Button testID="appeal-btn" small icon="🙋" title={`Xin cả phòng duyệt “${rejected}”`} variant="ink" onPress={appeal} />
+            )}
+          </KeyboardLift>
           {hint ? (
             <Button
               testID="hint-word"
@@ -204,7 +206,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               <Button testID="hint-btn" small variant="ghost" icon="🆘" title="Cứu trợ (1 lần mỗi ván)" onPress={askHint} />
             )
           )}
-        </KeyboardLift>
+        </>
       ) : (
         current && (
           <Button
@@ -278,8 +280,8 @@ function Definition({ definition, current = false }: { definition?: WordDefiniti
   if (!text || text === 'Chưa có giải nghĩa') return null;
   return (
     <View style={[styles.definition, current && styles.currentDefinition]} testID={current ? 'current-definition' : 'history-definition'}>
-      <T style={styles.definitionText}>{text}</T>
-      {source && <T style={styles.definitionSource}>Nguồn: {source}</T>}
+      <T numberOfLines={current ? 2 : undefined} style={styles.definitionText}>{text}</T>
+      {source && <T numberOfLines={current ? 1 : undefined} style={styles.definitionSource}>Nguồn: {source}</T>}
     </View>
   );
 }
