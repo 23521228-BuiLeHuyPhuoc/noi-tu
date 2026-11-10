@@ -1,7 +1,11 @@
-import { EMOJIS, MAX_HP, type Emoji, type FunSend, type HitMove, type ThrowItem, type TauntId } from '../../shared/src/types';
+import {
+  DOODLES, EMOJIS, MAX_HP, NICKNAMES,
+  type DoodleKind, type Emoji, type FunEvent, type FunSend, type HitMove, type NicknameId, type ThrowItem, type TauntId,
+} from '../../shared/src/types';
 
 const ITEMS: ThrowItem[] = ['dep', 'cachua', 'trung', 'phan', 'hoa', 'tim'];
-const TAUNTS: TauntId[] = ['nhanh', 'ga', 'anmay', 'run', 'huhon', 'gg', 'cuu', 'dinh', 'khoc', 'denlai'];
+const TAUNTS: TauntId[] = ['nhanh', 'ga', 'anmay', 'run', 'huhon', 'gg', 'cuu', 'dinh', 'khoc', 'denlai',
+  'xiu', 'bayma', 'tuoi', 'ngoan', 'chaybai', 'hetthuoc'];
 /** sát thương [thấp nhất, cao nhất] của mỗi chiêu — máu ảo, chỉ để vui */
 export const HIT_DAMAGE: Record<HitMove, [number, number]> = {
   tat: [5, 9],
@@ -23,7 +27,50 @@ export function cleanFun(raw: unknown): FunSend | null {
   if (f.kind === 'hit' && typeof f.to === 'string' && (f.move as string) in HIT_DAMAGE) {
     return { kind: 'hit', to: f.to, move: f.move as HitMove };
   }
+  if (f.kind === 'doodle' && typeof f.to === 'string' && DOODLES.includes(f.doodle as DoodleKind)) {
+    return { kind: 'doodle', to: f.to, doodle: f.doodle as DoodleKind };
+  }
+  if (f.kind === 'nick' && typeof f.to === 'string' && NICKNAMES.includes(f.nick as NicknameId)) {
+    return { kind: 'nick', to: f.to, nick: f.nick as NicknameId };
+  }
+  if ((f.kind === 'roach' || f.kind === 'ink' || f.kind === 'honk' || f.kind === 'cry') && typeof f.to === 'string') {
+    return { kind: f.kind, to: f.to };
+  }
+  if (f.kind === 'charm') return { kind: 'charm' };
   return null;
+}
+
+/** "chọc mất dạy": nhóm chiêu có giới hạn riêng (chặt hơn ném đồ) */
+export const TROLL_KINDS: FunSend['kind'][] = ['doodle', 'roach', 'ink', 'nick', 'honk', 'cry', 'charm'];
+/** chiêu phủ lên màn hình người bị chọc: mỗi người bị chọc chỉ nhận 1 lần mỗi SCREEN_COOLDOWN_MS (từ bất kỳ ai) */
+export const SCREEN_KINDS: FunSend['kind'][] = ['roach', 'ink'];
+export const SCREEN_COOLDOWN_MS = 8000;
+
+export const isTroll = (k: FunSend['kind']) => TROLL_KINDS.includes(k);
+export const isScreenTroll = (k: FunSend['kind']) => SCREEN_KINDS.includes(k);
+
+/** Số liệu ngẫu nhiên do server bốc để mọi máy thấy cùng một cảnh */
+export function trollExtras(f: FunSend, rng: () => number = Math.random): Pick<FunEvent, 'count' | 'corner' | 'variant'> {
+  if (f.kind === 'roach') return { count: 2 + Math.floor(rng() * 2) };
+  if (f.kind === 'ink') return { corner: Math.floor(rng() * 4) };
+  if (f.kind === 'honk') return { variant: Math.floor(rng() * 3) };
+  return {};
+}
+
+/** Mỗi người bị chọc (key) chỉ nhận một chiêu phủ màn hình mỗi `ms` mili giây */
+export class TargetCooldown {
+  private last = new Map<string, number>();
+  constructor(private readonly ms = SCREEN_COOLDOWN_MS) {}
+  take(key: string, now = Date.now()): boolean {
+    const t = this.last.get(key);
+    if (t !== undefined && now - t < this.ms) return false;
+    this.last.set(key, now);
+    if (this.last.size > 64) for (const [k, v] of this.last) if (now - v >= this.ms) this.last.delete(k);
+    return true;
+  }
+  remove(key: string): void {
+    this.last.delete(key);
+  }
 }
 
 /** Máu ảo của từng người trong phòng; bị K.O. thì hồi đầy */
@@ -53,12 +100,12 @@ export class HpBoard {
 /** Giới hạn tần suất kiểu "xô token": tối đa `burst` lần liền, hồi 1 lượt mỗi `refillMs` */
 export class RateLimiter {
   private tokens: number;
-  private last = Date.now();
-  constructor(private readonly burst = 6, private readonly refillMs = 1200) {
+  private last: number;
+  constructor(private readonly burst = 6, private readonly refillMs = 1200, start = Date.now()) {
+    this.last = start;
     this.tokens = burst;
   }
-  take(): boolean {
-    const now = Date.now();
+  take(now = Date.now()): boolean {
     this.tokens = Math.min(this.burst, this.tokens + (now - this.last) / this.refillMs);
     this.last = now;
     if (this.tokens < 1) return false;

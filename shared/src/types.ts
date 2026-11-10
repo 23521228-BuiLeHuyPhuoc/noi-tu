@@ -31,6 +31,19 @@ export const CHARACTER_GENDERS: CharacterGender[] = ['nam', 'nu', 'khac'];
 export const CHARACTER_AGES: CharacterAge[] = ['nhi', 'tre', 'trung', 'lao'];
 export const CHARACTER_HAIRS: CharacterHair[] = ['ngan', 'han', 'xoan', 'dai', 'bui', 'undercut'];
 
+/** phụ kiện "lầy" trên mặt nhân vật ('none' = không đeo gì) */
+export type CharacterAccessory =
+  | 'none' | 'kinhden' | 'raukem' | 'ria' | 'nonla' | 'nonbh' | 'bangdo'
+  | 'khautrang' | 'muihe' | 'taitho' | 'bangcanhan' | 'troc' | 'mahong';
+export const CHARACTER_ACCESSORIES: CharacterAccessory[] = [
+  'none', 'kinhden', 'raukem', 'ria', 'nonla', 'nonbh', 'bangdo',
+  'khautrang', 'muihe', 'taitho', 'bangcanhan', 'troc', 'mahong',
+];
+
+/** biểu cảm trên chân dung, đổi theo sự kiện trong ván */
+export type Mood = 'normal' | 'smug' | 'cry' | 'angry' | 'shock' | 'dizzy';
+export const MOODS: Mood[] = ['normal', 'smug', 'cry', 'angry', 'shock', 'dizzy'];
+
 export const PLAYER_COLORS = [
   { id: 0, hex: '#E5383B', light: '#FFE3E3', name: 'Đỏ Sơn' },
   { id: 1, hex: '#1D6FE8', light: '#D8ECFF', name: 'Xanh Dương' },
@@ -48,6 +61,8 @@ export interface CharacterConfig {
   hair: CharacterHair;
   /** chỉ số màu trong PLAYER_COLORS (0..7), không trùng trong phòng */
   color: number;
+  /** phụ kiện (tùy chọn; thiếu = không đeo) */
+  accessory?: CharacterAccessory;
 }
 
 export interface PublicPlayer {
@@ -302,22 +317,48 @@ export type ActionResult = { ok: true; hint?: string } | { ok: false; reason: Ac
 // ================= Tính năng "lầy" =================
 
 export type ThrowItem = 'dep' | 'cachua' | 'trung' | 'phan' | 'hoa' | 'tim';
-export type TauntId = 'nhanh' | 'ga' | 'anmay' | 'run' | 'huhon' | 'gg' | 'cuu' | 'dinh' | 'khoc' | 'denlai';
+export type TauntId = 'nhanh' | 'ga' | 'anmay' | 'run' | 'huhon' | 'gg' | 'cuu' | 'dinh' | 'khoc' | 'denlai'
+  | 'xiu' | 'bayma' | 'tuoi' | 'ngoan' | 'chaybai' | 'hetthuoc';
 
 export const EMOJIS = ['😂', '🤣', '😍', '😎', '🤡', '😡', '😭', '💀', '🔥', '👏', '🙏', '🤝', '💯', '🎉'] as const;
 export type Emoji = (typeof EMOJIS)[number];
 export type HitMove = 'dam' | 'da' | 'tat' | 'chuong';
 export const MAX_HP = 100;
 
+/** hình vẽ bậy lên mặt bạn bè (hiện ~20 giây) */
+export const DOODLES = ['ria', 'sung', 'muihe', 'mattim'] as const;
+export type DoodleKind = (typeof DOODLES)[number];
+/** biệt danh tạm thời (60 giây) chọn từ danh sách có sẵn, vui và vô hại */
+export const NICKNAMES = [
+  'game', 'nho', 'lidon', 'hexe', 'amvon', 'anhoi', 'ruabo', 'ngugat', 'khocnhe', 'angian', 'nhaybom', 'tuonglai',
+] as const;
+export type NicknameId = (typeof NICKNAMES)[number];
+export const DOODLE_MS = 20_000;
+export const NICK_MS = 60_000;
+
 export type FunSend =
   | { kind: 'throw'; to: string; item: ThrowItem }
   | { kind: 'taunt'; taunt: TauntId }
   | { kind: 'poke'; to: string }
   | { kind: 'emoji'; emoji: Emoji }
-  | { kind: 'hit'; to: string; move: HitMove };
+  | { kind: 'hit'; to: string; move: HitMove }
+  // "chọc mất dạy": chỉ để vui, không bao giờ ảnh hưởng kết quả ván
+  | { kind: 'doodle'; to: string; doodle: DoodleKind }
+  | { kind: 'roach'; to: string }
+  | { kind: 'ink'; to: string }
+  | { kind: 'nick'; to: string; nick: NicknameId }
+  | { kind: 'honk'; to: string }
+  | { kind: 'cry'; to: string }
+  | { kind: 'charm' };
 
-/** sự kiện phát cho cả phòng; đánh nhau thì kèm sát thương và máu còn lại (máu ảo, không ảnh hưởng game) */
-export type FunEvent = FunSend & { id: number; from: string; damage?: number; hp?: number; ko?: boolean };
+/**
+ * sự kiện phát cho cả phòng; đánh nhau thì kèm sát thương và máu còn lại (máu ảo, không ảnh hưởng game).
+ * `count` (số gián 2–3), `corner` (góc mực 0–3), `variant` (kiểu tiếng loa 0–2) do server bốc để mọi máy giống nhau.
+ */
+export type FunEvent = FunSend & {
+  id: number; from: string; damage?: number; hp?: number; ko?: boolean;
+  count?: number; corner?: number; variant?: number;
+};
 
 export const STICKER_IDS = [
   'quynh-01', 'quynh-02', 'quynh-03', 'quynh-04', 'quynh-05',

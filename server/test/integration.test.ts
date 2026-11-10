@@ -109,6 +109,32 @@ describe('Server qua Socket.IO', () => {
     expect((r.game as BauCuaView).dice).toHaveLength(3);
   });
 
+  it('chọc mất dạy: phát cho cả phòng, không tự chọc, gián/mực chỉ 1 lần mỗi 8 giây mỗi người', async () => {
+    const { cs, ids } = await roomOf(3);
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'doodle', to: ids[1], doodle: 'ria' })).toEqual({ ok: true });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'nick', to: ids[1], nick: 'game' })).toEqual({ ok: true });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'roach', to: ids[1] })).toEqual({ ok: true });
+    // chiêu phủ màn hình thứ hai lên cùng một người (kể cả từ người khác) bị chặn
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'ink', to: ids[1] })).toEqual({ ok: false });
+    expect(await cs[2].emitWithAck('fun:send', { kind: 'roach', to: ids[1] })).toEqual({ ok: false });
+    // người khác vẫn bị được
+    expect(await cs[1].emitWithAck('fun:send', { kind: 'ink', to: ids[2] })).toEqual({ ok: true });
+    // sai dữ liệu, tự chọc, ngoài phòng
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'nick', to: ids[1], nick: 'Tên lạ' as never })).toEqual({ ok: false });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'honk', to: ids[0] })).toEqual({ ok: false });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'cry', to: 'nguoi-la' })).toEqual({ ok: false });
+    await wait(50);
+    const seen = cs[2].fun.map((f) => f.kind);
+    expect(seen).toEqual(['doodle', 'nick', 'roach', 'ink']);
+    const roach = cs[2].fun.find((f) => f.kind === 'roach')!;
+    expect([2, 3]).toContain(roach.count);
+    // bucket riêng cho chọc mất dạy: tối đa 4 lần liền
+    const ok: boolean[] = [];
+    for (let i = 0; i < 6; i++) ok.push((await cs[2].emitWithAck('fun:send', { kind: 'charm' })).ok);
+    expect(ok.filter(Boolean).length).toBeLessThanOrEqual(4);
+    expect(ok.filter((x) => !x).length).toBeGreaterThan(0);
+  });
+
   it('ném dép, khịa, hối: phát cho cả phòng; chặn ném chính mình, người ngoài phòng và spam', async () => {
     const { cs, ids } = await roomOf(2);
     expect(await cs[0].emitWithAck('fun:send', { kind: 'throw', to: ids[1], item: 'dep' })).toEqual({ ok: true });

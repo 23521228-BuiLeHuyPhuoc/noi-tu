@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, type BauCuaRounds,
-  CHARACTER_AGES, CHARACTER_GENDERS, CHARACTER_HAIRS, PLAYER_COLORS,
-  type CharacterAge, type CharacterConfig, type CharacterGender, type CharacterHair,
+  CHARACTER_ACCESSORIES, CHARACTER_AGES, CHARACTER_GENDERS, CHARACTER_HAIRS, PLAYER_COLORS,
+  type CharacterAccessory, type CharacterAge, type CharacterConfig, type CharacterGender, type CharacterHair,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
-import { HpBoard } from './fun';
+import { HpBoard, TargetCooldown } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
@@ -70,6 +70,8 @@ export class Room {
   private chat: ChatMsg[] = [];
   private chatSeq = 0;
   readonly hp: HpBoard;
+  /** chống dội gián/mực lên màn hình một người */
+  readonly screenCooldown = new TargetCooldown();
   private readonly graceMs: number;
   private readonly rng: Rng;
   private readonly onChange: (room: Room) => void;
@@ -141,6 +143,10 @@ export class Room {
     if (partial.hair !== undefined) {
       if (!CHARACTER_HAIRS.includes(partial.hair as CharacterHair)) return { ok: false, error: 'bad_request' };
       next.hair = partial.hair;
+    }
+    if (partial.accessory !== undefined) {
+      if (!CHARACTER_ACCESSORIES.includes(partial.accessory as CharacterAccessory)) return { ok: false, error: 'bad_request' };
+      next.accessory = partial.accessory;
     }
     if (partial.color !== undefined) {
       const c = partial.color;
