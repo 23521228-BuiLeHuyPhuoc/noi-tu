@@ -48,6 +48,10 @@ for (const p of ps) await p.t('cell-0').waitFor();
 check((await ps[0].page.locator('[data-testid^="cell-"]').count()) === 40, 'bàn cờ có 40 ô');
 check((await ps[0].page.locator('[data-testid^="token-"]').count()) === 3, '3 quân cờ ở ô Xuất phát');
 await ps[0].page.screenshot({ path: `${SHOTS}/2-start.png` });
+check((await ps[0].page.locator('[data-testid^="cell-"] img').count()) >= 40, 'mỗi ô có icon (Twemoji)');
+check((await ps[0].page.locator('[data-testid^="wealth-card-"]').count()) === 3, '3 thẻ tài sản ở giữa bàn');
+const boardBox = await ps[0].t('cell-0').boundingBox();
+check(boardBox && boardBox.width >= 40 && boardBox.height >= 40, `ô Xuất phát đủ lớn (${Math.round(boardBox?.width ?? 0)}x${Math.round(boardBox?.height ?? 0)})`);
 
 let rolls = 0, bought = 0, ended = 0, skipped = 0;
 for (let i = 0; i < 40 && rolls < 6; i++) {
@@ -81,10 +85,8 @@ for (let i = 0; i < 40 && rolls < 6; i++) {
 }
 check(rolls >= 3, `đổ xúc xắc ${rolls} lần, qua nhiều lượt`);
 check(bought >= 1, `mua được ${bought} miếng đất (bỏ qua ${skipped})`);
-const owned = await ps[0].page.evaluate(() =>
-  [...document.querySelectorAll('[data-testid^="cell-"]')].filter((el) => getComputedStyle(el).backgroundColor !== 'rgb(255, 255, 255)').length,
-);
-check(owned >= 1, `bàn cờ tô màu chủ đất (${owned} ô)`);
+const owned = (await Promise.all(ps.map((p) => p.page.locator('[data-testid^="my-land-"]').count()))).reduce((x, y) => x + y, 0);
+check(owned >= 1, `ô đất của người chơi hiện ở mục "Đất của bạn" (${owned} ô)`);
 await ps[1].page.screenshot({ path: `${SHOTS}/4-board.png` });
 
 // xem chi tiết một ô đất
