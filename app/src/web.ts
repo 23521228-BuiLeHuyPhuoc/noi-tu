@@ -58,3 +58,32 @@ export function vibrate(ms: number | number[] = 120): void {
     }
   }
 }
+
+type VirtualKeyboardLike = EventTarget & { overlaysContent: boolean; boundingRect: { height: number } };
+
+/**
+ * Theo dõi chiều cao bàn phím ảo (px, 0 khi đóng) mà KHÔNG làm đổi bố cục của app:
+ * Android Chrome dùng VirtualKeyboard API (cùng meta `interactive-widget=overlays-content`),
+ * iOS Safari dùng VisualViewport. Chỉ những thành phần cần thấy ô nhập mới tự nâng mình lên.
+ */
+export function subscribeKeyboard(cb: (inset: number) => void): () => void {
+  if (!isWeb) return () => {};
+  const vk = (navigator as unknown as { virtualKeyboard?: VirtualKeyboardLike }).virtualKeyboard;
+  const vv = window.visualViewport;
+  if (vk) vk.overlaysContent = true;
+  const read = () => {
+    let inset = vk?.boundingRect ? vk.boundingRect.height : 0;
+    if (vv && vv.scale <= 1.01) inset = Math.max(inset, window.innerHeight - vv.height - vv.offsetTop);
+    cb(inset > 80 ? Math.round(inset) : 0);
+  };
+  const raf = requestAnimationFrame(read);
+  vk?.addEventListener('geometrychange', read);
+  vv?.addEventListener('resize', read);
+  vv?.addEventListener('scroll', read);
+  return () => {
+    cancelAnimationFrame(raf);
+    vk?.removeEventListener('geometrychange', read);
+    vv?.removeEventListener('resize', read);
+    vv?.removeEventListener('scroll', read);
+  };
+}

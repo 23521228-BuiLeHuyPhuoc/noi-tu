@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import type { AuthAck, AuthError } from '../../shared/src/types';
+import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { cleanName } from './room';
 import { toPublic, type Store, type UserRecord } from './store';
 
@@ -30,7 +31,7 @@ export function cleanUsername(raw: unknown): string | null {
 }
 
 const okPassword = (p: unknown): p is string => typeof p === 'string' && p.length >= 6 && p.length <= 72;
-const okAvatar = (a: unknown): a is number => Number.isInteger(a) && (a as number) >= 0 && (a as number) < 16;
+const okAvatar = (a: unknown): a is number => Number.isInteger(a) && (a as number) >= 0 && (a as number) < AVATAR_PRESETS.length;
 
 const fail = (error: AuthError): AuthAck => ({ ok: false, error });
 

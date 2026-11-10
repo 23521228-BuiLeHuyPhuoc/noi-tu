@@ -1,6 +1,8 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicPlayer } from '../../../shared/src/types';
-import { portraitOf, shortName, type PortraitSource } from '../avatars';
+import { doodleUri, MOOD_EMOJI, portraitOf, shortName, type PortraitSource } from '../avatars';
+import { useFace } from '../funState';
+import { nickText } from '../messages';
 import { C, FONT } from '../theme';
 
 export function Avatar({
@@ -20,7 +22,8 @@ export function Avatar({
   /** hạng (1..n): hiện thành huy hiệu nhỏ ở góc avatar */
   rank?: number;
 }) {
-  const pt = portraitOf(player);
+  const face = useFace(player.id);
+  const pt = portraitOf(player, face.mood);
   const borderCol = ring ?? (player.character ? pt.hex : C.ink);
   return (
     <Pressable
@@ -43,6 +46,11 @@ export function Avatar({
         ]}
       >
         <Image source={{ uri: pt.uri }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+        {face.doodle && (
+          <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
+        )}
+        {player.avatarUrl && face.mood !== 'normal' && <Text style={styles.moodBadge}>{MOOD_EMOJI[face.mood]}</Text>}
+        {face.charm && <Text testID={`charm-${player.id}`} style={styles.charm}>✨</Text>}
         {host && <Text style={styles.crown}>👑</Text>}
         {!player.connected && <Text style={styles.off}>💤</Text>}
         {rank !== undefined && (
@@ -54,6 +62,9 @@ export function Avatar({
       <Text numberOfLines={1} style={[styles.name, active && { color: C.gold }]}>
         {me ? 'Bạn' : shortName(player.name)}
       </Text>
+      {face.nick && (
+        <Text testID={`nick-${player.id}`} numberOfLines={2} style={styles.nick}>{nickText(face.nick).replace(/\s*\p{Extended_Pictographic}\uFE0F?$/u, '')}</Text>
+      )}
       {sub !== undefined && <Text numberOfLines={1} style={styles.sub}>{sub}</Text>}
     </Pressable>
   );
@@ -68,6 +79,13 @@ const styles = StyleSheet.create({
     // vòng sáng vàng quanh người đang tới lượt
     outlineWidth: 4, outlineColor: C.gold, outlineStyle: 'solid', outlineOffset: 2,
   } as object,
+  doodle: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
+  moodBadge: { position: 'absolute', bottom: -4, left: -4, fontSize: 16 },
+  charm: { position: 'absolute', top: -8, right: -8, fontSize: 18 },
+  nick: {
+    fontFamily: FONT, fontSize: 10, lineHeight: 12, textAlign: 'center', fontWeight: '900', color: C.ink, backgroundColor: C.gold, borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', maxWidth: '100%',
+  },
   crown: { position: 'absolute', top: -14, fontSize: 18 },
   rank: {
     position: 'absolute', top: -5, left: -7, minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 3,

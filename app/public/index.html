@@ -2,7 +2,7 @@
 <html lang="vi">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=overlays-content" />
     <meta name="theme-color" content="#B5121B" />
     <meta name="description" content="Xóm Lầy: nối từ, cờ cá ngựa, bầu cua chơi cùng bạn bè ngay trên điện thoại." />
     <!-- Cài lên màn hình chính như một app -->
@@ -18,8 +18,8 @@
     <title>Xóm Lầy</title>
     <style id="expo-reset">
       html, body { height: 100%; background: #B5121B; }
-      /* 100dvh: không bị thanh địa chỉ trình duyệt điện thoại che mất phần dưới */
-      body { overflow: hidden; height: 100dvh; margin: 0; overscroll-behavior: none;
+      /* Chiều cao cố định theo --app-h (đặt bằng script bên dưới, KHÔNG đổi khi bàn phím mở), dự phòng 100dvh */
+      body { overflow: hidden; height: var(--app-h, 100dvh); margin: 0; overscroll-behavior: none;
              -webkit-tap-highlight-color: transparent; }
       #root { display: flex; height: 100%; flex: 1;
               padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -27,6 +27,17 @@
       /* chữ trong ô nhập >= 16px để iPhone không tự phóng to khi gõ */
       input { font-size: 16px; }
     </style>
+    <script>
+      // Giữ chiều cao app ổn định khi bàn phím ảo mở: chỉ cập nhật khi không đang gõ vào ô nhập
+      (function () {
+        var d = document.documentElement;
+        function typing() { var a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); }
+        function set() { if (!typing()) d.style.setProperty('--app-h', window.innerHeight + 'px'); }
+        set();
+        window.addEventListener('resize', set);
+        window.addEventListener('orientationchange', function () { setTimeout(set, 350); });
+      })();
+    </script>
   </head>
   <body>
     <noscript>Bạn cần bật JavaScript để chơi Xóm Lầy.</noscript>

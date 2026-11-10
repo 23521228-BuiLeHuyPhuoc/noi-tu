@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 import {
   BAUCUA_CHIPS, BAUCUA_LOAN, BAUCUA_SYMBOLS, type BauCuaSymbol, type BauCuaView, type PublicPlayer, type RoomState,
 } from '../../../shared/src/types';
@@ -8,7 +8,7 @@ import { actionText, quip, SYMBOL } from '../messages';
 import { ART } from '../baucuaArt';
 import { portraitOf as portraitFor } from '../avatars';
 import { Portrait } from '../components/Avatar';
-import { useOnChange, useSecondsLeft } from '../hooks';
+import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -17,6 +17,8 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { compactXu } from '../format';
 import { rectOf, type Rect } from '../components/Fun';
+import { setMood } from '../funState';
+import { coinFrontUri, coinTiltedUri } from '../coins';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const PAPER = '#F7E7C1';
@@ -67,28 +69,40 @@ type Stake = { id: string; amount: number; color: string; mine: boolean };
 /** số đồng xu trong một chồng, tăng dần theo tiền cược */
 const coinsFor = (amount: number) => Math.max(1, Math.min(8, Math.round(Math.log2(amount / 10)) + 1));
 
+/** số ngẫu nhiên ổn định theo chuỗi (để mỗi đồng xu lệch/xoay khác nhau nhưng không đổi giữa các lần vẽ) */
+function jitter(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 1000) / 1000 - 0.5;
+}
+
 function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; small: boolean }) {
-  const w = small ? 20 : 24;
-  const h = small ? 8 : 9;
-  const step = small ? 3 : 4;
+  const w = small ? 32 : 38;
+  const h = (w * 42) / 64;
+  const step = small ? 3.5 : 4.2;
   return (
     <View pointerEvents="none" style={styles.pileWrap}>
       <T style={styles.pileTotal}>{shortFmt(total)}</T>
       <View style={styles.pileRow}>
         {stakes.map((st, k) => {
           const n = coinsFor(st.amount);
+          const kind = st.mine ? `gold|${st.color}` : st.color;
           return (
-            <View key={st.id} style={{ width: w, height: h + (n - 1) * step, marginLeft: k === 0 ? 0 : -w * 0.35, zIndex: st.mine ? 10 : k }}>
-              {Array.from({ length: n }, (_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.coin,
-                    { width: w, height: h, borderRadius: h, bottom: i * step, backgroundColor: st.color },
-                    st.mine && { borderColor: '#7A4B00', backgroundColor: C.gold },
-                  ]}
-                />
-              ))}
+            <View key={st.id} style={{ width: w, height: h + (n - 1) * step + 4, marginLeft: k === 0 ? 0 : -w * 0.28, zIndex: st.mine ? 10 : k }}>
+              {/* bóng đổ dưới chân chồng xu */}
+              <View style={[styles.pileShadow, { width: w * 0.96, height: h * 0.46, borderRadius: w, bottom: -1 }]} />
+              {Array.from({ length: n }, (_, i) => {
+                const shade = n === 1 ? 0 : i < n * 0.34 ? 2 : i < n * 0.67 ? 1 : 0;
+                const j = jitter(`${st.id}${i}`);
+                const j2 = jitter(`${i}${st.id}r`);
+                return (
+                  <Image
+                    key={i}
+                    source={{ uri: coinTiltedUri(kind, shade) }}
+                    style={{ position: 'absolute', left: j * 4.5, bottom: i * step + 1, width: w, height: h, transform: [{ rotate: `${j2 * 9}deg` }] }}
+                  />
+                );
+              })}
             </View>
           );
         })}
@@ -99,27 +113,49 @@ function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; sm
 
 // ---------------- Đồng xu bay từ avatar vào ô ----------------
 
+const SPIN = [1, 0.12, 1, 0.12, 1, 0.12, 1];
+
+/** Đồng xu quay lật 3D (scaleX), bay vòng cung, chạm ô thì nảy nhẹ và "keng" */
 function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: string; onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
+  const bounce = useState(() => new Animated.Value(0))[0];
+  const done = useRef(onDone);
+  useEffect(() => { done.current = onDone; }, [onDone]);
   useEffect(() => {
-    Animated.timing(t, { toValue: 1, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: false }).start(onDone);
-  }, [t, onDone]);
-  const fx = from.x + from.w / 2 - 11;
-  const fy = from.y + from.h / 2 - 11;
-  const tx = to.x + to.w / 2 - 11;
-  const ty = to.y + to.h * 0.62 - 11;
+    const anim = Animated.sequence([
+      Animated.timing(t, { toValue: 1, duration: 560, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+      Animated.timing(bounce, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+      Animated.timing(bounce, { toValue: 0, duration: 130, easing: Easing.in(Easing.quad), useNativeDriver: false }),
+      Animated.timing(bounce, { toValue: 0.4, duration: 70, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+      Animated.timing(bounce, { toValue: 0, duration: 70, easing: Easing.in(Easing.quad), useNativeDriver: false }),
+    ]);
+    const clink = setTimeout(() => play('clink'), 560);
+    anim.start(({ finished }) => finished && done.current());
+    return () => { clearTimeout(clink); anim.stop(); };
+  }, [t, bounce]);
+  const S = 30;
+  const fx = from.x + from.w / 2 - S / 2;
+  const fy = from.y + from.h / 2 - S / 2;
+  const tx = to.x + to.w / 2 - S / 2;
+  const ty = to.y + to.h * 0.62 - S / 2;
   return (
     <Animated.View
-      style={[
-        styles.flyCoin,
-        {
-          backgroundColor: color,
-          left: t.interpolate({ inputRange: [0, 1], outputRange: [fx, tx] }),
-          top: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, Math.min(fy, ty) - 50, ty] }),
-          transform: [{ scale: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.3, 0.7] }) }],
-        },
-      ]}
-    />
+      style={{
+        position: 'absolute', width: S, height: S,
+        left: t.interpolate({ inputRange: [0, 1], outputRange: [fx, tx] }),
+        top: Animated.add(
+          t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, Math.min(fy, ty) - 56, ty] }),
+          bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -9] }),
+        ),
+        transform: [
+          { scaleX: t.interpolate({ inputRange: [0, 0.17, 0.33, 0.5, 0.67, 0.83, 1], outputRange: SPIN }) },
+          { scale: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.25, 0.9] }) },
+          { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['-25deg', '10deg'] }) },
+        ],
+      }}
+    >
+      <Image source={{ uri: coinFrontUri(color) }} style={{ width: S, height: S }} />
+    </Animated.View>
   );
 }
 
@@ -408,7 +444,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const flySeq = useRef(0);
   const left = useSecondsLeft(g.stepEndsAt, game.clockOffset);
   // màn hình thấp (điện thoại nhỏ / bàn phím mở): thu gọn để thấy cả bát lẫn chiếu
-  const compact = useWindowDimensions().height < 740;
+  const compact = useStableWindow().height < 740;
 
   const isSpectator = !(me in g.balances);
   const myBets = g.bets[me] ?? {};
@@ -417,7 +453,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const available = balance - staked;
   const nameOf = (id: string) => (id === me ? 'Bạn' : g.names[id] ?? '?');
   const playerOf = (id: string): PublicPlayer | undefined => room.players.find((p) => p.id === id);
-  const colorOf = (id: string) => portraitFor(playerOf(id) ?? { avatar: 0 }).light;
+  const colorOf = (id: string) => portraitFor(playerOf(id) ?? { avatar: 0 }).hex;
   const borderColorOf = (id: string) => {
     const p = playerOf(id);
     return p?.character ? portraitFor(p).hex : C.ink;
@@ -440,6 +476,9 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
       setReveal(g.round);
       if (g.lastDeltas) {
         for (const [id, d] of Object.entries(g.lastDeltas)) {
+          // mặt mũi đổi theo vận may: ăn lớn thì cười đểu, trắng tay thì khóc
+          if (d >= 300) setMood(id, 'smug', 4500);
+          else if (d < 0 && (g.balances[id] ?? 0) <= 0) setMood(id, 'cry', 4500);
           if (id === me) continue; // người chơi đã thấy kết quả trên màn mở bát
           if (d >= 300) feed(quip.bigWin(nameOf(id), fmt(d)), 'good');
           else if (d < 0 && (g.balances[id] ?? 0) <= 0) feed(quip.broke(nameOf(id)), 'bad');
@@ -466,7 +505,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
           if ((mine[s] ?? 0) > (prev[id]?.[s] ?? 0)) {
             const from = rectOf(`avatar-${id}`, origin);
             const to = rectOf(`sym-${s}`, origin);
-            if (from && to) add.push({ id: ++flySeq.current, from, to, color: id === me ? C.gold : colorOf(id) });
+            const col = colorOf(id);
+            if (from && to) add.push({ id: ++flySeq.current, from, to, color: id === me ? `gold|${col}` : col });
             if (id !== me) play('coin');
           }
         }
@@ -762,7 +802,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E0D14', borderRadius: 18,
   },
   tile: { width: '32%', aspectRatio: 0.82, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
-  tileCompact: { aspectRatio: 1.05 },
+  tileCompact: { aspectRatio: 1.12 },
   tileInner: {
     flex: 1, borderWidth: 1.5, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 2, overflow: 'hidden',
@@ -782,8 +822,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, overflow: 'hidden', marginBottom: 2,
   },
   pileRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  coin: { position: 'absolute', left: 0, borderWidth: 1.5, borderColor: C.ink },
-  flyCoin: { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.ink },
+  pileShadow: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(30,8,8,0.42)', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
   mine: {
     position: 'absolute', top: -10, right: -6, backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink,
     borderRadius: 14, paddingHorizontal: 8, paddingVertical: 1, fontWeight: '900', fontSize: 13, overflow: 'hidden',

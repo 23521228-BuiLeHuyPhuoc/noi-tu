@@ -2,7 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import type { AuthAck, ClientToServerEvents, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
-import { cleanFun, RateLimiter } from './fun';
+import { cleanFun, isScreenTroll, isTroll, RateLimiter, trollExtras } from './fun';
 import type { Auth } from './auth';
 import type { UserRecord } from './store';
 
@@ -27,6 +27,8 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
     let token: string | null = null;
     const limiter = new RateLimiter();
     const chatLimiter = new RateLimiter(5, 1500);
+    // chọc mất dạy: tối đa 4 lần liền, hồi 1 lần mỗi 3 giây
+    const trollLimiter = new RateLimiter(4, 3000);
     const authLimiter = new RateLimiter(6, 4000);
 
     const currentRoom = (): Room | undefined => {
@@ -137,7 +139,11 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       if (!room || !session || !f || room.isSpectator(session.playerId)) return reply({ ok: false });
       if ('to' in f && (!room.has(f.to) || f.to === session.playerId)) return reply({ ok: false });
       if (!limiter.take()) return reply({ ok: false });
-      const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : {};
+      if (isTroll(f.kind)) {
+        if (!trollLimiter.take()) return reply({ ok: false });
+        if (isScreenTroll(f.kind) && 'to' in f && !room.screenCooldown.take(f.to)) return reply({ ok: false });
+      }
+      const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : trollExtras(f);
       io.to(room.code).emit('fun:event', { ...f, ...extra, id: ++funSeq, from: session.playerId });
       reply({ ok: true });
     });
