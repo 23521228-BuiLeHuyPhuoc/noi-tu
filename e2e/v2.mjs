@@ -50,11 +50,12 @@ async function suite(name, run) {
 async function definitionMatches(p) {
   const word = (await p.t('current-word').textContent()).trim();
   const expected = definitions[word];
-  const text = (await p.t('current-definition').textContent()).trim();
+  const hasBox = (await p.t('current-definition').count()) > 0;
+  const text = hasBox ? (await p.t('current-definition').textContent()).trim() : '';
   if (expected?.text) {
     assert.ok(text.includes(expected.text.trim().slice(0, 400)), `Definition belongs to ${word}`);
     assert.ok(text.includes(`Nguồn: ${expected.source.trim()}`), 'Definition credits its source');
-  } else assert.equal(text, 'Chưa có giải nghĩa');
+  } else assert.equal(hasBox, false, 'Không có giải nghĩa thì ẩn hẳn khung giải nghĩa');
   return { word, text };
 }
 
@@ -63,8 +64,13 @@ try {
     await a.t('start-btn').click();
     await a.t('current-word').waitFor();
     const initial = await definitionMatches(a);
-    assert.equal((await b.t('current-definition').textContent()).trim(), initial.text);
-    assert.equal((await a.t('history-definition').first().textContent()).trim(), initial.text);
+    if (initial.text) {
+      assert.equal((await b.t('current-definition').textContent()).trim(), initial.text);
+      assert.equal((await a.t('history-definition').first().textContent()).trim(), initial.text);
+    } else {
+      assert.equal(await b.t('current-definition').count(), 0);
+      assert.equal(await a.t('history-definition').count(), 0);
+    }
     const active = (await a.t('turn-label').textContent()).includes('Tới lượt bạn') ? a : b;
     await active.t('hint-btn').click();
     await active.t('hint-word').click();
@@ -75,9 +81,10 @@ try {
     const accepted = await definitionMatches(a);
     assert.equal(accepted.word, next);
     const history = await a.t('history-definition').allTextContents();
-    assert.ok(history.includes(initial.text), 'Earlier word keeps its definition');
-    assert.ok(history.includes(accepted.text), 'Accepted word carries definition into history');
-    assert.ok(history.length >= 2);
+    // từ không có nghĩa thì không có khung nào trong lịch sử
+    if (initial.text) assert.ok(history.includes(initial.text), 'Earlier word keeps its definition');
+    if (accepted.text) assert.ok(history.includes(accepted.text), 'Accepted word carries definition into history');
+    assert.equal(history.length, [initial.text, accepted.text].filter(Boolean).length);
   }));
 
   await suite('Nine Quynh Aka stickers and rejoin history', () => room('wordchain', async (a, b, code) => {
@@ -116,15 +123,18 @@ try {
     await a.t('start-btn').click();
     await b.t('sym-cua').waitFor();
     assert.equal(await b.t('bc-round').textContent(), 'Ván 1/20');
+    await b.t('bc-rank-open').click();
     await b.t('bc-leaderboard').waitFor();
     assert.ok((await b.t('bc-rank-1').textContent()).includes('1.000 xu'));
+    await b.page.getByLabel('Đóng', { exact: true }).click();
+    await b.t('bc-leaderboard').waitFor({ state: 'detached' });
     // Người thứ 3 vào phòng khi ván đã bắt đầu -> vẫn vào được ở chế độ xem (spectator)
     const spec = await player('E2E Spec');
     try {
       await spec.t('code-input').fill(code);
       await spec.t('join-btn').click();
       await spec.t('spectator-banner').waitFor();
-      await spec.t('bc-spectator').waitFor();
+      assert.equal(await spec.t('bc-spectator').count(), 0, 'Chỉ còn một thông báo chế độ xem (banner của Shell)');
       assert.equal(await spec.t('chip-50').count(), 0, 'Spectator has no betting chips');
     } finally {
       await spec.context.close();

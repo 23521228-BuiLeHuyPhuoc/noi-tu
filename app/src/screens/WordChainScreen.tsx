@@ -3,6 +3,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
 import type { RoomState, WordChainView, WordDefinition, WordHistoryItem, WordVote } from '../../../shared/src/types';
 import type { Game } from '../useGame';
+import { shortName } from '../avatars';
 import { actionText, quip } from '../messages';
 import { useOnNew, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
@@ -137,7 +138,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     >
       <Card style={styles.board}>
         <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
-          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
+          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${shortName(current.name, 14)}` : ''}
         </T>
         <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
           {first} <T style={styles.last}>{last}</T>
@@ -153,9 +154,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
         )}
       </Card>
 
-      {isSpectator ? (
-        <T style={styles.out}>👀 Bạn vào sau nên đang ở chế độ xem. Chờ ván kế tiếp để tham gia nối từ nhé!</T>
-      ) : meOut ? (
+      {isSpectator ? null : meOut ? (
         <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
       ) : myTurn ? (
         <View style={{ gap: 8 }}>
@@ -212,7 +211,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
             small
             variant="ghost"
             icon="⏰"
-            title={`Hối ${current.name}`}
+            title={`Hối ${shortName(current.name, 14)}`}
             onPress={() => game.sendFun({ kind: 'poke', to: current.id })}
           />
         )
@@ -274,11 +273,11 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
 function Definition({ definition, current = false }: { definition?: WordDefinition; current?: boolean }) {
   const text = definition?.text.trim();
   const source = definition?.source?.trim();
+  // server trả câu "Chưa có giải nghĩa" khi thiếu nghĩa: ẩn hẳn khung
+  if (!text || text === 'Chưa có giải nghĩa') return null;
   return (
     <View style={[styles.definition, current && styles.currentDefinition]} testID={current ? 'current-definition' : 'history-definition'}>
-      <T style={[styles.definitionText, !text && styles.definitionMissing]}>
-        {text || 'Chưa có giải nghĩa'}
-      </T>
+      <T style={styles.definitionText}>{text}</T>
       {source && <T style={styles.definitionSource}>Nguồn: {source}</T>}
     </View>
   );

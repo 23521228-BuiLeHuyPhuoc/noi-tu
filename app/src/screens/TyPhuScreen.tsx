@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
@@ -7,7 +7,7 @@ import {
 } from '../../../shared/src/typhu';
 import type { Game } from '../useGame';
 import { actionText } from '../messages';
-import { characterSvgUri, playerColorOf } from '../avatars';
+import { characterSvgUri, playerColorOf, shortName } from '../avatars';
 import { TYPHU_PHOTOS } from '../typhuArt';
 import { useOnChange, useOnNew, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
@@ -18,7 +18,9 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { TimerBar } from '../components/TimerBar';
 import { Dice } from '../components/Dice';
+import { TyPhuCell } from '../components/TyPhuCell';
 import { useShake } from '../components/Fun';
+import { compactXu } from '../format';
 
 /** màu dự phòng theo thứ tự lượt nếu người chơi chưa có character */
 export const TOKEN_COLORS = PLAYER_COLORS.map((c) => c.hex);
@@ -71,13 +73,17 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   };
   const colorOf = (id: string) => colorEntryOf(id).hex;
   const lightColorOf = (id: string) => colorEntryOf(id).light;
-  const portraitUriOf = (id: string) => {
-    const p = playerById.get(id);
-    if (p?.avatarUrl) return p.avatarUrl;
-    if (p?.character) return characterSvgUri(p.character);
-    return characterSvgUri({ gender: 'nam', age: 'tre', hair: 'han', color: Math.max(0, g.order.indexOf(id)) });
-  };
-  const nameOf = (id: string) => (id === me ? 'Bạn' : g.names[id] ?? '?');
+  const portraits = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const id of g.order) {
+      const p = room.players.find((x) => x.id === id);
+      m[id] = p?.avatarUrl
+        ?? characterSvgUri(p?.character ?? { gender: 'nam', age: 'tre', hair: 'han', color: Math.max(0, g.order.indexOf(id)) });
+    }
+    return m;
+  }, [room.players, g.order]);
+  const portraitUriOf = (id: string) => portraits[id] ?? characterSvgUri();
+  const nameOf = (id: string) => (id === me ? 'Bạn' : shortName(g.names[id] ?? '?', 12));
   const left = useSecondsLeft(g.turnEndsAt, game.clockOffset, g.turnSeconds);
   const inJail = me in g.jail;
 
@@ -272,7 +278,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
         ? 'Bạn đang ngồi tù: đổ đôi để ra, hoặc nộp tiền'
         : 'Tới lượt bạn, đổ xúc xắc đi!'
       : g.step === 'buy'
-        ? 'Mua miếng đất này không?'
+        ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)} xu?` : 'Mua miếng đất này không?'
         : g.step === 'manage'
           ? 'Chạm vào đất của bạn để xây nhà'
           : 'Chờ chút…'
@@ -281,6 +287,37 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
   const recent = g.log.slice(-2).reverse();
   const d = detail !== null ? TYPHU_BOARD[detail] : null;
   const activeCellFx = cellFx && now - cellFx.at < 2200 ? cellFx : null;
+
+  const landscape = !isPortrait;
+  const stacked = isPortrait && !rotated ? true : false;
+  const diceSize = Math.max(34, Math.min(48, minCell * 0.78));
+  const buyable = !moving && myTurn && g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending : null;
+  const controls = (
+    <>
+      {!stacked && (
+        <T testID="typhu-status" style={[styles.status, myTurn && { color: C.gold }]}>
+          {status}
+        </T>
+      )}
+      {!moving && myTurn && g.step === 'roll' ? (
+        <View style={styles.row}>
+          {inJail && (
+            <Button testID="pay-jail" small variant="paper" title={`Nộp ${TYPHU_JAIL_FINE} xu`} style={{ flex: 1 }} onPress={() => act({ type: 'payJail' })} />
+          )}
+          <Button testID="roll-btn" small title="🎲 Đổ xúc xắc" style={{ flex: 1.2 }} onPress={() => act({ type: 'roll' })} />
+        </View>
+      ) : buyable ? (
+        <View style={styles.row}>
+          <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => act({ type: 'skip' })} />
+          <Button testID="buy-btn" small title="Mua" style={{ flex: 1 }} onPress={() => act({ type: 'buy' })} />
+        </View>
+      ) : !moving && myTurn && g.step === 'manage' ? (
+        <Button testID="end-turn" small title="✓ Xong lượt" variant="gold" onPress={() => act({ type: 'endTurn' })} />
+      ) : null}
+      <TimerBar left={left} total={g.turnSeconds} />
+      {error && <T style={styles.error}>{error}</T>}
+    </>
+  );
 
   return (
     <Shell
@@ -295,13 +332,13 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
         dim: (p) => g.bankrupt.includes(p.id),
         ring: (p) => (g.order.includes(p.id) ? colorOf(p.id) : undefined),
         sub: (p) =>
-          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${fmt(g.cash[p.id])} xu${p.id in g.jail ? ' 🚔' : ''}` : undefined,
+          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${compactXu(g.cash[p.id])} xu${p.id in g.jail ? ' 🚔' : ''}` : undefined,
       }}
     >
       {isPortrait && (
         <View style={styles.rotateBar}>
-          <T numberOfLines={1} style={styles.rotateHint}>
-            📱 Xoay ngang màn hình để bàn cờ trải rộng cực đại!
+          <T style={styles.rotateHint}>
+            📱 Xoay ngang cho bàn cờ to hơn
           </T>
           <Pressable
             testID="rotate-toggle"
@@ -309,7 +346,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
             onPress={() => setForceRotate((v) => !v)}
             style={styles.rotateBtn}
           >
-            <T style={styles.rotateBtnText}>{forceRotate ? '↩ Khung dọc' : '🔄 Xoay ngang 90°'}</T>
+            <T style={styles.rotateBtnText}>{forceRotate ? '↩ Khung dọc' : '🔄 Xoay 90°'}</T>
           </Pressable>
         </View>
       )}
@@ -329,125 +366,39 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
             rotated && { transform: [{ rotate: '90deg' }] },
           ]}
         >
-          {/* 40 ô xung quanh bàn cờ với ảnh thật địa danh & huy hiệu cấp nhà rõ nét */}
+          {/* 40 ô xung quanh bàn cờ (memo: chỉ vẽ lại khi ô đó đổi) */}
           {TYPHU_BOARD.map((c, i) => {
             const [r, col] = typhuCellPos(i);
             const owner = g.owners[i];
-            const houses = g.houses[i] ?? 0;
-            const here = g.pendingBuy === i;
-            const isTrail = activeMovementState?.trail.has(i) ?? false;
-            const isStepTarget = activeMovementState?.activeStepCell === i;
-            const isFxCell = activeCellFx?.cell === i;
-            const photoUri = TYPHU_PHOTOS[c.name];
-            const badge = owner ? houseBadgeInfo(houses, colorOf(owner)) : null;
-
+            const badge = owner ? houseBadgeInfo(g.houses[i] ?? 0, colorOf(owner)) : null;
+            const fx = activeCellFx?.cell === i ? activeCellFx : null;
             return (
-              <Pressable
+              <TyPhuCell
                 key={i}
-                testID={`cell-${i}`}
-                accessibilityRole="button"
-                accessibilityLabel={`${i + 1}. ${c.name}${owner ? `, thuộc ${nameOf(owner)}` : ''}${isTyPhuProperty(c) ? `, giá ${c.price} xu` : ''}`}
-                onPress={() => setDetail(i)}
-                style={[
-                  styles.cell,
-                  { top: r * cellH, left: col * cellW, width: cellW, height: cellH },
-                  owner && {
-                    backgroundColor: lightColorOf(owner),
-                    borderWidth: 2.5,
-                    borderColor: colorOf(owner),
-                  },
-                  isTrail && styles.cellTrail,
-                  isStepTarget && styles.cellStepTarget,
-                  here && styles.cellHere,
-                  isFxCell && { borderWidth: 3.5, borderColor: activeCellFx.color },
-                ]}
-              >
-                {/* Ảnh địa danh thật trên mạng */}
-                {photoUri && (
-                  <Image
-                    source={{ uri: photoUri }}
-                    style={styles.cellPhoto}
-                    resizeMode="cover"
-                  />
-                )}
-                <View style={styles.cellScrim} />
-
-                {/* Dải màu bộ đất hoặc biểu tượng ô đặc biệt */}
-                {c.kind === 'land' ? (
-                  <View style={[styles.band, { backgroundColor: TYPHU_GROUPS[c.group].color, height: Math.max(5, cellH * 0.16) }]} />
-                ) : (
-                  <View style={styles.cornerBadge}>
-                    <T style={{ fontSize: Math.max(9, minCell * 0.22), lineHeight: Math.max(11, minCell * 0.25) }}>
-                      {CORNER_ICON[c.kind]}
-                    </T>
-                  </View>
-                )}
-
-                {/* Tên địa danh nổi bật trên nền ảnh */}
-                <View style={styles.cellNamePill}>
-                  <T
-                    numberOfLines={2}
-                    style={[
-                      styles.cellName,
-                      {
-                        fontSize: Math.max(7.5, Math.min(12, minCell * 0.19)),
-                        lineHeight: Math.max(8.5, Math.min(13.5, minCell * 0.22)),
-                      },
-                    ]}
-                  >
-                    {c.name}
-                  </T>
-                </View>
-
-                {/* Giá tiền khi chưa có chủ */}
-                {isTyPhuProperty(c) && !owner && (
-                  <View style={styles.pricePill}>
-                    <T style={[styles.price, { fontSize: Math.max(7, Math.min(11, minCell * 0.17)) }]}>
-                      {c.price}
-                    </T>
-                  </View>
-                )}
-
-                {/* Huy hiệu Chủ sở hữu + Cấp nhà (ĐẤT / C1 / C2 / C3 / KS) cực kỳ dễ phân biệt */}
-                {owner && badge && (
-                  <View
-                    style={[
-                      styles.ownerBar,
-                      {
-                        backgroundColor: badge.bg,
-                        borderColor: badge.border,
-                        minHeight: Math.max(12, cellH * 0.26),
-                      },
-                    ]}
-                  >
-                    <Image
-                      source={{ uri: portraitUriOf(owner) }}
-                      style={[
-                        styles.ownerImage,
-                        { width: Math.max(10, minCell * 0.24), height: Math.max(10, minCell * 0.24) },
-                      ]}
-                    />
-                    <T
-                      numberOfLines={1}
-                      style={[
-                        styles.levelText,
-                        { fontSize: Math.max(7, Math.min(11, minCell * 0.18)) },
-                      ]}
-                    >
-                      {badge.text}
-                    </T>
-                  </View>
-                )}
-
-                {/* Hiệu ứng ánh sáng bùng lên khi vừa mua đất hoặc nâng cấp nhà */}
-                {isFxCell && (
-                  <View pointerEvents="none" style={[styles.cellBurstOverlay, { borderColor: activeCellFx.color }]}>
-                    <View style={[styles.cellBurstPill, { backgroundColor: activeCellFx.color }]}>
-                      <T style={styles.cellBurstText}>{activeCellFx.label}</T>
-                    </View>
-                  </View>
-                )}
-              </Pressable>
+                index={i}
+                name={c.name}
+                bandColor={c.kind === 'land' ? TYPHU_GROUPS[c.group].color : null}
+                icon={c.kind === 'land' ? null : CORNER_ICON[c.kind]}
+                price={isTyPhuProperty(c) ? c.price : null}
+                top={r * cellH}
+                left={col * cellW}
+                w={cellW}
+                h={cellH}
+                minCell={minCell}
+                ownerName={owner ? nameOf(owner) : null}
+                ownerHex={owner ? colorOf(owner) : null}
+                ownerLight={owner ? lightColorOf(owner) : null}
+                ownerPortrait={owner ? portraitUriOf(owner) : null}
+                badgeText={badge?.text ?? null}
+                badgeBg={badge?.bg ?? null}
+                badgeBorder={badge?.border ?? null}
+                here={g.pendingBuy === i}
+                isTrail={activeMovementState?.trail.has(i) ?? false}
+                isStepTarget={activeMovementState?.activeStepCell === i}
+                fxLabel={fx?.label ?? null}
+                fxColor={fx?.color ?? null}
+                onPress={setDetail}
+              />
             );
           })}
 
@@ -562,7 +513,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
                         {id in g.jail && <T style={styles.turnDot}>🚔</T>}
                       </View>
                       <T numberOfLines={1} style={styles.wealthCash}>
-                        {isBankrupt ? '💀 Phá sản' : `💰 ${fmt(g.cash[id] ?? 0)} xu`}
+                        {isBankrupt ? '💀 Phá sản' : `${fmt(g.cash[id] ?? 0)} xu`}
                       </T>
                       <T numberOfLines={1} style={styles.wealthProps}>
                         {ownedCells.length} đất{houseCount > 0 ? ` · ${houseCount} nhà` : ''}{hotelCount > 0 ? ` · ${hotelCount} KS` : ''}
@@ -589,85 +540,41 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
             </View>
 
             {/* KHU VỰC XÚC XẮC & NÚT HÀNH ĐỘNG TRUNG TÂM */}
-            <View style={styles.actionHub}>
-              <View
-                testID={`dice-phase-${dicePhase}`}
-                accessibilityLabel={`Xúc xắc: ${dicePhase}`}
-                style={[
-                  styles.diceArena,
-                  diceAnimating && styles.diceArenaGlow,
-                  !reducedMotion && dicePhase === 'roll' && { transform: [{ rotate: `${rollElapsed * 1.8}deg` }, { scale: 1.1 }] },
-                  !reducedMotion && dicePhase === 'bounce' && { transform: [{ translateY: -Math.sin(((rollElapsed - 400) / 140) * Math.PI) * 10 }, { scale: 1.08 }] },
-                ]}
-              >
-                <Dice
-                  testID="die-1"
-                  value={dicePhase === 'roll' ? (Math.floor(now / 65) % 6) + 1 : g.dice?.[0] ?? null}
-                  rollId={diceAnimating ? g.rollId : 0}
-                  size={Math.max(34, Math.min(48, minCell * 0.78))}
-                />
-                <Dice
-                  testID="die-2"
-                  value={dicePhase === 'roll' ? (Math.floor(now / 83) % 6) + 1 : g.dice?.[1] ?? null}
-                  rollId={diceAnimating ? g.rollId : 0}
-                  size={Math.max(34, Math.min(48, minCell * 0.78))}
-                />
-              </View>
-
-              <View style={styles.controlsCol}>
-                <T testID="typhu-status" numberOfLines={2} style={[styles.status, myTurn && { color: C.gold }]}>
-                  {status}
-                </T>
-                {!moving && myTurn && g.step === 'roll' ? (
-                  <View style={styles.row}>
-                    {inJail && (
-                      <Button
-                        testID="pay-jail"
-                        small
-                        variant="paper"
-                        title={`Nộp ${TYPHU_JAIL_FINE} xu`}
-                        style={{ flex: 1 }}
-                        onPress={() => act({ type: 'payJail' })}
-                      />
-                    )}
-                    <Button
-                      testID="roll-btn"
-                      small
-                      title="🎲 Đổ xúc xắc"
-                      style={{ flex: 1.2 }}
-                      onPress={() => act({ type: 'roll' })}
-                    />
-                  </View>
-                ) : !moving && myTurn && g.step === 'buy' && pending && isTyPhuProperty(pending) ? (
-                  <View style={styles.row}>
-                    <Button
-                      testID="skip-btn"
-                      small
-                      variant="paper"
-                      title="Bỏ qua"
-                      style={{ flex: 0.8 }}
-                      onPress={() => act({ type: 'skip' })}
-                    />
-                    <Button
-                      testID="buy-btn"
-                      small
-                      title={`Mua ${pending.name} (${fmt(pending.price)})`}
-                      style={{ flex: 1.6 }}
-                      onPress={() => act({ type: 'buy' })}
-                    />
-                  </View>
-                ) : !moving && myTurn && g.step === 'manage' ? (
-                  <Button
-                    testID="end-turn"
-                    small
-                    title="✓ Xong lượt"
-                    variant="gold"
-                    onPress={() => act({ type: 'endTurn' })}
+            <View style={[styles.actionHub, stacked && styles.actionHubStacked]}>
+              <View style={[styles.hubTop, !stacked && { flex: 1 }]}>
+                <View
+                  testID={`dice-phase-${dicePhase}`}
+                  accessibilityLabel={`Xúc xắc: ${dicePhase}`}
+                  style={[
+                    styles.diceArena,
+                    diceAnimating && styles.diceArenaGlow,
+                    !reducedMotion && dicePhase === 'roll' && { transform: [{ rotate: `${rollElapsed * 1.8}deg` }, { scale: 1.1 }] },
+                    !reducedMotion && dicePhase === 'bounce' && { transform: [{ translateY: -Math.sin(((rollElapsed - 400) / 140) * Math.PI) * 10 }, { scale: 1.08 }] },
+                  ]}
+                >
+                  <Dice
+                    testID="die-1"
+                    value={dicePhase === 'roll' ? (Math.floor(now / 65) % 6) + 1 : g.dice?.[0] ?? null}
+                    rollId={diceAnimating ? g.rollId : 0}
+                    size={diceSize}
                   />
-                ) : null}
-                <TimerBar left={left} total={g.turnSeconds} />
-                {error && <T style={styles.error}>{error}</T>}
+                  <Dice
+                    testID="die-2"
+                    value={dicePhase === 'roll' ? (Math.floor(now / 83) % 6) + 1 : g.dice?.[1] ?? null}
+                    rollId={diceAnimating ? g.rollId : 0}
+                    size={diceSize}
+                  />
+                </View>
+                {stacked && (
+                  <T testID="typhu-status" style={[styles.status, styles.statusStacked, myTurn && { color: C.gold }]}>
+                    {status}
+                  </T>
+                )}
+                {!stacked && (
+                  <View style={styles.controlsCol}>{controls}</View>
+                )}
               </View>
+              {stacked && <View style={styles.controlsCol}>{controls}</View>}
             </View>
 
             {/* Thẻ Cơ hội / Khí vận & dòng sự kiện */}
@@ -689,9 +596,15 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {d && detail !== null && (
         <Sheet title={d.name} onClose={() => setDetail(null)}>
-          {TYPHU_PHOTOS[d.name] && (
-            <Image source={{ uri: TYPHU_PHOTOS[d.name] }} style={styles.detailPhoto} resizeMode="cover" />
-          )}
+          <View style={landscape ? styles.detailRow : undefined}>
+            {TYPHU_PHOTOS[d.name] && (
+              <Image
+                source={{ uri: TYPHU_PHOTOS[d.name] }}
+                style={[styles.detailPhoto, landscape ? styles.detailPhotoSide : styles.detailPhotoTop]}
+                resizeMode="cover"
+              />
+            )}
+            <View style={[{ gap: 8 }, landscape && { flex: 1 }]}>
           {d.kind === 'land' ? (
             <View style={{ gap: 6 }}>
               <View style={[styles.detailBand, { backgroundColor: TYPHU_GROUPS[d.group].color }]}>
@@ -765,6 +678,8 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
               {d.kind === 'tax' && `Nộp ${fmt(d.amount)} xu cho ngân hàng.`}
             </T>
           )}
+            </View>
+          </View>
         </Sheet>
       )}
 
@@ -958,6 +873,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 26, 19, 0.82)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5,
     borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.35)',
   },
+  actionHubStacked: { flexDirection: 'column', alignItems: 'stretch', gap: 6 },
+  hubTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusStacked: { flex: 1, textAlign: 'left', fontSize: 14 },
   diceArena: {
     flexDirection: 'row', alignItems: 'center', gap: 8, padding: 4, borderRadius: 10,
   },
@@ -991,9 +909,11 @@ const styles = StyleSheet.create({
   log: {
     fontSize: 11, textAlign: 'center', color: '#D8F5A2', fontWeight: '700',
   },
-  detailPhoto: {
-    width: '100%', height: 140, borderRadius: 12, borderWidth: 2, borderColor: C.ink,
-  },
+  detailPhoto: { borderRadius: 12, borderWidth: 2, borderColor: C.ink },
+  // ảnh gốc 116x80: chỉ phóng tối đa ~1,7 lần
+  detailPhotoTop: { width: 197, height: 136, alignSelf: 'center', marginBottom: 8 },
+  detailPhotoSide: { width: 140, height: 97 },
+  detailRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   detailBand: {
     borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 2, borderColor: C.ink,
   },

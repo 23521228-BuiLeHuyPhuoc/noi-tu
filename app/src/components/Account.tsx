@@ -1,28 +1,31 @@
 /** Đăng nhập / tạo tài khoản / sửa hồ sơ (lưu thành tích trên server) */
-import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { GAME_INFO, type GameType, type PublicUser } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { AVATARS, avatarOf } from '../avatars';
-import { C, FONT, sticker } from '../theme';
+import { AVATAR_PRESETS } from '../avatars';
+import { Portrait } from './Avatar';
+import { SERVER_URL } from '../config';
+import { C, FONT } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Sheet } from './Sheet';
 
 function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
   return (
     <View style={styles.avatars}>
-      {AVATARS.map((a, i) => (
+      {AVATAR_PRESETS.map((_, i) => (
         <Pressable
           key={i}
           testID={`avatar-pick-${i}`}
           accessibilityRole="button"
+          accessibilityLabel={`Chân dung ${i + 1}`}
           accessibilityState={{ selected: value === i, disabled }}
           disabled={disabled}
           onPress={() => onChange(i)}
-          style={[styles.pick, { backgroundColor: a.bg }, value === i && styles.pickOn, disabled && { opacity: 0.45 }]}
+          style={[styles.pick, value === i && styles.pickOn, disabled && { opacity: 0.45 }]}
         >
-          <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
+          <Portrait p={{ avatar: i }} size={46} border={value === i ? 3 : 1.5} />
         </Pressable>
       ))}
     </View>
@@ -30,16 +33,25 @@ function AvatarPicker({ value, onChange, disabled = false }: { value: number; on
 }
 
 function UserAvatar({ avatar, avatarUrl, size = 60 }: { avatar: number; avatarUrl?: string; size?: number }) {
-  const fallback = avatarOf(avatar);
-  return (
-    <View style={[styles.userAvatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: fallback.bg }]}>
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
-      ) : (
-        <Text style={{ fontSize: size * 0.56 }}>{fallback.emoji}</Text>
-      )}
-    </View>
-  );
+  return <Portrait p={{ avatar, avatarUrl }} size={size} />;
+}
+
+/** Server cũ không có trường avatarUploads (hoặc không gọi được): vẫn hiện nút tải ảnh. */
+function useAvatarUploads(): boolean {
+  const [ok, setOk] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${SERVER_URL}/health`)
+      .then((r) => r.json())
+      .then((j: { avatarUploads?: unknown }) => {
+        if (alive && j.avatarUploads === false) setOk(false);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ok;
 }
 
 function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
@@ -59,7 +71,7 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState(defaultName);
-  const [avatar, setAvatar] = useState(() => Math.floor(Math.random() * AVATARS.length));
+  const [avatar, setAvatar] = useState(() => Math.floor(Math.random() * AVATAR_PRESETS.length));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -146,6 +158,7 @@ export function ProfileSheet({ game, user, onClose }: { game: Game; user: Public
   const [uploading, setUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(user.avatarUrl);
   const [removePhoto, setRemovePhoto] = useState(false);
+  const canUpload = useAvatarUploads();
   const save = async () => {
     setBusy(true);
     let err = removePhoto ? await game.removeAvatar() : null;
@@ -183,19 +196,23 @@ export function ProfileSheet({ game, user, onClose }: { game: Game; user: Public
       <Field testID="profile-name" label="Tên hiển thị" value={displayName} onChangeText={setDisplayName} autoCapitalize="words" maxLength={24} />
       <View style={styles.photoRow}>
         <UserAvatar avatar={avatar} avatarUrl={avatarPreview} size={72} />
-        <View style={{ flex: 1, gap: 4 }}>
-          <Button
-            testID="avatar-upload"
-            small
-            variant="paper"
-            title={uploading ? 'Đang tải ảnh…' : 'Chọn ảnh của bạn'}
-            disabled={uploading || busy}
-            onPress={choosePhoto}
-          />
-          <T style={styles.photoNote}>JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh được cắt vuông.</T>
-        </View>
+        {canUpload ? (
+          <View style={{ flex: 1, gap: 4 }}>
+            <Button
+              testID="avatar-upload"
+              small
+              variant="paper"
+              title={uploading ? 'Đang tải ảnh…' : 'Chọn ảnh của bạn'}
+              disabled={uploading || busy}
+              onPress={choosePhoto}
+            />
+            <T style={styles.photoNote}>JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh được cắt vuông.</T>
+          </View>
+        ) : (
+          <T style={[styles.photoNote, { flex: 1 }]}>Chọn một chân dung bên dưới làm mặt đại diện.</T>
+        )}
       </View>
-      <T style={styles.label}>Hoặc dùng mặt đại diện có sẵn</T>
+      <T style={styles.label}>{canUpload ? 'Hoặc dùng mặt đại diện có sẵn' : 'Mặt đại diện'}</T>
       <AvatarPicker disabled={uploading || busy} value={avatar} onChange={(value) => {
         setAvatar(value);
         if (avatarPreview) {
@@ -262,8 +279,8 @@ const styles = StyleSheet.create({
   error: { color: C.ink, backgroundColor: '#FFD6D6', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   note: { fontSize: 12, color: C.muted, textAlign: 'center' },
   avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  pick: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  pickOn: { ...sticker(2), transform: [{ scale: 1.12 }] },
+  pick: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
+  pickOn: { transform: [{ scale: 1.12 }], shadowColor: C.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 0 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bigAvatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink },
   userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink, overflow: 'hidden' },
