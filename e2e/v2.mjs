@@ -111,11 +111,24 @@ try {
     } finally { await c.context.close(); }
   }));
 
-  await suite('Bau Cua round limit and fullscreen reveal', () => room('baucua', async (a, b) => {
+  await suite('Bau Cua round limit, live ranking, late spectator, and fullscreen reveal', () => room('baucua', async (a, b, code) => {
     await a.t('rounds-20').click();
     await a.t('start-btn').click();
     await b.t('sym-cua').waitFor();
     assert.equal(await b.t('bc-round').textContent(), 'Ván 1/20');
+    await b.t('bc-leaderboard').waitFor();
+    assert.ok((await b.t('bc-rank-1').textContent()).includes('1.000 xu'));
+    // Người thứ 3 vào phòng khi ván đã bắt đầu -> vẫn vào được ở chế độ xem (spectator)
+    const spec = await player('E2E Spec');
+    try {
+      await spec.t('code-input').fill(code);
+      await spec.t('join-btn').click();
+      await spec.t('spectator-banner').waitFor();
+      await spec.t('bc-spectator').waitFor();
+      assert.equal(await spec.t('chip-50').count(), 0, 'Spectator has no betting chips');
+    } finally {
+      await spec.context.close();
+    }
     assert.equal(await b.t('bc-die').count(), 0, 'Betting step hides result faces');
     await b.t('chip-50').click();
     await b.t('sym-cua').click();

@@ -55,6 +55,7 @@ export function Shell({
   // người đã rời phòng giữa ván không còn trong room.players; người mới (nếu có) thêm vào cuối
   for (const p of room.players) if (!players.includes(p)) players.push(p);
 
+  const meIsSpectator = room.players.find((p) => p.id === game.me)?.spectator === true;
   const content = (
     <View style={[styles.content, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen]}>
       {children}
@@ -67,10 +68,10 @@ export function Shell({
         me={p.id === game.me}
         host={p.id === room.hostId}
         active={strip.active === p.id}
-        dim={strip.dim?.(p)}
-        sub={strip.sub?.(p)}
+        dim={strip.dim?.(p) || p.spectator}
+        sub={p.spectator ? '👀 Đang xem' : strip.sub?.(p)}
         ring={strip.ring?.(p)}
-        onPress={p.id === game.me ? undefined : () => setTarget(p)}
+        onPress={p.id === game.me || meIsSpectator ? undefined : () => setTarget(p)}
       />
     </View>
   ));
@@ -115,6 +116,12 @@ export function Shell({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
           {stripItems}
         </ScrollView>
+      )}
+
+      {meIsSpectator && (
+        <View testID="spectator-banner" style={styles.spectatorBanner}>
+          <T style={styles.spectatorText}>👀 Ván đang diễn ra — bạn đang ở chế độ xem (chờ ván sau để tham gia)</T>
+        </View>
       )}
 
       {scroll ? (
@@ -162,6 +169,11 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
   contentLandscape: { paddingBottom: 4, gap: 6 },
   contentFullscreen: { paddingHorizontal: 4, paddingBottom: 4, gap: 4 },
+  spectatorBanner: {
+    marginHorizontal: 12, marginBottom: 4, paddingVertical: 5, paddingHorizontal: 10,
+    backgroundColor: 'rgba(25, 18, 14, 0.86)', borderRadius: 10, borderWidth: 1.5, borderColor: C.gold,
+  },
+  spectatorText: { color: C.gold, fontSize: 12, fontWeight: '800', textAlign: 'center' },
   badge: {
     position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.gold,
     borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,

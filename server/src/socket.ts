@@ -134,7 +134,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       const reply = typeof ack === 'function' ? ack : () => {};
       const room = currentRoom();
       const f = cleanFun(raw);
-      if (!room || !session || !f) return reply({ ok: false });
+      if (!room || !session || !f || room.isSpectator(session.playerId)) return reply({ ok: false });
       if ('to' in f && (!room.has(f.to) || f.to === session.playerId)) return reply({ ok: false });
       if (!limiter.take()) return reply({ ok: false });
       const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : {};
@@ -145,7 +145,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
     socket.on('chat:send', (p, ack) => {
       const reply = typeof ack === 'function' ? ack : () => {};
       const room = currentRoom();
-      if (!room || !session || !p || typeof p !== 'object') return reply({ ok: false });
+      if (!room || !session || !p || typeof p !== 'object' || room.isSpectator(session.playerId)) return reply({ ok: false });
       if (!chatLimiter.take()) return reply({ ok: false });
       const msg = room.addChat(session.playerId, p);
       if (!msg) return reply({ ok: false });

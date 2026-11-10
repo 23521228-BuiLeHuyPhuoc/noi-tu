@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
-  BAUCUA_CHIPS, BAUCUA_SYMBOLS, type BauCuaSymbol, type BauCuaView, type PublicPlayer, type RoomState,
+  BAUCUA_CHIPS, BAUCUA_LOAN, BAUCUA_SYMBOLS, type BauCuaSymbol, type BauCuaView, type PublicPlayer, type RoomState,
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { actionText, quip, SYMBOL } from '../messages';
 import { ART } from '../baucuaArt';
-import { avatarOf } from '../avatars';
+import { avatarOf, characterSvgUri, playerColorOf } from '../avatars';
 import { useOnChange, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
@@ -331,9 +331,9 @@ function Reveal({ dice, myBets, delta, onDone }: {
 
 // ---------------- Ô con vật ----------------
 
-function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress }: {
+function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disabled, onPress }: {
   s: BauCuaSymbol; chip: number; step: BauCuaView['step']; hits: number; mine: number;
-  stakes: Stake[]; total: number; glow: boolean; compact: boolean; onPress: () => void;
+  stakes: Stake[]; total: number; glow: boolean; compact: boolean; disabled?: boolean; onPress: () => void;
 }) {
   const pulse = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -356,7 +356,7 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress
       testID={`sym-${s}`}
       accessibilityRole="button"
       accessibilityLabel={`Đặt ${chip} xu vào ${SYMBOL[s].name}`}
-      disabled={step !== 'betting'}
+      disabled={step !== 'betting' || disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
@@ -408,13 +408,37 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   // màn hình thấp (điện thoại nhỏ / bàn phím mở): thu gọn để thấy cả bát lẫn chiếu
   const compact = useWindowDimensions().height < 740;
 
+  const isSpectator = !(me in g.balances);
   const myBets = g.bets[me] ?? {};
   const staked = Object.values(myBets).reduce((s, v) => s + (v ?? 0), 0);
   const balance = g.balances[me] ?? 0;
   const available = balance - staked;
   const nameOf = (id: string) => (id === me ? 'Bạn' : g.names[id] ?? '?');
   const playerOf = (id: string): PublicPlayer | undefined => room.players.find((p) => p.id === id);
-  const colorOf = (id: string) => avatarOf(playerOf(id)?.avatar ?? 0).bg;
+  const colorOf = (id: string) => {
+    const p = playerOf(id);
+    if (p?.character) return playerColorOf(p.character).light;
+    return avatarOf(p?.avatar ?? 0).bg;
+  };
+  const borderColorOf = (id: string) => {
+    const p = playerOf(id);
+    if (p?.character) return playerColorOf(p.character).hex;
+    return C.ink;
+  };
+  const portraitOf = (id: string) => {
+    const p = playerOf(id);
+    if (p?.avatarUrl) return p.avatarUrl;
+    if (p?.character) return characterSvgUri(p.character);
+    return undefined;
+  };
+
+  // Xếp hạng xu liên tục theo xu thực có (xu trong ví trừ tiền vay nóng)
+  const netOf = (id: string) => (g.balances[id] ?? 0) - (g.debts[id] ?? 0) * BAUCUA_LOAN;
+  const rankedIds = Object.keys(g.balances).sort(
+    (a, b) => netOf(b) - netOf(a) || (g.balances[b] ?? 0) - (g.balances[a] ?? 0),
+  );
+  const rankOf = (id: string) => rankedIds.indexOf(id) + 1;
+  const rankBadge = (rank: number) => (rank === 1 ? '🥇#1' : rank === 2 ? '🥈#2' : rank === 3 ? '🥉#3' : `#${rank}`);
 
   useOnChange(g.step, (step) => {
     if (step === 'rolling') play('dice');
@@ -480,7 +504,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   };
 
   const bet = async (s: BauCuaSymbol) => {
-    if (g.step !== 'betting') return;
+    if (g.step !== 'betting' || isSpectator) return;
     if (await act({ type: 'bet', symbol: s, amount: Math.min(chip, available) || chip })) play('coin');
   };
 
@@ -503,7 +527,11 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
       game={game}
       room={room}
       strip={{
-        sub: (p) => (p.id in g.balances ? `${fmt(g.balances[p.id])} xu${g.debts[p.id] ? ' 💸' : ''}` : undefined),
+        order: rankedIds,
+        sub: (p) =>
+          p.id in g.balances
+            ? `${rankBadge(rankOf(p.id))} · ${fmt(g.balances[p.id])} xu${g.debts[p.id] ? ' 💸' : ''}`
+            : '👀 Đang xem',
       }}
       overlay={
         <>
@@ -518,40 +546,46 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
         </>
       }
       bottom={
-        <>
-          <View style={styles.chips}>
-            {BAUCUA_CHIPS.map((v) => (
-              <Pressable
-                key={v}
-                testID={`chip-${v}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: chip === v }}
-                onPress={() => setChip(v)}
-                style={[styles.chip, sticker(chip === v ? 4 : 2), chip === v && styles.chipOn]}
-              >
-                <View style={styles.chipRing}>
-                  <T style={styles.chipText}>{v}</T>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.row}>
-            {available < 10 && staked === 0 ? (
-              <Button testID="loan-btn" small icon="💸" title="Vay nóng 500 xu" variant="ink" style={{ flex: 1 }} onPress={() => act({ type: 'loan' })} />
-            ) : (
-              <Button
-                testID="clear-bets"
-                small
-                title={staked > 0 ? `Rút cược (${fmt(staked)})` : 'Chưa cược'}
-                variant="paper"
-                disabled={staked === 0 || g.step !== 'betting'}
-                style={{ flex: 1 }}
-                onPress={() => act({ type: 'clearBets' })}
-              />
-            )}
-          </View>
-          {error && <T style={styles.error}>{error}</T>}
-        </>
+        isSpectator ? (
+          <T testID="bc-spectator" style={styles.spectatorNote}>
+            👀 Bạn đang ở chế độ xem — chờ hết ván này để vào sòng đặt cược nhé!
+          </T>
+        ) : (
+          <>
+            <View style={styles.chips}>
+              {BAUCUA_CHIPS.map((v) => (
+                <Pressable
+                  key={v}
+                  testID={`chip-${v}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: chip === v }}
+                  onPress={() => setChip(v)}
+                  style={[styles.chip, sticker(chip === v ? 4 : 2), chip === v && styles.chipOn]}
+                >
+                  <View style={styles.chipRing}>
+                    <T style={styles.chipText}>{v}</T>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.row}>
+              {available < 10 && staked === 0 ? (
+                <Button testID="loan-btn" small icon="💸" title="Vay nóng 500 xu" variant="ink" style={{ flex: 1 }} onPress={() => act({ type: 'loan' })} />
+              ) : (
+                <Button
+                  testID="clear-bets"
+                  small
+                  title={staked > 0 ? `Rút cược (${fmt(staked)})` : 'Chưa cược'}
+                  variant="paper"
+                  disabled={staked === 0 || g.step !== 'betting'}
+                  style={{ flex: 1 }}
+                  onPress={() => act({ type: 'clearBets' })}
+                />
+              )}
+            </View>
+            {error && <T style={styles.error}>{error}</T>}
+          </>
+        )
       }
     >
       <Card style={[styles.table, compact && { paddingVertical: 8 }]}>
@@ -587,11 +621,67 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   : 'Không cược ván này'}
           </T>
         )}
-        <T style={styles.wallet}>
-          Ví: <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
-          {staked > 0 ? `, đang cược ${fmt(staked)}` : ''}
-          {g.debts[me] ? `, nợ ${g.debts[me]} lần` : ''}
-        </T>
+        {!isSpectator && (
+          <T style={styles.wallet}>
+            Hạng <T style={{ fontWeight: '900', color: C.son }}>{rankBadge(rankOf(me))}/{rankedIds.length}</T> · Ví:{' '}
+            <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
+            {staked > 0 ? `, đang cược ${fmt(staked)}` : ''}
+            {g.debts[me] ? `, nợ ${g.debts[me]} lần` : ''}
+          </T>
+        )}
+      </Card>
+
+      <Card style={styles.rankCard}>
+        <View testID="bc-leaderboard" style={{ gap: 6 }}>
+          <T style={styles.rankTitle}>🏆 Bảng xếp hạng xu (cập nhật liên tục)</T>
+          {rankedIds.map((id, idx) => {
+            const rank = idx + 1;
+            const pStaked = Object.values(g.bets[id] ?? {}).reduce((s, v) => s + (v ?? 0), 0);
+            const pDelta = g.step === 'result' ? g.lastDeltas?.[id] : undefined;
+            const pUri = portraitOf(id);
+            const pDebt = g.debts[id] ?? 0;
+            return (
+              <View
+                key={id}
+                testID={`bc-rank-${rank}`}
+                style={[
+                  styles.rankRow,
+                  { borderLeftColor: borderColorOf(id) },
+                  id === me && styles.rankRowMe,
+                ]}
+              >
+                <T style={styles.rankMedal}>{rankBadge(rank)}</T>
+                <View style={[styles.rankAvatar, { backgroundColor: colorOf(id), borderColor: borderColorOf(id) }]}>
+                  {pUri ? (
+                    <Image source={{ uri: pUri }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                  ) : (
+                    <T style={{ fontSize: 13 }}>{avatarOf(playerOf(id)?.avatar ?? 0).emoji}</T>
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T numberOfLines={1} style={styles.rankName}>
+                    {nameOf(id)}
+                  </T>
+                  {(pStaked > 0 || pDebt > 0) && (
+                    <T numberOfLines={1} style={styles.rankSub}>
+                      {pStaked > 0 ? `Đang cược ${fmt(pStaked)}` : ''}
+                      {pStaked > 0 && pDebt > 0 ? ' · ' : ''}
+                      {pDebt > 0 ? `Nợ ${pDebt} lần (thực: ${fmt(netOf(id))})` : ''}
+                    </T>
+                  )}
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <T style={styles.rankXu}>{fmt(g.balances[id] ?? 0)} xu</T>
+                  {pDelta !== undefined && pDelta !== 0 && (
+                    <T style={[styles.rankDelta, { color: pDelta > 0 ? C.jade : C.danger }]}>
+                      {pDelta > 0 ? `+${fmt(pDelta)}` : fmt(pDelta)}
+                    </T>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </Card>
 
       <View style={[styles.board, sticker(5)]}>
@@ -609,6 +699,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
               total={stakes.reduce((t, x) => t + x.amount, 0)}
               glow={wonOn(s)}
               compact={compact}
+              disabled={isSpectator}
               onPress={() => bet(s)}
             />
           );
@@ -656,6 +747,22 @@ const styles = StyleSheet.create({
   face: { backgroundColor: PAPER, alignItems: 'center', justifyContent: 'center' },
   delta: { fontSize: 20, fontWeight: '900' },
   wallet: { color: C.muted, fontSize: 14, textAlign: 'center' },
+  rankCard: { paddingVertical: 10, paddingHorizontal: 12 },
+  rankTitle: { fontSize: 14, fontWeight: '900', color: C.son },
+  rankRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, paddingHorizontal: 8,
+    backgroundColor: C.mist, borderRadius: 10, borderLeftWidth: 4,
+  },
+  rankRowMe: { backgroundColor: '#FFF3BF' },
+  rankMedal: { fontWeight: '900', fontSize: 13, minWidth: 36 },
+  rankAvatar: {
+    width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  rankName: { fontWeight: '800', fontSize: 14 },
+  rankSub: { fontSize: 11, color: C.muted, fontWeight: '600' },
+  rankXu: { fontWeight: '900', fontSize: 14, color: C.ink },
+  rankDelta: { fontWeight: '800', fontSize: 11 },
+  spectatorNote: { color: C.gold, fontWeight: '800', fontSize: 14, textAlign: 'center', paddingVertical: 8 },
   // chiếu bầu cua: khung đỏ son, 6 ô giấy dó
   board: {
     flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, padding: 8,

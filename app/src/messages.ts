@@ -26,6 +26,7 @@ export const authText: Record<AuthError, string> = {
 
 export const actionText: Record<ActionError, string> = {
   not_playing: 'Ván chơi đã kết thúc.',
+  spectating: 'Bạn vào sau nên đang ở chế độ xem, chờ ván kế tiếp nhé.',
   not_your_turn: 'Chưa tới lượt bạn.',
   bad_action: 'Thao tác không hợp lệ.',
   not_host: 'Chỉ chủ phòng mới làm được việc này.',

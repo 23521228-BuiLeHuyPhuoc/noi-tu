@@ -32,13 +32,19 @@ describe('Room — phòng chờ', () => {
     expect(room.addPlayer('x'.repeat(25))).toEqual({ ok: false, error: 'invalid_name' });
   });
 
-  it('từ chối tên rỗng, phòng đầy, vào khi đang chơi', () => {
+  it('từ chối tên rỗng, phòng đầy; vào khi đang chơi thì ở chế độ xem (spectator) và không được thao tác', () => {
     const { room, ids } = setup(['A', 'B', 'C', 'D', 'E', 'F']);
     expect(room.addPlayer('   ')).toEqual({ ok: false, error: 'invalid_name' });
     expect(room.addPlayer('G')).toEqual({ ok: false, error: 'room_full' });
     room.removePlayer(ids[5]);
     room.start(ids[0]);
-    expect(room.addPlayer('G')).toEqual({ ok: false, error: 'room_playing' });
+    const joined = room.addPlayer('G');
+    expect(joined.ok).toBe(true);
+    if (joined.ok) {
+      const gPlayer = room.toPublic().players.find((p) => p.id === joined.playerId);
+      expect(gPlayer?.spectator).toBe(true);
+      expect(room.action(joined.playerId, { type: 'submit', word: 'mèo mướp' })).toEqual({ ok: false, reason: 'spectating' });
+    }
   });
 
   it('chỉ chủ phòng được đổi game, cài đặt và bắt đầu', () => {

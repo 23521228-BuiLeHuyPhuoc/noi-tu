@@ -86,9 +86,14 @@ export class Room {
     return this.players.some((p) => p.id === playerId);
   }
 
+  /** Người chơi vào phòng sau khi ván đã bắt đầu: chỉ được xem cho tới khi về lại phòng chờ */
+  isSpectator(playerId: string): boolean {
+    return this.phase !== 'lobby' && !this.participants.includes(playerId);
+  }
+
   // ---------- người chơi ----------
 
-  /** Vào phòng. Nếu `existingId` đã có trong phòng thì coi như vào lại (kể cả khi đang chơi). */
+  /** Vào phòng. Nếu ván đang diễn ra, người mới vẫn được vào ở chế độ xem (spectator). */
   addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean }): Result<{ playerId: string }> {
     const account = profile?.account === true;
     // khách không được mạo danh id tài khoản
@@ -100,7 +105,6 @@ export class Room {
     }
     const name = cleanName(rawName);
     if (!name) return { ok: false, error: 'invalid_name' };
-    if (this.phase !== 'lobby') return { ok: false, error: 'room_playing' };
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
@@ -261,6 +265,7 @@ export class Room {
 
   action(byId: string, action: unknown): ActionResult {
     if (this.phase !== 'playing' || !this.engine) return { ok: false, reason: 'not_playing' };
+    if (!this.participants.includes(byId)) return { ok: false, reason: 'spectating' };
     if (!action || typeof action !== 'object' || typeof (action as GameAction).type !== 'string') {
       return { ok: false, reason: 'bad_action' };
     }
@@ -287,6 +292,7 @@ export class Room {
         avatar: p.avatar,
         ...(p.avatarUrl ? { avatarUrl: p.avatarUrl } : {}),
         character: p.character,
+        ...(this.isSpectator(p.id) ? { spectator: true } : {}),
         ...(p.account ? { account: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,

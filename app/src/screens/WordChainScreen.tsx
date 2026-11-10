@@ -16,6 +16,7 @@ import { useShake } from '../components/Fun';
 export function WordChainScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as WordChainView;
   const myTurn = g.currentPlayerId === game.me;
+  const isSpectator = !g.order.includes(game.me ?? '');
   const meOut = g.eliminated.includes(game.me ?? '');
   const word = g.currentWord;
   const [first, last] = word.split(' ');
@@ -152,7 +153,9 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
         )}
       </Card>
 
-      {meOut ? (
+      {isSpectator ? (
+        <T style={styles.out}>👀 Bạn vào sau nên đang ở chế độ xem. Chờ ván kế tiếp để tham gia nối từ nhé!</T>
+      ) : meOut ? (
         <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
       ) : myTurn ? (
         <View style={{ gap: 8 }}>

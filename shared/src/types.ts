@@ -59,6 +59,8 @@ export interface PublicPlayer {
   avatarUrl?: string;
   /** hình tượng nhân vật tùy chỉnh (tóc tai, độ tuổi, giới tính, màu sắc không trùng) */
   character?: CharacterConfig;
+  /** vào phòng khi ván đang diễn ra: chỉ xem, chờ ván kế tiếp mới tham gia */
+  spectator?: boolean;
   /** đã đăng nhập tài khoản (có lưu thành tích) */
   account?: boolean;
 }
@@ -270,6 +272,7 @@ export type GameAction =
 export type ActionError =
   // chung
   | 'not_playing'
+  | 'spectating'
   | 'not_your_turn'
   | 'bad_action'
   | 'not_host'
