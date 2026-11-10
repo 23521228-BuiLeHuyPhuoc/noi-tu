@@ -18,13 +18,13 @@ function symbolRng(rolls: BauCuaSymbol[]) {
   };
 }
 
-function make(names: string[], rolls: BauCuaSymbol[] = []) {
+function make(names: string[], rolls: BauCuaSymbol[] = [], baucuaRounds?: number) {
   const finished: GameResult[] = [];
   let host = 'p0';
   const ctx: EngineContext = {
     rng: symbolRng(rolls),
     dict: smallDict(),
-    settings: { ludoPieces: 4 },
+    settings: { ludoPieces: 4, ...(baucuaRounds ? { baucuaRounds } : {}) },
     turnMs: BET,
     hostId: () => host,
     isConnected: () => true,
@@ -130,5 +130,31 @@ describe('Bầu cua', () => {
     setHost('p1');
     expect(Object.keys(v().balances)).toEqual(['p1']);
     expect(g.action('p1', { type: 'end' })).toEqual({ ok: true });
+  });
+
+  it('tự động kết thúc sau đủ số ván đã chọn, người nhiều xu nhất thắng', () => {
+    const { g, v, finished } = make(
+      ['An', 'Bình'],
+      ['cua', 'cua', 'ga', 'tom', 'tom', 'tom'],
+      2,
+    );
+    expect(v().maxRounds).toBe(2);
+    // Ván 1
+    g.action('p0', { type: 'bet', symbol: 'cua', amount: 100 }); // +200 -> 1200
+    g.action('p1', { type: 'bet', symbol: 'tom', amount: 200 }); // -200 -> 800
+    vi.advanceTimersByTime(BET + ROLL + RESULT);
+    expect(finished).toHaveLength(0);
+    expect(v().round).toBe(2);
+    // Ván 2 (ván cuối)
+    g.action('p0', { type: 'bet', symbol: 'ga', amount: 100 }); // -100 -> 1100
+    g.action('p1', { type: 'bet', symbol: 'tom', amount: 300 }); // +900 -> 1700
+    vi.advanceTimersByTime(BET + ROLL);
+    expect(v().step).toBe('result');
+    expect(finished).toHaveLength(0);
+    vi.advanceTimersByTime(RESULT);
+    expect(finished).toHaveLength(1);
+    expect(finished[0].winnerId).toBe('p1');
+    expect(finished[0].ranking.map((x) => x.playerId)).toEqual(['p1', 'p0']);
+    expect(finished[0].ranking[0].detail).toBe('1.700 xu');
   });
 });

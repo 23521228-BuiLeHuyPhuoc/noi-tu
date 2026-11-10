@@ -19,6 +19,8 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
 export interface RoomSettings {
   /** số ngựa mỗi người (cờ cá ngựa) */
   ludoPieces: 2 | 4;
+  /** số ván chơi bầu cua tới khi tự tổng kết */
+  baucuaRounds?: number;
 }
 
 export interface PublicPlayer {
@@ -164,10 +166,14 @@ export const BAUCUA_CHIPS = [10, 50, 100, 500] as const;
 export const BAUCUA_BET_SECONDS = 20;
 /** thời gian hiện kết quả (gồm hiệu ứng mở bát) */
 export const BAUCUA_RESULT_SECONDS = 7;
+export const BAUCUA_ROUND_OPTIONS = [10, 15, 20, 25, 30] as const;
+export type BauCuaRounds = (typeof BAUCUA_ROUND_OPTIONS)[number];
+export const BAUCUA_DEFAULT_ROUNDS: BauCuaRounds = 10;
 
 export interface BauCuaView {
   type: 'baucua';
   round: number;
+  maxRounds: number;
   step: 'betting' | 'rolling' | 'result';
   stepEndsAt: number;
   /** chỉ có giá trị ở bước kết quả */

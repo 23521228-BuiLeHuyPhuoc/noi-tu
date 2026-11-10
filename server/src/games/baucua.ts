@@ -5,7 +5,7 @@
  * - Hết xu thì được "vay nóng" 500 xu (bị ghi nợ). Chủ phòng bấm "Tổng kết" để kết thúc.
  */
 import {
-  BAUCUA_BET_SECONDS, BAUCUA_LOAN, BAUCUA_RESULT_SECONDS, BAUCUA_START, BAUCUA_SYMBOLS,
+  BAUCUA_BET_SECONDS, BAUCUA_DEFAULT_ROUNDS, BAUCUA_LOAN, BAUCUA_RESULT_SECONDS, BAUCUA_START, BAUCUA_SYMBOLS,
   type ActionResult, type BauCuaSymbol, type BauCuaView, type GameAction,
 } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
@@ -32,9 +32,11 @@ export class BauCuaGame implements GameEngine {
   private over = false;
   private readonly timer = new Timer();
   private readonly betMs: number;
+  private readonly maxRounds: number;
 
   constructor(private readonly ctx: EngineContext) {
     this.betMs = ctx.turnMs ?? BAUCUA_BET_SECONDS * 1000;
+    this.maxRounds = ctx.settings.baucuaRounds ?? BAUCUA_DEFAULT_ROUNDS;
   }
 
   start(players: EnginePlayer[]): void {
@@ -96,6 +98,7 @@ export class BauCuaGame implements GameEngine {
     return {
       type: 'baucua',
       round: this.round,
+      maxRounds: this.maxRounds,
       step: this.step,
       stepEndsAt: this.stepEndsAt,
       dice: this.step === 'result' ? this.dice : null,
@@ -154,6 +157,10 @@ export class BauCuaGame implements GameEngine {
     this.step = 'result';
     this.stepEndsAt = Date.now() + RESULT_MS;
     this.timer.set(RESULT_MS, () => {
+      if (this.round >= this.maxRounds) {
+        this.end();
+        return;
+      }
       this.round++;
       this.beginBetting();
     });

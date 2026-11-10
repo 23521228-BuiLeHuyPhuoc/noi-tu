@@ -108,8 +108,10 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
 // ---------------- Bầu cua ----------------
 {
   const [a, b, c] = await room('baucua', ['An', 'Bình', 'Chi']);
+  await a.t('rounds-15').click();
   await a.t('start-btn').click();
   for (const p of [a, b, c]) await p.t('sym-cua').waitFor();
+  check((await b.t('bc-round').textContent()) === 'Ván 1/15', 'chọn 15 ván: hiện Ván 1/15');
   await b.t('chip-100').click();
   await b.t('sym-cua').click();
   await b.t('sym-cua').click();
@@ -122,8 +124,8 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   check((await a.t('shake-btn').count()) + (await b.t('shake-btn').count()) === 0, 'không còn nút Lắc, máy tự lắc');
   await a.page.getByText('Máy đang lắc bát').waitFor({ timeout: 12000 });
   check(true, 'hết giờ cược: máy tự lắc bát');
-  await b.page.waitForFunction(() => document.querySelector('[data-testid="bc-bowl-stage"]')?.getAttribute('aria-label') === 'Bát đã mở, ba xúc xắc trên đĩa', null, { timeout: 6000 });
-  check((await b.t('bc-bowl-stage').getByTestId('bc-die').count()) === 3, 'mở bát trên bàn với 3 con');
+  await b.t('bc-reveal').waitFor({ timeout: 6000 });
+  check((await b.page.locator('[data-testid="reveal-die"]').count()) === 3, 'mở bát toàn màn hình với 3 con');
   await b.t('bc-delta').waitFor({ timeout: 6000 });
   const delta = await b.t('bc-delta').textContent();
   check(/xu/.test(delta), `mở bát, Bình thấy kết quả: ${delta}`);

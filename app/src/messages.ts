@@ -76,6 +76,7 @@ export const RULES: Record<GameType, string[]> = {
     'Mỗi người có 1.000 xu ảo. Chạm vào con vật để đặt cược. Hết 20 giây máy tự lắc.',
     'Mở bát ra 3 con: trúng mấy con thì ăn gấp bấy nhiêu lần.',
     'Cháy túi thì vay nóng 500 xu, nhưng bị gắn mác con nợ.',
+    'Hết số ván đã chọn (10–30 ván) sòng tự tổng kết: ai nhiều xu nhất (trừ nợ) là người chiến thắng.',
   ],
   typhu: [
     'Mỗi người 1.500 xu. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',

@@ -5,13 +5,12 @@ import {
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { actionText, quip, SYMBOL } from '../messages';
-import { ART, CARD_FRAME } from '../baucuaArt';
-import { BowlStage, useReducedMotion } from '../components/BowlStage';
+import { ART } from '../baucuaArt';
 import { avatarOf } from '../avatars';
 import { useOnChange, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
-import { C, sticker } from '../theme';
+import { C, FONT, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
@@ -21,47 +20,79 @@ const fmt = (n: number) => n.toLocaleString('vi-VN');
 const PAPER = '#F7E7C1';
 const shortFmt = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : fmt(n));
 
+// ---------------- Bát & xúc xắc nhỏ trên bàn ----------------
+
+function Bowl({ shaking, size = 72 }: { shaking: boolean; size?: number }) {
+  const a = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    if (!shaking) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(a, { toValue: 1, duration: 80, useNativeDriver: false }),
+        Animated.timing(a, { toValue: -1, duration: 80, useNativeDriver: false }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shaking, a]);
+  return (
+    <Animated.Text
+      style={{
+        fontSize: size,
+        transform: [
+          { rotate: a.interpolate({ inputRange: [-1, 1], outputRange: ['-16deg', '16deg'] }) },
+          { translateY: a.interpolate({ inputRange: [-1, 1], outputRange: [-5, 5] }) },
+        ],
+      }}
+    >
+      🥣
+    </Animated.Text>
+  );
+}
+
+function Face({ s, size, testID }: { s: BauCuaSymbol; size: number; testID?: string }) {
+  return (
+    <View testID={testID} accessibilityLabel={SYMBOL[s].name} style={[styles.face, sticker(3), { width: size, height: size, borderRadius: size * 0.2 }]}>
+      <Image source={{ uri: ART[s] }} style={{ width: size * 0.86, height: size * 0.86 }} accessibilityLabel={SYMBOL[s].name} />
+    </View>
+  );
+}
+
 // ---------------- Tiền vun trên ô ----------------
 
 type Stake = { id: string; amount: number; color: string; mine: boolean };
 
-const DENOMINATIONS = [500, 100, 50, 10] as const;
-const coinPalette = { 500: ['#CB7740', '#F8C383'], 100: ['#A78137', '#FFE5A1'], 50: ['#999D9A', '#E8E8DC'], 10: ['#A26943', '#E6B17B'] } as const;
+/** số đồng xu trong một chồng, tăng dần theo tiền cược */
+const coinsFor = (amount: number) => Math.max(1, Math.min(8, Math.round(Math.log2(amount / 10)) + 1));
 
 function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; small: boolean }) {
-  type Coin = { denomination: typeof DENOMINATIONS[number]; owner: string; mine: boolean };
-  const groups: Coin[][] = [];
-  let count = 0;
-  for (const stake of [...stakes].sort((a, b) => Number(b.mine) - Number(a.mine))) {
-    const group: Coin[] = [];
-    let remainder = stake.amount;
-    for (const denomination of DENOMINATIONS) {
-      const quantity = Math.floor(remainder / denomination);
-      count += quantity;
-      for (let i = 0; i < Math.min(quantity, 6); i++) group.push({ denomination, owner: stake.color, mine: stake.mine });
-      remainder %= denomination;
-    }
-    groups.push(group);
-  }
-  // Interleave owners so one large wager cannot hide everyone else's accent.
-  const shown = Array.from({ length: 6 }, (_, depth) => groups.flatMap((group) => group[depth] ? [group[depth]] : [])).flat().slice(0, 6);
-  const w = small ? 22 : 25;
-  return <View pointerEvents="none" style={styles.pileWrap} accessibilityLabel={fmt(total) + ' xu'}>
-    <View style={[styles.pileRow, { width: w * 2.4, height: 31 }]}>
-      {shown.map((coin, i) => <View key={i} style={[styles.coin, {
-        width: w, height: 13, borderRadius: 30, left: (i % 3) * (w * 0.7), bottom: Math.floor(i / 3) * 6,
-        backgroundColor: coinPalette[coin.denomination][0], borderColor: '#735025', borderBottomWidth: 4,
-        zIndex: i + 1,
-      }]}>
-        <View style={{ position: 'absolute', left: 1, right: 1, top: 0, height: 8, borderRadius: 20, backgroundColor: coinPalette[coin.denomination][1], borderWidth: 1, borderColor: '#916C3D', alignItems: 'center', justifyContent: 'center' }}>
-          <T style={{ fontSize: 6, lineHeight: 7, color: '#654520', fontWeight: '900' }}>{coin.denomination}</T>
-        </View>
-        <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 3, backgroundColor: coin.owner, borderWidth: 1, borderColor: coin.mine ? '#FFF5CB' : '#5D3927', right: -1, bottom: -3 }} />
-      </View>)}
-      {count > shown.length && <T style={styles.coinMore}>+{count - shown.length}</T>}
+  const w = small ? 20 : 24;
+  const h = small ? 8 : 9;
+  const step = small ? 3 : 4;
+  return (
+    <View pointerEvents="none" style={styles.pileWrap}>
+      <T style={styles.pileTotal}>{shortFmt(total)}</T>
+      <View style={styles.pileRow}>
+        {stakes.map((st, k) => {
+          const n = coinsFor(st.amount);
+          return (
+            <View key={st.id} style={{ width: w, height: h + (n - 1) * step, marginLeft: k === 0 ? 0 : -w * 0.35, zIndex: st.mine ? 10 : k }}>
+              {Array.from({ length: n }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.coin,
+                    { width: w, height: h, borderRadius: h, bottom: i * step, backgroundColor: st.color },
+                    st.mine && { borderColor: '#7A4B00', backgroundColor: C.gold },
+                  ]}
+                />
+              ))}
+            </View>
+          );
+        })}
+      </View>
     </View>
-    <T style={styles.pileTotal}>{shortFmt(total)}</T>
-  </View>;
+  );
 }
 
 // ---------------- Đồng xu bay từ avatar vào ô ----------------
@@ -90,6 +121,214 @@ function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: str
   );
 }
 
+// ---------------- Mở bát toàn màn hình ----------------
+
+const REVEAL_MS = 3600;
+const FLY_AT = 1900;
+
+function Rays({ size }: { size: number }) {
+  const spin = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 9000, easing: Easing.linear, useNativeDriver: false }));
+    loop.start();
+    return () => loop.stop();
+  }, [spin]);
+  const r = size / 2;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', width: size, height: size,
+        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+      }}
+    >
+      {Array.from({ length: 12 }, (_, i) => (
+        <View key={i} style={{ position: 'absolute', width: size, height: size, alignItems: 'center', transform: [{ rotate: `${i * 30}deg` }] }}>
+          {/* tam giác có đỉnh ở tâm */}
+          <View
+            style={{
+              width: 0, height: 0, borderLeftWidth: r * 0.16, borderRightWidth: r * 0.16, borderTopWidth: r,
+              borderLeftColor: 'transparent', borderRightColor: 'transparent',
+              borderTopColor: i % 2 ? 'rgba(255,194,26,0.16)' : 'rgba(255,240,180,0.26)',
+            }}
+          />
+        </View>
+      ))}
+    </Animated.View>
+  );
+}
+
+function RevealDie({ s, i, x, y, size, target, fade }: {
+  s: BauCuaSymbol; i: number; x: number; y: number; size: number; target: Rect | null; fade: boolean;
+}) {
+  const pop = useState(() => new Animated.Value(0))[0];
+  const fly = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(250 + i * 380),
+      Animated.spring(pop, { toValue: 1, friction: 4, tension: 120, useNativeDriver: false }),
+    ]).start();
+  }, [pop, i]);
+  // vị trí ô đích được đo lúc FLY_AT: bay ngay khi có
+  const go = !!target || fade;
+  useEffect(() => {
+    if (!go) return;
+    Animated.sequence([
+      Animated.delay(i * 140),
+      Animated.timing(fly, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+    ]).start();
+  }, [go, fly, i]);
+  const tx = target ? target.x + target.w / 2 - size / 2 : x;
+  const ty = target ? target.y + target.h / 2 - size / 2 : y;
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: fly.interpolate({ inputRange: [0, 1], outputRange: [x, tx] }),
+        top: fly.interpolate({ inputRange: [0, 1], outputRange: [y, ty] }),
+        opacity: target ? fly.interpolate({ inputRange: [0, 0.85, 1], outputRange: [1, 1, 0] }) : fade ? fly.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] }) : 1,
+        transform: [
+          { scale: Animated.multiply(pop, target ? fly.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }) : 1) },
+          { rotate: pop.interpolate({ inputRange: [0, 1], outputRange: ['-200deg', '0deg'] }) },
+        ],
+      }}
+    >
+      <View style={[styles.halo, { width: size * 1.5, height: size * 1.5, borderRadius: size, left: -size * 0.25, top: -size * 0.25 }]} />
+      <Face s={s} size={size} testID="reveal-die" />
+    </Animated.View>
+  );
+}
+
+function Rain({ width }: { width: number }) {
+  const drops = useState(() => Array.from({ length: 22 }, () => ({ x: Math.random() * width, d: 900 + Math.random() * 700, delay: Math.random() * 900 })))[0];
+  return (
+    <>
+      {drops.map((dr, i) => (
+        <Drop key={i} {...dr} />
+      ))}
+    </>
+  );
+}
+
+function Drop({ x, d, delay }: { x: number; d: number; delay: number }) {
+  const t = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(t, { toValue: 1, duration: d, easing: Easing.in(Easing.quad), useNativeDriver: false }));
+    const id = setTimeout(() => loop.start(), delay);
+    return () => {
+      clearTimeout(id);
+      loop.stop();
+    };
+  }, [t, d, delay]);
+  return (
+    <Animated.Text style={{ position: 'absolute', left: x, fontSize: 18, top: t.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }}>
+      💧
+    </Animated.Text>
+  );
+}
+
+function Reveal({ dice, myBets, delta, onDone }: {
+  dice: BauCuaSymbol[];
+  myBets: Partial<Record<BauCuaSymbol, number>>;
+  delta: number | undefined;
+  onDone: () => void;
+}) {
+  const root = useRef<ComponentRef<typeof View>>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const [targets, setTargets] = useState<(Rect | null)[] | null>(null);
+  const [phase, setPhase] = useState<'show' | 'after'>('show');
+  const fade = useState(() => new Animated.Value(0))[0];
+  const sad = useState(() => new Animated.Value(0))[0];
+  const betOn = (s: BauCuaSymbol) => (myBets[s] ?? 0) > 0;
+  const anyBet = BAUCUA_SYMBOLS.some(betOn);
+  const lost = anyBet && !dice.some(betOn);
+
+  useEffect(() => {
+    play('reveal');
+    Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: false }).start();
+    const t1 = setTimeout(() => {
+      // con nào trúng ô mình đặt thì bay vào ô đó
+      const origin = (root.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      setTargets(dice.map((s) => (betOn(s) ? rectOf(`sym-${s}`, origin) : null)));
+      setPhase('after');
+      if (lost) {
+        play('sad');
+        vibrate([60, 80, 60]);
+        Animated.timing(sad, { toValue: 1, duration: 400, useNativeDriver: false }).start();
+      } else if ((delta ?? 0) > 0) {
+        play('win');
+        vibrate(80);
+      }
+    }, FLY_AT);
+    const t2 = setTimeout(() => Animated.timing(fade, { toValue: 0, duration: 300, useNativeDriver: false }).start(onDone), REVEAL_MS);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // chỉ chạy một lần cho mỗi lần mở bát
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const size = box ? Math.min(104, (box.w - 60) / 3) : 90;
+  const gap = 14;
+  const cy = box ? box.h * 0.36 : 0;
+
+  return (
+    <Animated.View
+      testID="bc-reveal"
+      pointerEvents="none"
+      onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+      style={[StyleSheet.absoluteFill, { zIndex: 70, opacity: fade, overflow: 'hidden' }]}
+    >
+      {/* View thường (không phải Animated) để đo vị trí trên web */}
+      <View ref={root} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(42,10,16,0.84)' }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(38,40,52,0.9)', opacity: sad }]} />
+      {box && (
+        <>
+          {!lost && (
+            <View style={{ position: 'absolute', left: box.w / 2 - box.w, top: cy - box.w, width: box.w * 2, height: box.w * 2, alignItems: 'center', justifyContent: 'center' }}>
+              <Rays size={box.w * 2} />
+              <View style={styles.glow} />
+            </View>
+          )}
+          <T style={[styles.revealTitle, { top: cy - size - 40 }]}>{lost && phase === 'after' ? '' : 'MỞ BÁT!'}</T>
+          {dice.map((s, i) => (
+            <RevealDie
+              key={i}
+              s={s}
+              i={i}
+              size={size}
+              x={box.w / 2 + (i - 1) * (size + gap) - size / 2}
+              y={cy - size / 2}
+              target={targets?.[i] ?? null}
+              fade={targets !== null && !targets[i] && anyBet}
+            />
+          ))}
+          {phase === 'after' && (
+            <View style={[styles.revealMsg, { top: cy + size / 2 + 26 }]}>
+              {lost ? (
+                <View testID="bc-sad" style={{ alignItems: 'center' }}>
+                  <T style={{ fontSize: 64 }}>😭</T>
+                  <T style={styles.sadText}>Trật lất hết rồi…</T>
+                </View>
+              ) : delta && delta > 0 ? (
+                <T style={styles.winText}>Trúng rồi! +{fmt(delta)} xu 🤑</T>
+              ) : delta && delta < 0 ? (
+                <T style={styles.meh}>Trúng mà vẫn lỗ {fmt(-delta)} xu 😅</T>
+              ) : anyBet && delta === 0 ? (
+                <T style={styles.meh}>Huề vốn 😌</T>
+              ) : !anyBet ? (
+                <T style={styles.meh}>Bạn không cược ván này</T>
+              ) : null}
+            </View>
+          )}
+          {lost && phase === 'after' && <Rain width={box.w} />}
+        </>
+      )}
+    </Animated.View>
+  );
+}
+
 // ---------------- Ô con vật ----------------
 
 function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress }: {
@@ -97,10 +336,8 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress
   stakes: Stake[]; total: number; glow: boolean; compact: boolean; onPress: () => void;
 }) {
   const pulse = useState(() => new Animated.Value(0))[0];
-  const reduced = useReducedMotion();
   useEffect(() => {
     if (!glow) return;
-    if (reduced) { pulse.setValue(0.7); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 420, useNativeDriver: false }),
@@ -112,7 +349,7 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress
       loop.stop();
       pulse.setValue(0);
     };
-  }, [glow, pulse, reduced]);
+  }, [glow, pulse]);
   const result = step === 'result';
   return (
     <Pressable
@@ -124,16 +361,15 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, onPress
       style={({ pressed }) => [
         styles.tile,
         compact && styles.tileCompact,
-        { borderWidth: 2, borderColor: '#E0AB59', boxShadow: pressed ? '0px 1px 0px #511A16' : '0px 4px 0px #511A16' },
+        sticker(pressed ? 1 : 4),
         pressed && { transform: [{ translateY: 3 }] },
-        result && hits === 0 && { opacity: 0.68 },
+        result && hits === 0 && { opacity: 0.4 },
         result && hits > 0 && !glow && { borderColor: C.jade, borderWidth: 4 },
       ]}
     >
-      <Image pointerEvents="none" source={{ uri: CARD_FRAME }} style={StyleSheet.absoluteFill} resizeMode="stretch" />
       {glow && <Animated.View pointerEvents="none" style={[styles.tileGlow, { opacity: pulse }]} />}
       <View style={styles.tileInner}>
-        <Image source={{ uri: ART[s] }} style={styles.tileArt} resizeMode="contain" />
+        <Image source={{ uri: ART[s] }} style={[styles.tileArt, compact && { width: '62%' }]} resizeMode="contain" />
         <View style={styles.banner}>
           <T style={styles.bannerText}>{SYMBOL[s].name}</T>
         </View>
@@ -161,6 +397,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const [chip, setChip] = useState<number>(50);
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
+  const [reveal, setReveal] = useState<number | null>(null);
   // cược của mình ở ván vừa mở bát (server xóa cược khi mở bát nên phải nhớ lại)
   const [resultBets, setResultBets] = useState<{ round: number; bets: Partial<Record<BauCuaSymbol, number>> }>({ round: 0, bets: {} });
   const lastBets = useRef<Partial<Record<BauCuaSymbol, number>>>({});
@@ -169,8 +406,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const flySeq = useRef(0);
   const left = useSecondsLeft(g.stepEndsAt, game.clockOffset);
   // màn hình thấp (điện thoại nhỏ / bàn phím mở): thu gọn để thấy cả bát lẫn chiếu
-  const compact = useWindowDimensions().height < 880;
-  const reduced = useReducedMotion();
+  const compact = useWindowDimensions().height < 740;
 
   const myBets = g.bets[me] ?? {};
   const staked = Object.values(myBets).reduce((s, v) => s + (v ?? 0), 0);
@@ -185,9 +421,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     if (step === 'betting') play('pop');
     if (step === 'result' && g.dice) {
       setResultBets({ round: g.round, bets: lastBets.current });
-      play('reveal');
-      if ((g.lastDeltas?.[me] ?? 0) > 0) { play('win'); vibrate(80); }
-      else if ((g.lastDeltas?.[me] ?? 0) < 0) { play('sad'); vibrate([60, 80, 60]); }
+      setReveal(g.round);
       if (g.lastDeltas) {
         for (const [id, d] of Object.entries(g.lastDeltas)) {
           if (d >= 300) feed(quip.bigWin(nameOf(id), fmt(d)), 'good');
@@ -204,7 +438,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     const prev = prevBets.current;
     prevBets.current = g.bets;
     if (g.step !== 'result') lastBets.current = g.bets[me] ?? {};
-    if (g.step !== 'betting' || reduced) return;
+    if (g.step !== 'betting') return;
     const bets = g.bets;
     // đo vị trí ở khung hình kế tiếp (sau khi bố cục đã cập nhật)
     requestAnimationFrame(() => {
@@ -278,6 +512,9 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
               <FlyCoin key={f.id} from={f.from} to={f.to} color={f.color} onDone={() => dropFly(f.id)} />
             ))}
           </View>
+          {reveal === g.round && g.step === 'result' && g.dice && (
+            <Reveal key={reveal} dice={g.dice} myBets={roundBets} delta={myDelta} onDone={() => setReveal(null)} />
+          )}
         </>
       }
       bottom={
@@ -319,8 +556,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     >
       <Card style={[styles.table, compact && { paddingVertical: 8 }]}>
         <View style={styles.tableHead}>
-          <T style={styles.round}>Ván {g.round}</T>
-          <T testID="bc-step" numberOfLines={1} adjustsFontSizeToFit style={styles.step}>{stepText}</T>
+          <T testID="bc-round" style={styles.round}>Ván {g.round}/{g.maxRounds}</T>
+          <T testID="bc-step" style={styles.step}>{stepText}</T>
           {isHost && (
             <Pressable testID="end-open" onPress={() => setEnding(true)} hitSlop={8}>
               <T style={styles.endLink}>Tổng kết</T>
@@ -332,7 +569,13 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
             <View style={[styles.timeFill, { width: `${Math.min(100, (left / 20) * 100)}%` }, left <= 5 && { backgroundColor: C.danger }]} />
           </View>
         )}
-        <BowlStage step={g.step} dice={g.step === 'result' ? g.dice : null} compact={compact} />
+        <View style={[styles.plate, compact && { height: 64 }]}>
+          {g.step === 'result' && g.dice ? (
+            g.dice.map((s, i) => <Face key={`${g.round}-${i}`} s={s} size={compact ? 46 : 58} testID="bc-die" />)
+          ) : (
+            <Bowl shaking={g.step === 'rolling'} size={compact ? 46 : 64} />
+          )}
+        </View>
         {g.step === 'result' && myDelta !== undefined && (
           <T testID="bc-delta" style={[styles.delta, { color: myDelta > 0 ? C.jade : myDelta < 0 ? C.danger : C.muted }]}>
             {myDelta > 0
@@ -400,10 +643,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 
 const styles = StyleSheet.create({
   table: { gap: 6, alignItems: 'center' },
-  tableHead: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'stretch' },
-  round: { fontWeight: '900', fontSize: 13, color: C.muted },
-  step: { flex: 1, fontWeight: '900', fontSize: 14, textAlign: 'center' },
-  endLink: { color: C.son, fontWeight: '800', textDecorationLine: 'underline', fontSize: 13 },
+  tableHead: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
+  round: { fontWeight: '900', fontSize: 14, color: C.muted },
+  step: { flex: 1, fontWeight: '900', fontSize: 16, textAlign: 'center' },
+  endLink: { color: C.son, fontWeight: '800', textDecorationLine: 'underline', fontSize: 14 },
   timeTrack: { alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: C.mist, overflow: 'hidden', borderWidth: 1.5, borderColor: C.ink },
   timeFill: { height: '100%', backgroundColor: C.jade },
   plate: {
@@ -416,31 +659,30 @@ const styles = StyleSheet.create({
   // chiếu bầu cua: khung đỏ son, 6 ô giấy dó
   board: {
     flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, padding: 8,
-    backgroundColor: '#74231E', borderRadius: 12, borderColor: '#D8A34E', borderWidth: 2,
+    backgroundColor: '#8E0D14', borderRadius: 18,
   },
-  tile: { width: '32%', aspectRatio: 0.71, borderRadius: 8, backgroundColor: '#A83025', padding: 4, overflow: 'visible' },
-  tileCompact: { aspectRatio: 0.76 },
+  tile: { width: '32%', aspectRatio: 0.82, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
+  tileCompact: { aspectRatio: 1.05 },
   tileInner: {
-    flex: 1, borderWidth: 1, borderColor: '#DCA653', borderRadius: 4, alignItems: 'center', justifyContent: 'flex-start',
+    flex: 1, borderWidth: 1.5, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 2, overflow: 'hidden',
   },
-  tileArt: { width: '96%', aspectRatio: 1, flexShrink: 0 },
+  tileArt: { width: '88%', aspectRatio: 1, flexShrink: 1 },
   tileGlow: {
     position: 'absolute', top: -6, left: -6, right: -6, bottom: -6, borderRadius: 16, borderWidth: 4, borderColor: C.gold,
     backgroundColor: 'rgba(255,214,80,0.35)', shadowColor: '#FFD650', shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: 0 },
     zIndex: -1,
   },
-  banner: { position: 'absolute', left: 0, right: 0, bottom: 1, paddingVertical: 1, borderTopWidth: 1, borderTopColor: '#DCA653' },
+  banner: { alignSelf: 'stretch', backgroundColor: C.son, paddingVertical: 1 },
   bannerText: { color: PAPER, fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 1 },
-  pileAnchor: { position: 'absolute', left: 0, right: 0, bottom: 25, height: 38, alignItems: 'center' },
+  pileAnchor: { position: 'absolute', left: 0, right: 0, bottom: 22, alignItems: 'center' },
   pileWrap: { alignItems: 'center' },
   pileTotal: {
     fontSize: 11, fontWeight: '900', color: '#fff', backgroundColor: 'rgba(42,10,16,0.82)', paddingHorizontal: 6,
-    borderRadius: 8, overflow: 'hidden', marginTop: -2, lineHeight: 13,
+    borderRadius: 8, overflow: 'hidden', marginBottom: 2,
   },
   pileRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  coin: { position: 'absolute', borderWidth: 1, boxShadow: '1px 2px 2px #3B1D1740' },
-  coinMore: { position: 'absolute', right: -9, top: -4, color: '#FFF1C5', backgroundColor: '#5E201B', borderRadius: 5, fontSize: 8, fontWeight: '900', paddingHorizontal: 2, zIndex: 10 },
+  coin: { position: 'absolute', left: 0, borderWidth: 1.5, borderColor: C.ink },
   flyCoin: { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.ink },
   mine: {
     position: 'absolute', top: -10, right: -6, backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink,
@@ -463,4 +705,18 @@ const styles = StyleSheet.create({
   chipText: { fontWeight: '900', fontSize: 15 },
   row: { flexDirection: 'row', gap: 10 },
   error: { color: C.ink, backgroundColor: C.gold, padding: 6, borderRadius: 8, fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  // mở bát
+  halo: { position: 'absolute', backgroundColor: 'rgba(255,214,80,0.5)', shadowColor: '#FFD650', shadowOpacity: 1, shadowRadius: 30, shadowOffset: { width: 0, height: 0 } },
+  glow: {
+    width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(255,194,26,0.28)',
+    shadowColor: '#FFC21A', shadowOpacity: 0.9, shadowRadius: 70, shadowOffset: { width: 0, height: 0 },
+  },
+  revealTitle: {
+    position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 34, fontWeight: '900', color: C.gold,
+    letterSpacing: 2, fontFamily: FONT,
+  },
+  revealMsg: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
+  winText: { fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center' },
+  sadText: { fontSize: 22, fontWeight: '900', color: '#C9D1E0', textAlign: 'center' },
+  meh: { fontSize: 20, fontWeight: '800', color: C.onSon, textAlign: 'center' },
 });

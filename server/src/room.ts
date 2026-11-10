@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, type BauCuaRounds,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
@@ -55,7 +56,7 @@ export class Room {
   players: Player[] = [];
   hostId = '';
   gameType: GameType = 'wordchain';
-  settings: RoomSettings = { ludoPieces: 4 };
+  settings: RoomSettings = { ludoPieces: 4, baucuaRounds: BAUCUA_DEFAULT_ROUNDS };
 
   private engine: GameEngine | null = null;
   private result: GameResult | null = null;
@@ -186,6 +187,10 @@ export class Room {
     if (settings?.ludoPieces !== undefined) {
       if (settings.ludoPieces !== 2 && settings.ludoPieces !== 4) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, ludoPieces: settings.ludoPieces };
+    }
+    if (settings?.baucuaRounds !== undefined) {
+      if (!BAUCUA_ROUND_OPTIONS.includes(settings.baucuaRounds as BauCuaRounds)) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, baucuaRounds: settings.baucuaRounds };
     }
     // đổi game sau khi kết thúc thì quay về phòng chờ
     if (this.phase === 'finished') this.backToLobby();

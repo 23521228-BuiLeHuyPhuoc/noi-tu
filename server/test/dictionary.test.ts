@@ -45,4 +45,12 @@ describe('Dictionary', () => {
     expect(d.has('đồ đạc')).toBe(false);
     expect(d.size).toBe(3);
   });
+
+  it('kho từ lớn (server/data): mở rộng hàng chục triệu tổ hợp 2 âm tiết tiếng Việt hợp lệ', () => {
+    const d = Dictionary.load(join(__dirname, '..', 'data'));
+    expect(d.size).toBeGreaterThan(50_000_000);
+    expect(d.has('học sinh')).toBe(true);
+    expect(d.has('mèo mướp')).toBe(true);
+    expect(d.countNext('mèo', new Set())).toBeGreaterThan(5000);
+  });
 });

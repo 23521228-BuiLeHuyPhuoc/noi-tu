@@ -34,8 +34,12 @@ describe('Room — phòng chờ', () => {
     expect(room.configure(ids[0], 'ludo', { ludoPieces: 2 })).toEqual({ ok: true });
     expect(room.toPublic().gameType).toBe('ludo');
     expect(room.toPublic().settings.ludoPieces).toBe(2);
+    expect(room.configure(ids[0], 'baucua', { baucuaRounds: 20 })).toEqual({ ok: true });
+    expect(room.toPublic().settings.baucuaRounds).toBe(20);
+    expect(room.configure(ids[0], 'ludo')).toEqual({ ok: true });
     expect(room.configure(ids[0], 'xyz')).toEqual({ ok: false, error: 'bad_request' });
     expect(room.configure(ids[0], undefined, { ludoPieces: 3 as never })).toEqual({ ok: false, error: 'bad_request' });
+    expect(room.configure(ids[0], undefined, { baucuaRounds: 7 as never })).toEqual({ ok: false, error: 'bad_request' });
     expect(room.start(ids[1])).toEqual({ ok: false, error: 'not_host' });
     expect(room.start(ids[0]).ok).toBe(true);
   });

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
+import {
+  BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, GAME_INFO, type GameType, type RoomState,
+} from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { shareInvite } from '../web';
 import { GAME_META, RULES } from '../messages';
@@ -108,6 +110,29 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
+      {room.gameType === 'baucua' && (
+        <Card style={{ gap: 10 }}>
+          <T style={styles.h3}>Số ván chơi (ai nhiều xu nhất thắng)</T>
+          <View style={styles.roundRow}>
+            {BAUCUA_ROUND_OPTIONS.map((k) => {
+              const active = (room.settings.baucuaRounds ?? BAUCUA_DEFAULT_ROUNDS) === k;
+              return (
+                <Button
+                  key={k}
+                  testID={`rounds-${k}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={`${k} ván`}
+                  disabled={!isHost}
+                  style={{ flex: 1, minWidth: 56, paddingHorizontal: 6 }}
+                  onPress={() => game.configure({ settings: { baucuaRounds: k } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
       <Card style={{ gap: 8 }}>
         <T style={styles.h3}>Luật chơi</T>
         {RULES[room.gameType].map((r) => (
@@ -136,6 +161,7 @@ const styles = StyleSheet.create({
   chosenName: { fontSize: 22, fontWeight: '900' },
   h3: { fontSize: 16, fontWeight: '800' },
   row: { flexDirection: 'row', gap: 10 },
+  roundRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   rule: { fontSize: 15, lineHeight: 22 },
   wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
   error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },

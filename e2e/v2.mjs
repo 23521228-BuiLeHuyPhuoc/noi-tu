@@ -111,20 +111,21 @@ try {
     } finally { await c.context.close(); }
   }));
 
-  await suite('Bau Cua covered bowl opens on table', () => room('baucua', async (a, b) => {
+  await suite('Bau Cua round limit and fullscreen reveal', () => room('baucua', async (a, b) => {
+    await a.t('rounds-20').click();
     await a.t('start-btn').click();
-    await b.t('bc-bowl-stage').waitFor();
-    assert.equal(await b.t('bc-bowl-stage').getAttribute('aria-label'), 'Bát úp kín ba xúc xắc');
-    assert.equal(await b.t('bc-die').count(), 0, 'Covered bowl exposes no result faces');
+    await b.t('sym-cua').waitFor();
+    assert.equal(await b.t('bc-round').textContent(), 'Ván 1/20');
+    assert.equal(await b.t('bc-die').count(), 0, 'Betting step hides result faces');
     await b.t('chip-50').click();
     await b.t('sym-cua').click();
     await b.t('mybet-cua').waitFor();
     await b.t('bc-step').filter({ hasText: 'Máy đang lắc bát' }).waitFor({ timeout: 35000 });
     assert.equal(await b.t('bc-die').count(), 0, 'Shaking still hides result faces');
-    await b.page.waitForFunction(() => document.querySelector('[data-testid="bc-bowl-stage"]')?.getAttribute('aria-label') === 'Bát đã mở, ba xúc xắc trên đĩa');
-    assert.equal(await b.t('bc-bowl-stage').getByTestId('bc-die').count(), 3);
-    assert.equal(await b.t('bc-reveal').count(), 0, 'No fullscreen reveal overlay');
+    await b.t('bc-reveal').waitFor({ timeout: 6000 });
+    assert.equal(await b.page.locator('[data-testid="reveal-die"]').count(), 3);
     await b.t('bc-delta').waitFor();
+    assert.equal(await b.t('bc-die').count(), 3);
     for (const die of await b.t('bc-die').all()) assert.ok(await die.getAttribute('aria-label'));
   }));
 
