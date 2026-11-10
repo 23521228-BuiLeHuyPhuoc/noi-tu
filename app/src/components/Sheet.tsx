@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
 
@@ -11,7 +11,9 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       <View style={[styles.panel, sticker(0)]}>
         <View style={styles.grip} />
         <T style={styles.title}>{title}</T>
-        {children}
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {children}
+        </ScrollView>
       </View>
     </View>
   );
@@ -22,8 +24,10 @@ const styles = StyleSheet.create({
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(42,10,16,0.55)' },
   panel: {
     backgroundColor: C.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomWidth: 0,
-    padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center',
+    padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center', maxHeight: '92%',
   },
+  body: { flexGrow: 0, flexShrink: 1 },
+  bodyContent: { gap: 14 },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: C.mist, alignSelf: 'center' },
   title: { fontSize: 20, fontWeight: '900' },
 });
