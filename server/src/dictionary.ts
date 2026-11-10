@@ -11,17 +11,25 @@ export class Dictionary {
   /** các từ có thể dùng làm từ mở đầu (chữ cuối có ít nhất vài từ nối tiếp) */
   private starters: string[] = [];
 
-  constructor(words: Iterable<string>) {
-    for (const raw of words) {
-      const w = normalizeWord(raw);
-      if (!w || w.split(' ').length !== WORD_SYLLABLES || this.words.has(w)) continue;
-      this.words.add(w);
-      const f = firstSyllable(w);
-      const list = this.byFirst.get(f);
-      if (list) list.push(w);
-      else this.byFirst.set(f, [w]);
-    }
+  constructor(words: Iterable<string>, private readonly banned: ReadonlySet<string> = new Set()) {
+    for (const raw of words) this.insert(raw);
     this.starters = [...this.words].filter((w) => (this.byFirst.get(lastSyllable(w))?.length ?? 0) >= 3);
+  }
+
+  /** Thêm một từ (vd. từ được cả phòng duyệt). Trả về từ đã chuẩn hóa nếu thêm mới, ngược lại null. */
+  add(raw: string): string | null {
+    return this.insert(raw);
+  }
+
+  private insert(raw: string): string | null {
+    const w = normalizeWord(raw);
+    if (!w || w.split(' ').length !== WORD_SYLLABLES || this.words.has(w) || this.banned.has(w)) return null;
+    this.words.add(w);
+    const f = firstSyllable(w);
+    const list = this.byFirst.get(f);
+    if (list) list.push(w);
+    else this.byFirst.set(f, [w]);
+    return w;
   }
 
   /** Nạp từ thư mục data: words.txt + extra-words.txt − banned-words.txt */
@@ -34,9 +42,8 @@ export class Dictionary {
         .map((l) => l.trim())
         .filter((l) => l && !l.startsWith('#'));
     };
-    const banned = new Set(read('banned-words.txt').map((w) => normalizeWord(w)).filter(Boolean));
-    const all = [...read('words.txt'), ...read('extra-words.txt')];
-    return new Dictionary(all.filter((w) => !banned.has(normalizeWord(w))));
+    const banned = new Set(read('banned-words.txt').map((w) => normalizeWord(w)).filter((w): w is string => !!w));
+    return new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned);
   }
 
   get size(): number {

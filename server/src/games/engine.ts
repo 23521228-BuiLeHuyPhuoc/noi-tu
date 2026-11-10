@@ -21,6 +21,8 @@ export interface EngineContext {
   changed: () => void;
   /** kết thúc ván */
   finish: (result: GameResult) => void;
+  /** cả phòng vừa duyệt một từ mới: thêm vào từ điển và lưu lại */
+  learnWord: (word: string, byName: string) => void;
 }
 
 export interface GameEngine {

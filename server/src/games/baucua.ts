@@ -1,17 +1,17 @@
 /**
  * Bầu cua tôm cá (xu ảo, nhà cái là máy):
- * - Đặt cược trong thời gian cho phép, chủ phòng có thể bấm "Lắc" sớm.
+ * - Đặt cược trong thời gian cho phép; hết giờ máy tự lắc (không ai lắc tay).
  * - Mở bát 3 viên: mỗi con trúng k lần thì ăn tiền cược × k, không trúng thì mất tiền cược.
  * - Hết xu thì được "vay nóng" 500 xu (bị ghi nợ). Chủ phòng bấm "Tổng kết" để kết thúc.
  */
 import {
-  BAUCUA_BET_SECONDS, BAUCUA_LOAN, BAUCUA_START, BAUCUA_SYMBOLS,
+  BAUCUA_BET_SECONDS, BAUCUA_LOAN, BAUCUA_RESULT_SECONDS, BAUCUA_START, BAUCUA_SYMBOLS,
   type ActionResult, type BauCuaSymbol, type BauCuaView, type GameAction,
 } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const ROLL_MS = 2600;
-const RESULT_MS = 5000;
+const RESULT_MS = BAUCUA_RESULT_SECONDS * 1000;
 const MAX_RECENT = 12;
 const MAX_BET_PER_SYMBOL = 1_000_000;
 
@@ -67,11 +67,6 @@ export class BauCuaGame implements GameEngine {
         if (this.step !== 'betting') return { ok: false, reason: 'not_betting' };
         this.bets[playerId] = {};
         this.ctx.changed();
-        return { ok: true };
-      case 'shake':
-        if (playerId !== this.ctx.hostId()) return { ok: false, reason: 'not_host' };
-        if (this.step !== 'betting') return { ok: false, reason: 'not_betting' };
-        this.beginRolling();
         return { ok: true };
       case 'loan':
         if (this.available(playerId) >= 10) return { ok: false, reason: 'loan_denied' };

@@ -1,11 +1,13 @@
 import { toSyllables, firstSyllable, lastSyllable } from '../../../shared/src/vi';
 import {
-  TURN_SECONDS, WORD_SYLLABLES,
-  type ActionResult, type GameAction, type WordChainView, type WordHistoryItem,
+  TURN_SECONDS, VOTE_SECONDS, WORD_SYLLABLES,
+  type ActionResult, type ActionError, type GameAction, type WordChainView, type WordHistoryItem, type WordVote,
 } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const MAX_HISTORY = 300;
+/** sau khi xin duyệt bị từ chối, người chơi còn ít nhất chừng này thời gian */
+const MIN_RESUME_MS = 5000;
 
 interface WPlayer extends EnginePlayer {
   eliminated: boolean;
@@ -26,9 +28,16 @@ export class WordChainGame implements GameEngine {
   private over = false;
   private readonly timer = new Timer();
   private readonly turnMs: number;
+  private readonly voteMs: number;
+  /** đang xin duyệt từ; thời gian lượt tạm dừng, còn lại `pausedLeft` ms */
+  private vote: WordVote | null = null;
+  private pausedLeft = 0;
+  /** đã xin duyệt trong lượt này chưa (mỗi lượt 1 lần) */
+  private appealedTurn = false;
 
   constructor(private readonly ctx: EngineContext) {
     this.turnMs = ctx.turnMs ?? TURN_SECONDS * 1000;
+    this.voteMs = Math.min(VOTE_SECONDS * 1000, this.turnMs);
   }
 
   start(players: EnginePlayer[]): void {
@@ -45,22 +54,39 @@ export class WordChainGame implements GameEngine {
 
   action(playerId: string, a: GameAction): ActionResult {
     if (this.over) return { ok: false, reason: 'not_playing' };
+    if (a.type === 'vote') return this.castVote(playerId, a.yes);
+    if (this.vote) return { ok: false, reason: 'bad_action' };
     if (a.type === 'hint') return this.hint(playerId);
-    if (a.type !== 'submit') return { ok: false, reason: 'bad_action' };
+    if (a.type !== 'submit' && a.type !== 'appeal') return { ok: false, reason: 'bad_action' };
     if (playerId !== this.currentId) return { ok: false, reason: 'not_your_turn' };
     if (this.turnEndsAt !== null && Date.now() >= this.turnEndsAt) {
       this.timeout();
       return { ok: false, reason: 'timeout' };
     }
-    const raw = a.word;
-    if (typeof raw !== 'string' || raw.length > 60) return { ok: false, reason: 'format' };
-    const syl = toSyllables(raw);
-    if (!syl || syl.length !== WORD_SYLLABLES) return { ok: false, reason: 'format' };
-    const word = syl.join(' ');
-    if (firstSyllable(word) !== lastSyllable(this.currentWord)) return { ok: false, reason: 'chain' };
-    if (this.used.has(word)) return { ok: false, reason: 'used' };
-    if (!this.ctx.dict.has(word)) return { ok: false, reason: 'not_in_dictionary' };
+    const checked = this.check(a.word);
+    if (typeof checked !== 'string') {
+      // từ chưa có trong từ điển vẫn có thể xin cả phòng duyệt
+      if (a.type === 'appeal' && checked.reason === 'not_in_dictionary') return this.appeal(playerId, checked.word);
+      return { ok: false, reason: a.type === 'appeal' ? 'cannot_appeal' : checked.reason };
+    }
+    if (a.type === 'appeal') return { ok: false, reason: 'cannot_appeal' };
+    this.accept(playerId, checked);
+    return { ok: true };
+  }
 
+  /** Kiểm tra từ gửi lên: trả về từ đã chuẩn hóa nếu hợp lệ */
+  private check(raw: unknown): string | { reason: ActionError; word: string } {
+    if (typeof raw !== 'string' || raw.length > 60) return { reason: 'format', word: '' };
+    const syl = toSyllables(raw);
+    if (!syl || syl.length !== WORD_SYLLABLES) return { reason: 'format', word: '' };
+    const word = syl.join(' ');
+    if (firstSyllable(word) !== lastSyllable(this.currentWord)) return { reason: 'chain', word };
+    if (this.used.has(word)) return { reason: 'used', word };
+    if (!this.ctx.dict.has(word)) return { reason: 'not_in_dictionary', word };
+    return word;
+  }
+
+  private accept(playerId: string, word: string): void {
     const p = this.find(playerId)!;
     p.words++;
     this.totalWords++;
@@ -70,7 +96,73 @@ export class WordChainGame implements GameEngine {
     this.currentId = this.nextAlive(playerId, false);
     this.beginTurn();
     this.ctx.changed();
+  }
+
+  // ---------- xin duyệt từ ----------
+
+  private appeal(playerId: string, word: string): ActionResult {
+    if (this.appealedTurn) return { ok: false, reason: 'cannot_appeal' };
+    const voters = this.players
+      .filter((p) => p.id !== playerId && !p.eliminated && this.ctx.isConnected(p.id))
+      .map((p) => p.id);
+    if (voters.length === 0) return { ok: false, reason: 'no_voters' };
+    const by = this.find(playerId)!;
+    this.appealedTurn = true;
+    this.pausedLeft = Math.max(0, (this.turnEndsAt ?? Date.now()) - Date.now());
+    this.turnEndsAt = null;
+    this.vote = { word, byId: playerId, byName: by.name, voters, yes: [], no: [], endsAt: Date.now() + this.voteMs };
+    this.timer.set(this.voteMs, () => this.resolveVote());
+    this.ctx.changed();
     return { ok: true };
+  }
+
+  private castVote(playerId: string, yes: unknown): ActionResult {
+    const v = this.vote;
+    if (!v || !v.voters.includes(playerId)) return { ok: false, reason: 'not_voting' };
+    if (typeof yes !== 'boolean') return { ok: false, reason: 'bad_action' };
+    v.yes = v.yes.filter((id) => id !== playerId);
+    v.no = v.no.filter((id) => id !== playerId);
+    (yes ? v.yes : v.no).push(playerId);
+    if (v.yes.length + v.no.length >= v.voters.length) this.resolveVote();
+    else this.ctx.changed();
+    return { ok: true };
+  }
+
+  /** Chốt phiếu: đồng ý nhiều hơn phản đối (người không bấm coi như bỏ phiếu trắng) */
+  private resolveVote(): void {
+    const v = this.vote;
+    if (!v || this.over) return;
+    this.vote = null;
+    this.timer.clear();
+    const approved = v.yes.length > v.no.length;
+    this.push({ kind: 'vote', word: v.word, playerId: v.byId, name: v.byName, approved });
+    if (approved && !this.used.has(v.word) && this.currentId === v.byId) {
+      this.ctx.learnWord(v.word, v.byName);
+      this.accept(v.byId, v.word);
+      return;
+    }
+    this.resumeTurn();
+  }
+
+  private resumeTurn(): void {
+    const left = Math.max(MIN_RESUME_MS, this.pausedLeft);
+    this.turnEndsAt = Date.now() + left;
+    this.timer.set(left, () => this.timeout());
+    this.ctx.changed();
+  }
+
+  /** người bỏ phiếu rời đi / bị loại giữa chừng */
+  private dropVoter(playerId: string): void {
+    const v = this.vote;
+    if (!v) return;
+    if (v.byId === playerId) {
+      this.vote = null;
+      return;
+    }
+    v.voters = v.voters.filter((id) => id !== playerId);
+    v.yes = v.yes.filter((id) => id !== playerId);
+    v.no = v.no.filter((id) => id !== playerId);
+    if (v.voters.length === 0 || v.yes.length + v.no.length >= v.voters.length) this.resolveVote();
   }
 
   /** Quyền cứu trợ: mỗi người 1 lần/ván, chỉ người hỏi mới thấy từ gợi ý */
@@ -94,6 +186,8 @@ export class WordChainGame implements GameEngine {
     if (!p.eliminated) {
       p.eliminated = true;
       this.push({ kind: 'eliminated', playerId, name: p.name, reason: 'left' });
+      // người xin duyệt luôn là người đang tới lượt, nên chỉ cần bỏ phiếu của người rời đi
+      this.dropVoter(playerId);
       if (this.checkEnd()) return;
       if (this.currentId === playerId) {
         this.currentId = this.nextAlive(playerId, true);
@@ -117,6 +211,7 @@ export class WordChainGame implements GameEngine {
       nextCount: this.ctx.dict.countNext(lastSyllable(this.currentWord), this.used),
       history: this.history,
       totalWords: this.totalWords,
+      vote: this.over ? null : this.vote,
     };
   }
 
@@ -127,6 +222,8 @@ export class WordChainGame implements GameEngine {
   // ---------- nội bộ ----------
 
   private beginTurn(): void {
+    this.appealedTurn = false;
+    this.vote = null;
     this.turnEndsAt = Date.now() + this.turnMs;
     this.timer.set(this.turnMs, () => this.timeout());
   }

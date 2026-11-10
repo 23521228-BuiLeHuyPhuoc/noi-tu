@@ -6,7 +6,7 @@ import { smallDict } from './helpers';
 
 const BET = 20_000;
 const ROLL = 2600;
-const RESULT = 5000;
+const RESULT = 7000;
 
 /** rng trả về đúng các con vật cho trước khi lắc */
 function symbolRng(rolls: BauCuaSymbol[]) {
@@ -30,6 +30,7 @@ function make(names: string[], rolls: BauCuaSymbol[] = []) {
     isConnected: () => true,
     changed: vi.fn(),
     finish: (r) => finished.push(r),
+    learnWord: () => {},
   };
   const g = new BauCuaGame(ctx);
   g.start(names.map((n, i) => ({ id: `p${i}`, name: n })));
@@ -83,10 +84,13 @@ describe('Bầu cua', () => {
     expect(v().round).toBe(2);
   });
 
-  it('chỉ chủ phòng được lắc sớm và tổng kết', () => {
+  it('không ai lắc tay: hết giờ cược máy tự lắc; chỉ chủ phòng được tổng kết', () => {
     const { g, v, finished } = make(['An', 'Bình'], ['tom', 'tom', 'tom']);
-    expect(g.action('p1', { type: 'shake' })).toEqual({ ok: false, reason: 'not_host' });
-    expect(g.action('p0', { type: 'shake' })).toEqual({ ok: true });
+    expect(g.action('p0', { type: 'shake' } as never)).toEqual({ ok: false, reason: 'bad_action' });
+    expect(v().step).toBe('betting');
+    vi.advanceTimersByTime(BET - 1);
+    expect(v().step).toBe('betting');
+    vi.advanceTimersByTime(1);
     expect(v().step).toBe('rolling');
     expect(g.action('p0', { type: 'bet', symbol: 'tom', amount: 10 })).toEqual({ ok: false, reason: 'not_betting' });
     expect(g.action('p1', { type: 'end' })).toEqual({ ok: false, reason: 'not_host' });

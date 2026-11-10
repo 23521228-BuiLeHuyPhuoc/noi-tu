@@ -97,15 +97,15 @@ describe('Server qua Socket.IO', () => {
     await until(cs[0], (st) => (st.game as LudoView).rollId === 1);
   });
 
-  it('tạo phòng Bầu cua, đặt cược, chờ mở bát', async () => {
+  it('tạo phòng Bầu cua, đặt cược, máy tự lắc rồi mở bát', async () => {
     const { cs } = await roomOf(2, 'baucua');
     expect(cs[0].state!.gameType).toBe('baucua');
     await cs[0].emitWithAck('game:start');
     await until(cs[1], (s) => s.phase === 'playing');
     expect(await cs[1].emitWithAck('game:action', { type: 'bet', symbol: 'cua', amount: 100 })).toEqual({ ok: true });
     await until(cs[0], (s) => (s.game as BauCuaView).bets[cs[1].state!.players[1].id]?.cua === 100);
-    expect(await cs[0].emitWithAck('game:action', { type: 'shake' })).toEqual({ ok: true });
-    const r = await until(cs[1], (s) => (s.game as BauCuaView).step === 'result', 5000);
+    await until(cs[1], (s) => (s.game as BauCuaView).step === 'rolling', 5000);
+    const r = await until(cs[1], (s) => (s.game as BauCuaView).step === 'result', 6000);
     expect((r.game as BauCuaView).dice).toHaveLength(3);
   });
 

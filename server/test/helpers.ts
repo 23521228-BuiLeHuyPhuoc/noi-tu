@@ -23,18 +23,26 @@ export const TURN = 30_000;
 
 export function setup(names: string[], opts: { dict?: Dictionary; rng?: () => number; turnMs?: number } = {}) {
   const onChange = vi.fn();
-  const room = new Room('ABC123', opts.dict ?? smallDict(), {
+  const dict = opts.dict ?? smallDict();
+  const learned: { word: string; by: string }[] = [];
+  const finishes: { gameType: string; participants: string[]; winnerId: string | null }[] = [];
+  const room = new Room('ABC123', dict, {
     turnMs: opts.turnMs ?? TURN,
     disconnectGraceMs: 30_000,
     rng: opts.rng ?? zeroRng,
     onChange,
+    learnWord: (word, by) => {
+      learned.push({ word, by });
+      dict.add(word);
+    },
+    onFinish: (info) => finishes.push(info),
   });
   const ids = names.map((n) => {
     const r = room.addPlayer(n);
     if (!r.ok) throw new Error(r.error);
     return r.playerId;
   });
-  return { room, ids, onChange };
+  return { room, ids, onChange, dict, learned, finishes };
 }
 
 export const wc = (room: Room) => room.toPublic().game as WordChainView;

@@ -26,6 +26,8 @@ export interface PublicPlayer {
   connected: boolean;
   /** chỉ số avatar (thú + màu), không trùng trong phòng */
   avatar: number;
+  /** đã đăng nhập tài khoản (có lưu thành tích) */
+  account?: boolean;
 }
 
 export interface RankEntry {
@@ -68,7 +70,8 @@ export type WordHistoryItem =
   | { kind: 'word'; word: string; playerId: string; name: string }
   | { kind: 'eliminated'; playerId: string; name: string; reason: 'timeout' | 'left' }
   | { kind: 'newWord'; word: string }
-  | { kind: 'hint'; playerId: string; name: string };
+  | { kind: 'hint'; playerId: string; name: string }
+  | { kind: 'vote'; word: string; playerId: string; name: string; approved: boolean };
 
 export interface WordChainView {
   type: 'wordchain';
@@ -86,6 +89,21 @@ export interface WordChainView {
   nextCount: number;
   history: WordHistoryItem[];
   totalWords: number;
+  /** đang xin cả phòng duyệt một từ chưa có trong từ điển */
+  vote: WordVote | null;
+}
+
+export const VOTE_SECONDS = 12;
+
+export interface WordVote {
+  word: string;
+  byId: string;
+  byName: string;
+  /** những người được bỏ phiếu */
+  voters: string[];
+  yes: string[];
+  no: string[];
+  endsAt: number;
 }
 
 // ================= Cờ cá ngựa =================
@@ -139,6 +157,8 @@ export const BAUCUA_START = 1000;
 export const BAUCUA_LOAN = 500;
 export const BAUCUA_CHIPS = [10, 50, 100, 500] as const;
 export const BAUCUA_BET_SECONDS = 20;
+/** thời gian hiện kết quả (gồm hiệu ứng mở bát) */
+export const BAUCUA_RESULT_SECONDS = 7;
 
 export interface BauCuaView {
   type: 'baucua';
@@ -192,11 +212,12 @@ export interface TyPhuView {
 export type GameAction =
   | { type: 'submit'; word: string }
   | { type: 'hint' }
+  | { type: 'appeal'; word: string }
+  | { type: 'vote'; yes: boolean }
   | { type: 'roll' }
   | { type: 'move'; piece: number }
   | { type: 'bet'; symbol: BauCuaSymbol; amount: number }
   | { type: 'clearBets' }
-  | { type: 'shake' }
   | { type: 'loan' }
   | { type: 'buy' }
   | { type: 'skip' }
@@ -219,6 +240,9 @@ export type ActionError =
   | 'timeout'
   | 'hint_used'
   | 'no_hint'
+  | 'cannot_appeal'
+  | 'no_voters'
+  | 'not_voting'
   // cờ cá ngựa
   | 'illegal_move'
   // bầu cua
@@ -236,12 +260,56 @@ export type ActionResult = { ok: true; hint?: string } | { ok: false; reason: Ac
 export type ThrowItem = 'dep' | 'cachua' | 'trung' | 'phan' | 'hoa' | 'tim';
 export type TauntId = 'nhanh' | 'ga' | 'anmay' | 'run' | 'huhon' | 'gg' | 'cuu' | 'dinh' | 'khoc' | 'denlai';
 
+export const EMOJIS = ['😂', '🤣', '😍', '😎', '🤡', '😡', '😭', '💀', '🔥', '👏', '🙏', '🤝', '💯', '🎉'] as const;
+export type Emoji = (typeof EMOJIS)[number];
+export type HitMove = 'dam' | 'da' | 'tat' | 'chuong';
+export const MAX_HP = 100;
+
 export type FunSend =
   | { kind: 'throw'; to: string; item: ThrowItem }
   | { kind: 'taunt'; taunt: TauntId }
-  | { kind: 'poke'; to: string };
+  | { kind: 'poke'; to: string }
+  | { kind: 'emoji'; emoji: Emoji }
+  | { kind: 'hit'; to: string; move: HitMove };
 
-export type FunEvent = FunSend & { id: number; from: string };
+/** sự kiện phát cho cả phòng; đánh nhau thì kèm sát thương và máu còn lại (máu ảo, không ảnh hưởng game) */
+export type FunEvent = FunSend & { id: number; from: string; damage?: number; hp?: number; ko?: boolean };
+
+export interface ChatMsg {
+  id: number;
+  from: string;
+  name: string;
+  text: string;
+  at: number;
+}
+export const CHAT_MAX = 200;
+
+// ================= Tài khoản =================
+
+export interface GameStat {
+  played: number;
+  won: number;
+}
+
+export interface PublicUser {
+  id: string;
+  username: string;
+  displayName: string;
+  avatar: number;
+  stats: Partial<Record<GameType, GameStat>>;
+}
+
+export type AuthError =
+  | 'invalid_username'
+  | 'invalid_password'
+  | 'invalid_name'
+  | 'username_taken'
+  | 'wrong_credentials'
+  | 'session_expired'
+  | 'rate_limited'
+  | 'server_error';
+
+export type AuthAck = { ok: true; token: string; user: PublicUser } | { ok: false; error: AuthError };
 
 // ================= Sự kiện socket =================
 
@@ -275,9 +343,17 @@ export interface ClientToServerEvents {
   'game:restart': (ack: (r: Ack) => void) => void;
   'room:leave': (ack: (r: Ack) => void) => void;
   'fun:send': (f: FunSend, ack: (r: { ok: boolean }) => void) => void;
+  'chat:send': (p: { text: string }, ack: (r: { ok: boolean }) => void) => void;
+  'auth:register': (p: { username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
+  'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;
+  'auth:resume': (p: { token: string }, ack: (r: AuthAck) => void) => void;
+  'auth:update': (p: { displayName?: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
+  'auth:logout': (ack: (r: { ok: boolean }) => void) => void;
 }
 
 export interface ServerToClientEvents {
   'room:state': (s: RoomState) => void;
   'fun:event': (e: FunEvent) => void;
+  'chat:msg': (m: ChatMsg) => void;
+  'chat:history': (ms: ChatMsg[]) => void;
 }

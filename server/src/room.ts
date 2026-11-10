@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import {
-  GAME_INFO, MAX_NAME, MAX_PLAYERS,
-  type ActionResult, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
+  CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
+  type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState,
 } from '../../shared/src/types';
+import { HpBoard } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
@@ -17,6 +18,10 @@ export interface RoomOptions {
   disconnectGraceMs?: number;
   rng?: Rng;
   onChange?: (room: Room) => void;
+  /** ván vừa kết thúc (để cộng thành tích cho tài khoản) */
+  onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null }) => void;
+  /** cả phòng duyệt một từ mới */
+  learnWord?: (word: string, byName: string) => void;
 }
 
 interface Player {
@@ -24,8 +29,13 @@ interface Player {
   name: string;
   connected: boolean;
   avatar: number;
+  account: boolean;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
+
+/** id của người chơi đã đăng nhập: "u-" + id tài khoản (khách không được dùng tiền tố này) */
+export const ACCOUNT_PREFIX = 'u-';
+const CHAT_KEEP = 40;
 
 type Result<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
 
@@ -48,6 +58,10 @@ export class Room {
 
   private engine: GameEngine | null = null;
   private result: GameResult | null = null;
+  private participants: string[] = [];
+  private chat: ChatMsg[] = [];
+  private chatSeq = 0;
+  readonly hp: HpBoard;
   private readonly graceMs: number;
   private readonly rng: Rng;
   private readonly onChange: (room: Room) => void;
@@ -56,6 +70,7 @@ export class Room {
     this.graceMs = opts.disconnectGraceMs ?? 30_000;
     this.rng = opts.rng ?? Math.random;
     this.onChange = opts.onChange ?? (() => {});
+    this.hp = new HpBoard(this.rng);
   }
 
   get connectedCount(): number {
@@ -69,7 +84,10 @@ export class Room {
   // ---------- người chơi ----------
 
   /** Vào phòng. Nếu `existingId` đã có trong phòng thì coi như vào lại (kể cả khi đang chơi). */
-  addPlayer(rawName: unknown, existingId?: string): Result<{ playerId: string }> {
+  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; account?: boolean }): Result<{ playerId: string }> {
+    const account = profile?.account === true;
+    // khách không được mạo danh id tài khoản
+    if (existingId?.startsWith(ACCOUNT_PREFIX) && !account) existingId = undefined;
     const existing = existingId ? this.find(existingId) : undefined;
     if (existing) {
       this.setConnected(existing.id, true);
@@ -81,13 +99,42 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    const usedAvatars = new Set(this.players.map((p) => p.avatar));
-    let avatar = Math.floor(this.rng() * AVATAR_COUNT);
-    while (usedAvatars.has(avatar)) avatar = (avatar + 1) % AVATAR_COUNT;
-    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar });
+    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), account });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
+  }
+
+  /** Đổi tên/ảnh đại diện (khi người chơi sửa hồ sơ tài khoản) — chỉ khi chưa vào ván */
+  updateProfile(playerId: string, name?: string, avatar?: number): void {
+    const p = this.find(playerId);
+    if (!p || this.phase === 'playing') return;
+    if (name && name !== p.name) {
+      p.name = '';
+      p.name = this.uniqueName(name);
+    }
+    if (avatar !== undefined && avatar !== p.avatar) {
+      const old = p.avatar;
+      p.avatar = -1;
+      p.avatar = this.freeAvatar(avatar, old);
+    }
+    this.changed();
+  }
+
+  /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ */
+  addChat(playerId: string, raw: unknown): ChatMsg | null {
+    const p = this.find(playerId);
+    if (!p || typeof raw !== 'string') return null;
+    const text = raw.normalize('NFC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+    if (!text) return null;
+    const msg: ChatMsg = { id: ++this.chatSeq, from: p.id, name: p.name, text, at: Date.now() };
+    this.chat.push(msg);
+    if (this.chat.length > CHAT_KEEP) this.chat.shift();
+    return msg;
+  }
+
+  get chatLog(): ChatMsg[] {
+    return [...this.chat];
   }
 
   setConnected(playerId: string, connected: boolean): void {
@@ -106,6 +153,7 @@ export class Room {
     if (!p) return;
     this.clearRemoveTimer(p);
     this.players = this.players.filter((x) => x.id !== p.id);
+    this.hp.remove(p.id);
     if (this.hostId === p.id) this.hostId = this.players[0]?.id ?? '';
     if (this.phase === 'playing') this.engine?.removePlayer(p.id);
     this.changed();
@@ -143,6 +191,7 @@ export class Room {
       [order[i], order[j]] = [order[j], order[i]];
     }
     this.result = null;
+    this.participants = order.map((p) => p.id);
     this.engine = this.createEngine();
     this.phase = 'playing';
     this.engine.start(order.map((p) => ({ id: p.id, name: p.name })));
@@ -171,7 +220,13 @@ export class Room {
       code: this.code,
       phase: this.phase,
       hostId: this.hostId,
-      players: this.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, avatar: p.avatar })),
+      players: this.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        connected: p.connected,
+        avatar: p.avatar,
+        ...(p.account ? { account: true } : {}),
+      })),
       maxPlayers: MAX_PLAYERS,
       gameType: this.gameType,
       settings: this.settings,
@@ -200,6 +255,7 @@ export class Room {
         if (this.phase === 'playing') this.changed();
       },
       finish: (result: GameResult) => this.finish(result),
+      learnWord: (word: string, byName: string) => this.opts.learnWord?.(word, byName),
     };
     switch (this.gameType) {
       case 'ludo':
@@ -220,6 +276,7 @@ export class Room {
     this.engine?.dispose();
     for (const p of this.players) if (!p.connected) this.scheduleRemoval(p);
     this.changed();
+    this.opts.onFinish?.({ gameType: this.gameType, participants: this.participants, winnerId: result.winnerId });
   }
 
   private backToLobby(): void {
@@ -231,6 +288,18 @@ export class Room {
 
   private find(id: string): Player | undefined {
     return this.players.find((p) => p.id === id);
+  }
+
+  /** ảnh đại diện chưa ai dùng, ưu tiên `wanted` */
+  private freeAvatar(wanted?: number, fallback?: number): number {
+    const used = new Set(this.players.map((p) => p.avatar));
+    const ok = (a: number | undefined): a is number =>
+      a !== undefined && Number.isInteger(a) && a >= 0 && a < AVATAR_COUNT && !used.has(a);
+    if (ok(wanted)) return wanted;
+    if (ok(fallback)) return fallback;
+    let avatar = Math.floor(this.rng() * AVATAR_COUNT);
+    while (used.has(avatar)) avatar = (avatar + 1) % AVATAR_COUNT;
+    return avatar;
   }
 
   private uniqueName(name: string): string {

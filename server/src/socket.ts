@@ -1,8 +1,10 @@
 import type { Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, GameType, ServerToClientEvents } from '../../shared/src/types';
+import type { AuthAck, ClientToServerEvents, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
-import { cleanName, type Room } from './room';
+import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
 import { cleanFun, RateLimiter } from './fun';
+import type { Auth } from './auth';
+import type { UserRecord } from './store';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -14,14 +16,18 @@ export function broadcastRoom(io: IO, room: Room): void {
 let funSeq = 0;
 
 /** Gắn các xử lý sự kiện. Server là trọng tài duy nhất: mọi kiểm tra đều ở đây và trong Room/engine. */
-export function attachSocketHandlers(io: IO, manager: RoomManager): void {
+export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): void {
   // socket đang đại diện cho mỗi người chơi ("CODE:playerId" -> socket.id)
   const activeSocket = new Map<string, string>();
   const key = (code: string, playerId: string) => `${code}:${playerId}`;
 
   io.on('connection', (socket: Sock) => {
     let session: { code: string; playerId: string } | null = null;
+    let user: UserRecord | null = null;
+    let token: string | null = null;
     const limiter = new RateLimiter();
+    const chatLimiter = new RateLimiter(5, 1500);
+    const authLimiter = new RateLimiter(6, 4000);
 
     const currentRoom = (): Room | undefined => {
       if (!session) return undefined;
@@ -43,10 +49,12 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
     };
 
     const enter = (room: Room, name: unknown, playerId: unknown) => {
-      const wanted = typeof playerId === 'string' ? playerId : undefined;
+      // đã đăng nhập: luôn dùng id + tên + ảnh của tài khoản
+      const wanted = user ? ACCOUNT_PREFIX + user.id : typeof playerId === 'string' ? playerId : undefined;
+      const displayName = user ? user.displayName : name;
       // vào socket room trước để nhận được room:state ngay sau khi thêm người chơi
       socket.join(room.code);
-      const res = room.addPlayer(name, wanted);
+      const res = room.addPlayer(displayName, wanted, user ? { avatar: user.avatar, account: true } : undefined);
       if (!res.ok) {
         socket.leave(room.code);
         return res;
@@ -54,13 +62,14 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       session = { code: room.code, playerId: res.playerId };
       activeSocket.set(key(room.code, res.playerId), socket.id);
       socket.emit('room:state', room.toPublic());
+      socket.emit('chat:history', room.chatLog);
       return { ok: true as const, code: room.code, playerId: res.playerId };
     };
 
     socket.on('room:create', (p, ack) => {
       if (typeof ack !== 'function') return;
       if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
-      if (!cleanName(p.name)) return ack({ ok: false, error: 'invalid_name' });
+      if (!user && !cleanName(p.name)) return ack({ ok: false, error: 'invalid_name' });
       detach(true);
       const room = manager.create();
       const res = enter(room, p.name, p.playerId);
@@ -73,7 +82,8 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
       const room = manager.get(p.code);
       if (!room) return ack({ ok: false, error: 'room_not_found' });
-      if (session && (session.code !== room.code || session.playerId !== p.playerId)) detach(true);
+      const me = user ? ACCOUNT_PREFIX + user.id : p.playerId;
+      if (session && (session.code !== room.code || session.playerId !== me)) detach(true);
       ack(enter(room, p.name, p.playerId));
     });
 
@@ -111,7 +121,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       if (typeof ack === 'function') ack({ ok: true });
     });
 
-    // ném dép, khịa, hối: phát cho cả phòng, có giới hạn tần suất chống spam
+    // ném dép, khịa, hối, thả emoji, đánh nhau: phát cho cả phòng, có giới hạn tần suất chống spam
     socket.on('fun:send', (raw, ack) => {
       const reply = typeof ack === 'function' ? ack : () => {};
       const room = currentRoom();
@@ -119,8 +129,81 @@ export function attachSocketHandlers(io: IO, manager: RoomManager): void {
       if (!room || !session || !f) return reply({ ok: false });
       if ('to' in f && (!room.has(f.to) || f.to === session.playerId)) return reply({ ok: false });
       if (!limiter.take()) return reply({ ok: false });
-      io.to(room.code).emit('fun:event', { ...f, id: ++funSeq, from: session.playerId });
+      const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : {};
+      io.to(room.code).emit('fun:event', { ...f, ...extra, id: ++funSeq, from: session.playerId });
       reply({ ok: true });
+    });
+
+    socket.on('chat:send', (p, ack) => {
+      const reply = typeof ack === 'function' ? ack : () => {};
+      const room = currentRoom();
+      if (!room || !session || !p || typeof p !== 'object') return reply({ ok: false });
+      if (!chatLimiter.take()) return reply({ ok: false });
+      const msg = room.addChat(session.playerId, p.text);
+      if (!msg) return reply({ ok: false });
+      io.to(room.code).emit('chat:msg', msg);
+      reply({ ok: true });
+    });
+
+    // ---------- tài khoản ----------
+
+    type AuthResult = { ack: AuthAck; user?: UserRecord };
+    const handleAuth = (
+      ack: unknown,
+      run: () => Promise<AuthResult>,
+      after?: (r: AuthResult) => void,
+      limited = true,
+    ) => {
+      if (typeof ack !== 'function') return;
+      const reply = ack as (r: AuthAck) => void;
+      if (limited && !authLimiter.take()) return reply({ ok: false, error: 'rate_limited' });
+      run()
+        .then((r) => {
+          if (r.ack.ok && r.user) {
+            user = r.user;
+            token = r.ack.token;
+          }
+          after?.(r);
+          reply(r.ack);
+        })
+        .catch((e) => {
+          console.error('auth error', e);
+          reply({ ok: false, error: 'server_error' });
+        });
+    };
+
+    socket.on('auth:register', (p, ack) => handleAuth(ack, () => auth.register(p ?? {})));
+    socket.on('auth:login', (p, ack) => handleAuth(ack, () => auth.login(p ?? {})));
+    socket.on('auth:resume', (p, ack) => handleAuth(ack, () => auth.resume(p?.token), undefined, false));
+
+    socket.on('auth:update', (p, ack) => {
+      if (!user || !token) {
+        if (typeof ack === 'function') ack({ ok: false, error: 'session_expired' });
+        return;
+      }
+      const uid = user.id;
+      const tk = token;
+      handleAuth(
+        ack,
+        () => auth.update(uid, tk, p ?? {}),
+        (r) => {
+          const room = currentRoom();
+          if (r.ack.ok && room && session?.playerId === ACCOUNT_PREFIX + uid) {
+            room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar);
+          }
+        },
+      );
+    });
+
+    socket.on('auth:logout', (ack) => {
+      const tk = token;
+      user = null;
+      token = null;
+      // đăng xuất thì rời phòng (id người chơi gắn với tài khoản)
+      detach(true);
+      const done = () => typeof ack === 'function' && ack({ ok: true });
+      if (tk) auth.logout(tk).then(done, done);
+      else done();
     });
 
     socket.on('disconnect', () => detach(false));

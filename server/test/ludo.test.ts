@@ -28,6 +28,7 @@ function make(names: string[], faces: number[], opts: { pieces?: 2 | 4; away?: s
     isConnected: (id) => !(opts.away ?? []).includes(id),
     changed,
     finish: (r) => finished.push(r),
+    learnWord: () => {},
   };
   const g = new LudoGame(ctx);
   g.start(names.map((n, i) => ({ id: `p${i}`, name: n })));

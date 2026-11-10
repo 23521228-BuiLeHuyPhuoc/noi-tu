@@ -30,6 +30,7 @@ function make(names: string[], values: (number | { card: number })[] = [], away:
     isConnected: (id) => !away.includes(id),
     changed: vi.fn(),
     finish: (r) => finished.push(r),
+    learnWord: () => {},
   };
   const g = new TyPhuGame(ctx);
   g.start(names.map((n, i) => ({ id: `p${i}`, name: n })));
