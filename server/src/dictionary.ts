@@ -9,8 +9,6 @@ export class Dictionary {
   private readonly definitions = new Map<string, WordDefinition>();
   private readonly words = new Set<string>();
   private readonly byFirst = new Map<string, string[]>();
-  /** âm tiết tiếng Việt đã chứng thực trong kho từ lớn (cho phép ghép từ 2 âm tiết hàng chục triệu tổ hợp) */
-  private readonly syllables = new Set<string>();
   /** các từ có thể dùng làm từ mở đầu (chữ cuối có ít nhất vài từ nối tiếp) */
   private starters: string[] = [];
 
@@ -21,23 +19,12 @@ export class Dictionary {
         this.definitions.set(word, { text: value.text.trim().slice(0, 400), source: value.source.trim() });
     }
     for (const raw of words) this.insert(raw);
-    if (this.words.size >= 10_000) {
-      for (const w of this.words) {
-        this.syllables.add(firstSyllable(w));
-        this.syllables.add(lastSyllable(w));
-      }
-    }
     this.starters = [...this.words].filter((w) => (this.byFirst.get(lastSyllable(w))?.length ?? 0) >= 3);
   }
 
   /** Thêm một từ (vd. từ được cả phòng duyệt). Trả về từ đã chuẩn hóa nếu thêm mới, ngược lại null. */
   add(raw: string): string | null {
-    const w = this.insert(raw);
-    if (w && this.syllables.size > 0) {
-      this.syllables.add(firstSyllable(w));
-      this.syllables.add(lastSyllable(w));
-    }
-    return w;
+    return this.insert(raw);
   }
 
   private insert(raw: string): string | null {
@@ -73,45 +60,21 @@ export class Dictionary {
   }
 
   get size(): number {
-    if (this.syllables.size > 0) return this.syllables.size * this.syllables.size - this.banned.size;
     return this.words.size;
   }
 
   /** `word` phải đã được chuẩn hóa */
   has(word: string): boolean {
-    if (this.banned.has(word)) return false;
-    if (this.words.has(word)) return true;
-    if (this.syllables.size > 0) {
-      const parts = word.split(' ');
-      return parts.length === WORD_SYLLABLES && this.syllables.has(parts[0]) && this.syllables.has(parts[1]);
-    }
-    return false;
+    return this.words.has(word);
   }
 
   /** Các từ bắt đầu bằng `syllable` chưa có trong `used` */
   nextOptions(syllable: string, used: ReadonlySet<string> = new Set()): string[] {
-    const curated = (this.byFirst.get(syllable) ?? []).filter((w) => !used.has(w));
-    if (curated.length > 0 || !this.syllables.has(syllable)) return curated;
-    const out: string[] = [];
-    for (const s2 of this.syllables) {
-      const w = `${syllable} ${s2}`;
-      if (!used.has(w) && !this.banned.has(w)) {
-        out.push(w);
-        if (out.length >= 100) break;
-      }
-    }
-    return out;
+    return (this.byFirst.get(syllable) ?? []).filter((w) => !used.has(w));
   }
 
   /** Số từ bắt đầu bằng `syllable` chưa có trong `used` */
   countNext(syllable: string, used: ReadonlySet<string>): number {
-    if (this.syllables.size > 0) {
-      if (!this.syllables.has(syllable)) return 0;
-      let n = this.syllables.size;
-      for (const u of used) if (firstSyllable(u) === syllable) n--;
-      for (const b of this.banned) if (firstSyllable(b) === syllable && !used.has(b)) n--;
-      return Math.max(0, n);
-    }
     const list = this.byFirst.get(syllable);
     if (!list) return 0;
     let n = 0;

@@ -100,6 +100,12 @@ function loadSources(dir: string): { headword: Source[]; gloss: Source[] } {
     ['vietanh.tab', 'Việt–Anh'],
     ['spdict_vietanh.tab', 'SPDict Việt–Anh'],
     ['viettbn.tab', 'Việt–TBN'],
+    ['vietphap.tab', 'Việt–Pháp'],
+    ['vietduc.tab', 'Việt–Đức'],
+    ['vietnga.tab', 'Việt–Nga'],
+    ['vietnhat.tab', 'Việt–Nhật'],
+    ['viethan.tab', 'Việt–Hàn'],
+    ['viettrung.tab', 'Việt–Trung'],
   ] as const) {
     if (has(f)) headword.push({ name, entries: headwordsTab(join(dir, f)) });
   }
@@ -109,7 +115,16 @@ function loadSources(dir: string): { headword: Source[]; gloss: Source[] } {
   }
   const wk = join(DATA_DIR, 'sources', 'wiktionary-kaikki.txt');
   if (existsSync(wk)) headword.push({ name: 'Wiktionary', entries: lines(wk) });
-  for (const [f, name] of [['anhviet.tab', 'giải nghĩa Anh–Việt'], ['anhvietbeta.tab', 'giải nghĩa Anh–Việt (beta)']] as const) {
+  for (const [f, name] of [
+    ['anhviet.tab', 'giải nghĩa Anh–Việt'],
+    ['anhvietbeta.tab', 'giải nghĩa Anh–Việt (beta)'],
+    ['phapviet.tab', 'giải nghĩa Pháp–Việt'],
+    ['ducviet.tab', 'giải nghĩa Đức–Việt'],
+    ['ngaviet.tab', 'giải nghĩa Nga–Việt'],
+    ['nhatviet.tab', 'giải nghĩa Nhật–Việt'],
+    ['hanviet.tab', 'giải nghĩa Hàn–Việt'],
+    ['trungviet.tab', 'giải nghĩa Trung–Việt'],
+  ] as const) {
     if (has(f)) gloss.push({ name, entries: glossSegments(join(dir, f)) });
   }
   return { headword, gloss };
@@ -168,7 +183,7 @@ function main() {
       if (w && looksLikePhrase(w)) freq.set(w, (freq.get(w) ?? 0) + 1);
     }
   }
-  const MIN_GLOSS = 2;
+  const MIN_GLOSS = 1;
   let before = words.size;
   for (const [w, n] of freq) if (n >= MIN_GLOSS) words.add(w);
   stats.push(`${'cụm trong lời giải nghĩa'.padEnd(28)} ${String(freq.size).padStart(7)} cụm, ≥${MIN_GLOSS} lần: mới thêm ${words.size - before}`);
@@ -176,17 +191,49 @@ function main() {
   // lượng từ + danh từ (Wiktionary ghi rõ danh từ nào đi với lượng từ nào: cái bàn, con mèo, quả cam…)
   before = words.size;
   const cls = join(DATA_DIR, 'sources', 'wiktionary-classifiers.txt');
-  if (existsSync(cls)) for (const l of lines(cls)) {
+  const clsLines = existsSync(cls) ? lines(cls) : [];
+  for (const l of clsLines) {
     const w = acceptEntry(l);
     if (w) words.add(w);
   }
-  // lượng từ tương đương thì đổi chỗ cho nhau được: cái ↔ chiếc, quả ↔ trái, quyển ↔ cuốn
-  const SAME: [string, string][] = [['cái', 'chiếc'], ['quả', 'trái'], ['quyển', 'cuốn']];
+  // lượng từ tương đương thì đổi chỗ cho nhau được: cái ↔ chiếc, quả ↔ trái, quyển ↔ cuốn, bông ↔ đóa, ngôi ↔ căn, hạt ↔ hột
+  const SAME: [string, string][] = [
+    ['cái', 'chiếc'],
+    ['quả', 'trái'],
+    ['quyển', 'cuốn'],
+    ['bông', 'đóa'],
+    ['ngôi', 'căn'],
+    ['hạt', 'hột'],
+  ];
   for (const w of [...words]) {
     const [a, b] = w.split(' ');
     for (const [x, y] of SAME) {
       if (a === x) words.add(`${y} ${b}`);
       if (a === y) words.add(`${x} ${b}`);
+    }
+  }
+  // mở rộng cụm danh từ/động từ có nghĩa theo đúng nhóm danh từ đã phân loại trong Wiktionary
+  const ANIMALS_PRE = ['chú', 'đàn', 'bầy', 'nuôi', 'bắt', 'mỗi', 'mấy', 'vài', 'nhiều'];
+  const ANIMALS_SUF = ['con', 'mẹ', 'đực', 'cái', 'nhỏ', 'lớn', 'to', 'rừng', 'nhà', 'hoang', 'này', 'kia', 'đó', 'ấy', 'nào', 'khác'];
+  const OBJECTS_CLS = new Set(['cái', 'chiếc', 'bộ', 'căn', 'ngôi', 'tờ', 'quyển', 'cuốn', 'bức', 'tấm', 'cây']);
+  const OBJECTS_PRE = ['mua', 'bán', 'sửa', 'dùng', 'mỗi', 'mấy', 'vài', 'nhiều', 'từng'];
+  const OBJECTS_SUF = ['mới', 'cũ', 'nhỏ', 'lớn', 'to', 'đẹp', 'tốt', 'hỏng', 'này', 'kia', 'đó', 'ấy', 'nào', 'khác', 'riêng', 'chung'];
+  const PLANTS_CLS = new Set(['bông', 'đóa', 'quả', 'trái', 'hạt', 'hột', 'củ']);
+  const PLANTS_PRE = ['trồng', 'hái', 'mùa', 'vườn', 'mua', 'bán', 'mỗi', 'mấy', 'vài', 'nhiều'];
+  const PLANTS_SUF = ['tươi', 'khô', 'chín', 'xanh', 'non', 'rừng', 'vườn', 'nhỏ', 'lớn', 'to', 'đẹp', 'thơm', 'này', 'kia', 'đó', 'nào', 'khác'];
+  for (const l of clsLines) {
+    const w = acceptEntry(l);
+    if (!w) continue;
+    const [c, n] = w.split(' ');
+    if (c === 'con') {
+      for (const p of ANIMALS_PRE) if (p !== n) words.add(`${p} ${n}`);
+      for (const s of ANIMALS_SUF) if (s !== n) words.add(`${n} ${s}`);
+    } else if (OBJECTS_CLS.has(c)) {
+      for (const p of OBJECTS_PRE) if (p !== n) words.add(`${p} ${n}`);
+      for (const s of OBJECTS_SUF) if (s !== n) words.add(`${n} ${s}`);
+    } else if (PLANTS_CLS.has(c)) {
+      for (const p of PLANTS_PRE) if (p !== n) words.add(`${p} ${n}`);
+      for (const s of PLANTS_SUF) if (s !== n) words.add(`${n} ${s}`);
     }
   }
   stats.push(`${'lượng từ + danh từ'.padEnd(28)} ${''.padStart(7)}       mới thêm ${words.size - before}`);
@@ -198,9 +245,11 @@ function main() {
   if (sorted.length < 40000) throw new Error(`Kho từ quá ít (${sorted.length}), kiểm tra lại thư mục nguồn`);
 
   writeFileSync(join(DATA_DIR, 'words.txt'), sorted.join('\n') + '\n');
-  const definitionsPath = join(DATA_DIR, 'definitions.json');
-  const previous = existsSync(definitionsPath) ? JSON.parse(readFileSync(definitionsPath, 'utf8')) : {};
-  writeFileSync(definitionsPath, JSON.stringify({ ...previous, ...extractDefinitions(dir) }, null, 2) + '\n');
+  if (process.argv.includes('--with-defs')) {
+    const definitionsPath = join(DATA_DIR, 'definitions.json');
+    const previous = existsSync(definitionsPath) ? JSON.parse(readFileSync(definitionsPath, 'utf8')) : {};
+    writeFileSync(definitionsPath, JSON.stringify({ ...extractDefinitions(dir), ...previous }, null, 2) + '\n');
+  }
   const header = (title: string) =>
     `# ${title}\n# Mỗi dòng một từ 2 chữ. Dòng bắt đầu bằng # bị bỏ qua. Khởi động lại server để áp dụng.\n`;
   const extra = join(DATA_DIR, 'extra-words.txt');

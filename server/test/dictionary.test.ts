@@ -46,11 +46,11 @@ describe('Dictionary', () => {
     expect(d.size).toBe(3);
   });
 
-  it('kho từ lớn (server/data): mở rộng hàng chục triệu tổ hợp 2 âm tiết tiếng Việt hợp lệ', () => {
+  it('kho từ lớn (server/data): chỉ nhận từ có nghĩa trong từ điển, từ vô nghĩa bị từ chối', () => {
     const d = Dictionary.load(join(__dirname, '..', 'data'));
-    expect(d.size).toBeGreaterThan(50_000_000);
+    expect(d.size).toBeGreaterThan(80_000);
     expect(d.has('học sinh')).toBe(true);
     expect(d.has('mèo mướp')).toBe(true);
-    expect(d.countNext('mèo', new Set())).toBeGreaterThan(5000);
+    expect(d.has('mèo bàn')).toBe(false);
   });
 });
