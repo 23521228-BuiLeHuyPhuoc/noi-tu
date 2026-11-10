@@ -51,7 +51,8 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
   const op = Math.min(fadeIn, fadeOut);
   const pop = ease(Math.min(1, el / 420));
   const scale = 0.4 + 0.6 * pop + (el < 420 ? Math.sin((el / 420) * Math.PI) * 0.12 : 0);
-  const cy = H * 0.4;
+  const k = Math.min(1, Math.max(0.75, H / 520)); // màn thấp (ngang): thu nhỏ nội dung cho vừa
+  const cy = H < 500 ? H * 0.5 : H * 0.4;
   const loss = a.kind === 'loss';
   const bank = a.kind === 'bankrupt';
   const tint = loss ? 'rgba(14,38,32,0.8)' : bank ? 'rgba(30,24,28,0.86)' : a.kind === 'buy' ? 'rgba(42,10,16,0.72)' : 'rgba(60,30,0,0.74)';
@@ -73,7 +74,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
       {loss && <Fog now={now} W={W} H={H} />}
 
       {/* nội dung giữa */}
-      <View style={{ position: 'absolute', left: 0, right: 0, top: cy - 120, alignItems: 'center', transform: [{ scale }] }}>
+      <View style={{ position: 'absolute', left: 0, right: 0, top: cy - 140, height: 280, justifyContent: 'center', alignItems: 'center', transform: [{ scale: scale * k }] }}>
         {a.kind === 'buy' && (
           <>
             {portrait}
@@ -101,7 +102,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
               source={{ uri: iconUri('1f47b') }}
               style={{
                 width: 96, height: 96, opacity: Math.min(1, el / 300) * (p > 0.8 ? (1 - p) / 0.2 : 1),
-                transform: [{ translateY: -ease(p) * 70 }, { translateX: Math.sin(el / 140) * 16 }, { rotate: `${Math.sin(el / 170) * 12}deg` }],
+                transform: [{ translateY: -ease(p) * 36 }, { translateX: Math.sin(el / 140) * 16 }, { rotate: `${Math.sin(el / 170) * 12}deg` }],
               }}
             />
             <T style={[styles.huge, { color: '#B2F2BB', transform: [{ translateX: Math.sin(el / 45) * (p < 0.3 ? 4 : 1) }] }]}>
@@ -121,7 +122,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
         )}
         {bank && (
           <>
-            <Image source={{ uri: FX_ICON.skull }} style={{ width: 96, height: 96, transform: [{ rotate: `${Math.sin(el / 120) * 10}deg` }] }} />
+            <Image source={{ uri: FX_ICON.skull }} style={{ width: 96, height: 96, marginBottom: 22, transform: [{ rotate: `${Math.sin(el / 120) * 10}deg` }] }} />
             <View style={[styles.stamp, { borderColor: '#6B2B2B', transform: [{ rotate: '-7deg' }, { scale: 1 + (1 - ease(Math.min(1, el / 380))) * 2.2 }] }]}>
               <T style={[styles.stampTxt, { color: '#6B2B2B', fontSize: 30 }]}>PHÁ SẢN</T>
             </View>

@@ -432,6 +432,7 @@ export function TyPhuScreen({ game, room }: { game: Game; room: RoomState }) {
                 inJail={inJail}
                 buyable={buyable ? { name: buyable.name, price: buyable.price } : null}
                 left={left}
+                paused={g.step === 'wait' || moving || diceAnimating}
                 dice={{ phase: dicePhase, animating: diceAnimating, elapsed: rollElapsed }}
                 playback={playback}
                 clockOffset={game.clockOffset}

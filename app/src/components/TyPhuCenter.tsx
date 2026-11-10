@@ -38,6 +38,8 @@ export interface CenterProps {
   inJail: boolean;
   buyable: { name: string; price: number } | null;
   left: number;
+  /** đồng hồ lượt chưa chạy (xúc xắc đang lăn / quân đang đi / đang chờ): hiện thanh đầy, không đếm */
+  paused?: boolean;
   dice: { phase: 'roll' | 'bounce' | 'reveal'; animating: boolean; elapsed: number };
   playback: DiceRollView | null;
   clockOffset: number;
@@ -195,7 +197,7 @@ export function TyPhuCenter(p: CenterProps) {
   const showBuy = idle && p.myTurn && g.step === 'buy' && p.buyable;
   const showEnd = idle && p.myTurn && g.step === 'manage';
   const timeTotal = Math.max(1, g.turnSeconds);
-  const hot = p.left <= 5;
+  const hot = !p.paused && p.left <= 5;
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
   const trayH = L.action.h - 44;
   const canThrow = showRoll && !p.dice.animating;
@@ -229,9 +231,9 @@ export function TyPhuCenter(p: CenterProps) {
           <T testID="typhu-status" numberOfLines={2} style={[styles.status, p.myTurn && { color: '#C2410C' }]}>{p.status}</T>
           <View style={styles.timerRow}>
             <View style={styles.track}>
-              <View style={{ height: '100%', width: `${clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
+              <View style={{ height: '100%', width: `${p.paused ? 100 : clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
             </View>
-            <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.left}s</T>
+            <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
           </View>
         </View>
       </View>
