@@ -11,7 +11,7 @@ import { useOnNew } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
-import { avatarOf } from '../avatars';
+import { Portrait } from './Avatar';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { STICKERS, stickerOf } from '../stickers';
@@ -381,7 +381,6 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
       setSending(false);
     }
   };
-  const avatar = (id: string) => avatarOf(players.find((p) => p.id === id)?.avatar ?? 0);
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
@@ -431,14 +430,11 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
         {game.chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
         {game.chat.map((m) => {
           const mine = m.from === me;
-          const a = avatar(m.from);
-          const avatarUrl = players.find((p) => p.id === m.from)?.avatarUrl;
+          const pl = players.find((p) => p.id === m.from);
           const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
           return (
             <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
-              <View style={[styles.msgAvatar, { backgroundColor: a.bg }]}>
-                <>{avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Text style={{ fontSize: 16 }}>{a.emoji}</Text>}</>
-              </View>
+              <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} />
               <View style={[styles.msg, mine ? styles.msgMine : null]}>
                 {!mine && <T style={styles.msgName}>{m.name}</T>}
                 {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>}

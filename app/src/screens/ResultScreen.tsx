@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { avatarOf } from '../avatars';
 import { GAME_META } from '../messages';
 import { play } from '../sound';
-import { C, sticker } from '../theme';
+import { C } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Shell } from '../components/Shell';
 import { Confetti } from '../components/Fun';
+import { Portrait } from '../components/Avatar';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
@@ -18,7 +18,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const isHost = room.hostId === game.me;
   const iWon = r.winnerId === game.me;
   const [error, setError] = useState<string | null>(null);
-  const avatarById = new Map(room.players.map((p) => [p.id, p.avatar]));
+  const playerById = new Map(room.players.map((p) => [p.id, p]));
 
   useEffect(() => {
     play(iWon || !r.winnerId ? 'win' : 'lose');
@@ -62,15 +62,13 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
       </View>
       <Card style={{ gap: 4 }}>
         {r.ranking.map((e, i) => {
-          const av = avatarOf(avatarById.get(e.playerId) ?? i);
+          const pl = playerById.get(e.playerId);
           return (
             <View key={e.playerId} style={[styles.rank, i === 0 && styles.first]}>
               <T style={styles.medal}>{MEDALS[i] ?? `${i + 1}.`}</T>
-              <View style={[styles.av, sticker(2), { backgroundColor: av.bg }]}>
-                <T style={{ fontSize: 22 }}>{av.emoji}</T>
-              </View>
+              <Portrait p={pl ?? { avatar: i }} size={44} />
               <View style={{ flex: 1 }}>
-                <T numberOfLines={1} style={styles.name}>{e.playerId === game.me ? `${e.name} (bạn)` : e.name}</T>
+                <T style={styles.name}>{e.playerId === game.me ? `${e.name} (bạn)` : e.name}</T>
                 <T style={styles.detail}>{e.detail}</T>
               </View>
             </View>
