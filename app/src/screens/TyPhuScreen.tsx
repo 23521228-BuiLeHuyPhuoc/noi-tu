@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Image, ScrollView, StyleSheet, View } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, isTyPhuProperty, stationRent, utilityRent,
@@ -483,7 +483,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         </View>
 
         {/* bảng thông tin nổi khi tới ô mua được hoặc được xây nhà (không nghiêng theo bàn) */}
-        {myTurn && !moving && (g.step === 'buy' || g.step === 'manage') && (
+        {myTurn && !moving && !activeAnn && (g.step === 'buy' || g.step === 'manage') && (
           <DecisionCard
             g={g}
             me={me}
@@ -666,7 +666,8 @@ function DecisionCard(p: {
           </View>
           <View style={dc.body}>
             {cells.length === 0 && <T style={dc.note}>Chưa đủ tiền để xây thêm.</T>}
-            {cells.slice(0, 5).map((i) => {
+            <ScrollView style={{ maxHeight: 132 }} contentContainerStyle={{ gap: 2 }}>
+            {cells.map((i) => {
               const c = TYPHU_BOARD[i];
               if (c.kind !== 'land') return null;
               const h = g.houses[i] ?? 0;
@@ -678,10 +679,11 @@ function DecisionCard(p: {
                     <T numberOfLines={1} style={dc.rentV}>{c.name}</T>
                     <T style={dc.rentK}>{h === 0 ? 'Đất trống' : `Nhà cấp ${h}`} → {next}</T>
                   </View>
-                  <Button testID={`build-${i}`} small variant="gold" title={`Xây -${money(TYPHU_GROUPS[c.group].house)}`} onPress={() => p.onAct({ type: 'build', cell: i })} />
+                  <Button testID={`build-${i}`} small variant="gold" title={`Xây -${money(TYPHU_GROUPS[c.group].house)}`} style={{ minHeight: 30, paddingVertical: 2 }} onPress={() => p.onAct({ type: 'build', cell: i })} />
                 </View>
               );
             })}
+            </ScrollView>
             {timer}
             <Button testID="end-turn" small variant="ink" title="Xong lượt" onPress={() => p.onAct({ type: 'endTurn' })} />
           </View>
@@ -707,7 +709,7 @@ const dc = StyleSheet.create({
   track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: '#E9ECEF', overflow: 'hidden', borderWidth: 1, borderColor: '#111' },
   secs: { fontSize: 13, lineHeight: 16, fontWeight: '900', color: '#111', minWidth: 28, textAlign: 'right' },
   btns: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  buildRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  buildRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 1 },
   dot: { width: 12, height: 12, borderRadius: 3, borderWidth: 1, borderColor: '#111' },
 });
 

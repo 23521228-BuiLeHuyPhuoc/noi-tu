@@ -29,13 +29,21 @@ export interface TyPhuCellProps {
 const BOARD_BG = '#CDE6D0';
 const INK = '#111';
 
+const svgUri = (body: string, vb: string) =>
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}"><g stroke="#111" stroke-width="2" stroke-linejoin="round">${body}</g></svg>`)}`;
+/** nhà xanh mái nhọn và khách sạn đỏ kiểu quân nhà của bàn cờ in */
+const HOUSE = svgUri('<path d="M2 11L10 3L18 11V19H2Z" fill="#2FB344"/><path d="M2 11L10 3L18 11" fill="none"/><rect x="8" y="13" width="4" height="6" fill="#1B7A2E"/>', '0 0 20 21');
+const HOTEL = svgUri('<path d="M2 9L8 3H28L34 9V19H2Z" fill="#E03131"/><path d="M2 9H34" fill="none"/><rect x="15" y="12" width="6" height="7" fill="#A61E1E"/><rect x="6" y="11" width="4" height="4" fill="#FFE3E3" stroke-width="1.2"/><rect x="26" y="11" width="4" height="4" fill="#FFE3E3" stroke-width="1.2"/>', '0 0 36 21');
+
 /** Nhà cấp 1-3: nhà xanh nhỏ; cấp 4: khách sạn đỏ. `vertical`: xếp dọc (ô ở cạnh bên). */
-function Houses({ n, vertical }: { n: number; vertical: boolean }) {
+function Houses({ n, size, vertical }: { n: number; size: number; vertical: boolean }) {
   if (n <= 0) return null;
-  if (n >= TYPHU_MAX_HOUSES) return <View style={[styles.hotel, vertical && { width: 7, height: 13 }]} />;
+  if (n >= TYPHU_MAX_HOUSES) {
+    return <Image source={{ uri: HOTEL }} style={vertical ? { width: size * 1.05, height: size * 0.62 } : { width: size * 1.75, height: size * 1.02 }} resizeMode="contain" />;
+  }
   return (
-    <View style={{ flexDirection: vertical ? 'column' : 'row', gap: 1.5 }}>
-      {Array.from({ length: n }, (_, k) => <View key={k} style={styles.house} />)}
+    <View style={{ flexDirection: vertical ? 'column' : 'row', gap: 1 }}>
+      {Array.from({ length: n }, (_, k) => <Image key={k} source={{ uri: HOUSE }} style={{ width: size, height: size * 1.05 }} resizeMode="contain" />)}
     </View>
   );
 }
@@ -82,11 +90,11 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const W = p.w;
     const nameSize = Math.max(6.5, Math.min(10, W / 5.2));
     const priceSize = Math.max(7, Math.min(10.5, W / 4.6));
-    const bandH = p.h * 0.2;
+    const bandH = Math.max(13, p.h * 0.24);
     const iconSize = Math.min(W * 0.8, p.h * 0.4);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>
-        <Houses n={p.houses} vertical={false} />
+        <Houses n={p.houses} size={Math.min(bandH - 2, (W - 6) / 3.3)} vertical={false} />
       </View>
     ) : null;
     return (
@@ -114,7 +122,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const sidePrice = priceTxt.replace(' xu', '');
   const bandEl = band ? (
     <View style={[styles.bandV, { backgroundColor: band }, p.side === 'right' ? styles.bandBorderL : styles.bandBorderR]}>
-      <Houses n={p.houses} vertical />
+      <Houses n={p.houses} size={Math.min(12, (H - 6) / 3.3)} vertical />
     </View>
   ) : null;
   return (
@@ -126,7 +134,6 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
           <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.28) }]}>{name}</T>
           {sidePrice !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.3) }]}>{sidePrice}</T>}
         </View>
-        {face && <View style={[styles.sideFace, p.side === 'right' ? { left: 1 } : { right: 1 }]}>{face}</View>}
         {p.side === 'right' && bandEl}
       </View>
       {overlay}
@@ -141,7 +148,7 @@ const styles = StyleSheet.create({
   row: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   rowText: { flex: 1, minWidth: 0, paddingHorizontal: 2, alignItems: 'center' },
   bandH: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  bandV: { alignSelf: 'stretch', width: 10, alignItems: 'center', justifyContent: 'center' },
+  bandV: { alignSelf: 'stretch', width: 14, alignItems: 'center', justifyContent: 'center' },
   bandBorderB: { borderBottomWidth: 0.75, borderColor: INK },
   bandBorderT: { borderTopWidth: 0.75, borderColor: INK },
   bandBorderL: { borderLeftWidth: 0.75, borderColor: INK },
@@ -151,10 +158,8 @@ const styles = StyleSheet.create({
   price: { color: INK, fontWeight: '800', textAlign: 'center' },
   minus: { color: '#C92A2A' },
   plus: { color: '#2B8A3E' },
-  sideFace: { position: 'absolute', bottom: 1, transform: [{ scale: 0.85 }] },
+  sideFace: { position: 'absolute', bottom: 1, marginHorizontal: 14, transform: [{ scale: 0.85 }] },
   ownerFace: { width: 13, height: 13, borderRadius: 7, backgroundColor: '#fff', borderWidth: 1.5 },
-  house: { width: 6, height: 6, backgroundColor: '#2F9E44', borderWidth: 1, borderColor: INK },
-  hotel: { width: 13, height: 7, backgroundColor: '#E03131', borderWidth: 1, borderColor: INK },
   corner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1, padding: 2 },
   cornerName: { color: INK, fontWeight: '800', textAlign: 'center' },
 });
