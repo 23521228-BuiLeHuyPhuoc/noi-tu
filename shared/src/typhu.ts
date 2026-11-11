@@ -39,15 +39,15 @@ export const TYPHU_BOARD: TyPhuCell[] = [
   { kind: 'tax', name: 'Thuế thu nhập', amount: 200 },
   { kind: 'station', name: 'Ga miền Tây', price: 200 },
   land('Vũng Tàu', 'troi', 100),
-  { kind: 'chance', name: 'Cơ hội' },
   land('Nha Trang', 'troi', 100),
-  { kind: 'utility', name: 'Công ty điện', price: 150 },
   // cạnh trái (dưới → trên)
   { kind: 'jail', name: 'Nhà tù' },
   land('Hội An', 'hong', 140),
+  { kind: 'utility', name: 'Công ty điện', price: 150 },
   land('Đà Nẵng', 'hong', 140),
   { kind: 'station', name: 'Ga miền Trung', price: 200 },
   land('Huế', 'cam', 180),
+  { kind: 'community', name: 'Khí vận' },
   land('Hạ Long', 'cam', 200),
   // hàng trên (trái → phải)
   { kind: 'rest', name: 'Nghỉ chân' },
@@ -58,11 +58,11 @@ export const TYPHU_BOARD: TyPhuCell[] = [
   land('Đà Lạt', 'vang', 260),
   { kind: 'utility', name: 'Công ty nước', price: 150 },
   land('Buôn Ma Thuột', 'vang', 260),
-  { kind: 'community', name: 'Khí vận' },
-  land('Biên Hòa', 'luc', 300),
   // cạnh phải (trên → dưới)
   { kind: 'gotojail', name: 'Vào tù' },
+  land('Biên Hòa', 'luc', 300),
   land('Bình Dương', 'luc', 320),
+  { kind: 'chance', name: 'Cơ hội' },
   { kind: 'station', name: 'Ga miền Nam', price: 200 },
   land('Hà Nội', 'lam', 350),
   { kind: 'tax', name: 'Thuế xa xỉ', amount: 100 },
@@ -92,10 +92,10 @@ export function stationRent(count: number): number { return count > 0 ? 25 * 2 *
 export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 10 : 4) : 0; }
 
 export const TYPHU_SIZE = TYPHU_BOARD.length;
-export const TYPHU_JAIL = 10;
-/** bàn hình chữ nhật cho màn ngang: 11 cột × 7 hàng (9 ô trên/dưới, 5 ô mỗi bên) */
-export const TYPHU_COLS = 11;
-export const TYPHU_ROWS = 7;
+export const TYPHU_JAIL = 8;
+/** bàn vuông 9 × 9: 4 góc + 7 ô mỗi cạnh */
+export const TYPHU_COLS = 9;
+export const TYPHU_ROWS = 9;
 export const TYPHU_START_CASH = 1500;
 export const TYPHU_PASS_START = 200;
 export const TYPHU_JAIL_FINE = 50;
@@ -118,8 +118,8 @@ export function rentOf(cell: number, houses: number, fullGroup: boolean): number
 
 /** Toạ độ (hàng, cột) trên lưới 9×9. */
 export function typhuCellPos(i: number): [number, number] {
-  if (i <= 10) return [6, 10 - i];
-  if (i <= 15) return [6 - (i - 10), 0];
-  if (i <= 26) return [0, i - 16];
-  return [i - 26, 10];
+  if (i <= 8) return [8, 8 - i];
+  if (i <= 15) return [16 - i, 0];
+  if (i <= 24) return [0, i - 16];
+  return [i - 24, 8];
 }

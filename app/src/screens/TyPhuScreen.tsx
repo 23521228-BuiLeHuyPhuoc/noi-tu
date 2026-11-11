@@ -16,7 +16,7 @@ import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
 import { play } from '../sound';
 import { vibrate } from '../web';
-import { C, sticker } from '../theme';
+import { C } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
@@ -75,15 +75,16 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
   const availW = stageSize && stageSize.w > 200 ? stageSize.w - 4 : Math.max(320, width - 12);
   const availH = stageSize && stageSize.h > 200 ? stageSize.h - 8 : Math.max(220, height - 60);
-  const boardW = Math.floor(availW);
-  const boardH = Math.floor(availH);
-  const geo = useMemo(() => makeGeo(boardW, boardH), [boardW, boardH]);
+  const tilt = useMemo(() => fitTilted(availW, availH), [availW, availH]);
+  const boardW = tilt.S;
+  const boardH = tilt.S;
+  const geo = useMemo(() => makeGeo(tilt.S), [tilt.S]);
   const hasCard = !!g.card;
   const layout = useMemo(
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(22, Math.min(30, geo.wm * 0.5, geo.hm * 0.6));
+  const pawnBase = Math.max(18, Math.min(28, geo.wm * 0.62));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -138,13 +139,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const cellMid = (i: number) => {
     const r = geo.rect[i];
     const sd = geo.side[i];
-    if (sd === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.5 };
-    // quân cờ đứng trên mép trong của ô (phía dải màu) để không che tên và giá
-    if (sd === 'top') return { x: r.x + r.w / 2, y: r.y + 3 };
-    if (sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h - 3 };
-    if (sd === 'left') return { x: r.x + 3, y: r.y + r.h / 2 };
-    return { x: r.x + r.w - 3, y: r.y + r.h / 2 };
-  };
+    // mũi ghim quân cờ cắm ở phần dưới ô (theo hướng nhìn), phần thân nổi lên trên
+    if (sd === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.62 };
+    if (sd === 'top' || sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h * 0.7 };
+    return { x: r.x + r.w / 2, y: r.y + r.h * 0.82 };
+  };;
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
     const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
     if (!movement || movement.playerId !== id || serverNow >= movement.endsAt || reducedMotion) return still();
@@ -389,8 +388,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         <View
           style={[
             styles.board,
-            sticker(5),
-            { width: boardW, height: boardH },
+            { width: boardW, height: boardH, transform: [{ perspective: TILT_PERSP }, { translateY: tilt.dy }, { rotateX: `${TILT_DEG}deg` }] },
           ]}
         >
           {/* 40 ô (memo: chỉ vẽ lại khi ô đó đổi) */}
@@ -595,11 +593,34 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 }
 
 
+/** góc nghiêng bàn cờ 3D (nhìn từ phía người chơi) */
+const TILT_DEG = 36;
+const TILT_PERSP = 1100;
+/** Tìm cạnh bàn vuông lớn nhất mà sau khi nghiêng 3D vẫn lọt khung, kèm độ dời để hình chiếu nằm giữa. */
+function fitTilted(availW: number, availH: number): { S: number; dy: number } {
+  const th = (TILT_DEG * Math.PI) / 180;
+  const proj = (S: number) => {
+    const a = S / 2;
+    const st = TILT_PERSP / (TILT_PERSP + a * Math.sin(th));
+    const sb = TILT_PERSP / (TILT_PERSP - a * Math.sin(th));
+    return { h: a * Math.cos(th) * (st + sb), w: S * sb, dy: -(a * Math.cos(th) * (sb - st)) / 2 };
+  };
+  let lo = 200;
+  let hi = 2000;
+  for (let k = 0; k < 30; k++) {
+    const mid = (lo + hi) / 2;
+    const pr = proj(mid);
+    if (pr.h <= availH - 4 && pr.w <= availW - 4) lo = mid; else hi = mid;
+  }
+  const S = Math.floor(lo);
+  return { S, dy: proj(S).dy };
+}
+
 const styles = StyleSheet.create({
   stageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  board: { backgroundColor: '#DDF1E6', borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  board: { backgroundColor: '#CDE6D0', borderWidth: 2, borderColor: '#111', position: 'relative', boxShadow: '0px 18px 24px rgba(0,0,0,0.35)' },
   center: {
-    position: 'absolute', backgroundColor: '#FFE9B5', borderRadius: 14, borderWidth: 2.5, borderColor: C.ink, zIndex: 4,
+    position: 'absolute', zIndex: 4,
   },
   detailPhoto: { borderRadius: 12, borderWidth: 2, borderColor: C.ink },
   // ảnh gốc 116x80: chỉ phóng tối đa ~1,7 lần

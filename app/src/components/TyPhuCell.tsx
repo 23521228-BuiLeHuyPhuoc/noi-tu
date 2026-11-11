@@ -27,124 +27,89 @@ export interface TyPhuCellProps {
   onPress: (i: number) => void;
 }
 
-/** màu nền + dải cho ô đặc biệt (không thuộc bộ đất) */
-const SPECIAL: Record<string, { bg: string; band: string }> = {
-  start: { bg: '#B2F2BB', band: '#2F9E44' },
-  jail: { bg: '#DEE2E6', band: '#868E96' },
-  rest: { bg: '#C3FAE8', band: '#12B886' },
-  gotojail: { bg: '#E5DBFF', band: '#7950F2' },
-  chance: { bg: '#FFE8CC', band: '#FD7E14' },
-  community: { bg: '#FFDEEB', band: '#E64980' },
-  station: { bg: '#E9ECEF', band: '#495057' },
-  utility: { bg: '#E3F6FF', band: '#228BE6' },
-  tax: { bg: '#FFF3BF', band: '#F59F00' },
-};
+const BOARD_BG = '#CDE6D0';
+const INK = '#111';
+/** góc quay nội dung từng ô để chữ quay ra mép ngoài như bàn cờ in */
+const ROT: Record<string, string> = { top: '0deg', right: '90deg', bottom: '180deg', left: '-90deg' };
+const CORNER_ROT: Record<string, string> = { start: '-45deg', jail: '45deg', rest: '135deg', gotojail: '-135deg' };
 
-/** pha màu với trắng để làm nền nhạt cho ô đất */
-function tint(hex: string, k = 0.8): string {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (v: number) => Math.round(v + (255 - v) * k);
-  return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
-}
-
-/** Một ô bàn cờ: thẻ bo tròn nền nhạt theo nhóm, dải màu ở cạnh hướng vào tâm, TÊN + GIÁ chữ to. Icon chỉ ở ô đặc biệt. */
+/** Một ô kiểu bàn cờ in: nền xanh nhạt, viền mảnh, dải màu bộ đất ở mép trong, TÊN in hoa, giá ở mép ngoài. */
 export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const c = TYPHU_BOARD[p.index];
   const owned = p.ownerHex !== null;
-  const corner = p.side === 'corner';
-  const sp = SPECIAL[c.kind];
   const isLand = c.kind === 'land';
-  const band = isLand ? TYPHU_GROUPS[c.group].color : sp.band;
-  const bg = isLand ? tint(band) : sp.bg;
   const price = isTyPhuProperty(c) ? c.price : c.kind === 'tax' ? c.amount : null;
-  const name = shortCellName(c.name);
+  const name = shortCellName(c.name).toUpperCase();
   const label = `${p.index + 1}. ${c.name}${p.ownerName ? `, thuộc ${p.ownerName}` : ''}${price !== null ? `, ${c.kind === 'tax' ? 'nộp' : 'giá'} ${price} xu` : ''}`;
   const frame = [
     styles.cell,
-    { left: p.x, top: p.y, width: p.w, height: p.h, backgroundColor: bg },
-    owned && { borderColor: p.ownerHex!, borderWidth: 3 },
-    p.isTrail && styles.trail,
-    p.isStepTarget && styles.step,
-    p.here && styles.here,
+    { left: p.x, top: p.y, width: p.w, height: p.h, backgroundColor: owned ? p.ownerLight! : BOARD_BG },
   ];
+  const hl = p.here ? C.son : p.isStepTarget || p.isTrail ? C.gold : null;
   const hotel = p.houses >= TYPHU_MAX_HOUSES;
-  const priceTxt = price === null ? '' : c.kind === 'tax' ? `-${price}` : `${price}`;
-  const badges = (
-    <View style={styles.badges} pointerEvents="none">
-      {p.houses > 0 && (
-        <View style={styles.houseBits}>
-          <Image source={{ uri: hotel ? FX_ICON.hotel : FX_ICON.house }} style={styles.houseIcon} />
-          {!hotel && p.houses > 1 && <T style={styles.houseNum}>{p.houses}</T>}
-        </View>
-      )}
-      {owned && <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} />}
+  const face = owned ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
+  const houses = p.houses > 0 ? (
+    <View style={styles.houseBits}>
+      <Image source={{ uri: hotel ? FX_ICON.hotel : FX_ICON.house }} style={styles.houseIcon} />
+      {!hotel && p.houses > 1 && <T style={styles.houseNum}>{p.houses}</T>}
     </View>
-  );
+  ) : null;
 
-  if (corner) {
-    const cf = Math.max(12, Math.min(16, p.h * 0.17));
-    const icon = Math.max(22, Math.min(p.h - cf - 16, p.w * 0.45, 44));
+  if (p.side === 'corner') {
+    const box = p.w * 0.8;
+    const icon = box * 0.52;
+    const fs = Math.max(8, Math.min(13, box / 6.5));
     return (
-      <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={[...frame, styles.cornerCell]}>
-        <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
-        <T numberOfLines={1} adjustsFontSizeToFit style={[styles.cornerName, { fontSize: cf, lineHeight: cf + 3 }]}>{name}</T>
+      <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
+        <View style={[styles.corner, { left: (p.w - box) / 2, top: (p.h - box) / 2, width: box, height: box, transform: [{ rotate: CORNER_ROT[c.kind] ?? '0deg' }] }]}>
+          <T numberOfLines={1} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.4) }]}>{name}</T>
+          <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
+        </View>
+        {hl && <View pointerEvents="none" style={[styles.hl, { borderColor: hl }]} />}
       </Pressable>
     );
   }
 
   const horiz = p.side === 'top' || p.side === 'bottom';
-  const bt = 6; // độ dày dải màu
-  const bandStyle =
-    p.side === 'top' ? { top: 0, left: 0, right: 0, height: bt }
-    : p.side === 'bottom' ? { bottom: 0, left: 0, right: 0, height: bt }
-    : p.side === 'left' ? { left: 0, top: 0, bottom: 0, width: bt }
-    : { right: 0, top: 0, bottom: 0, width: bt };
-  const inset =
-    p.side === 'top' ? { paddingTop: bt } : p.side === 'bottom' ? { paddingBottom: bt }
-    : p.side === 'left' ? { paddingLeft: bt } : { paddingRight: bt };
-  const nameSize = horiz ? Math.max(11, Math.min(14, p.w / 6)) : Math.max(11, Math.min(14, p.h * 0.28));
-  const priceSize = horiz ? Math.max(13, Math.min(18, p.h * 0.24)) : Math.max(13, Math.min(17, p.h * 0.34));
-  const iconSize = horiz ? Math.max(18, Math.min(priceTxt ? 26 : 34, p.h * (priceTxt ? 0.3 : 0.42))) : Math.max(20, Math.min(30, p.h * 0.55));
-  const iconEl = !isLand ? <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" /> : null;
+  const W = horiz ? p.w : p.h; // chiều dọc theo mép bàn
+  const H = horiz ? p.h : p.w; // chiều sâu vào trong
+  const nameSize = Math.max(7, Math.min(11, W / 5));
+  const priceSize = Math.max(7.5, Math.min(11, W / 4.6));
+  const priceTxt = price === null ? '' : c.kind === 'tax' ? `NỘP ${price}` : `${price} xu`;
+  const iconSize = Math.min(W * 0.78, H * 0.42);
 
   return (
     <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
-      <View style={[styles.band, bandStyle, { backgroundColor: band }]} />
-      {horiz ? (
-        <View style={[styles.inner, inset]}>
-          {iconEl}
-          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: nameSize + 2 }]}>{name}</T>
-          {priceTxt !== '' && <T style={[styles.price, { fontSize: priceSize, lineHeight: priceSize + 2 }]}>{priceTxt}</T>}
-        </View>
-      ) : (
-        <View style={[styles.innerRow, inset]}>
-          {iconEl}
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: nameSize + 2, textAlign: 'left' }]}>{name}</T>
-            {priceTxt !== '' && <T style={[styles.price, { fontSize: priceSize, lineHeight: priceSize + 2, textAlign: 'left' }]}>{priceTxt}</T>}
+      <View style={[styles.upright, { width: W, height: H, left: (p.w - W) / 2, top: (p.h - H) / 2, transform: [{ rotate: ROT[p.side] }] }]}>
+        {isLand ? (
+          <View style={[styles.band, { height: H * 0.22, backgroundColor: TYPHU_GROUPS[c.group].color }]}>
+            {face}{houses}
           </View>
+        ) : face ? <View style={[styles.specialFace, { height: H * 0.2 }]}>{face}</View> : null}
+        <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.4), marginTop: isLand || face ? 1 : 3 }]}>{name}</T>
+        <View style={styles.mid}>
+          {!isLand && <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />}
         </View>
-      )}
-      {badges}
+        {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.4) }]}>{priceTxt}</T>}
+      </View>
+      {hl && <View pointerEvents="none" style={[styles.hl, { borderColor: hl }]} />}
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
-  cell: { position: 'absolute', borderRadius: 9, borderWidth: 1.5, borderColor: 'rgba(42,10,16,0.35)', overflow: 'hidden' },
-  trail: { borderColor: C.gold, borderWidth: 2.5 },
-  step: { borderColor: C.gold, borderWidth: 3 },
-  here: { borderColor: C.son, borderWidth: 3.5 },
-  band: { position: 'absolute' },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, gap: 1 },
-  innerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 },
-  name: { color: C.ink, fontWeight: '800', textAlign: 'center' },
-  price: { color: C.ink, fontWeight: '900', textAlign: 'center' },
-  badges: { position: 'absolute', top: 2, right: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ownerFace: { width: 13, height: 13, borderRadius: 7, backgroundColor: '#fff', borderWidth: 1.5 },
+  cell: { position: 'absolute', borderWidth: 0.75, borderColor: INK, overflow: 'hidden' },
+  upright: { position: 'absolute', alignItems: 'center' },
+  band: { alignSelf: 'stretch', borderBottomWidth: 0.75, borderColor: INK, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  specialFace: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  name: { color: INK, fontWeight: '700', textAlign: 'center', paddingHorizontal: 1, letterSpacing: -0.2 },
+  mid: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  price: { color: INK, fontWeight: '700', textAlign: 'center', marginBottom: 3 },
+  hl: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 3 },
+  ownerFace: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff', borderWidth: 1.5 },
   houseBits: { flexDirection: 'row', alignItems: 'center' },
-  houseIcon: { width: 13, height: 13 },
-  houseNum: { color: C.ink, fontWeight: '900', fontSize: 10, lineHeight: 12 },
-  cornerCell: { alignItems: 'center', justifyContent: 'center', gap: 2, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(42,10,16,0.45)' },
-  cornerName: { color: C.ink, fontWeight: '900', textAlign: 'center' },
+  houseIcon: { width: 12, height: 12 },
+  houseNum: { color: INK, fontWeight: '900', fontSize: 9, lineHeight: 11 },
+  corner: { position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  cornerName: { color: INK, fontWeight: '800', textAlign: 'center' },
 });
