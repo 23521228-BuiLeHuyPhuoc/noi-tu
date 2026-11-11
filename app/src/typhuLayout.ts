@@ -1,4 +1,4 @@
-import { typhuCellPos } from '../../shared/src/typhu';
+import { TYPHU_SIZE, typhuCellPos } from '../../shared/src/typhu';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 /** phía của cell hướng vào tâm bàn (nơi đặt dải màu bộ đất) */
@@ -11,25 +11,26 @@ export interface BoardGeo {
   side: BandSide[];
 }
 
-/** Bàn 11×11 nhưng ô góc và ô cạnh khác kích thước: ô cạnh hẹp-cao trên màn dọc, rộng-thấp trên màn ngang. */
+/** Bàn chữ nhật 11 cột × 7 hàng cho màn ngang: ô góc to, 9 ô trên/dưới, 5 ô mỗi bên; giữa các ô có khe nhỏ. */
 export function makeGeo(W: number, H: number): BoardGeo {
-  const cw = Math.round(W * 0.13);
-  const ch = Math.round(H * 0.17);
-  const wm = (W - 2 * cw) / 7;
-  const hm = (H - 2 * ch) / 7;
-  const colX = (c: number) => (c === 0 ? 0 : c === 8 ? cw + 7 * wm : cw + (c - 1) * wm);
-  const colW = (c: number) => (c === 0 || c === 8 ? cw : wm);
-  const rowY = (r: number) => (r === 0 ? 0 : r === 8 ? ch + 7 * hm : ch + (r - 1) * hm);
-  const rowH = (r: number) => (r === 0 || r === 8 ? ch : hm);
+  const cw = Math.round(W * 0.115);
+  const ch = Math.round(H * 0.2);
+  const wm = (W - 2 * cw) / 9;
+  const hm = (H - 2 * ch) / 5;
+  const colX = (c: number) => (c === 0 ? 0 : c === 10 ? cw + 9 * wm : cw + (c - 1) * wm);
+  const colW = (c: number) => (c === 0 || c === 10 ? cw : wm);
+  const rowY = (r: number) => (r === 0 ? 0 : r === 6 ? ch + 5 * hm : ch + (r - 1) * hm);
+  const rowH = (r: number) => (r === 0 || r === 6 ? ch : hm);
+  const G = 2; // khe giữa các ô
   const rect: Rect[] = [];
   const side: BandSide[] = [];
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < TYPHU_SIZE; i++) {
     const [r, c] = typhuCellPos(i);
-    rect.push({ x: colX(c), y: rowY(r), w: colW(c), h: rowH(r) });
-    const corner = (r === 0 || r === 8) && (c === 0 || c === 8);
-    side.push(corner ? 'corner' : r === 8 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
+    rect.push({ x: colX(c) + G / 2, y: rowY(r) + G / 2, w: colW(c) - G, h: rowH(r) - G });
+    const corner = (r === 0 || r === 6) && (c === 0 || c === 10);
+    side.push(corner ? 'corner' : r === 6 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
   }
-  return { W, H, cw, ch, wm, hm, rect, side, center: { x: cw, y: ch, w: 7 * wm, h: 7 * hm } };
+  return { W, H, cw, ch, wm, hm, rect, side, center: { x: cw + 3, y: ch + 3, w: 9 * wm - 6, h: 5 * hm - 6 } };
 }
 
 export interface CenterLayout {
@@ -78,28 +79,32 @@ export function makeCenterLayout(w: number, h: number, n: number, hasCard: boole
       logRows: Math.max(0, Math.min(6, Math.floor(log.h / ROW))),
     };
   }
-  const lw = Math.round(w * 0.42);
-  const rx = pad + lw + gap;
-  const rw = w - rx - pad;
-  const header: Rect = { x: pad, y: pad, w: lw, h: 26 };
-  const banner: Rect = { x: pad, y: header.y + header.h + gap, w: lw, h: 50 };
-  const aY = banner.y + banner.h + gap;
-  const action: Rect = { x: pad, y: aY, w: lw, h: Math.max(110, Math.min(170, h - pad - aY)) };
-  const rows = Math.ceil(n / 2);
-  const cardH = n > 4 ? 36 : 42;
-  const cardW = (rw - gap) / 2;
+  // màn ngang: 3 cột — [xúc xắc + nút] [tên game, lượt chơi, diễn biến] [tiền từng người, đất của bạn]
+  const c1w = Math.round(w * 0.34);
+  const c2x = pad + c1w + gap;
+  const c2w = Math.round(w * 0.31);
+  const c3x = c2x + c2w + gap;
+  const c3w = w - c3x - pad;
+  const action: Rect = { x: pad, y: pad, w: c1w, h: h - 2 * pad };
+  const header: Rect = { x: c2x, y: pad, w: c2w, h: 26 };
+  const banner: Rect = { x: c2x, y: header.y + header.h + gap, w: c2w, h: 50 };
+  // ≤3 người: mỗi người một dòng cho đủ chỗ tên; đông hơn thì 2 cột
+  const cols = n <= 3 ? 1 : 2;
+  const rows = Math.ceil(n / cols);
+  const cardH = n > 4 ? 32 : n > 3 ? 38 : 36;
+  const cardW = (c3w - gap * (cols - 1)) / cols;
   const wealth: Rect[] = Array.from({ length: n }, (_, i) => ({
-    x: rx + (i % 2) * (cardW + gap), y: pad + Math.floor(i / 2) * (cardH + 4), w: cardW, h: cardH,
+    x: c3x + (i % cols) * (cardW + gap), y: pad + Math.floor(i / cols) * (cardH + 4), w: cardW, h: cardH,
   }));
   const wealthH = rows * cardH + (rows - 1) * 4;
-  const chips: Rect = { x: rx, y: pad + wealthH + gap, w: rw, h: 46 };
-  const logY = chips.y + chips.h + gap + dock;
-  const log: Rect = { x: rx, y: logY, w: rw, h: Math.max(0, h - pad - logY) };
+  const chips: Rect = { x: c3x, y: pad + wealthH + gap, w: c3w, h: Math.max(40, h - 2 * pad - wealthH - gap) };
+  const logY = banner.y + banner.h + gap + dock;
+  const log: Rect = { x: c2x, y: logY, w: c2w, h: Math.max(0, h - pad - logY) };
   return {
     wide, header, banner, action, wealth, chips, log,
-    cardBig: { x: rx, y: pad, w: rw, h: h - 2 * pad },
-    cardDock: { x: rx, y: chips.y + chips.h + gap, w: rw, h: dock - 3 },
+    cardBig: { x: c2x, y: pad, w: w - c2x - pad, h: h - 2 * pad },
+    cardDock: { x: c2x, y: banner.y + banner.h + gap, w: c2w, h: dock - 3 },
     diceSize: 0,
-    logRows: Math.max(0, Math.min(6, Math.floor(log.h / ROW))),
+    logRows: Math.max(0, Math.min(4, Math.floor(log.h / ROW))),
   };
 }

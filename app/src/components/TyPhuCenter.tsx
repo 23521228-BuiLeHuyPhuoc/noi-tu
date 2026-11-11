@@ -203,7 +203,7 @@ export function TyPhuCenter(p: CenterProps) {
       {/* đầu: tên game + nút phụ */}
       <View style={[abs(L.header), styles.head]}>
         <Image source={{ uri: FX_ICON.bag }} style={{ width: 18, height: 18 }} />
-        <T numberOfLines={1} style={styles.logo}>TỶ PHÚ XÓM LẦY</T>
+        <T numberOfLines={1} style={styles.logo}>{L.wide ? 'TỶ PHÚ' : 'TỶ PHÚ XÓM LẦY'}</T>
         <View style={{ flex: 1 }} />
         {p.isHost && (
           <Pressable testID="end-open" accessibilityRole="button" onPress={p.onEnd} hitSlop={8} style={[styles.miniBtn, { backgroundColor: C.paper }]}>

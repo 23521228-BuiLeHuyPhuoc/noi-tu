@@ -8,7 +8,7 @@ export const TYPHU_SHORT_NAMES: Record<string, string> = {
   'Công ty điện': 'Điện',
   'Công ty nước': 'Nước',
   'Thuế thu nhập': 'Thuế',
-  'Thuế xa xỉ': 'Thuế xa xỉ',
+  'Thuế xa xỉ': 'Thuế',
 };
 
 export const shortCellName = (name: string) => TYPHU_SHORT_NAMES[name] ?? name;

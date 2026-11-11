@@ -83,7 +83,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(28, Math.min(44, geo.wm * 1.25, geo.hm * 0.85));
+  const pawnBase = Math.max(22, Math.min(30, geo.wm * 0.5, geo.hm * 0.6));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -139,10 +139,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     const r = geo.rect[i];
     const sd = geo.side[i];
     if (sd === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.5 };
-    if (sd === 'top') return { x: r.x + r.w / 2, y: r.y + r.h * 0.3 };
-    if (sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h * 0.7 };
-    if (sd === 'left') return { x: r.x + r.w * 0.14, y: r.y + r.h / 2 };
-    return { x: r.x + r.w * 0.86, y: r.y + r.h / 2 };
+    // quân cờ đứng trên mép trong của ô (phía dải màu) để không che tên và giá
+    if (sd === 'top') return { x: r.x + r.w / 2, y: r.y + 3 };
+    if (sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h - 3 };
+    if (sd === 'left') return { x: r.x + 3, y: r.y + r.h / 2 };
+    return { x: r.x + r.w - 3, y: r.y + r.h / 2 };
   };
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
     const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
