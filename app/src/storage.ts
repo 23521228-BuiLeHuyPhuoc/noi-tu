@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEYS = { name: 'noitu.name', playerId: 'noitu.playerId', room: 'noitu.room', token: 'xomlay.token' } as const;
+const KEYS = {
+  name: 'noitu.name', playerId: 'noitu.playerId', room: 'noitu.room', token: 'xomlay.token',
+  avatar: 'xomlay.guestAvatar', photo: 'xomlay.guestPhoto',
+} as const;
 
 async function get(key: string): Promise<string | null> {
   try {
@@ -31,4 +34,13 @@ export const storage = {
   /** phiên đăng nhập tài khoản */
   getToken: () => get(KEYS.token),
   setToken: (v: string | null) => set(KEYS.token, v),
+  /** khách: mặt đại diện có sẵn đã chọn (chỉ số) */
+  getAvatar: async () => {
+    const v = Number(await get(KEYS.avatar));
+    return Number.isInteger(v) && v >= 0 ? v : null;
+  },
+  setAvatar: (v: number | null) => set(KEYS.avatar, v === null ? null : String(v)),
+  /** khách: địa chỉ ảnh đại diện đã tải lên */
+  getPhoto: () => get(KEYS.photo),
+  setPhoto: (v: string | null) => set(KEYS.photo, v),
 };

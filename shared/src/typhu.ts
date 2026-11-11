@@ -5,9 +5,10 @@ export type TyPhuGroup = 'nau' | 'troi' | 'hong' | 'cam' | 'do' | 'lam' | 'vang'
 export type TyPhuCell =
   | { kind: 'start'; name: string }
   | { kind: 'jail'; name: string }
-  | { kind: 'rest'; name: string }
+  | { kind: 'airport'; name: string }
   | { kind: 'gotojail'; name: string }
   | { kind: 'chance'; name: string }
+  /** ô Rủi ro: chỉ rút thẻ xấu (ô Cơ hội chỉ rút thẻ tốt) */
   | { kind: 'community'; name: string }
   | { kind: 'station'; name: string; price: number }
   | { kind: 'utility'; name: string; price: number }
@@ -34,7 +35,7 @@ const land = (name: string, group: TyPhuGroup, price: number): TyPhuCell => ({
 export const TYPHU_BOARD: TyPhuCell[] = [
   { kind: 'start', name: 'Xuất phát' },
   land('Cà Mau', 'nau', 60),
-  { kind: 'community', name: 'Khí vận' },
+  { kind: 'community', name: 'Rủi ro' },
   land('Bạc Liêu', 'nau', 60),
   { kind: 'tax', name: 'Thuế thu nhập', amount: 200 },
   { kind: 'station', name: 'Ga miền Tây', price: 200 },
@@ -49,10 +50,10 @@ export const TYPHU_BOARD: TyPhuCell[] = [
   land('Phan Thiết', 'hong', 160),
   { kind: 'station', name: 'Ga miền Trung', price: 200 },
   land('Huế', 'cam', 180),
-  { kind: 'community', name: 'Khí vận' },
+  { kind: 'community', name: 'Rủi ro' },
   land('Hội An', 'cam', 180),
   land('Đà Nẵng', 'cam', 200),
-  { kind: 'rest', name: 'Nghỉ chân' },
+  { kind: 'airport', name: 'Sân bay' },
   land('Hạ Long', 'do', 220),
   { kind: 'chance', name: 'Cơ hội' },
   land('Hải Phòng', 'do', 220),
@@ -65,7 +66,7 @@ export const TYPHU_BOARD: TyPhuCell[] = [
   { kind: 'gotojail', name: 'Vào tù' },
   land('Biên Hòa', 'luc', 300),
   land('Bình Dương', 'luc', 300),
-  { kind: 'community', name: 'Khí vận' },
+  { kind: 'community', name: 'Rủi ro' },
   land('Vũng Tàu', 'luc', 320),
   { kind: 'station', name: 'Ga miền Nam', price: 200 },
   { kind: 'chance', name: 'Cơ hội' },
@@ -84,7 +85,8 @@ export interface TyPhuMovement {
   endsAt: number;
   /** thời gian xúc xắc lăn trước khi quân cờ bắt đầu đi (ms) */
   delay: number;
-  kind: 'roll' | 'card' | 'jail';
+  /** fly: bay thẳng tới ô đích (sân bay, thẻ bay), không đi qua từng ô nên không tính qua Xuất phát */
+  kind: 'roll' | 'card' | 'jail' | 'fly';
 }
 /** mỗi ô quân cờ đi mất ~300ms (chia cho tốc độ x2, x3); xúc xắc lăn 1,6-2,1s tuỳ mô phỏng vật lý */
 export const TYPHU_MOVE_STEP_MS = 300;
@@ -93,7 +95,8 @@ export const TYPHU_ROLL_MAX_MS = 2100;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
   return cell.kind === 'land' || cell.kind === 'station' || cell.kind === 'utility';
 }
-export function stationRent(count: number): number { return count > 0 ? 50 * 2 ** (count - 1) : 0; }
+/** tiền thuê ga: 50/100/200/400 theo số ga cùng chủ, mỗi sao nâng cấp của ga đó nhân đôi */
+export function stationRent(count: number, stars = 0): number { return count > 0 ? 50 * 2 ** (count - 1) * 2 ** stars : 0; }
 export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 20 : 8) : 0; }
 
 export const TYPHU_SIZE = TYPHU_BOARD.length;
@@ -102,9 +105,14 @@ export const TYPHU_JAIL = 10;
 export const TYPHU_COLS = 11;
 export const TYPHU_ROWS = 11;
 export const TYPHU_START_CASH = 1500;
-export const TYPHU_PASS_START = 200;
+export const TYPHU_PASS_START = 500;
 export const TYPHU_JAIL_FINE = 50;
 export const TYPHU_MAX_HOUSES = 4; // 4 = khách sạn
+/** nhà ga chỉ nâng sao (không xây nhà): tối đa 3 sao, mỗi sao 100 xu */
+export const TYPHU_STATION_MAX = 3;
+export const TYPHU_STATION_UPGRADE = 100;
+/** máy bay ở ô Sân bay bay tới các ô này (mọi ô trừ chính Sân bay) */
+export const TYPHU_AIRPORT = 20;
 export const TYPHU_TURN_SECONDS = 20;
 export const TYPHU_SPEEDS = [1, 2, 3] as const;
 /** hệ số tiền thuê theo số nhà (1..4) */
@@ -120,6 +128,25 @@ export function rentOf(cell: number, houses: number, fullGroup: boolean): number
   if (c.kind !== 'land') return 0;
   if (houses > 0) return c.rent * TYPHU_HOUSE_MULT[houses - 1];
   return fullGroup ? c.rent * 2 : c.rent;
+}
+
+/** cấp tối đa của ô: đất 4 (khách sạn), ga 3 sao, ô khác không nâng được */
+export function maxLevelOf(cell: number): number {
+  const c = TYPHU_BOARD[cell];
+  return c?.kind === 'land' ? TYPHU_MAX_HOUSES : c?.kind === 'station' ? TYPHU_STATION_MAX : 0;
+}
+
+/** giá nâng 1 cấp (1 nhà ở đất, 1 sao ở ga) */
+export function upgradeCostOf(cell: number): number {
+  const c = TYPHU_BOARD[cell];
+  return c?.kind === 'land' ? TYPHU_GROUPS[c.group].house : c?.kind === 'station' ? TYPHU_STATION_UPGRADE : 0;
+}
+
+/** số tiền ngân hàng trả khi bán 1 lần ở ô này: còn cấp nhà/sao thì bán bớt 1 cấp, hết thì bán đất (đều nửa giá) */
+export function sellRefundOf(cell: number, level: number): number {
+  const c = TYPHU_BOARD[cell];
+  if (!c || !isTyPhuProperty(c)) return 0;
+  return level > 0 ? upgradeCostOf(cell) / 2 : c.price / 2;
 }
 
 export interface TyPhuSaleItem {
@@ -144,8 +171,7 @@ export function liquidValueOf(
     if (owner !== playerId || i === excludeCell) continue;
     const c = TYPHU_BOARD[i];
     if (!c || !isTyPhuProperty(c)) continue;
-    v += c.price / 2;
-    if (c.kind === 'land') v += ((houses[i] ?? 0) * TYPHU_GROUPS[c.group].house) / 2;
+    v += c.price / 2 + ((houses[i] ?? 0) * upgradeCostOf(i)) / 2;
   }
   return v;
 }
@@ -169,9 +195,8 @@ export function suggestSales(
 
   for (const i of sorted) {
     while (simCash < needTotal && (simHouses[i] ?? 0) > 0) {
-      const c = TYPHU_BOARD[i] as Extract<TyPhuCell, { kind: 'land' }>;
       simHouses[i]--;
-      simCash += TYPHU_GROUPS[c.group].house / 2;
+      simCash += upgradeCostOf(i) / 2;
       suggestedCells.add(i);
     }
   }
@@ -185,12 +210,12 @@ export function suggestSales(
   const items: TyPhuSaleItem[] = sorted.map((i) => {
     const c = TYPHU_BOARD[i] as Extract<TyPhuCell, { price: number }>;
     const h = houses[i] ?? 0;
-    if (h > 0 && c.kind === 'land') {
+    if (h > 0) {
       return {
         cell: i,
         kind: 'house',
         name: c.name,
-        refund: TYPHU_GROUPS[c.group].house / 2,
+        refund: upgradeCostOf(i) / 2,
         houses: h,
         suggested: suggestedCells.has(i),
       };

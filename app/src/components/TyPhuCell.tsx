@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import { TYPHU_BOARD, TYPHU_GROUPS, TYPHU_MAX_HOUSES, isTyPhuProperty } from '../../../shared/src/typhu';
+import { TYPHU_BOARD, TYPHU_GROUPS, TYPHU_MAX_HOUSES, TYPHU_PASS_START, isTyPhuProperty } from '../../../shared/src/typhu';
 import { C } from '../theme';
 import { T } from '../ui';
 import { shortCellName } from '../typhuNames';
@@ -24,7 +24,7 @@ export interface TyPhuCellProps {
   isTrail: boolean;
   isStepTarget: boolean;
   onPress: (i: number) => void;
-  /** hũ tiền (chỉ ô Nghỉ chân) */
+  /** hũ tiền (chỉ ô Xuất phát) */
   pot?: number;
 }
 
@@ -68,6 +68,12 @@ function Houses({ n, size, vertical, color }: { n: number; size: number; vertica
   );
 }
 
+/** Sao nâng cấp của nhà ga (ga không xây nhà) */
+function Stars({ n, size }: { n: number; size: number }) {
+  if (n <= 0) return null;
+  return <T numberOfLines={1} style={[styles.stars, { fontSize: size, lineHeight: Math.round(size * 1.15) }]}>{'★'.repeat(n)}</T>;
+}
+
 /** Một ô kiểu bàn cờ in, chữ luôn xuôi theo hướng người cầm máy: dải màu bộ đất ở mép trong, TÊN in hoa, giá ở mép ngoài. */
 export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const c = TYPHU_BOARD[p.index];
@@ -83,8 +89,10 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const hl = p.here ? C.son : p.isStepTarget || p.isTrail ? C.gold : null;
   const ring = hl ?? (owned ? p.ownerHex! : null);
   const overlay = ring ? <View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderWidth: hl ? 3 : 2.5 }]} /> : null;
-  const face = owned && p.houses === 0 ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
-  const priceTxt = price === null ? (c.kind === 'start' ? '+200' : c.kind === 'rest' ? (p.pot ? `+${p.pot}` : 'HŨ 0') : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
+  const isStation = c.kind === 'station';
+  // ga có sao vẫn hiện mặt chủ (sao vẽ riêng); đất có nhà thì nhà thay cho mặt chủ
+  const face = owned && (p.houses === 0 || isStation) ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
+  const priceTxt = price === null ? (c.kind === 'start' ? `+${TYPHU_PASS_START}` : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
   const minus = c.kind === 'tax';
 
   if (p.side === 'corner') {
@@ -96,6 +104,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
           <T numberOfLines={2} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.2) }]}>{name}</T>
           <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
           {priceTxt !== '' && <T style={[styles.price, styles.plus, { fontSize: fs, lineHeight: Math.round(fs * 1.25) }]}>{priceTxt}</T>}
+          {c.kind === 'start' && !!p.pot && <T numberOfLines={1} style={[styles.price, styles.pot, { fontSize: fs * 0.9, lineHeight: Math.round(fs * 1.15) }]}>HŨ {p.pot}</T>}
         </View>
         {overlay}
       </Pressable>
@@ -126,6 +135,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
             {!isLand && <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />}
             {face}
           </View>
+          {isStation && <Stars n={p.houses} size={Math.max(7, Math.min(11, W / 4.2))} />}
           {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.32), marginBottom: 1 }]}>{priceTxt}</T>}
           {p.side === 'bottom' && bandEl}
         </View>
@@ -159,6 +169,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
         )}
         <View style={styles.rowText}>
           <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.25) }]}>{name}</T>
+          {isStation && <Stars n={p.houses} size={Math.max(7, Math.min(10, H / 4.6))} />}
           {sidePrice !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.28) }]}>{sidePrice}</T>}
         </View>
         {p.side === 'right' && bandEl}
@@ -185,6 +196,8 @@ const styles = StyleSheet.create({
   price: { color: INK, fontWeight: '800', textAlign: 'center' },
   minus: { color: '#C92A2A' },
   plus: { color: '#2B8A3E' },
+  pot: { color: '#B45309' },
+  stars: { color: '#F59F00', fontWeight: '900', textAlign: 'center', textShadowColor: '#111', textShadowRadius: 1.5, letterSpacing: -0.5 },
   sideIconWrap: { marginLeft: 2, alignItems: 'center', justifyContent: 'center' },
   sideFace: { position: 'absolute', right: -3, bottom: -2, transform: [{ scale: 0.8 }] },
   ownerFace: { width: 13, height: 13, borderRadius: 7, backgroundColor: '#fff', borderWidth: 1.5 },

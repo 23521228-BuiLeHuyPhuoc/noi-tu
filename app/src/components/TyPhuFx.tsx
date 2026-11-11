@@ -1,6 +1,7 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { C } from '../theme';
 import { T } from '../ui';
+import { TYPHU_PASS_START } from '../../../shared/src/typhu';
 import { FX_ICON } from '../typhuCellIcons';
 import type { Rect } from '../typhuLayout';
 
@@ -143,7 +144,7 @@ export function TyPhuFxLayer({ fx, now, cells, W, H, center }: {
             return (
               <View key={key} pointerEvents="none" style={StyleSheet.absoluteFill}>
                 {coins}
-                <Stamp text="+200" color="#0B8A5F" cx={m.x - 8} cy={m.y - 30 - p * 24} p={Math.min(0.7, p)} W={W} H={H} w={92} h={38} font={22} icon={FX_ICON.flag} />
+                <Stamp text={`+${TYPHU_PASS_START}`} color="#0B8A5F" cx={m.x - 8} cy={m.y - 30 - p * 24} p={Math.min(0.7, p)} W={W} H={H} w={92} h={38} font={22} icon={FX_ICON.flag} />
               </View>
             );
           }

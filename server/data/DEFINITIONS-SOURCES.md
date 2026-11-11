@@ -57,22 +57,54 @@ pp. 1317-1325: https://aclanthology.org/2022.lrec-1.140/ .
 
 ---
 
-# English word list and Vietnamese definitions (`words-en.txt`, `definitions-en.json`)
+# English word list and Vietnamese definitions (`words-en.txt`, `definitions-en.json`, `common-en.txt`)
 
-The English Word Chain mode (`wordchain_en`) uses `words-en.txt` (210,357 single-word English entries, `[a-z]{2,}`) and `definitions-en.json` (124,235 direct Vietnamese definitions with IPA and part-of-speech tags, plus runtime morphological lemma fallback for `-s`, `-es`, `-ed`, `-ing` inflections).
+The English Word Chain mode (`wordchain_en`) only accepts words attested by reputable,
+licensed sources. Built by `server/scripts/build-en-dictionary.py` (2026-11-11):
+210,987 words, 130,549 Vietnamese definitions (about 98% of common words; the rest
+show no meaning box). Proper nouns, capitalised abbreviations and the noisy headwords of
+"TudienAnhVietBeta" are no longer accepted as words.
 
-## Sources
+## Word list (valid words) = union of
 
-1. **Vietnamese Wiktionary (`lang_code == "en"`) via Kaikki / Wiktextract**
-   - Source: https://vi.wiktionary.org/ (CC BY-SA 4.0)
-   - Dataset: https://kaikki.org/viwiktionary/raw-wiktextract-data.jsonl.gz
-2. **StarDict English–Vietnamese Dictionary (`star_anhviet.tab` & `TudienAnhVietBeta.tab`)**
-   - Repository: https://github.com/catusf/tudien (Free Vietnamese Dictionary Project / StarDict Anh–Việt, GPL)
-3. **ENABLE1 & Popular English Word Lists**
-   - Repository: https://github.com/dolph/dictionary (`enable1.txt`, `popular.txt`, Public Domain)
+1. **SCOWL size 70 ("large")**, Kevin Atkinson — the word lists behind aspell/hunspell
+   spell checkers. Generated at http://app.aspell.net/create (US, GB-ise, GB-ize, CA;
+   variant level 1; diacritics stripped). Only all-lowercase `a–z` entries (drops proper
+   nouns and possessives). License: http://wordlist.aspell.net/scowl-readme/ (permissive).
+2. **ENABLE1** (public domain), via https://github.com/dolph/dictionary (`enable1.txt`).
+3. **Princeton WordNet 2.0** single-word lowercase lemmas (WordNet License), via
+   `catusf/tudien` `WordNet2.0.tab`.
+4. **Vietnamese Wiktionary** English entries (Kaikki / Wiktextract, CC BY-SA 4.0):
+   lowercase headwords; part-of-speech `name`, `abbrev`, `phrase`, affixes and senses tagged
+   abbreviation / initialism / acronym / misspelling are skipped.
+5. **FVDP English–Vietnamese dictionary** (Free Vietnamese Dictionary Project, Hồ Ngọc Đức;
+   StarDict `star_anhviet.tab` via https://github.com/catusf/tudien, GPL): lowercase headwords.
+
+`common-en.txt` = SCOWL size 35 words present in the list; used to pick hints and opening words.
+
+## Vietnamese definitions, by priority
+
+1. **Vietnamese Wiktionary** (CC BY-SA 4.0): senses grouped by part of speech
+   ("(danh từ) …", "(động từ) …"), IPA from `sounds`, and inflection links from `form_of`
+   or glosses such as "Quá khứ của take". Archaic forms ("thou art" = be) are ignored.
+2. **FVDP** (GPL): part-of-speech blocks; examples (`=…+…`), idioms (`!…`) and
+   specialised fields (`@…`) are removed. Multiple lines for one headword are merged.
+3. **Inflections**: irregular verbs (`SPDict-Irregular-Verbs.tab`, catusf/tudien) and
+   regular `-s/-es/-ed/-ing/-er/-est/-ly` forms, only when the base is a defined valid word
+   and the inflected form itself is in SCOWL/ENABLE. Stored as `"@base|label"` and expanded
+   by the server, e.g. `took` → "(quá khứ của take) …", `cats` → "(số nhiều của cat) …".
+   US/UK spelling variants are linked the same way (`archeology` → `archaeology`).
+4. **TudienAnhVietBeta** (catusf/tudien): only IPA for non-inflected words and a last-resort
+   gloss (labels like "(Econ)" removed).
+5. `definitions-en-fixes.json`: hand corrections for entries the sources get wrong
+   (e.g. `xi`, `xu`, `xray`, `art`).
+
+Every source keeps its own license; Wiktionary-derived text remains CC BY-SA 4.0 and
+FVDP-derived text GPL. Attribution is kept in this file and in the server's definition source string.
 
 ## Rebuild
 
-```powershell
-python server/scripts/build-en-dictionary.py <scratch-dir> server/data
+```bash
+bash server/scripts/fetch-sources-en.sh ../en-sources   # ~150 MB download
+python server/scripts/build-en-dictionary.py ../en-sources
 ```

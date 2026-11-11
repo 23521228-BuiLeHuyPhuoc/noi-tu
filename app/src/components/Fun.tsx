@@ -216,7 +216,7 @@ function Bubble({ item, pos, onDone }: { item: BubbleItem; pos: Placed; onDone: 
       ]}
     >
       {!stacked && <View style={[styles.tail, item.chat && { backgroundColor: C.ink }, { left: pos.tailX - 6 }]} />}
-      {pos.named && <Text numberOfLines={1} style={[styles.bubbleName, item.chat && { color: C.onSon }]}>{item.name}</Text>}
+      {pos.named && <Text numberOfLines={2} style={[styles.bubbleName, item.chat && { color: C.onSon }]}>{item.name}</Text>}
       {asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.bubbleSticker} resizeMode="contain" /> : <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.bubbleText, item.chat && { color: C.gold }]}>{item.text}</Text>}
     </View>
   );
@@ -357,8 +357,11 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           play(nice ? 'coin' : 'splat');
           if (toR) add({ kind: 'splat', emoji, at: toR });
           if (toMe) {
-            vibrate(nice ? 60 : 200);
-            if (!nice) shake();
+            // quá 3 lần rung màn hình trong 15 giây (soft): chỉ hiện trên avatar, không rung máy
+            if (!e.soft) {
+              vibrate(nice ? 60 : 200);
+              if (!nice) shake();
+            }
             feed(`${from} ${nice ? 'tặng' : 'ném'} ${emoji} vào mặt bạn!`, nice ? 'fun' : 'bad');
           }
         };
@@ -395,7 +398,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           setWobble(e.to, e.ko || e.move === 'chuong' ? 'spin' : 'shake', e.ko ? 2800 : 1800);
           play(e.ko ? 'ko' : 'punch');
           if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
-          if (toMe) {
+          if (toMe && !e.soft) {
             vibrate(e.ko ? [200, 80, 300] : 150);
             shake(e.ko ? 'quake' : 'normal');
           }
@@ -459,6 +462,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setMood(e.to, 'shock', 4200);
         setWobble(e.to, 'blackout', 4200);
       }
+      // bị chọc đúng lúc đang tới lượt Nối từ: server bù lại thời gian
+      if (toMe && e.pausedMs) feed(`⏸ Bị chọc nên được bù +${(e.pausedMs / 1000).toLocaleString('vi-VN')} giây vào lượt`, 'good');
     });
   }, [game, add, feed, shake, say]);
 
@@ -729,14 +734,17 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
 
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
   const [pane, setPane] = useState<'doodle' | 'nick' | null>(null);
-  const hit = (move: HitMove) => {
-    game.sendFun({ kind: 'hit', to: target.id, move });
-    onClose();
-  };
+  const feed = useFeed();
   const send = (f: Parameters<Game['sendFun']>[0]) => {
-    game.sendFun(f);
     onClose();
+    void game.sendFun(f).then((r) => {
+      // mỗi người chỉ bị rung/sụp nguồn/gián/mực tối đa 3 lần mỗi 15 giây
+      if (!r.ok && r.reason === 'limited') {
+        feed(`⏳ ${target.name} bị chọc đủ rồi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa nhé (tối đa 3 lần/15 giây)`, 'info');
+      } else if (!r.ok && r.reason === 'busy') feed('Chọc chậm thôi, từ từ nào 😅', 'info');
+    });
   };
+  const hit = (move: HitMove) => send({ kind: 'hit', to: target.id, move });
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
       <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
@@ -750,6 +758,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       </View>
 
       <T style={styles.sectionLabel}>😈 Chọc mất dạy (chỉ để cười thôi nha)</T>
+      <T style={styles.limitNote}>Rung, xoay, sụp nguồn, gián, mực, hối: mỗi người chỉ dính tối đa 3 lần mỗi 15 giây. Đang tới lượt nối từ thì được bù lại thời gian.</T>
       {pane ? (
         <>
       {pane === 'doodle' && (
@@ -799,10 +808,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
               title={t.emoji}
               big
               variant="paper"
-              onPress={() => {
-                game.sendFun({ kind: 'throw', to: target.id, item: t.item });
-                onClose();
-              }}
+              onPress={() => send({ kind: 'throw', to: target.id, item: t.item })}
             />
             <T style={styles.cellLabel}>{t.name}</T>
           </View>
@@ -813,10 +819,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         icon="⏰"
         title={`Hối ${target.name}`}
         variant="ink"
-        onPress={() => {
-          game.sendFun({ kind: 'poke', to: target.id });
-          onClose();
-        }}
+        onPress={() => send({ kind: 'poke', to: target.id })}
       />
     </Sheet>
   );
@@ -967,6 +970,7 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
+  limitNote: { fontSize: 11, color: C.muted, lineHeight: 15, marginTop: -4 },
   stickerRow: { gap: 8, paddingVertical: 4 },
   stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 12 },
   stickerThumb: { width: 80, height: 84 },

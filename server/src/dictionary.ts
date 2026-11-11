@@ -7,7 +7,7 @@ import { type WordDefinition, WORD_SYLLABLES } from '../../shared/src/types';
 export type Rng = () => number;
 export type DictLang = 'vi' | 'en';
 
-const DEFAULT_EN_SOURCE = 'Từ điển Anh–Việt (StarDict) & Wiktionary tiếng Việt · CC BY-SA 4.0';
+const DEFAULT_EN_SOURCE = 'Wiktionary tiếng Việt (CC BY-SA 4.0) & Từ điển Anh–Việt FVDP (Hồ Ngọc Đức, GPL)';
 
 /** Giải nghĩa dùng được: không phải tham chiếu chéo ("Xem ...") và không quá ngắn */
 export function usableDefinition(text: string): boolean {
@@ -29,6 +29,8 @@ export class Dictionary {
   private definedStarters: string[] = [];
   /** từ điển tiếng Anh đi kèm (khi nạp từ thư mục data hoặc gán trong test) */
   en?: Dictionary;
+  /** từ thông dụng (tiếng Anh: danh sách SCOWL cỡ nhỏ): ưu tiên khi cứu trợ và chọn từ mở đầu */
+  private common = new Set<string>();
 
   constructor(
     words: Iterable<string>,
@@ -113,6 +115,19 @@ export class Dictionary {
     return dict;
   }
 
+  /** đánh dấu các từ thông dụng (chỉ giữ từ có trong kho) */
+  setCommon(words: Iterable<string>): void {
+    this.common = new Set();
+    for (const raw of words) {
+      const w = this.norm(raw);
+      if (w && this.words.has(w)) this.common.add(w);
+    }
+    if (this.lang === 'en' && this.common.size >= 50) {
+      const pick = this.definedStarters.filter((w) => this.common.has(w));
+      if (pick.length >= 50) this.definedStarters = pick;
+    }
+  }
+
   /** Nạp từ điển tiếng Anh từ thư mục data: words-en.txt + extra-words-en.txt − banned-words-en.txt */
   static loadEn(dataDir: string): Dictionary {
     const read = (name: string) => {
@@ -126,7 +141,9 @@ export class Dictionary {
     const banned = new Set(read('banned-words-en.txt').map((w) => normalizeEnWord(w)).filter((w): w is string => !!w));
     const path = join(dataDir, 'definitions-en.json');
     const definitions = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
-    return new Dictionary([...read('words-en.txt'), ...read('extra-words-en.txt')], banned, definitions, 'en');
+    const dict = new Dictionary([...read('words-en.txt'), ...read('extra-words-en.txt')], banned, definitions, 'en');
+    dict.setCommon(read('common-en.txt'));
+    return dict;
   }
 
   /** Nghĩa của từ; không có thì trả undefined (client ẩn khung giải nghĩa). */
@@ -134,9 +151,17 @@ export class Dictionary {
     const word = this.norm(raw);
     if (!word) return undefined;
     const direct = this.definitions.get(word);
-    if (direct) return direct;
+    if (direct) return direct.text.startsWith('@') ? this.resolveRef(direct) : direct;
     if (this.lang === 'en') return this.inflectedDefinition(word);
     return undefined;
+  }
+
+  /** biến thể lưu dạng "@gốc|nhãn" (vd "@take|quá khứ của"): ghép nhãn với nghĩa của gốc */
+  private resolveRef(def: WordDefinition): WordDefinition | undefined {
+    const [lemma, label] = def.text.slice(1).split('|');
+    const base = lemma ? this.definitions.get(lemma) : undefined;
+    if (!base || base.text.startsWith('@') || !label) return undefined;
+    return { text: `(${label} ${lemma}) ${stripIpa(base.text)}`.slice(0, 400), source: base.source };
   }
 
   private inflectedDefinition(word: string): WordDefinition | undefined {
@@ -185,7 +210,8 @@ export class Dictionary {
       if (word.endsWith('ily') && word.length > 4) candidates.push(['trạng từ của', word.slice(0, -3) + 'y']);
     }
     for (const [label, base] of candidates) {
-      const def = this.definitions.get(base);
+      // chỉ đoán gốc từ khi gốc đó thật sự là một từ trong kho (tránh "need" -> "ne", "bring" -> "br")
+      const def = this.words.has(base) && base.length >= 2 ? this.definitions.get(base) : undefined;
       if (def) {
         return { text: `(${label} ${base}) ${stripIpa(def.text)}`.slice(0, 400), source: def.source };
       }
@@ -205,6 +231,24 @@ export class Dictionary {
   /** Các từ bắt đầu bằng `syllable` (hoặc chữ cái đầu với tiếng Anh) chưa có trong `used` */
   nextOptions(syllable: string, used: ReadonlySet<string> = new Set()): string[] {
     return (this.byFirst.get(syllable) ?? []).filter((w) => !used.has(w));
+  }
+
+  /**
+   * Từ dùng cho quyền cứu trợ: ưu tiên từ thông dụng có giải nghĩa và không đẩy người kế tiếp vào ngõ cụt;
+   * không có thì nới dần điều kiện.
+   */
+  hintOptions(syllable: string, used: ReadonlySet<string> = new Set()): string[] {
+    const all = this.nextOptions(syllable, used);
+    if (all.length <= 1) return all;
+    const open = (w: string) => (this.byFirst.get(this.lastUnit(w)) ?? []).some((x) => x !== w && !used.has(x));
+    const sane = (w: string) => this.lang !== 'en' || (w.length >= 3 && w.length <= 9);
+    const tiers = [
+      all.filter((w) => this.common.has(w) && this.definitions.has(w) && sane(w) && open(w)),
+      all.filter((w) => this.definitions.has(w) && sane(w) && open(w)),
+      all.filter((w) => this.definitions.has(w) && open(w)),
+      all.filter(open),
+    ];
+    return tiers.find((t) => t.length > 0) ?? all;
   }
 
   /** Số từ bắt đầu bằng `syllable` (hoặc chữ cái đầu với tiếng Anh) chưa có trong `used` */

@@ -1,5 +1,5 @@
 import {
-  DOODLES, EMOJIS, MAX_HP, NICKNAMES,
+  DISRUPT_LIMIT, DISRUPT_PAUSE_MS, DISRUPT_WINDOW_MS, DOODLES, EMOJIS, HARD_DISRUPT_KINDS, MAX_HP, NICKNAMES,
   type DoodleKind, type Emoji, type FunEvent, type FunSend, type HitMove, type NicknameId, type ThrowItem, type TauntId,
 } from '../../shared/src/types';
 
@@ -114,5 +114,54 @@ export class RateLimiter {
     if (this.tokens < 1) return false;
     this.tokens -= 1;
     return true;
+  }
+}
+
+/** chiêu chỉ để làm phiền màn hình (rung, xoay, sụp nguồn, gián, mực, hối): quá giới hạn thì chặn hẳn */
+export const isHardDisrupt = (k: FunSend['kind']) => (HARD_DISRUPT_KINDS as readonly string[]).includes(k);
+
+/** chiêu làm rung/lắc/che màn hình người bị chọc (đánh và ném đồ bẩn cũng rung màn hình họ) */
+export function isDisruptive(f: FunSend): boolean {
+  if (isHardDisrupt(f.kind)) return true;
+  if (f.kind === 'hit') return true;
+  return f.kind === 'throw' && f.item !== 'hoa' && f.item !== 'tim';
+}
+
+/** số ms người bị chọc mất vì hiệu ứng (để bù vào lượt Nối từ) */
+export function pauseMsOf(f: FunSend, extra: { ko?: boolean; [k: string]: unknown } = {}): number {
+  const base = DISRUPT_PAUSE_MS[f.kind] ?? 0;
+  return f.kind === 'hit' && extra.ko ? Math.max(base, DISRUPT_PAUSE_MS.quake ?? base) : base;
+}
+
+/** Giới hạn kiểu cửa sổ trượt: mỗi khóa tối đa `limit` lần trong `windowMs` */
+export class WindowLimiter {
+  private hits = new Map<string, number[]>();
+  constructor(private readonly limit = DISRUPT_LIMIT, private readonly windowMs = DISRUPT_WINDOW_MS) {}
+
+  private recent(key: string, now: number): number[] {
+    const xs = (this.hits.get(key) ?? []).filter((t) => now - t < this.windowMs);
+    if (xs.length) this.hits.set(key, xs);
+    else this.hits.delete(key);
+    return xs;
+  }
+
+  /** số ms phải chờ trước khi `key` được thêm một lần nữa (0 = được ngay) */
+  wait(key: string, now = Date.now()): number {
+    const xs = this.recent(key, now);
+    if (xs.length < this.limit) return 0;
+    return Math.max(1, xs[xs.length - this.limit] + this.windowMs - now);
+  }
+
+  /** ghi nhận một lần nếu còn lượt; trả về false nếu đã chạm giới hạn */
+  take(key: string, now = Date.now()): boolean {
+    if (this.wait(key, now) > 0) return false;
+    const xs = this.hits.get(key) ?? [];
+    xs.push(now);
+    this.hits.set(key, xs);
+    return true;
+  }
+
+  remove(key: string): void {
+    this.hits.delete(key);
   }
 }

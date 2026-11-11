@@ -34,8 +34,9 @@ export const actionText: Record<ActionError, string> = {
   chain: 'Chưa nối đúng chữ cuối.',
   used: 'Từ này đã có người dùng rồi.',
   not_in_dictionary: 'Từ này chưa có trong từ điển.',
+  vi_keyboard: 'Bàn phím đang gõ dấu tiếng Việt (Telex/VNI) nên chữ bị đổi. Tắt bộ gõ tiếng Việt rồi gõ lại nhé.',
   timeout: 'Hết giờ mất rồi!',
-  hint_used: 'Bạn đã dùng quyền cứu trợ rồi.',
+  hint_used: 'Bạn đã hết quyền cứu trợ.',
   no_hint: 'Hết đường rồi, cứu trợ cũng chịu.',
   cannot_appeal: 'Không xin duyệt được từ này (mỗi lượt chỉ xin 1 lần, và từ phải nối đúng).',
   no_voters: 'Không còn ai online để bỏ phiếu.',
@@ -83,8 +84,8 @@ export const RULES: Record<GameType, string[]> = {
   ],
   typhu: [
     'Mỗi người 1.500 xu. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',
-    'Dừng ở đất người khác phải trả tiền thuê. Có đủ bộ màu thì xây nhà, lên khách sạn.',
-    'Đi qua Xuất phát nhận 200 xu. Hết tiền là phá sản, người trụ lại cuối cùng thắng.',
+    'Dừng ở đất người khác phải trả tiền thuê. Dừng ở đất của mình thì nâng nhà, lên khách sạn.',
+    'Đi qua Xuất phát nhận 500 xu. Thiếu tiền thì tự chọn bán nhà đất; bán hết vẫn thiếu mới phá sản. Người trụ lại cuối cùng thắng.',
   ],
 };
 

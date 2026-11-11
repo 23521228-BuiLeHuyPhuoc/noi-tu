@@ -1,14 +1,14 @@
 /** Đăng nhập / tạo tài khoản / sửa hồ sơ (lưu thành tích trên server) */
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { GAME_INFO, type GameType, type PublicUser } from '../../../shared/src/types';
+import { GAME_INFO, MAX_NAME, type GameType, type PublicUser, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { AVATAR_PRESETS } from '../avatars';
+import { AVATAR_PRESETS, type PortraitSource } from '../avatars';
 import { Portrait } from './Avatar';
 import { SERVER_URL } from '../config';
 import { C, FONT } from '../theme';
-import { Button, Card, T } from '../ui';
+import { Button, Card, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 
 function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
@@ -43,8 +43,9 @@ function useAvatarUploads(): boolean {
     let alive = true;
     fetch(`${SERVER_URL}/health`)
       .then((r) => r.json())
-      .then((j: { avatarUploads?: unknown }) => {
-        if (alive && j.avatarUploads === false) setOk(false);
+      .then((j: { avatarUploads?: unknown; photoUploads?: unknown }) => {
+        // photoUploads: server nhận ảnh của khách (giữ tạm nếu thiếu Cloudinary); server cũ chỉ có avatarUploads
+        if (alive && j.avatarUploads === false && j.photoUploads !== true) setOk(false);
       })
       .catch(() => {});
     return () => {
@@ -150,90 +151,165 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
   );
 }
 
-export function ProfileSheet({ game, user, onClose }: { game: Game; user: PublicUser; onClose: () => void }) {
-  const [displayName, setDisplayName] = useState(user.displayName);
-  const [avatar, setAvatar] = useState(user.avatar);
+/**
+ * Sửa hồ sơ ở bất cứ đâu (trang chủ, phòng chờ, giữa ván): tên, ảnh tự tải lên, mặt đại diện có sẵn.
+ * Dùng chung cho khách và người có tài khoản. Đổi ngay giữa ván cũng được, mọi người thấy liền.
+ */
+export function ProfileSheet({ game, room, initialName, onClose }: {
+  game: Game; room?: RoomState | null; initialName?: string; onClose: () => void;
+}) {
+  const user = game.user;
+  const mePlayer = room?.players.find((p) => p.id === game.me);
+  const [displayName, setDisplayName] = useState(user?.displayName ?? mePlayer?.name ?? initialName ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState(user.avatarUrl);
-  const [removePhoto, setRemovePhoto] = useState(false);
   const canUpload = useAvatarUploads();
-  const save = async () => {
+  const feed = useFeed();
+
+  // chân dung đang dùng: trong phòng lấy đúng như mọi người đang thấy
+  const portrait: PortraitSource = mePlayer
+    ? mePlayer
+    : user
+      ? { avatar: user.avatar, avatarUrl: user.avatarUrl }
+      : { avatar: game.guest.avatar ?? 0, avatarUrl: game.guest.avatarUrl };
+  const avatarNow = mePlayer?.avatar ?? user?.avatar ?? game.guest.avatar ?? -1;
+  const hasPhoto = !!portrait.avatarUrl;
+  const playing = room?.phase === 'playing';
+
+  const saveName = async () => {
+    const name = displayName.trim();
+    if (!name) return setError('Tên không được để trống.');
     setBusy(true);
-    let err = removePhoto ? await game.removeAvatar() : null;
-    if (!err) err = await game.updateProfile({ displayName: displayName.trim(), avatar });
+    setError(null);
+    const err = await game.saveProfile({ name });
     setBusy(false);
     if (err) setError(err);
-    else onClose();
+    else {
+      feed('Đã đổi tên ✏️', 'good');
+      onClose();
+    }
   };
+
+  const pickAvatar = async (avatar: number) => {
+    setBusy(true);
+    setError(null);
+    const err = await game.saveProfile({ avatar });
+    setBusy(false);
+    if (err) setError(err);
+    else setNote('Đã đổi mặt đại diện.');
+  };
+
   const choosePhoto = async () => {
     setError(null);
+    setNote(null);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
+      base64: Platform.OS !== 'web',
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     setUploading(true);
-    const err = await game.uploadAvatar({
+    const err = await game.changePhoto({
       uri: asset.uri,
       fileName: asset.fileName,
       mimeType: asset.mimeType,
       file: asset.file,
+      base64: asset.base64,
     });
     setUploading(false);
     if (err) setError(err);
-    else {
-      setAvatarPreview(asset.uri);
-      setRemovePhoto(false);
-    }
+    else setNote('Đã đổi ảnh đại diện 📸');
   };
+
+  const removePhoto = async () => {
+    setBusy(true);
+    setError(null);
+    const err = await game.removePhoto();
+    setBusy(false);
+    if (err) setError(err);
+    else setNote('Đã bỏ ảnh, dùng lại mặt đại diện.');
+  };
+
   return (
-    <Sheet title="Sửa hồ sơ" onClose={onClose}>
-      <Field testID="profile-name" label="Tên hiển thị" value={displayName} onChangeText={setDisplayName} autoCapitalize="words" maxLength={24} />
-      <View style={styles.photoRow}>
-        <UserAvatar avatar={avatar} avatarUrl={avatarPreview} size={72} />
-        {canUpload ? (
-          <View style={{ flex: 1, gap: 4 }}>
+    <Sheet title="Sửa tên & ảnh" onClose={onClose}>
+      <View testID="profile-sheet" style={styles.photoRow}>
+        <Portrait p={portrait} size={76} />
+        <View style={{ flex: 1, gap: 6 }}>
+          {canUpload && (
             <Button
               testID="avatar-upload"
               small
-              variant="paper"
-              title={uploading ? 'Đang tải ảnh…' : 'Chọn ảnh của bạn'}
+              variant="gold"
+              icon="📷"
+              title={uploading ? 'Đang tải ảnh…' : hasPhoto ? 'Đổi ảnh khác' : 'Tải ảnh của bạn'}
               disabled={uploading || busy}
               onPress={choosePhoto}
             />
-            <T style={styles.photoNote}>JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh được cắt vuông.</T>
-          </View>
-        ) : (
-          <T style={[styles.photoNote, { flex: 1 }]}>Chọn một chân dung bên dưới làm mặt đại diện.</T>
-        )}
+          )}
+          {hasPhoto && (
+            <Button testID="avatar-remove" small variant="paper" title="Bỏ ảnh" disabled={uploading || busy} onPress={removePhoto} />
+          )}
+          <T style={styles.photoNote}>
+            {canUpload ? 'JPG, PNG hoặc WebP. Ảnh được cắt vuông, đổi lúc nào cũng được, kể cả giữa ván.' : 'Chọn một mặt đại diện bên dưới.'}
+          </T>
+        </View>
       </View>
-      <T style={styles.label}>{canUpload ? 'Hoặc dùng mặt đại diện có sẵn' : 'Mặt đại diện'}</T>
-      <AvatarPicker disabled={uploading || busy} value={avatar} onChange={(value) => {
-        setAvatar(value);
-        if (avatarPreview) {
-          setAvatarPreview(undefined);
-          setRemovePhoto(true);
-        }
-      }} />
-      {removePhoto && <T style={styles.photoNote}>Ảnh đã tải sẽ được bỏ khi bạn nhấn Lưu.</T>}
-      {error && <T style={styles.error}>{error}</T>}
-      <Button testID="profile-save" title="Lưu" disabled={busy || uploading || !displayName.trim()} onPress={save} />
-      <Button
-        testID="logout-btn"
-        title="Đăng xuất"
-        variant="paper"
-        disabled={busy || uploading}
-        onPress={async () => {
-          await game.logout();
-          onClose();
+
+      <Field
+        testID="profile-name"
+        label="Tên hiển thị"
+        value={displayName}
+        onChangeText={(t) => {
+          setDisplayName(t);
+          setError(null);
+        }}
+        autoCapitalize="words"
+        maxLength={MAX_NAME}
+        onSubmitEditing={saveName}
+        returnKeyType="done"
+      />
+
+      <T style={styles.label}>{hasPhoto ? 'Hoặc dùng mặt đại diện có sẵn (sẽ thay ảnh)' : 'Mặt đại diện có sẵn'}</T>
+      <AvatarPicker
+        disabled={uploading || busy}
+        value={hasPhoto ? -1 : avatarNow}
+        onChange={async (value) => {
+          if (hasPhoto) await game.removePhoto();
+          await pickAvatar(value);
         }}
       />
+      {room?.phase === 'lobby' && <T style={styles.photoNote}>Muốn chỉnh tóc, mặt, trang phục chi tiết? Dùng bảng “Tạo hình nhân vật” trong phòng chờ.</T>}
+      {note && <T testID="profile-note" style={styles.okNote}>{note}</T>}
+      {error && <T testID="profile-error" style={styles.error}>{error}</T>}
+      <Button testID="profile-save" title={busy ? 'Đang lưu…' : 'Lưu tên'} disabled={busy || uploading || !displayName.trim()} onPress={saveName} />
+      {user && (
+        <Button
+          testID="logout-btn"
+          title={room ? 'Đăng xuất (sẽ rời phòng)' : 'Đăng xuất'}
+          variant="paper"
+          disabled={busy || uploading || playing}
+          onPress={async () => {
+            await game.logout();
+            onClose();
+          }}
+        />
+      )}
     </Sheet>
+  );
+}
+
+/** Thẻ của khách ở trang chủ: chân dung + nút sửa tên & ảnh */
+export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () => void }) {
+  return (
+    <Pressable testID="guest-profile-edit" accessibilityRole="button" accessibilityLabel="Sửa tên và ảnh" onPress={onPress} style={styles.guestAvatar}>
+      <Portrait p={{ avatar: game.guest.avatar ?? 0, avatarUrl: game.guest.avatarUrl }} size={52} />
+      <T style={styles.editBadge}>✏️</T>
+    </Pressable>
   );
 }
 
@@ -247,8 +323,8 @@ export function ProfileCard({ user, onEdit }: { user: PublicUser; onEdit: () => 
       <View testID="profile-card" style={styles.profileRow}>
         <UserAvatar avatar={user.avatar} avatarUrl={user.avatarUrl} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <T numberOfLines={1} style={styles.pname}>{user.displayName}</T>
-          <T numberOfLines={1} style={styles.puser}>@{user.username}</T>
+          <T style={styles.pname}>{user.displayName}</T>
+          <T style={styles.puser}>@{user.username}</T>
           <T style={styles.pstat}>{played} ván · {won} lần thắng</T>
         </View>
         <Button testID="profile-edit" small variant="paper" title="Sửa" onPress={onEdit} />
@@ -286,6 +362,9 @@ const styles = StyleSheet.create({
   userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink, overflow: 'hidden' },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   photoNote: { fontSize: 11, color: C.muted, lineHeight: 15 },
+  okNote: { color: C.ink, backgroundColor: '#D8F8E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  guestAvatar: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  editBadge: { position: 'absolute', right: -4, bottom: -4, fontSize: 16 },
   pname: { fontSize: 20, fontWeight: '900' },
   puser: { fontSize: 13, color: C.muted, fontWeight: '600' },
   pstat: { fontSize: 13, color: C.jade, fontWeight: '800' },

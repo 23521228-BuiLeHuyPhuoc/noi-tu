@@ -211,11 +211,31 @@ export type GameView = WordChainView | BauCuaView | TyPhuView;
 export const WORD_SYLLABLES = 2;
 export const TURN_SECONDS = 30;
 
+/**
+ * Nối từ Anh: thời gian mỗi lượt của từng người giảm tuyến tính từ 30 giây xuống 15 giây
+ * khi người đó tự nối đúng được 30 từ (mỗi từ đúng bớt 0,5 giây), sau đó giữ ở 15 giây.
+ */
+export const EN_TURN_MIN_RATIO = 0.5;
+export const EN_RAMP_WORDS = 30;
+/** Nối từ Anh: cứ mỗi 30 từ tự nối đúng được thêm 1 lượt cứu trợ */
+export const EN_HINT_EVERY = 30;
+
+/** Thời gian lượt (ms) của một người chơi Nối từ Anh đã tự nối đúng `correct` từ. `baseMs` = thời gian gốc (30 giây). */
+export function enTurnMs(baseMs: number, correct: number): number {
+  const k = Math.min(Math.max(0, correct), EN_RAMP_WORDS) / EN_RAMP_WORDS;
+  return Math.round(baseMs * (1 - (1 - EN_TURN_MIN_RATIO) * k));
+}
+
+/** Số lượt cứu trợ tối đa đã mở khóa (chưa trừ số lần đã dùng) */
+export function hintAllowance(lang: 'vi' | 'en', correct: number): number {
+  return lang === 'en' ? 1 + Math.floor(Math.max(0, correct) / EN_HINT_EVERY) : 1;
+}
+
 export interface WordDefinition { text: string; source: string | null }
 
 export type WordHistoryItem =
   | { kind: 'start'; word: string; definition?: WordDefinition }
-  | { kind: 'word'; word: string; playerId: string; name: string; definition?: WordDefinition }
+  | { kind: 'word'; word: string; playerId: string; name: string; definition?: WordDefinition; /** từ do quyền cứu trợ nối hộ */ hint?: boolean }
   | { kind: 'eliminated'; playerId: string; name: string; reason: 'timeout' | 'left' }
   | { kind: 'newWord'; word: string; definition?: WordDefinition }
   | { kind: 'hint'; playerId: string; name: string }
@@ -228,12 +248,20 @@ export interface WordChainView {
   eliminated: string[];
   /** số từ mỗi người đã nối */
   words: Record<string, number>;
+  /** những người đã hết quyền cứu trợ (giữ để tương thích) */
   hintUsed: string[];
+  /** số lượt cứu trợ còn lại của mỗi người */
+  hintsLeft?: Record<string, number>;
+  /** số từ mỗi người tự nối đúng (không tính từ nhờ cứu trợ): dùng tính thời gian lượt và thưởng cứu trợ */
+  correct?: Record<string, number>;
   currentWord: string;
   currentDefinition?: WordDefinition;
   currentPlayerId: string | null;
   turnEndsAt: number | null;
+  /** độ dài lượt hiện tại (giây, có thể lẻ): Nối từ Anh giảm dần theo số từ đúng của người đang tới lượt */
   turnSeconds: number;
+  /** số mili giây đã bù cho người đang tới lượt vì bị chọc (rung, sụp nguồn…) trong lượt này */
+  turnBonusMs?: number;
   /** số từ còn có thể nối tiếp từ hiện tại (chưa dùng trong ván) */
   nextCount: number;
   history: WordHistoryItem[];
@@ -305,20 +333,22 @@ export interface TyPhuView {
   owners: Record<number, string>;
   houses: Record<number, number>;
   currentPlayerId: string | null;
-  /** upgrade: vừa dừng ở đất của mình, được chọn nâng cấp nhà ngay tại ô đó */
-  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait';
+  /** upgrade: vừa dừng ở đất/ga của mình, được chọn nâng cấp ngay tại ô đó; debt: thiếu tiền, phải tự chọn bán nhà đất */
+  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait' | 'debt';
   dice: [number, number] | null;
   rollId: number;
   /** ô đang chờ quyết định mua (step buy) hoặc nâng cấp (step upgrade) */
   pendingBuy: number | null;
-  /** hũ tiền ở ô Nghỉ chân: thuế và tiền phạt dồn vào, ai dừng ở đó thì ăn cả hũ */
+  /** hũ tiền ở ô Xuất phát: thuế và tiền phạt dồn vào, ai dừng đúng ô Xuất phát thì ăn cả hũ */
   pot?: number;
+  /** khoản người đang tới lượt phải trả mà chưa đủ tiền mặt (step debt): tự bán nhà đất từng ô cho tới khi đủ */
+  debt?: { amount: number; to: string | null; why: string } | null;
   turnEndsAt: number | null;
   turnSeconds: number;
   /** các dòng diễn biến gần nhất, mới nhất ở cuối */
   log: { id: number; kind: TyPhuLogKind; text: string }[];
-  /** thẻ cơ hội vừa rút */
-  card: { id: number; text: string } | null;
+  /** thẻ vừa rút: good = thẻ Cơ hội (luôn tốt), không thì thẻ Rủi ro (luôn xấu) */
+  card: { id: number; text: string; good?: boolean } | null;
   /** các khung hình mô phỏng cú lăn xúc xắc đang diễn ra (null khi đã xong) */
   roll: DiceRollView | null;
   /** tốc độ chơi (1, 2, 3): rút ngắn thời gian đi quân, chờ và thông báo */
@@ -360,6 +390,8 @@ export type ActionError =
   | 'chain'
   | 'used'
   | 'not_in_dictionary'
+  /** chuỗi có dấu tiếng Việt (bộ gõ Telex/VNI đang bật) và không đoán ra từ tiếng Anh nào */
+  | 'vi_keyboard'
   | 'timeout'
   | 'hint_used'
   | 'no_hint'
@@ -376,7 +408,8 @@ export type ActionError =
   | 'cannot_build'
   | 'no_money';
 
-export type ActionResult = { ok: true; hint?: string } | { ok: false; reason: ActionError };
+/** `word`: từ server đã hiểu (sau khi chuẩn hóa / dịch ngược bộ gõ) — app dùng để hiện và xin duyệt đúng từ */
+export type ActionResult = { ok: true; hint?: string; word?: string } | { ok: false; reason: ActionError; word?: string };
 
 // ================= Tính năng "lầy" =================
 
@@ -425,7 +458,24 @@ export type FunSend =
 export type FunEvent = FunSend & {
   id: number; from: string; damage?: number; hp?: number; ko?: boolean;
   count?: number; corner?: number; variant?: number;
+  /** người bị chọc đã nhận quá DISRUPT_LIMIT chiêu rung/lắc gần đây: chỉ hiện trên avatar, không rung màn hình họ */
+  soft?: boolean;
+  /** số mili giây được bù vào đồng hồ lượt của người bị chọc (đang tới lượt Nối từ) */
+  pausedMs?: number;
 };
+
+/** Các chiêu làm rung/lắc/xoay/che màn hình người bị chọc: mỗi người chỉ nhận tối đa DISRUPT_LIMIT lần mỗi DISRUPT_WINDOW_MS */
+export const DISRUPT_LIMIT = 3;
+export const DISRUPT_WINDOW_MS = 15_000;
+/** chiêu chỉ có tác dụng làm phiền màn hình: quá giới hạn thì bị chặn hẳn */
+export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke'] as const;
+/** thời gian (ms) được bù vào lượt Nối từ khi người đang tới lượt dính chiêu */
+export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
+  blackout: 4500, spin: 3500, roach: 3000, ink: 2000, quake: 1500, poke: 1000, hit: 1000, throw: 1000,
+};
+/** tổng thời gian bù tối đa trong một lượt */
+export const DISRUPT_MAX_BONUS_MS = 15_000;
+export type FunAck = { ok: boolean; /** bị giới hạn: thử lại sau chừng này ms */ retryMs?: number; reason?: 'limited' | 'busy' };
 
 export const STICKER_IDS = [
   'quynh-01', 'quynh-02', 'quynh-03', 'quynh-04', 'quynh-05',
@@ -490,17 +540,21 @@ export interface JoinResult {
 
 export interface ClientToServerEvents {
   'room:create': (
-    p: { name: string; playerId?: string; gameType?: GameType },
+    p: { name: string; playerId?: string; gameType?: GameType; avatar?: number; avatarUrl?: string },
     ack: (r: Ack<JoinResult>) => void,
   ) => void;
-  'room:join': (p: { code: string; name: string; playerId?: string }, ack: (r: Ack<JoinResult>) => void) => void;
+  'room:join': (p: { code: string; name: string; playerId?: string; avatar?: number; avatarUrl?: string }, ack: (r: Ack<JoinResult>) => void) => void;
   'room:config': (p: { gameType?: GameType; settings?: Partial<RoomSettings> }, ack: (r: Ack) => void) => void;
   'player:customize': (p: Partial<CharacterConfig>, ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   'game:restart': (ack: (r: Ack) => void) => void;
   'room:leave': (ack: (r: Ack) => void) => void;
-  'fun:send': (f: FunSend, ack: (r: { ok: boolean }) => void) => void;
+  'fun:send': (f: FunSend, ack: (r: FunAck) => void) => void;
+  /** đổi tên / mặt đại diện có sẵn ngay trong phòng (khách; người có tài khoản dùng auth:update) — được cả lúc đang chơi */
+  'player:profile': (p: { name?: string; avatar?: number }, ack: (r: Ack) => void) => void;
+  /** ảnh đại diện của khách: ảnh JPG/PNG/WebP đã thu nhỏ (base64), hoặc remove để bỏ ảnh */
+  'player:photo': (p: { data?: string; remove?: boolean }, ack: (r: Ack<{ avatarUrl?: string }> | { ok: false; error: 'avatar_unavailable' | 'invalid_image' | 'rate_limited' | 'not_in_room' }) => void) => void;
   'chat:send': (p: ChatSend, ack: (r: { ok: boolean }) => void) => void;
   'auth:register': (p: { username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;

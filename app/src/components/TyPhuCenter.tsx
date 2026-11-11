@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL_FINE, liquidValueOf, type TyPhuGroup,
 } from '../../../shared/src/typhu';
@@ -9,6 +9,7 @@ import { C } from '../theme';
 import { Button, T } from '../ui';
 import { FX_ICON, ICON_BY_CELL, iconUri } from '../typhuCellIcons';
 import { shortCellName } from '../typhuNames';
+import { RISK_ICON } from '../typhuPictos';
 import type { CenterLayout, Rect } from '../typhuLayout';
 import type { DiceRollView, ThrowImpulse } from '../../../shared/src/dice';
 import { useShellTools } from './Shell';
@@ -17,6 +18,27 @@ import { TyPhuDice3D } from './TyPhuDice3D';
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const abs = (r: Rect) => ({ position: 'absolute' as const, left: r.x, top: r.y, width: r.w, height: r.h });
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** web: tên dài liền một chữ vẫn xuống dòng được thay vì tràn */
+const WRAP = (Platform.OS === 'web' ? { wordBreak: 'break-word' } : {}) as TextStyle;
+
+/**
+ * Cỡ chữ và số dòng để hiện ĐỦ tên người chơi trong khung rộng `w`, cao `h` (không cắt "…"):
+ * vừa 1 dòng ở cỡ đủ đọc thì giữ 1 dòng, không thì xuống 2-3 dòng và thu nhỏ chữ.
+ */
+export function fitName(name: string, w: number, h: number, maxFs = 11): { fs: number; lh: number; lines: number } {
+  const len = Math.max(1, [...name].length);
+  const CH = 0.62; // bề rộng trung bình 1 ký tự in đậm so với cỡ chữ
+  let best = { fs: 6, lh: 7, lines: 3 };
+  for (const lines of [1, 2, 3]) {
+    const byW = ((w * lines) / (len * CH)) * (lines > 1 ? 0.85 : 1); // xuống dòng theo từ thì hao chỗ
+    const byH = h / (lines * 1.15);
+    const fs = Math.min(maxFs, byW, byH);
+    const cand = { fs: Math.max(6, Math.floor(fs * 2) / 2), lh: Math.ceil(Math.max(6, fs) * 1.15), lines };
+    if (fs >= (lines === 1 ? 9 : 7)) return cand;
+    if (fs > best.fs || lines === 1) best = cand;
+  }
+  return best;
+}
 
 const LOG_ICON: Record<TyPhuLogKind, string> = {
   buy: iconUri('1f3e0'), rent: iconUri('1f4b0'), jail: iconUri('1f694'), card: iconUri('2728'), pot: iconUri('1f36f'),
@@ -84,6 +106,10 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   const showRc = rc && p.now >= rc.from && p.now < rc.until;
   const wobbleDeg = face.wobble === 'spin' ? `${Math.round(Math.sin(p.now / 65) * 28)}deg` : face.wobble ? `${Math.round(Math.sin(p.now / 35) * 14)}deg` : '0deg';
   const wobbleX = face.wobble ? Math.round(Math.cos(p.now / 40) * 4) : 0;
+  const name = p.nameOf(id);
+  const icons = (id in g.jail ? 15 : 0) + (cur ? 15 : 0);
+  // chỗ cho tên: trừ avatar, khoảng cách, viền; chừa 1 dòng tiền ở dưới
+  const fit = fitName(name, Math.max(24, rect.w - (rect.h - 4) - 14 - icons), Math.max(10, rect.h - 6 - 15));
   return (
     <>
     <Pressable
@@ -119,8 +145,8 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
         </View>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={[styles.rowC, { paddingRight: 26 }]}>
-          <T numberOfLines={1} style={styles.wName}>{p.nameOf(id)}</T>
+        <View style={styles.rowC}>
+          <T testID={`wealth-name-${id}`} numberOfLines={fit.lines} style={[styles.wName, { fontSize: fit.fs, lineHeight: fit.lh }, WRAP]}>{name}</T>
           {id in g.jail && <Image source={{ uri: FX_ICON.police }} style={styles.tiny} />}
           {cur && <Image source={{ uri: FX_ICON.dice }} style={styles.tiny} />}
         </View>
@@ -130,14 +156,15 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
           ) : (
             <>
               <Image source={{ uri: FX_ICON.coin }} style={styles.tiny} />
-              <T style={styles.wCash}>{fmt(g.cash[id] ?? 0)}</T>
+              <T numberOfLines={1} style={[styles.wCash, { flexShrink: 1 }]}>{fmt(g.cash[id] ?? 0)}</T>
             </>
           )}
+          <View style={{ flex: 1 }} />
+          <View style={[styles.landChip, { backgroundColor: color }]}>
+            <T style={styles.landTxt}>{lands}</T>
+            <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
+          </View>
         </View>
-      </View>
-      <View style={[styles.landChip, rect.w < 170 ? styles.landChipNarrow : styles.landChipWide, { backgroundColor: color }]}>
-        <T style={styles.landTxt}>{lands}</T>
-        <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
       </View>
     </Pressable>
     {showRc && (
@@ -199,7 +226,7 @@ function CardView({ p, layout }: { p: CenterProps; layout: CenterLayout }) {
   const angle = (1 - flip) * 180;
   const faceUp = angle < 90;
   const chance = c.title === 'CƠ HỘI';
-  const bg = chance ? '#FFE066' : '#FFB3D6';
+  const bg = chance ? '#B2F2BB' : '#FFC9C9';
   return (
     <View
       testID="typhu-card"
@@ -213,7 +240,7 @@ function CardView({ p, layout }: { p: CenterProps; layout: CenterLayout }) {
       {faceUp ? (
         <View style={{ alignItems: 'center', gap: 4, transform: [{ scaleX: 1 }] }}>
           <T style={styles.cardTitle}>{c.title}</T>
-          <Image source={{ uri: iconUri(chance ? '2753' : '1f381') }} style={{ width: 26, height: 26 }} />
+          <Image source={{ uri: chance ? iconUri('2753') : RISK_ICON }} style={{ width: 26, height: 26 }} />
           <T style={styles.cardText}>{c.text}</T>
         </View>
       ) : (
@@ -230,6 +257,7 @@ export function TyPhuCenter(p: CenterProps) {
   const showRoll = idle && p.myTurn && g.step === 'roll';
   const showBuy = idle && p.myTurn && g.step === 'buy' && p.buyable;
   const showEnd = idle && p.myTurn && (g.step === 'manage' || g.step === 'upgrade');
+  const showDebt = idle && p.myTurn && g.step === 'debt';
   const timeTotal = Math.max(1, g.turnSeconds);
   const hot = !p.paused && p.left <= 5;
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
@@ -286,7 +314,8 @@ export function TyPhuCenter(p: CenterProps) {
       <View style={[abs(L.action), styles.actionBox]}>
         {L.wide && (
           <View style={[styles.statusRow, { height: statusH - 4 }]}>
-            <T testID="typhu-status" numberOfLines={1} style={[styles.status, { flex: 1 }, p.myTurn && { color: '#C2410C' }]}>{p.status}</T>
+            {/* trạng thái có tên người chơi: dài thì xuống 2 dòng chữ nhỏ hơn, không cắt tên */}
+            <T testID="typhu-status" numberOfLines={2} style={[styles.status, { flex: 1 }, p.status.length * 6.4 > L.action.w - 12 && { fontSize: 10.5, lineHeight: 12 }, p.myTurn && { color: '#C2410C' }, WRAP]}>{p.status}</T>
           </View>
         )}
         <View
@@ -312,8 +341,8 @@ export function TyPhuCenter(p: CenterProps) {
               {p.inJail && <Button testID="pay-jail" small variant="paper" disabled={!canPayJail} title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
               <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
-          ) : showBuy || showEnd ? (
-            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : 'Chọn nâng cấp nhà ở bảng thông tin'}</T>
+          ) : showBuy || showEnd || showDebt ? (
+            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : showDebt ? 'Thiếu tiền: chọn nhà đất để bán ở bảng thông tin' : 'Chọn nâng cấp ở bảng thông tin'}</T>
           ) : (
             <T style={[styles.hint, { flex: 1 }]}>{p.dice.animating ? 'Đang đổ xúc xắc...' : p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}
@@ -390,12 +419,10 @@ const styles = StyleSheet.create({
   },
   wAvatar: { borderWidth: 3, overflow: 'hidden' },
   rowC: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  wName: { fontSize: 11, fontWeight: '800', color: C.ink, flexShrink: 1 },
+  wName: { fontSize: 11, fontWeight: '800', color: C.ink, flexShrink: 1, flexGrow: 1 },
   wCash: { fontSize: 13, fontWeight: '900', color: '#B45309', lineHeight: 16 },
   tiny: { width: 12, height: 12 },
-  landChipWide: { right: 3, top: 3 },
-  landChipNarrow: { right: 2, top: 2 },
-  landChip: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 7, paddingHorizontal: 3, height: 15, borderWidth: 1.5, borderColor: C.ink },
+  landChip: { flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 7, paddingHorizontal: 3, height: 15, borderWidth: 1.5, borderColor: C.ink },
   landTxt: { color: '#fff', fontWeight: '900', fontSize: 11, lineHeight: 13 },
   chipsBox: { backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 11, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden' },
   chipsTitle: { fontSize: 10, fontWeight: '900', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },

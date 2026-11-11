@@ -18,7 +18,7 @@ describe('Xin cả phòng duyệt từ chưa có trong từ điển', () => {
   it('đa số đồng ý: từ được nhận, thêm vào từ điển và chuyển lượt', () => {
     const { room, cur, others, learned, dict } = three();
     vi.advanceTimersByTime(10_000);
-    expect(submit(room, cur, 'mèo hoang')).toEqual({ ok: false, reason: 'not_in_dictionary' });
+    expect(submit(room, cur, 'mèo hoang')).toEqual({ ok: false, reason: 'not_in_dictionary', word: 'mèo hoang' });
     expect(room.action(cur, { type: 'appeal', word: 'Mèo  Hoang' })).toEqual({ ok: true });
     let g = wc(room);
     expect(g.vote).toMatchObject({ word: 'mèo hoang', byId: cur, voters: others, yes: [], no: [] });

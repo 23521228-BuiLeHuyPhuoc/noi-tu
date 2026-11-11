@@ -72,12 +72,14 @@ try {
       assert.equal(await a.t('history-definition').count(), 0);
     }
     const active = (await a.t('turn-label').textContent()).includes('Tới lượt bạn') ? a : b;
+    // cứu trợ nối hộ luôn
     await active.t('hint-btn').click();
-    await active.t('hint-word').click();
-    const suffix = await active.t('word-input').inputValue();
-    const next = `${initial.word.split(/\s+/).at(-1)} ${suffix}`;
-    await active.t('submit-btn').click();
-    await a.page.waitForFunction((word) => document.querySelector('[data-testid="current-word"]')?.textContent.trim() === word, next);
+    await a.page.waitForFunction((word) => {
+      const t = document.querySelector('[data-testid="current-word"]')?.textContent.trim();
+      return t && t !== word;
+    }, initial.word);
+    const next = (await a.t('current-word').textContent()).trim();
+    assert.equal(next.split(/\s+/)[0], initial.word.split(/\s+/).at(-1));
     const accepted = await definitionMatches(a);
     assert.equal(accepted.word, next);
     const history = await a.t('history-definition').allTextContents();

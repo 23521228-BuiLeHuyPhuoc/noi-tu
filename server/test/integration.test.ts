@@ -117,8 +117,8 @@ describe('Server qua Socket.IO', () => {
     expect(await cs[0].emitWithAck('fun:send', { kind: 'nick', to: ids[1], nick: 'game' })).toEqual({ ok: true });
     expect(await cs[0].emitWithAck('fun:send', { kind: 'roach', to: ids[1] })).toEqual({ ok: true });
     // chiêu phủ màn hình thứ hai lên cùng một người (kể cả từ người khác) bị chặn
-    expect(await cs[0].emitWithAck('fun:send', { kind: 'ink', to: ids[1] })).toEqual({ ok: false });
-    expect(await cs[2].emitWithAck('fun:send', { kind: 'roach', to: ids[1] })).toEqual({ ok: false });
+    expect(await cs[0].emitWithAck('fun:send', { kind: 'ink', to: ids[1] })).toMatchObject({ ok: false });
+    expect(await cs[2].emitWithAck('fun:send', { kind: 'roach', to: ids[1] })).toMatchObject({ ok: false });
     // người khác vẫn bị được
     expect(await cs[1].emitWithAck('fun:send', { kind: 'ink', to: ids[2] })).toEqual({ ok: true });
     // sai dữ liệu, tự chọc, ngoài phòng

@@ -1,7 +1,7 @@
 import { toSyllables, firstSyllable, lastSyllable } from '../../../shared/src/vi';
-import { normalizeEnWord, firstLetter, lastLetter } from '../../../shared/src/en';
+import { enCandidates, firstLetter, hasVietMarks, lastLetter } from '../../../shared/src/en';
 import {
-  TURN_SECONDS, VOTE_SECONDS, WORD_SYLLABLES,
+  DISRUPT_MAX_BONUS_MS, TURN_SECONDS, VOTE_SECONDS, WORD_SYLLABLES, enTurnMs, hintAllowance,
   type ActionResult, type ActionError, type GameAction, type WordChainView, type WordHistoryItem, type WordVote,
 } from '../../../shared/src/types';
 import type { Dictionary, DictLang } from '../dictionary';
@@ -14,8 +14,11 @@ const MIN_RESUME_MS = 5000;
 interface WPlayer extends EnginePlayer {
   eliminated: boolean;
   left: boolean;
+  /** tổng số từ đã nối (kể cả từ nhờ cứu trợ) */
   words: number;
-  hintUsed: boolean;
+  /** số từ tự nối đúng (gõ hoặc được cả phòng duyệt): tính thời gian lượt và thưởng cứu trợ */
+  correct: number;
+  hintsUsed: number;
 }
 
 export class WordChainGame implements GameEngine {
@@ -37,6 +40,10 @@ export class WordChainGame implements GameEngine {
   private pausedLeft = 0;
   /** đã xin duyệt trong lượt này chưa (mỗi lượt 1 lần) */
   private appealedTurn = false;
+  /** độ dài lượt hiện tại (ms) */
+  private turnLenMs = 0;
+  /** đã bù bao nhiêu ms cho người đang tới lượt vì bị chọc */
+  private bonusMs = 0;
 
   constructor(private readonly ctx: EngineContext, private readonly lang: DictLang = 'vi') {
     this.dict = lang === 'en' ? (ctx.dict.en ?? ctx.dict) : ctx.dict;
@@ -49,7 +56,7 @@ export class WordChainGame implements GameEngine {
   }
 
   start(players: EnginePlayer[]): void {
-    this.players = players.map((p) => ({ ...p, eliminated: false, left: false, words: 0, hintUsed: false }));
+    this.players = players.map((p) => ({ ...p, eliminated: false, left: false, words: 0, correct: 0, hintsUsed: 0 }));
     this.solo = players.length === 1;
     const first = this.dict.randomStart(this.used, this.ctx.rng);
     if (!first) throw new Error('Kho từ rỗng');
@@ -75,32 +82,19 @@ export class WordChainGame implements GameEngine {
     if (typeof checked !== 'string') {
       // từ chưa có trong từ điển vẫn có thể xin cả phòng duyệt
       if (a.type === 'appeal' && checked.reason === 'not_in_dictionary') return this.appeal(playerId, checked.word);
-      return { ok: false, reason: a.type === 'appeal' ? 'cannot_appeal' : checked.reason };
+      if (a.type === 'appeal') return { ok: false, reason: 'cannot_appeal' };
+      // từ chưa có trong kho: báo lại đúng từ server đã hiểu để app xin duyệt đúng từ đó
+      return checked.reason === 'not_in_dictionary' ? { ok: false, reason: checked.reason, word: checked.word } : { ok: false, reason: checked.reason };
     }
     if (a.type === 'appeal') return { ok: false, reason: 'cannot_appeal' };
-    this.accept(playerId, checked);
+    this.accept(playerId, checked, true);
     return { ok: true };
   }
 
   /** Kiểm tra từ gửi lên: trả về từ đã chuẩn hóa nếu hợp lệ */
   private check(raw: unknown): string | { reason: ActionError; word: string } {
     if (typeof raw !== 'string' || raw.length > 60) return { reason: 'format', word: '' };
-    if (this.lang === 'en') {
-      const word = normalizeEnWord(raw);
-      if (!word) return { reason: 'format', word: '' };
-      const need = lastLetter(this.currentWord);
-      if (firstLetter(word) !== need) return { reason: 'chain', word };
-      const resolved =
-        !this.dict.has(word) &&
-        word.startsWith(need + need) &&
-        word.length >= 3 &&
-        (this.dict.has(word.slice(1)) || this.used.has(word.slice(1)))
-          ? word.slice(1)
-          : word;
-      if (this.used.has(resolved)) return { reason: 'used', word: resolved };
-      if (!this.dict.has(resolved)) return { reason: 'not_in_dictionary', word: resolved };
-      return resolved;
-    }
+    if (this.lang === 'en') return this.checkEn(raw);
     const syl = toSyllables(raw);
     if (!syl || syl.length !== WORD_SYLLABLES) return { reason: 'format', word: '' };
     const word = syl.join(' ');
@@ -110,13 +104,36 @@ export class WordChainGame implements GameEngine {
     return word;
   }
 
-  private accept(playerId: string, word: string): void {
+  /**
+   * Nối từ tiếng Anh. App luôn gửi "chữ đầu đã khóa + phần người chơi gõ", nên nếu người chơi lỡ gõ cả từ
+   * thì chữ đầu bị lặp (xxmas): từ không có trong từ điển mà mở đầu bằng 2 chữ đó thì bỏ bớt 1 chữ.
+   * Chuỗi bị bộ gõ tiếng Việt thêm dấu (Telex: xmas -> xmá) được dịch ngược rồi thử từng cách.
+   */
+  private checkEn(raw: string): string | { reason: ActionError; word: string } {
+    const need = lastLetter(this.currentWord);
+    const cands = enCandidates(raw);
+    if (cands.length === 0) return { reason: 'format', word: '' };
+    const resolve = (w: string) => (!this.dict.has(w) && w.length >= 3 && w.startsWith(need + need) ? w.slice(1) : w);
+    const resolved = [...new Set(cands.map(resolve))];
+    const chained = resolved.filter((w) => firstLetter(w) === need);
+    const ok = chained.find((w) => this.dict.has(w) && !this.used.has(w));
+    if (ok) return ok;
+    if (chained.length === 0) return { reason: 'chain', word: resolved[0] };
+    const used = chained.find((w) => this.used.has(w));
+    if (used) return { reason: 'used', word: used };
+    // có dấu tiếng Việt mà không đoán ra từ nào: nhắc tắt bộ gõ thay vì cho xin duyệt một chuỗi lạ
+    if (hasVietMarks(raw)) return { reason: 'vi_keyboard', word: '' };
+    return { reason: 'not_in_dictionary', word: chained[0] };
+  }
+
+  private accept(playerId: string, word: string, own: boolean): void {
     const p = this.find(playerId)!;
     p.words++;
+    if (own) p.correct++;
     this.totalWords++;
     this.used.add(word);
     this.currentWord = word;
-    this.push({ kind: 'word', word, playerId, name: p.name });
+    this.push({ kind: 'word', word, playerId, name: p.name, ...(own ? {} : { hint: true }) });
     this.currentId = this.nextAlive(playerId, false);
     this.beginTurn();
     this.ctx.changed();
@@ -162,7 +179,7 @@ export class WordChainGame implements GameEngine {
     this.push({ kind: 'vote', word: v.word, playerId: v.byId, name: v.byName, approved });
     if (approved && !this.used.has(v.word) && this.currentId === v.byId) {
       this.ctx.learnWord(v.word, v.byName);
-      this.accept(v.byId, v.word);
+      this.accept(v.byId, v.word, true);
       return;
     }
     this.resumeTurn();
@@ -189,18 +206,53 @@ export class WordChainGame implements GameEngine {
     if (v.voters.length === 0 || v.yes.length + v.no.length >= v.voters.length) this.resolveVote();
   }
 
-  /** Quyền cứu trợ: mỗi người 1 lần/ván, chỉ người hỏi mới thấy từ gợi ý */
+  private hintsLeft(p: WPlayer): number {
+    return Math.max(0, hintAllowance(this.lang, p.correct) - p.hintsUsed);
+  }
+
+  /**
+   * Quyền cứu trợ: mỗi người 1 lần/ván (Nối từ Anh: thêm 1 lần sau mỗi 30 từ tự nối đúng).
+   * Server chọn một từ hợp lệ và nối luôn cho người chơi (không cần điền rồi bấm Gửi).
+   */
   private hint(playerId: string): ActionResult {
     const p = this.find(playerId);
     if (!p || p.eliminated) return { ok: false, reason: 'not_playing' };
     if (playerId !== this.currentId) return { ok: false, reason: 'not_your_turn' };
-    if (p.hintUsed) return { ok: false, reason: 'hint_used' };
-    const options = this.dict.nextOptions(this.lastUnit(this.currentWord), this.used);
+    if (this.turnEndsAt !== null && Date.now() >= this.turnEndsAt) {
+      this.timeout();
+      return { ok: false, reason: 'timeout' };
+    }
+    if (this.hintsLeft(p) <= 0) return { ok: false, reason: 'hint_used' };
+    const options = this.dict.hintOptions(this.lastUnit(this.currentWord), this.used);
     if (options.length === 0) return { ok: false, reason: 'no_hint' };
-    p.hintUsed = true;
+    const word = options[Math.floor(this.ctx.rng() * options.length)];
+    p.hintsUsed++;
     this.push({ kind: 'hint', playerId, name: p.name });
+    this.accept(playerId, word, false);
+    return { ok: true, hint: word };
+  }
+
+  /**
+   * Người chơi dính chiêu làm rung/che màn hình: nếu đang tới lượt thì bù lại thời gian đã mất.
+   * Trả về số ms thực sự được bù (0 nếu không bù).
+   */
+  disrupt(playerId: string, ms: number): number {
+    if (this.over || this.vote || playerId !== this.currentId || this.turnEndsAt === null) return 0;
+    const add = Math.max(0, Math.min(ms, DISRUPT_MAX_BONUS_MS - this.bonusMs));
+    if (add <= 0) return 0;
+    const left = this.turnEndsAt - Date.now();
+    if (left <= 0) return 0;
+    this.bonusMs += add;
+    this.turnEndsAt += add;
+    this.timer.set(left + add, () => this.timeout());
     this.ctx.changed();
-    return { ok: true, hint: options[Math.floor(this.ctx.rng() * options.length)] };
+    return add;
+  }
+
+  /** người chơi đổi tên giữa ván */
+  renamePlayer(playerId: string, name: string): void {
+    const p = this.find(playerId);
+    if (p) p.name = name;
   }
 
   removePlayer(playerId: string): void {
@@ -227,12 +279,15 @@ export class WordChainGame implements GameEngine {
       order: this.players.map((p) => p.id),
       eliminated: this.players.filter((p) => p.eliminated).map((p) => p.id),
       words: Object.fromEntries(this.players.map((p) => [p.id, p.words])),
-      hintUsed: this.players.filter((p) => p.hintUsed).map((p) => p.id),
+      hintUsed: this.players.filter((p) => this.hintsLeft(p) <= 0).map((p) => p.id),
+      hintsLeft: Object.fromEntries(this.players.map((p) => [p.id, this.hintsLeft(p)])),
+      correct: Object.fromEntries(this.players.map((p) => [p.id, p.correct])),
       currentWord: this.currentWord,
       currentDefinition: this.dict.definition(this.currentWord),
       currentPlayerId: this.over ? null : this.currentId,
       turnEndsAt: this.over ? null : this.turnEndsAt,
-      turnSeconds: this.turnMs / 1000,
+      turnSeconds: (this.turnLenMs || this.turnMs) / 1000,
+      turnBonusMs: this.over ? 0 : this.bonusMs,
       nextCount: this.dict.countNext(this.lastUnit(this.currentWord), this.used),
       history: this.history.map((item) => 'word' in item ? { ...item, definition: this.dict.definition(item.word) } : item),
       totalWords: this.totalWords,
@@ -246,11 +301,19 @@ export class WordChainGame implements GameEngine {
 
   // ---------- nội bộ ----------
 
+  /** độ dài lượt của một người: Nối từ Anh giảm dần 30s -> 15s theo số từ tự nối đúng */
+  private turnLengthFor(id: string | null): number {
+    const p = id ? this.find(id) : undefined;
+    return this.lang === 'en' && p ? enTurnMs(this.turnMs, p.correct) : this.turnMs;
+  }
+
   private beginTurn(): void {
     this.appealedTurn = false;
     this.vote = null;
-    this.turnEndsAt = Date.now() + this.turnMs;
-    this.timer.set(this.turnMs, () => this.timeout());
+    this.bonusMs = 0;
+    this.turnLenMs = this.turnLengthFor(this.currentId);
+    this.turnEndsAt = Date.now() + this.turnLenMs;
+    this.timer.set(this.turnLenMs, () => this.timeout());
   }
 
   private timeout(): void {

@@ -124,10 +124,13 @@ await tid(p, 'submit-btn').click();
 await tid(p, 'word-error').waitFor();
 check(true, `báo lỗi từ sai: "${await tid(p, 'word-error').textContent()}"`);
 
+// cứu trợ: server nối hộ luôn một từ hợp lệ
+const beforeHint = await currentWord(p);
 await tid(p, 'hint-btn').click();
-await tid(p, 'hint-word').waitFor();
-const hintText = await tid(p, 'hint-word').textContent();
-check(/Gợi ý: \S+ \S+/.test(hintText), `cứu trợ cho gợi ý: "${hintText}"`);
+await p.waitForFunction((w) => document.querySelector('[data-testid="current-word"]')?.textContent.trim() !== w, beforeHint);
+const hinted = await currentWord(p);
+check(hinted.split(' ')[0] === beforeHint.split(' ')[1], `cứu trợ nối hộ: "${beforeHint}" -> "${hinted}"`);
+used.add(hinted);
 await shot(p, '3-game-hint');
 
 for (let i = 0; i < 4; i++) {

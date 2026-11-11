@@ -57,25 +57,29 @@ describe('Nối từ tiếng Anh (wordchain_en)', () => {
     expect(submit(room, p0, 'two words')).toEqual({ ok: false, reason: 'format' });
     expect(submit(room, p0, '123')).toEqual({ ok: false, reason: 'format' });
     expect(submit(room, p0, 'sex')).toEqual({ ok: false, reason: 'chain' });
-    expect(submit(room, p0, 'tunknown')).toEqual({ ok: false, reason: 'not_in_dictionary' });
+    expect(submit(room, p0, 'tunknown')).toEqual({ ok: false, reason: 'not_in_dictionary', word: 'tunknown' });
     expect(submit(room, p0, 'tits')).toEqual({ ok: true });
     expect(submit(room, p1, 'sex')).toEqual({ ok: true });
     expect(submit(room, p0, 'xmas')).toEqual({ ok: true });
     expect(submit(room, p1, 'sex')).toEqual({ ok: false, reason: 'used' });
   });
 
-  it('quyền cứu trợ trả về từ tiếng Anh bắt đầu bằng chữ cái cuối của từ hiện tại', () => {
+  it('quyền cứu trợ nối luôn một từ tiếng Anh bắt đầu bằng chữ cái cuối, ưu tiên từ có nghĩa', () => {
     const { room } = startEn(['An', 'Bình'], 'art');
-    const [p0] = wc(room).order;
+    const [p0, p1] = wc(room).order;
     const r = room.action(p0, { type: 'hint' });
     expect(r.ok && r.hint?.startsWith('t')).toBe(true);
-    expect(room.action(p0, { type: 'hint' })).toEqual({ ok: false, reason: 'hint_used' });
+    // các từ bắt đầu bằng t có nghĩa: tit, time, table
+    expect(['tit', 'time', 'table']).toContain(r.ok ? r.hint : '');
+    expect(wc(room).currentWord).toBe(r.ok ? r.hint : '');
+    expect(wc(room).currentPlayerId).toBe(p1);
+    expect(wc(room).hintsLeft?.[p0]).toBe(0);
   });
 
   it('xin cả phòng duyệt từ tiếng Anh mới: đồng ý thì thêm vào từ điển tiếng Anh', () => {
     const { room, dict, learned } = startEn(['An', 'Bình', 'Chi'], 'art');
     const [p0, p1, p2] = wc(room).order;
-    expect(submit(room, p0, 'tizz')).toEqual({ ok: false, reason: 'not_in_dictionary' });
+    expect(submit(room, p0, 'tizz')).toEqual({ ok: false, reason: 'not_in_dictionary', word: 'tizz' });
     expect(room.action(p0, { type: 'appeal', word: 'Tizz' })).toEqual({ ok: true });
     expect(wc(room).vote?.word).toBe('tizz');
     expect(room.action(p1, { type: 'vote', yes: true })).toEqual({ ok: true });

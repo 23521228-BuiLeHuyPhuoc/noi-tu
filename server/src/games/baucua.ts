@@ -111,6 +111,11 @@ export class BauCuaGame implements GameEngine {
     };
   }
 
+  /** người chơi đổi tên giữa ván */
+  renamePlayer(playerId: string, name: string): void {
+    if (playerId in this.names) this.names[playerId] = name;
+  }
+
   dispose(): void {
     this.timer.clear();
   }

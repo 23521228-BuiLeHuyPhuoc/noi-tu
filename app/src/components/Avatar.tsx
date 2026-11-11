@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicPlayer } from '../../../shared/src/types';
-import { doodleUri, MOOD_EMOJI, portraitOf, shortName, type PortraitSource } from '../avatars';
+import { doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
 
 export function Avatar({
-  player, size = 52, active, dim, host, sub, me, onPress, ring, rank,
+  player, size = 52, active, dim, host, sub, me, onPress, ring, rank, editable,
 }: {
   player: PublicPlayer;
   size?: number;
@@ -22,6 +22,8 @@ export function Avatar({
   ring?: string;
   /** hạng (1..n): hiện thành huy hiệu nhỏ ở góc avatar */
   rank?: number;
+  /** avatar của chính mình: hiện bút chì, chạm để sửa tên & ảnh */
+  editable?: boolean;
 }) {
   const face = useFace(player.id);
   const pt = portraitOf(player, face.mood);
@@ -81,8 +83,8 @@ export function Avatar({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={onPress ? `Chọc ${player.name}` : player.name}
-      style={[styles.wrap, { width: size + 22 }, dim && { opacity: 0.4 }]}
+      accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : onPress ? `Chọc ${player.name}` : player.name}
+      style={[styles.wrap, { minWidth: size + 22, maxWidth: size + 64 }, dim && { opacity: 0.4 }]}
     >
       <Animated.View
         testID={`avatar-${player.id}`}
@@ -114,19 +116,21 @@ export function Avatar({
         {face.charm && <Text testID={`charm-${player.id}`} style={styles.charm}>✨</Text>}
         {host && <Text style={styles.crown}>👑</Text>}
         {!player.connected && <Text style={styles.off}>💤</Text>}
+        {editable && player.connected && <Text testID="avatar-edit-badge" style={styles.edit}>✏️</Text>}
         {rank !== undefined && (
           <View testID={`rank-badge-${player.id}`} style={[styles.rank, rank === 1 && { backgroundColor: C.gold }]}>
             <Text style={styles.rankText}>{rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}</Text>
           </View>
         )}
       </Animated.View>
-      <Text numberOfLines={1} style={[styles.name, active && { color: C.gold }]}>
-        {me ? 'Bạn' : shortName(player.name)}
+      {/* tên đầy đủ, xuống dòng khi dài (không cắt bớt) */}
+      <Text testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: 7 }]}>
+        {player.name}{me ? ' (bạn)' : ''}
       </Text>
       {face.nick && (
         <Text testID={`nick-${player.id}`} numberOfLines={2} style={styles.nick}>{nickText(face.nick).replace(/\s*\p{Extended_Pictographic}\uFE0F?$/u, '')}</Text>
       )}
-      {sub !== undefined && <Text numberOfLines={1} style={styles.sub}>{sub}</Text>}
+      {sub !== undefined && <Text style={styles.sub}>{sub}</Text>}
     </Pressable>
   );
 }
@@ -158,8 +162,12 @@ const styles = StyleSheet.create({
   },
   rankText: { fontFamily: FONT, fontSize: 11, fontWeight: '900', color: C.ink },
   off: { position: 'absolute', bottom: -6, right: -6, fontSize: 16 },
-  name: { fontFamily: FONT, fontSize: 13, fontWeight: '700', color: C.onSon, maxWidth: '100%' },
-  sub: { fontFamily: FONT, fontSize: 12, fontWeight: '600', color: C.onSon, opacity: 0.85 },
+  edit: { position: 'absolute', bottom: -6, right: -8, fontSize: 15 },
+  name: {
+    fontFamily: FONT, fontSize: 12, lineHeight: 15, fontWeight: '700', color: C.onSon, maxWidth: '100%', textAlign: 'center',
+    wordBreak: 'break-word', overflowWrap: 'anywhere',
+  } as object,
+  sub: { fontFamily: FONT, fontSize: 12, fontWeight: '600', color: C.onSon, opacity: 0.85, textAlign: 'center' },
 });
 
 /** Chân dung tròn dùng chung (kết quả, trò chuyện, tài khoản): cùng cách vẽ như trong ván. */

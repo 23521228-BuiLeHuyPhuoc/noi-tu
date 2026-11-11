@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
-  Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunEvent, FunSend, GameAction, GameType, JoinResult,
+  Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
   PublicUser, RoomSettings, RoomState, ServerToClientEvents, StickerId,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
 import { authText, errorText } from './messages';
-import { clearInviteParam } from './web';
+import { clearInviteParam, squareJpeg } from './web';
 
 type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 export type ConnStatus = 'connecting' | 'online' | 'offline';
@@ -20,6 +20,14 @@ export interface AvatarUploadAsset {
   mimeType?: string | null;
   /** Expo ImagePicker provides this on web. */
   file?: Blob;
+  /** ảnh dạng base64 (ImagePicker với base64: true, dùng khi không thu nhỏ được trên máy) */
+  base64?: string | null;
+}
+
+/** hồ sơ khách lưu trên máy: mặt đại diện có sẵn và ảnh đã tải lên */
+export interface GuestProfile {
+  avatar?: number;
+  avatarUrl?: string;
 }
 
 export interface Game {
@@ -38,7 +46,8 @@ export interface Game {
   act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
   leave(): void;
-  sendFun(f: FunSend): void;
+  /** gửi chiêu ném/khịa/hối…; kết quả cho biết có bị giới hạn không */
+  sendFun(f: FunSend): Promise<FunAck>;
   /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
   onFun(cb: (e: FunEvent) => void): () => void;
   /** tài khoản đang đăng nhập (null = chơi khách) */
@@ -50,6 +59,15 @@ export interface Game {
   updateProfile(p: { displayName?: string; avatar?: number }): Promise<string | null>;
   uploadAvatar(asset: AvatarUploadAsset): Promise<string | null>;
   removeAvatar(): Promise<string | null>;
+  /** hồ sơ khách (không đăng nhập) */
+  guest: GuestProfile;
+  /** đổi tên / mặt đại diện ở bất cứ đâu (trang chủ, phòng chờ, giữa ván) — tài khoản hay khách đều được */
+  saveProfile(p: { name?: string; avatar?: number }): Promise<string | null>;
+  /** đổi ảnh đại diện ở bất cứ đâu; `persist`: tài khoản có kho ảnh lâu dài thì lưu vào tài khoản */
+  changePhoto(asset: AvatarUploadAsset): Promise<string | null>;
+  removePhoto(): Promise<string | null>;
+  /** server có kho ảnh lâu dài (Cloudinary) cho tài khoản không */
+  photoPersist: boolean;
   logout(): Promise<void>;
   /** tin nhắn trong phòng */
   chat: ChatMsg[];
@@ -66,6 +84,9 @@ export function useGame(): Game {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [guest, setGuest] = useState<GuestProfile>({});
+  const guestRef = useRef<GuestProfile>({});
+  const [photoPersist, setPhotoPersist] = useState(true);
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
@@ -82,6 +103,26 @@ export function useGame(): Game {
     setChat([]);
     await storage.setRoom(null);
   }, []);
+
+  const updateGuest = useCallback((patch: GuestProfile) => {
+    guestRef.current = { ...guestRef.current, ...patch };
+    setGuest(guestRef.current);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([storage.getAvatar(), storage.getPhoto()]).then(([avatar, avatarUrl]) => {
+      if (!alive) return;
+      updateGuest({ avatar: avatar ?? undefined, avatarUrl: avatarUrl ?? undefined });
+    });
+    fetch(`${SERVER_URL}/health`)
+      .then((r) => r.json())
+      .then((j: { avatarUploads?: unknown }) => alive && setPhotoPersist(j.avatarUploads !== false))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [updateGuest]);
 
   useEffect(() => {
     const socket: GameSocket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
@@ -110,7 +151,7 @@ export function useGame(): Game {
       const name = (await storage.getName()) ?? 'Người chơi';
       if (!code || !playerId) return;
       try {
-        const res: Ack<JoinResult> = await socket.timeout(ACK_TIMEOUT).emitWithAck('room:join', { code, name, playerId });
+        const res: Ack<JoinResult> = await socket.timeout(ACK_TIMEOUT).emitWithAck('room:join', { code, name, playerId, ...guestRef.current });
         if (res.ok) await remember(res.code, res.playerId, name);
         else {
           if (roomCodeRef.current) setNotice('Phòng cũ không còn nữa. ' + errorText[res.error]);
@@ -154,10 +195,12 @@ export function useGame(): Game {
     async (kind: 'create' | 'join', name: string, code = '', gameType?: GameType): Promise<string | null> => {
       setNotice(null);
       const playerId = (await storage.getPlayerId()) ?? undefined;
+      // khách mang theo mặt đại diện + ảnh đã chọn (server chỉ nhận ảnh do chính nó cấp)
+      const profile = guestRef.current;
       const res = await call<Ack<JoinResult>>((s) =>
         kind === 'create'
-          ? s.timeout(ACK_TIMEOUT).emitWithAck('room:create', { name, playerId, gameType })
-          : s.timeout(ACK_TIMEOUT).emitWithAck('room:join', { code: code.trim().toUpperCase(), name, playerId }),
+          ? s.timeout(ACK_TIMEOUT).emitWithAck('room:create', { name, playerId, gameType, ...profile })
+          : s.timeout(ACK_TIMEOUT).emitWithAck('room:join', { code: code.trim().toUpperCase(), name, playerId, ...profile }),
       );
       if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
       if (!res.ok) return errorText[res.error];
@@ -247,6 +290,56 @@ export function useGame(): Game {
     }
   }, []);
 
+  const inRoom = () => !!roomCodeRef.current;
+
+  const saveProfile = useCallback(async (p: { name?: string; avatar?: number }): Promise<string | null> => {
+    const name = p.name?.normalize('NFC').replace(/\s+/g, ' ').trim();
+    if (p.name !== undefined && !name) return 'Tên không được để trống.';
+    if (user) {
+      const patch: { displayName?: string; avatar?: number } = {};
+      if (name !== undefined && name !== user.displayName) patch.displayName = name;
+      if (p.avatar !== undefined) patch.avatar = p.avatar;
+      if (Object.keys(patch).length === 0) return null;
+      return authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', patch));
+    }
+    if (name !== undefined) await storage.setName(name);
+    if (p.avatar !== undefined) {
+      await storage.setAvatar(p.avatar);
+      updateGuest({ avatar: p.avatar });
+    }
+    if (!inRoom()) return null;
+    return simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('player:profile', { ...(name !== undefined ? { name } : {}), ...(p.avatar !== undefined ? { avatar: p.avatar } : {}) }));
+  }, [user, authCall, simple, updateGuest]);
+
+  const changePhoto = useCallback(async (asset: AvatarUploadAsset): Promise<string | null> => {
+    // tài khoản + server có kho ảnh lâu dài: lưu vào tài khoản (dùng được ở mọi máy)
+    if (user && photoPersist) return uploadAvatar(asset);
+    const data = (await squareJpeg(asset.file ?? asset.uri)) ?? (asset.base64 ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}` : null);
+    if (!data) return 'Không đọc được ảnh này, thử ảnh khác nhé.';
+    const res = await call((s) => s.timeout(15_000).emitWithAck('player:photo', { data }));
+    if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
+    if (!res.ok) {
+      if (res.error === 'rate_limited') return 'Bạn vừa đổi ảnh; chờ vài giây rồi thử lại nhé.';
+      if (res.error === 'invalid_image') return 'Ảnh không hợp lệ hoặc lớn quá (chọn ảnh JPG/PNG/WebP).';
+      return 'Tải ảnh chưa thành công, thử lại nhé.';
+    }
+    const url = 'avatarUrl' in res ? res.avatarUrl : undefined;
+    if (!user && url) {
+      await storage.setPhoto(url);
+      updateGuest({ avatarUrl: url });
+    }
+    return null;
+  }, [user, photoPersist, uploadAvatar, call, updateGuest]);
+
+  const removePhoto = useCallback(async (): Promise<string | null> => {
+    if (user && photoPersist && user.avatarUrl) return removeAvatar();
+    await storage.setPhoto(null);
+    updateGuest({ avatarUrl: undefined });
+    if (!inRoom()) return null;
+    const res = await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('player:photo', { remove: true }));
+    return res?.ok ? null : 'Không bỏ được ảnh, thử lại nhé.';
+  }, [user, photoPersist, removeAvatar, call, updateGuest]);
+
   return {
     status,
     room,
@@ -267,8 +360,9 @@ export function useGame(): Game {
       socketRef.current?.emit('room:leave', () => {});
       void forget();
     },
-    sendFun: (f) => {
-      socketRef.current?.emit('fun:send', f, () => {});
+    sendFun: async (f) => {
+      const res = await call<FunAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:send', f));
+      return res ?? { ok: false };
     },
     onFun: (cb) => {
       funListeners.current.add(cb);
@@ -283,6 +377,11 @@ export function useGame(): Game {
     updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
     uploadAvatar,
     removeAvatar,
+    guest,
+    saveProfile,
+    changePhoto,
+    removePhoto,
+    photoPersist,
     logout: async () => {
       await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:logout'));
       setUser(null);

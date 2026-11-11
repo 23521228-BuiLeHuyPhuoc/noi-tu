@@ -7,7 +7,7 @@ import { getInviteCode } from '../web';
 import { GAME_META } from '../messages';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
-import { AuthSheet, ProfileCard, ProfileSheet } from '../components/Account';
+import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
 
 const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
@@ -86,19 +86,24 @@ export function HomeScreen({ game }: { game: Game }) {
         ) : (
           <Card style={{ gap: 8 }}>
             <T style={styles.h2}>Bạn tên gì?</T>
-            <TextInput
-              testID="name-input"
-              style={styles.input}
-              value={name}
-              onChangeText={(t) => {
-                setName(t);
-                setError(null);
-              }}
-              placeholder="Ví dụ: Phước"
-              placeholderTextColor={C.muted}
-              maxLength={24}
-              autoCorrect={false}
-            />
+            <View style={styles.nameRow}>
+              <GuestAvatarButton game={game} onPress={() => setProfile(true)} />
+              <TextInput
+                testID="name-input"
+                style={[styles.input, { flex: 1, minWidth: 0 }]}
+                value={name}
+                onChangeText={(t) => {
+                  setName(t);
+                  setError(null);
+                  void storage.setName(t.trim());
+                }}
+                placeholder="Ví dụ: Phước"
+                placeholderTextColor={C.muted}
+                maxLength={24}
+                autoCorrect={false}
+              />
+            </View>
+            <T style={styles.authHint}>Chạm vào ảnh để chọn mặt đại diện hoặc tải ảnh của bạn (đổi lại được cả trong ván).</T>
             <View style={styles.authRow}>
               <T style={styles.authHint}>Chơi khách, hoặc</T>
               <Pressable testID="auth-open" disabled={!online} onPress={() => setAuth('login')} hitSlop={6}>
@@ -149,7 +154,17 @@ export function HomeScreen({ game }: { game: Game }) {
         {!invite && join}
       </ScrollView>
       {auth && <AuthSheet game={game} initial={auth} defaultName={name.trim()} onClose={() => setAuth(null)} />}
-      {profile && user && <ProfileSheet game={game} user={user} onClose={() => setProfile(false)} />}
+      {profile && (
+        <ProfileSheet
+          game={game}
+          initialName={name.trim()}
+          onClose={() => {
+            setProfile(false);
+            // khách đổi tên trong bảng: cập nhật ô nhập tên
+            if (!user) storage.getName().then((n) => n && setName(n));
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -192,6 +207,7 @@ const styles = StyleSheet.create({
   go: { fontSize: 36, fontWeight: '900', color: C.son },
   joinCard: { gap: 10 },
   authRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   authHint: { fontSize: 13, color: C.muted },
   authLink: { fontSize: 13, color: C.son, fontWeight: '800', textDecorationLine: 'underline' },
   joinRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },

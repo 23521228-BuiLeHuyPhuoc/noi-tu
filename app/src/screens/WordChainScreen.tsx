@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
-import type { RoomState, WordChainView, WordDefinition, WordHistoryItem, WordVote } from '../../../shared/src/types';
+import { hasVietMarks } from '../../../shared/src/en';
+import {
+  EN_HINT_EVERY, EN_RAMP_WORDS, EN_TURN_MIN_RATIO, TURN_SECONDS, enTurnMs,
+  type RoomState, type WordChainView, type WordDefinition, type WordHistoryItem, type WordVote,
+} from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { shortName } from '../avatars';
 import { actionText, quip } from '../messages';
 import { useOnNew, useSecondsLeft } from '../hooks';
 import { play } from '../sound';
@@ -30,7 +33,6 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [rejected, setRejected] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
@@ -42,18 +44,17 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setText('');
     setError(null);
     setRejected(null);
-    setHint(null);
   }
 
-  /** ghép chữ đầu đã khóa với phần người chơi gõ (bỏ chữ đầu nếu lỡ gõ lại) */
+  /**
+   * ghép chữ đầu đã khóa với phần người chơi gõ.
+   * Tiếng Anh: luôn gửi "chữ khóa + phần gõ"; nếu người chơi lỡ gõ cả từ (xxmas) server tự bỏ chữ lặp,
+   * và tự dịch ngược chữ bị bộ gõ Telex thêm dấu (xmá -> xmas).
+   */
   const fullWord = (typed: string) => {
     if (isEn) {
       const clean = typed.normalize('NFC').trim().toLowerCase();
-      if (!clean) return '';
-      if (clean.length >= 2 && clean.startsWith(last) && (!/^[aeol]$/.test(last) || clean.startsWith(last + last))) {
-        return clean;
-      }
-      return `${last}${clean}`;
+      return clean ? `${last}${clean}` : '';
     }
     const parts = typed.normalize('NFC').trim().split(/\s+/).filter(Boolean);
     if (parts.length > 1) {
@@ -108,8 +109,14 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setSending(false);
     inputRef.current?.focus();
     if (!r.ok) {
-      setError(r.reason === 'format' && isEn ? 'Từ phải là 1 từ đơn tiếng Anh (a–z).' : actionText[r.reason]);
-      setRejected(r.reason === 'not_in_dictionary' ? w : null);
+      const viKeys = isEn && r.reason !== 'vi_keyboard' && hasVietMarks(text);
+      setError(
+        r.reason === 'format' && isEn
+          ? viKeys ? actionText.vi_keyboard : 'Từ phải là 1 từ đơn tiếng Anh (a–z), không dấu, không khoảng trắng.'
+          : actionText[r.reason],
+      );
+      // xin duyệt đúng từ server đã hiểu (vd gõ lại chữ đầu: "ttizz" -> "tizz")
+      setRejected(r.reason === 'not_in_dictionary' ? r.word ?? w : null);
       play('error');
     } else play('coin');
   };
@@ -124,12 +131,31 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     } else setError(actionText[r.reason]);
   };
 
+  // cứu trợ: server chọn một từ hợp lệ và nối luôn, không cần điền rồi bấm Gửi
+  const [hinting, setHinting] = useState(false);
   const askHint = async () => {
+    if (hinting) return;
+    setHinting(true);
     const r = await game.act({ type: 'hint' });
-    if (r.ok && r.hint) setHint(r.hint);
-    else if (!r.ok) setError(actionText[r.reason]);
+    setHinting(false);
+    if (r.ok && r.hint) {
+      play('coin');
+      feed(`🆘 Cứu trợ nối hộ: ${r.hint}`, 'good');
+    } else if (!r.ok) setError(actionText[r.reason]);
   };
   const voting = g.vote !== null;
+  const me = game.me ?? '';
+  const myHints = g.hintsLeft?.[me] ?? (g.hintUsed.includes(me) ? 0 : 1);
+  const myCorrect = g.correct?.[me] ?? 0;
+  // Nối từ Anh: lượt của mỗi người ngắn dần 30s -> 15s theo số từ tự nối đúng; mỗi 30 từ thêm 1 cứu trợ
+  // suy ra thời gian gốc từ lượt hiện tại (server có thể đặt khác 30s khi test)
+  const curCorrect = g.correct?.[g.currentPlayerId ?? ''] ?? 0;
+  const baseMs = g.currentPlayerId
+    ? Math.round((g.turnSeconds * 1000) / (1 - (1 - EN_TURN_MIN_RATIO) * (Math.min(curCorrect, EN_RAMP_WORDS) / EN_RAMP_WORDS)) / 100) * 100
+    : TURN_SECONDS * 1000;
+  const myTurnSec = isEn ? enTurnMs(baseMs, myCorrect) / 1000 : g.turnSeconds;
+  const toBonus = EN_HINT_EVERY - (myCorrect % EN_HINT_EVERY);
+  const fmtSec = (x: number) => `${Number.isInteger(x) ? x : x.toFixed(1).replace('.', ',')}s`;
 
   const names = new Map(room.players.map((p) => [p.id, p.name]));
   const current = room.players.find((p) => p.id === g.currentPlayerId);
@@ -149,7 +175,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     >
       <Card style={styles.board}>
         <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
-          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${shortName(current.name, 14)}` : ''}
+          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
         </T>
         <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
           {isEn ? first : `${first} `}<T style={styles.last}>{last}</T>
@@ -161,7 +187,17 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
         {voting ? (
           <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
         ) : (
-          <TimerBar testID="seconds-left" left={left} total={g.turnSeconds} />
+          <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
+        )}
+        {!voting && (g.turnBonusMs ?? 0) > 0 && (
+          <T testID="turn-bonus" style={styles.bonus}>
+            ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
+          </T>
+        )}
+        {isEn && !isSpectator && !meOut && (
+          <T testID="en-progress" style={styles.progress}>
+            ⏱ Lượt của bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm dần tới 15s)' : ''} · 🆘 còn {myHints} · thêm 1 cứu trợ sau {toBonus} từ nữa
+          </T>
         )}
       </Card>
 
@@ -182,6 +218,11 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                   style={styles.input}
                   value={text}
                   editable={!voting}
+                  // tắt gợi ý/tự sửa của bàn phím; Android: bàn phím chữ thường không bộ gõ dấu
+                  autoComplete="off"
+                  spellCheck={false}
+                  {...(isEn && Platform.OS === 'android' ? { keyboardType: 'visible-password' as const } : {})}
+                  {...(isEn && Platform.OS === 'web' ? ({ lang: 'en' } as object) : {})}
                   onChangeText={(t) => {
                     setText(t);
                     setError(null);
@@ -206,18 +247,16 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               <Button testID="appeal-btn" small icon="🙋" title={`Xin cả phòng duyệt “${rejected}”`} variant="ink" onPress={appeal} />
             )}
           </KeyboardLift>
-          {hint ? (
+          {myHints > 0 && (
             <Button
-              testID="hint-word"
+              testID="hint-btn"
               small
-              variant="paper"
-              title={`Gợi ý: ${hint} (chạm để điền)`}
-              onPress={() => setText(isEn ? hint.slice(1) : hint.split(' ').slice(1).join(' '))}
+              variant="ghost"
+              icon="🆘"
+              title={hinting ? 'Đang cứu trợ…' : `Cứu trợ: nối hộ 1 từ (còn ${myHints})`}
+              disabled={hinting || voting || sending}
+              onPress={askHint}
             />
-          ) : (
-            !g.hintUsed.includes(game.me ?? '') && (
-              <Button testID="hint-btn" small variant="ghost" icon="🆘" title="Cứu trợ (1 lần mỗi ván)" onPress={askHint} />
-            )
           )}
         </>
       ) : (
@@ -227,8 +266,11 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
             small
             variant="ghost"
             icon="⏰"
-            title={`Hối ${shortName(current.name, 14)}`}
-            onPress={() => game.sendFun({ kind: 'poke', to: current.id })}
+            title={`Hối ${current.name}`}
+            onPress={async () => {
+              const r = await game.sendFun({ kind: 'poke', to: current.id });
+              if (!r.ok && r.reason === 'limited') feed(`⏳ Hối từ từ thôi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa`, 'info');
+            }}
           />
         )
       )}
@@ -334,8 +376,8 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
       return (
         <View style={styles.historyEntry}>
           <View style={styles.wordRow}>
-            <T style={styles.wordText}>{item.word}</T>
-            <T numberOfLines={1} style={styles.by}>{isMe(item.playerId) ? 'Bạn' : item.name}</T>
+            <T style={styles.wordText}>{item.word}{item.hint ? ' 🆘' : ''}</T>
+            <T style={styles.by}>{isMe(item.playerId) ? 'Bạn' : item.name}</T>
           </View>
           <Definition definition={item.definition} />
         </View>
@@ -366,6 +408,8 @@ const styles = StyleSheet.create({
     fontSize: 20, fontWeight: '700', color: C.ink, outlineStyle: 'none',
   } as object,
   paused: { color: C.son, fontWeight: '800', fontSize: 14 },
+  bonus: { color: C.jade, fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  progress: { color: C.muted, fontWeight: '700', fontSize: 12, textAlign: 'center' },
   voteLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', padding: 16, zIndex: 75 },
   voteCard: { backgroundColor: C.paper, borderRadius: 22, padding: 18, gap: 10, alignItems: 'stretch' },
   voteHead: { fontSize: 16, fontWeight: '800', color: C.muted, textAlign: 'center' },
@@ -382,6 +426,6 @@ const styles = StyleSheet.create({
   definitionMissing: { color: C.muted, fontStyle: 'italic' },
   wordRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 3 },
   wordText: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
-  by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right' },
+  by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right', wordBreak: 'break-word' } as object,
   sys: { color: C.muted, fontSize: 14, fontStyle: 'italic', paddingVertical: 3 },
 });

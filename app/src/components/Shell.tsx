@@ -11,6 +11,7 @@ import { useStableWindow } from '../hooks';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
 import { Sheet } from './Sheet';
+import { ProfileSheet } from './Account';
 
 export interface StripOptions {
   sub?: (p: PublicPlayer) => string | undefined;
@@ -30,7 +31,10 @@ export interface ShellTools {
   muted: boolean;
   toggleMute: () => void;
   leave: () => void;
+  /** chạm vào người khác: bảng chọc; chạm vào chính mình: bảng sửa tên & ảnh */
   openPlayer: (id: string) => void;
+  /** mở bảng sửa tên & ảnh của mình */
+  openProfile: () => void;
 }
 const ToolsCtx = createContext<ShellTools | null>(null);
 export const useShellTools = () => useContext(ToolsCtx);
@@ -58,6 +62,7 @@ export function Shell({
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   // tin nhắn chưa đọc: chỉ đếm tin mới sau khi vào màn hình
   const lastId = game.chat.at(-1)?.id ?? 0;
   const [seenId, setSeenId] = useState(lastId);
@@ -99,7 +104,8 @@ export function Shell({
         ring={strip.ring?.(p)}
         rank={p.spectator ? undefined : strip.rank?.(p)}
         size={stripSize}
-        onPress={p.id === game.me || meIsSpectator ? undefined : () => setTarget(p)}
+        editable={p.id === game.me}
+        onPress={p.id === game.me ? () => setProfileOpen(true) : meIsSpectator ? undefined : () => setTarget(p)}
       />
     </View>
   ));
@@ -111,7 +117,12 @@ export function Shell({
       muted,
       toggleMute: () => { setMuted(!muted); setMutedState(!muted); },
       leave: () => setLeaving(true),
-      openPlayer: (id) => { const pl = room.players.find((x) => x.id === id); if (pl && id !== game.me) setTarget(pl); },
+      openPlayer: (id) => {
+        if (id === game.me) return setProfileOpen(true);
+        const pl = room.players.find((x) => x.id === id);
+        if (pl) setTarget(pl);
+      },
+      openProfile: () => setProfileOpen(true),
     }}>
     <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
       {!bare && (<>
@@ -120,7 +131,8 @@ export function Shell({
           testID="room-chip"
           small
           variant="paper"
-          title={`Phòng ${room.code}`}
+          // màn hẹp: chỉ ghi mã phòng cho đủ chỗ các nút ✏️ 💬 🔊 🚪
+          title={iconOnly ? room.code : `Phòng ${room.code}`}
           style={styles.chip}
           onPress={async () => (await copyText(room.code)) && feed('Đã sao chép mã phòng')}
         />
@@ -136,6 +148,7 @@ export function Shell({
             {stripItems}
           </ScrollView>
         )}
+        <IconButton testID="profile-open" icon="✏️" label="Sửa tên & ảnh" onPress={() => setProfileOpen(true)} />
         <View>
           <IconButton testID="chat-open" icon="💬" label="Trò chuyện" onPress={() => setChatOpen(true)} />
           {unread > 0 && (
@@ -193,6 +206,7 @@ export function Shell({
       <TrollLayer game={game} players={room.players} />
       {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
       {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
+      {profileOpen && <ProfileSheet game={game} room={room} onClose={() => setProfileOpen(false)} />}
       {leaving && (
         <Sheet title="Rời phòng?" onClose={() => setLeaving(false)}>
           <T style={{ color: C.muted }}>
@@ -213,9 +227,9 @@ const styles = StyleSheet.create({
   rootFullscreen: { maxWidth: '100%' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4 },
   topLandscape: { paddingTop: 3, paddingBottom: 2, paddingHorizontal: 8, gap: 6 },
-  chip: { marginBottom: 0 },
+  chip: { marginBottom: 0, flexShrink: 1, minWidth: 0 },
   gameName: { flex: 1, color: C.onSon, fontWeight: '800', fontSize: 15 },
-  gameIcon: { flex: 1, fontSize: 24, textAlign: 'center' },
+  gameIcon: { flex: 1, minWidth: 0, fontSize: 22, textAlign: 'center' },
   gameNameLandscape: { flex: 0, marginRight: 4 },
   // ScrollView ngang trên web mặc định giãn hết chiều cao còn lại -> chặn lại
   stripScroll: { flexGrow: 0, flexShrink: 0 },

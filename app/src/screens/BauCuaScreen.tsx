@@ -724,7 +724,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   <T style={styles.rankMedal}>{rankBadge(rank)}</T>
                   <Portrait p={playerOf(id) ?? { avatar: 0 }} size={30} border={2} />
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <T numberOfLines={1} style={styles.rankName}>
+                    <T style={styles.rankName}>
                       {nameOf(id)}
                     </T>
                     {(pStaked > 0 || pDebt > 0) && (

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
 import type { Express, Request } from 'express';
 import multer from 'multer';
@@ -11,6 +12,8 @@ const MAX_CONCURRENT_UPLOADS = 6;
 export interface AvatarUploader {
   upload(data: Buffer, userId: string): Promise<{ secure_url: string; public_id: string }>;
   destroy?(publicId: string): Promise<void>;
+  /** địa chỉ ảnh do chính kho này cấp (để khách gửi lại ảnh cũ khi vào phòng mới) */
+  isOwnUrl?(url: string): boolean;
 }
 
 export function cloudinaryUploader(env = process.env): AvatarUploader | undefined {
@@ -32,7 +35,74 @@ export function cloudinaryUploader(env = process.env): AvatarUploader | undefine
     destroy: async (publicId) => {
       await cloudinary.uploader.destroy(publicId, { invalidate: true, resource_type: 'image' });
     },
+    isOwnUrl: (url) => url.startsWith(`https://res.cloudinary.com/${cloud_name}/image/upload/`) && url.includes('/xomlay/avatars/'),
   };
+}
+
+/** ảnh đại diện của khách: tối đa 400 KB (app đã thu nhỏ về 256x256 trước khi gửi) */
+const GUEST_MAX_BYTES = 400 * 1024;
+const MEM_MAX_PHOTOS = 100;
+
+/**
+ * Ảnh đại diện cho khách (không cần tài khoản), đổi được ở bất cứ đâu kể cả giữa ván.
+ * Có Cloudinary thì lưu ở đó (mỗi máy một ô, ghi đè); không có thì giữ tạm trong bộ nhớ server (mất khi khởi động lại).
+ */
+export class PhotoService {
+  private readonly mem = new Map<string, { data: Buffer; type: string }>();
+  private readonly issued = new Set<string>();
+  constructor(private readonly uploader?: AvatarUploader) {}
+
+  /** giải mã + kiểm tra ảnh base64 (có thể kèm tiền tố data:image/...;base64,) */
+  static decode(raw: unknown): { data: Buffer; type: string } | null {
+    if (typeof raw !== 'string' || raw.length > GUEST_MAX_BYTES * 1.4 + 100) return null;
+    const b64 = raw.replace(/^data:image\/[a-z+]+;base64,/i, '');
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(b64)) return null;
+    const data = Buffer.from(b64, 'base64');
+    if (data.length < 64 || data.length > GUEST_MAX_BYTES) return null;
+    const type = imageType(data);
+    return type ? { data, type } : null;
+  }
+
+  /**
+   * lưu ảnh của khách; `origin` = gốc địa chỉ server (cho ảnh giữ trong bộ nhớ).
+   * Mỗi lần tải dùng một tên ngẫu nhiên: mã người chơi lộ trong trạng thái phòng nên không dùng làm tên ảnh
+   * (tránh người khác ghi đè ảnh của mình).
+   */
+  async saveGuest(img: { data: Buffer; type: string }, origin: string): Promise<string> {
+    const slot = 'guest-' + randomUUID();
+    if (this.uploader) {
+      const r = await this.uploader.upload(img.data, slot);
+      if (!r.secure_url.startsWith('https://')) throw new Error('Invalid upload URL');
+      this.issued.add(r.secure_url);
+      return r.secure_url;
+    }
+    const id = `${slot}-${Date.now().toString(36)}`;
+    this.mem.set(id, img);
+    while (this.mem.size > MEM_MAX_PHOTOS) this.mem.delete(this.mem.keys().next().value!);
+    const url = `${origin.replace(/\/$/, '')}/api/img/${id}`;
+    this.issued.add(url);
+    return url;
+  }
+
+  /** địa chỉ ảnh có phải do server này cấp không (khách gửi lại khi vào phòng khác) */
+  trusted(url: unknown): url is string {
+    if (typeof url !== 'string' || url.length > 300 || !/^https?:\/\//.test(url)) return false;
+    if (this.issued.has(url)) {
+      const m = /\/api\/img\/([\w-]+)$/.exec(url);
+      return !m || this.mem.has(m[1]);
+    }
+    return this.uploader?.isOwnUrl?.(url) ?? false;
+  }
+
+  attach(app: Express): void {
+    app.get('/api/img/:id', (req, res) => {
+      const img = this.mem.get(String(req.params.id));
+      if (!img) { res.status(404).end(); return; }
+      res.setHeader('Content-Type', img.type);
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.send(img.data);
+    });
+  }
 }
 
 function imageType(data: Buffer): string | null {

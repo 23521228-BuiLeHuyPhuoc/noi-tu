@@ -59,9 +59,9 @@ await shot(cur === a ? b : a, '08-word-other');
 await cur.t('word-input').fill('abc xyz');
 await cur.t('submit-btn').click();
 await cur.t('word-error').waitFor();
+await shot(cur, '09-word-error');
 await cur.t('hint-btn').click();
-await cur.t('hint-word').waitFor();
-await shot(cur, '09-word-error-hint');
+await cur.page.waitForTimeout(500);
 // taunt
 await c.t('chat-open').click();
 await c.t('taunt-ga').click();

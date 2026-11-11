@@ -71,13 +71,14 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   check(/^[a-z]{2,}$/.test(initialWord), `Nối từ Anh từ mở đầu: ${initialWord}`);
   check((await a.t('current-definition').count()) > 0, 'Nối từ Anh hiện chú thích nghĩa tiếng Việt');
   const cur = (await a.t('turn-label').textContent()).includes('Tới lượt bạn') ? a : b;
+  // cứu trợ nối hộ luôn (không cần điền rồi bấm Gửi)
   await cur.t('hint-btn').click();
-  await cur.t('hint-word').click();
-  const suffix = await cur.t('word-input').inputValue();
-  const expectedWord = `${initialWord.slice(-1)}${suffix}`;
-  await cur.t('submit-btn').click();
-  await a.page.waitForFunction((w) => document.querySelector('[data-testid="current-word"]')?.textContent.trim() === w, expectedWord);
-  check(true, `Nối từ Anh nối thành công: ${initialWord} -> ${expectedWord}`);
+  await a.page.waitForFunction((w) => {
+    const t = document.querySelector('[data-testid="current-word"]')?.textContent.trim();
+    return t && t !== w;
+  }, initialWord);
+  const expectedWord = (await a.t('current-word').textContent()).trim();
+  check(expectedWord[0] === initialWord.slice(-1), `Nối từ Anh: cứu trợ nối hộ ${initialWord} -> ${expectedWord}`);
   await a.page.context().close();
   await b.page.context().close();
 }

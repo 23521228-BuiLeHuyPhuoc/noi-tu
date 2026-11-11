@@ -35,6 +35,10 @@ export interface GameEngine {
   removePlayer(playerId: string): void;
   /** trạng thái kết nối của người chơi thay đổi giữa ván */
   onPlayerConnection?(playerId: string, connected: boolean): void;
+  /** người chơi dính chiêu làm rung/che màn hình (ms ước lượng bị mất); trả về số ms được bù vào lượt */
+  disrupt?(playerId: string, ms: number): number;
+  /** người chơi đổi tên giữa ván */
+  renamePlayer?(playerId: string, name: string): void;
   view(): GameView;
   dispose(): void;
 }

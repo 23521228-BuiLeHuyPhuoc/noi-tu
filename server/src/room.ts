@@ -9,7 +9,7 @@ import {
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { parseLook } from '../../shared/src/types';
-import { HpBoard, TargetCooldown } from './fun';
+import { HpBoard, TargetCooldown, WindowLimiter } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
@@ -76,6 +76,8 @@ export class Room {
   private readonly spreadSeed = Math.floor(Math.random() * 997);
   /** chống dội gián/mực lên màn hình một người */
   readonly screenCooldown = new TargetCooldown();
+  /** mỗi người chỉ bị rung/lắc/che màn hình tối đa 3 lần mỗi 15 giây (từ bất kỳ ai) */
+  readonly disruptLimiter = new WindowLimiter();
   private readonly graceMs: number;
   private readonly rng: Rng;
   private readonly onChange: (room: Room) => void;
@@ -117,7 +119,8 @@ export class Room {
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
 
     const id = existingId && /^[\w-]{8,64}$/.test(existingId) ? existingId : randomUUID();
-    const preset = account ? this.presetFor(profile?.avatar) : undefined;
+    // tài khoản và khách đã tự chọn mặt đại diện: dựng nhân vật theo mặt đó
+    const preset = this.presetFor(profile?.avatar);
     const character: CharacterConfig = preset ?? this.spreadCharacter();
     this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account });
     if (!this.hostId) this.hostId = id;
@@ -231,27 +234,53 @@ export class Room {
     return { ok: true };
   }
 
-  /** Đổi tên/ảnh đại diện (khi người chơi sửa hồ sơ tài khoản) — chỉ khi chưa vào ván */
-  updateProfile(playerId: string, name?: string, avatar?: number, avatarUrl?: string): void {
+  /**
+   * Hồ sơ tài khoản vừa đổi (tên, mặt đại diện, ảnh). Truyền đủ hồ sơ: avatarUrl undefined nghĩa là đã bỏ ảnh.
+   * `explicit`: chính người chơi vừa chọn mặt mới (áp luôn nhân vật theo mặt đó, kể cả khi đã tự chỉnh).
+   */
+  updateProfile(playerId: string, name?: string, avatar?: number, avatarUrl?: string, explicit = false): void {
+    this.patchProfile(playerId, { name, avatar, avatarUrl: avatarUrl ?? null, explicit });
+  }
+
+  /**
+   * Đổi tên / mặt đại diện / ảnh của một người trong phòng, được cả lúc đang chơi.
+   * Trường undefined giữ nguyên; avatarUrl null là bỏ ảnh. Trả về false nếu tên không hợp lệ.
+   */
+  patchProfile(playerId: string, patch: { name?: unknown; avatar?: number; avatarUrl?: string | null; explicit?: boolean }): boolean {
     const p = this.find(playerId);
-    if (!p) return;
-    // Callers pass the complete public profile, so undefined explicitly clears a removed upload.
-    p.avatarUrl = avatarUrl;
-    if (this.phase === 'playing') { this.changed(); return; }
-    if (name && name !== p.name) {
-      p.name = '';
-      p.name = this.uniqueName(name);
+    if (!p) return false;
+    if (patch.name !== undefined) {
+      const name = cleanName(patch.name);
+      if (!name) return false;
+      if (name !== p.name) {
+        p.name = '';
+        p.name = this.uniqueName(name);
+        if (this.phase === 'playing') this.engine?.renamePlayer?.(p.id, p.name);
+        for (const m of this.chat) if (m.from === p.id) m.name = p.name;
+      }
     }
-    if (avatar !== undefined && avatar !== p.avatar) {
+    if (patch.avatarUrl !== undefined) p.avatarUrl = patch.avatarUrl ?? undefined;
+    const avatar = patch.avatar;
+    if (avatar !== undefined && Number.isInteger(avatar) && avatar >= 0 && avatar < AVATAR_COUNT && (avatar !== p.avatar || patch.explicit)) {
       const old = p.avatar;
       p.avatar = -1;
       p.avatar = this.freeAvatar(avatar, old);
-      if (p.account && !p.characterCustom) {
+      if (patch.explicit || (p.account && !p.characterCustom)) {
         const preset = this.presetFor(avatar, p.id);
-        if (preset) p.character = preset;
+        if (preset) {
+          p.character = preset;
+          if (patch.explicit) p.characterCustom = false;
+        }
       }
     }
     this.changed();
+    return true;
+  }
+
+  /** người chơi dính chiêu làm rung/che màn hình: bù thời gian lượt nếu game hỗ trợ. Trả về số ms được bù. */
+  disrupt(playerId: string, ms: number): number {
+    if (this.phase !== 'playing' || !this.engine?.disrupt) return 0;
+    return this.engine.disrupt(playerId, ms);
   }
 
   /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ */
@@ -299,6 +328,7 @@ export class Room {
     this.clearRemoveTimer(p);
     this.players = this.players.filter((x) => x.id !== p.id);
     this.hp.remove(p.id);
+    this.disruptLimiter.remove(p.id);
     if (this.hostId === p.id) this.hostId = this.players[0]?.id ?? '';
     if (this.phase === 'playing') this.engine?.removePlayer(p.id);
     this.changed();
@@ -384,9 +414,18 @@ export class Room {
       gameType: this.gameType,
       settings: this.settings,
       serverNow: Date.now(),
-      game: this.engine ? this.engine.view() : null,
+      game: this.gameView(),
       result: this.result,
     };
+  }
+
+  /** trạng thái ván; tên người chơi luôn lấy theo tên hiện tại trong phòng (đổi tên giữa ván vẫn khớp) */
+  private gameView(): RoomState['game'] {
+    const view = this.engine ? this.engine.view() : null;
+    if (!view || !('names' in view) || !view.names) return view;
+    const names = { ...view.names };
+    for (const p of this.players) if (p.id in names) names[p.id] = p.name;
+    return { ...view, names } as RoomState['game'];
   }
 
   dispose(): void {

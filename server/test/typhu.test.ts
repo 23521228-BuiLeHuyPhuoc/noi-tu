@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TyPhuGame, TYPHU_CARDS } from '../src/games/typhu';
+import { TyPhuGame, TYPHU_CARDS, TYPHU_COMMUNITY_CARDS } from '../src/games/typhu';
 import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
-import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, rentOf, typhuCellPos, stationRent, utilityRent, suggestSales } from '../../shared/src/typhu';
+import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, TYPHU_PASS_START, rentOf, typhuCellPos, stationRent, utilityRent, suggestSales } from '../../shared/src/typhu';
 import { simulateThrow } from '../src/games/dice3d';
 import { DICE_DEFAULT_IMPULSE, DICE_FACES, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
 import { smallDict } from './helpers';
@@ -61,7 +61,7 @@ describe('Cờ tỷ phú V2', () => {
   expect(TYPHU_BOARD).toHaveLength(40);
   for (const [kind, count] of Object.entries({land:22, station:4, utility:2, chance:3, community:3, tax:2}))
    expect(TYPHU_BOARD.filter(c => c.kind === kind)).toHaveLength(count);
-  expect([0,10,20,30].map(i => TYPHU_BOARD[i].kind)).toEqual(['start','jail','rest','gotojail']);
+  expect([0,10,20,30].map(i => TYPHU_BOARD[i].kind)).toEqual(['start','jail','airport','gotojail']);
   expect(new Set(TYPHU_BOARD.map((_, i) => typhuCellPos(i).join(','))).size).toBe(40);
  });
  it('locks actions until authoritative movement finishes, exposes reconnect-safe timing, then buys', () => {
@@ -91,31 +91,56 @@ describe('Cờ tỷ phú V2', () => {
   expect(b.v().houses[3]).toBe(1);expect(b.v().cash.p0).toBe(1450);
  });
  it('buys stations and utilities and scales their rent by owned count', () => {
-  expect([1,2,3,4].map(stationRent)).toEqual([50,100,200,400]);expect(utilityRent(2,7)).toBe(140);
+  expect([1,2,3,4].map(n=>stationRent(n))).toEqual([50,100,200,400]);expect(stationRent(2,3)).toBe(800);expect(utilityRent(2,7)).toBe(140);
   const a=make(['An','Bình'],[2,3]); a.g.action('p0',{type:'roll'});a.settle();
   expect(a.v().pendingBuy).toBe(5); a.g.action('p0',{type:'buy'});expect(a.v().cash.p0).toBe(1300);
   const b=make(['An','Bình'],[2,3]);b.own([5,15,25],'p1');b.g.action('p0',{type:'roll'});b.settle();expect(b.v().cash.p0).toBe(1300);
   const c=make(['An','Bình'],[3,4]);c.pl(0).pos=5;c.own([12,28],'p1');c.g.action('p0',{type:'roll'});c.settle();expect(c.v().cash.p0).toBe(1360);
   expect(c.g.action('p0',{type:'build',cell:12}).ok).toBe(false);
  });
- it('draws community cards separately and preserves doubles', () => {
+ it('Rủi ro only draws bad cards (into the pot at Start) and preserves doubles', () => {
   const {g,v,settle}=make(['An','Bình'],[1,1,{card:0}]);g.action('p0',{type:'roll'});settle();
-  expect(v().card?.text).toContain('hoàn thuế');expect(v().cash.p0).toBe(1600);expect(v().step).toBe('roll');
+  expect(v().card).toMatchObject({good:false});expect(v().card?.text).toContain('mũ bảo hiểm');
+  expect(v().cash.p0).toBe(1450);expect(v().pot).toBe(50);expect(v().step).toBe('roll');
  });
- it('draws chance and publishes chained card movement', () => {
-  const {g,v,pl,settle}=make(['An','Bình'],[1,2,{card:6}]);pl(0).pos=4;g.action('p0',{type:'roll'});
-  vi.advanceTimersByTime(v().movement!.endsAt-Date.now());expect(v().movement?.kind).toBe('card');
-  settle();expect(v().pos.p0).toBe(0);expect(v().cash.p0).toBe(1700);
+ it('every Cơ hội card helps and every Rủi ro card hurts', () => {
+  for (const c of TYPHU_CARDS) expect((c.money ?? 0) >= 0 && !c.jail && !c.perLevel && (c.move ?? 0) >= 0).toBe(true);
+  for (const c of TYPHU_COMMUNITY_CARDS) expect((c.money ?? 0) <= 0 && !c.each && !c.ownLand && (c.move ?? 0) <= 0).toBe(true);
+ });
+ it('Cơ hội: flies straight to Start (no pass bonus, only the card reward) and eats the pot', () => {
+  const {g,v,pl,settle}=make(['An','Bình'],[1,2,{card:6}]);pl(0).pos=4;
+  (g as unknown as {pot:number}).pot=80;
+  g.action('p0',{type:'roll'});
+  vi.advanceTimersByTime(v().movement!.endsAt-Date.now());expect(v().movement?.kind).toBe('fly');expect(v().movement?.path).toEqual([0]);
+  settle();expect(v().pos.p0).toBe(0);expect(v().cash.p0).toBe(1500+TYPHU_PASS_START+80);expect(v().pot).toBe(0);
+ });
+ it('Cơ hội: walks to your nearest own land to upgrade it', () => {
+  const {g,v,pl,own,settle}=make(['An','Bình'],[1,2,{card:7}]);pl(0).pos=4;own([11],'p0');
+  g.action('p0',{type:'roll'});settle();
+  expect(v().pos.p0).toBe(11);expect(v().step).toBe('upgrade');expect(v().pendingBuy).toBe(11);
+ });
+ it('Sân bay flies to a random cell (never itself) and handles that cell', () => {
+  const {g,v,pl,settle}=make(['An','Bình'],[1,2,{card:7.99}]);pl(0).pos=17;
+  g.action('p0',{type:'roll'});
+  vi.advanceTimersByTime(v().movement!.endsAt-Date.now());
+  expect(v().movement?.kind).toBe('fly');
+  settle();
+  expect(v().pos.p0).toBe(39);expect(v().step).toBe('buy');
  });
  it('passes start, charges tax and sends players to jail', () => {
-  const a=make(['An','Bình'],[2,3]);a.pl(0).pos=36;a.g.action('p0',{type:'roll'});a.settle();expect(a.v().cash.p0).toBe(1700);
+  const a=make(['An','Bình'],[2,3]);a.pl(0).pos=36;a.g.action('p0',{type:'roll'});a.settle();expect(a.v().cash.p0).toBe(1500+TYPHU_PASS_START);
   const b=make(['An','Bình'],[1,3]);b.g.action('p0',{type:'roll'});b.settle();expect(b.v().cash.p0).toBe(1300);
   const c=make(['An','Bình'],[3,4]);c.pl(0).pos=23;c.g.action('p0',{type:'roll'});c.settle();expect(c.v().pos.p0).toBe(10);expect(c.v().jail.p0).toBe(0);
  });
  it('handles jail release, third doubles, liquidation, bankruptcy and asset ranking', () => {
   const a=make(['An','Bình']);a.pl(0).jail=0;expect(a.g.action('p0',{type:'payJail'}).ok).toBe(true);expect(a.v().cash.p0).toBe(1450);
   const b=make(['An','Bình'],[2,2]);(b.g as unknown as {players:{doubles:number}[]}).players[0].doubles=2;b.g.action('p0',{type:'roll'});expect(b.v().jail.p0).toBe(0);
-  const c=make(['An','Bình'],[1,3]);c.pl(0).cash=1;c.own([5],'p0');c.g.action('p0',{type:'roll'});c.settle();expect(c.v().bankrupt).toEqual(['p0']);expect(c.finished[0].winnerId).toBe('p1');expect(c.v().owners[5]).toBeUndefined();
+  // thiếu tiền thuế: không tự bán, chờ người chơi tự chọn; bán hết vẫn thiếu mới phá sản
+  const c=make(['An','Bình'],[1,3]);c.pl(0).cash=1;c.own([5],'p0');c.g.action('p0',{type:'roll'});c.settle();
+  expect(c.v().step).toBe('debt');expect(c.v().debt).toEqual({amount:200,to:null,why:'nộp Thuế thu nhập'});expect(c.v().owners[5]).toBe('p0');expect(c.v().bankrupt).toEqual([]);
+  expect(c.g.action('p0',{type:'roll'}).ok).toBe(false);
+  expect(c.g.action('p0',{type:'sell',cell:5}).ok).toBe(true);
+  expect(c.v().bankrupt).toEqual(['p0']);expect(c.finished[0].winnerId).toBe('p1');expect(c.v().owners[5]).toBeUndefined();
   const d=make(['An','Bình']);d.own([5,12],'p1');d.g.action('p0',{type:'end'});expect(d.finished[0].winnerId).toBe('p1');
  });
  it('keeps jailed players in place, releases doubles and charges on the third failed attempt', () => {
@@ -131,13 +156,19 @@ describe('Cờ tỷ phú V2', () => {
   const {g,v}=make(['An','Bình','Chi'],[1,2]);g.action('p0',{type:'roll'});g.removePlayer('p0');
   expect(v().movement).toBeNull();expect(v().currentPlayerId).toBe('p1');
  });
- it('triggers monopoly win and ranks winner #1 when acquiring properties from a bankrupt debtor, and shortens timer on disconnect', () => {
-  const {g,pl,own,finished,settle}=make(['An','Bình','Chi'],[2,3]);
-  own([5,15,25],'p1');own([35],'p0');pl(0).cash=10;pl(2).cash=9999;
+ it('has no quick-win rule: owning all 4 stations does not end the game; only the last player standing wins', () => {
+  const {g,v,pl,own,finished,settle}=make(['An','Bình','Chi'],[2,3]);
+  own([5,15,25,35],'p1');pl(2).cash=9999;
   g.action('p0',{type:'roll'});settle();
-  expect(finished).toHaveLength(1);
-  expect(finished[0].winnerId).toBe('p1');
-  expect(finished[0].ranking[0].playerId).toBe('p1');
+  expect(finished).toHaveLength(0);
+  expect(v().cash.p0).toBe(1500-stationRent(4));
+  const b=make(['An','Bình','Chi'],[2,3]);
+  b.own([5,15,25],'p1');b.own([35],'p0');b.pl(0).cash=10;
+  b.g.action('p0',{type:'roll'});b.settle();
+  expect(b.v().debt).toMatchObject({amount:200,to:'p1'});
+  b.g.action('p0',{type:'sell',cell:35});
+  expect(b.v().bankrupt).toEqual(['p0']);expect(b.finished).toHaveLength(0);
+  expect(b.v().cash.p1).toBe(1500+110);
   const away: string[] = [];
   const d = make(['An','Bình'],[1,2],away);
   away.push('p0');
@@ -154,6 +185,10 @@ describe('Cờ tỷ phú V2', () => {
   a.own([1, 11], 'p0'); // ô 1 (Cà Mau, giá 60 -> bán được 30), ô 11 (Quy Nhơn, giá 140 -> bán được 70)
   const suggestedJail = suggestSales('p0', 50, 20, a.v().owners, a.v().houses);
   expect(suggestedJail[0]).toMatchObject({ cell: 1, kind: 'property', refund: 30, suggested: true });
+  // không tự bán: phải tự chọn bán trước rồi mới nộp được
+  expect(a.g.action('p0', { type: 'payJail' }).ok).toBe(false);
+  expect(a.v().owners[1]).toBe('p0');
+  expect(a.g.action('p0', { type: 'sell', cell: 1 }).ok).toBe(true);
   expect(a.g.action('p0', { type: 'payJail' }).ok).toBe(true);
   expect(a.v().jail.p0).toBeUndefined();
   expect(a.v().owners[1]).toBeUndefined();
@@ -180,6 +215,8 @@ describe('Cờ tỷ phú V2', () => {
   c.settle();
   expect(c.v().step).toBe('buy');
   expect(c.v().pendingBuy).toBe(3);
+  expect(c.g.action('p0', { type: 'buy' }).ok).toBe(false);
+  expect(c.g.action('p0', { type: 'sell', cell: 1 }).ok).toBe(true);
   expect(c.g.action('p0', { type: 'buy' }).ok).toBe(true);
   expect(c.v().owners[1]).toBeUndefined();
   expect(c.v().owners[3]).toBe('p0');
@@ -195,10 +232,42 @@ describe('Cờ tỷ phú V2', () => {
   expect(d.v().step).toBe('upgrade');
   expect(d.v().pendingBuy).toBe(3);
   expect(d.g.action('p0', { type: 'sell', cell: 3 }).ok).toBe(false); // không được bán chính ô đang xét nâng cấp
+  expect(d.g.action('p0', { type: 'build', cell: 3 }).ok).toBe(false);
+  expect(d.g.action('p0', { type: 'sell', cell: 1 }).ok).toBe(true);
   expect(d.g.action('p0', { type: 'build', cell: 3 }).ok).toBe(true);
   expect(d.v().houses[1]).toBeUndefined();
   expect(d.v().houses[3]).toBe(1);
   expect(d.v().cash.p0).toBe(0);
+ });
+ it('upgrades own stations with stars (max 3, 100 each) that double their rent, never houses', () => {
+  const a=make(['An','Bình'],[2,3]);a.own([5],'p0');a.g.action('p0',{type:'roll'});a.settle();
+  expect(a.v().step).toBe('upgrade');expect(a.g.action('p0',{type:'build',cell:5}).ok).toBe(true);
+  expect(a.v().houses[5]).toBe(1);expect(a.v().cash.p0).toBe(1400);
+  const b=make(['An','Bình'],[2,3]);b.own([5],'p0');(b.g as unknown as {houses:Record<number,number>}).houses[5]=3;
+  b.g.action('p0',{type:'roll'});b.settle();expect(b.v().step).not.toBe('upgrade');
+  const c=make(['An','Bình'],[2,3]);c.own([5,15],'p1');(c.g as unknown as {houses:Record<number,number>}).houses[5]=2;
+  c.g.action('p0',{type:'roll'});c.settle();expect(c.v().cash.p0).toBe(1500-stationRent(2,2));expect(stationRent(2,2)).toBe(400);
+ });
+ it('debt: picks what to sell one at a time, pays automatically once cash is enough, then the turn goes on', () => {
+  const {g,v,pl,own,settle}=make(['An','Bình'],[1,3]); // ô 4 Thuế 200
+  pl(0).cash=50;own([1,3,11],'p0');(g as unknown as {houses:Record<number,number>}).houses[11]=2;
+  g.action('p0',{type:'roll'});settle();
+  expect(v().step).toBe('debt');expect(v().cash.p0).toBe(50);
+  expect(g.action('p0',{type:'sell',cell:11}).ok).toBe(true); // bán 1 cấp nhà Quy Nhơn +50
+  expect(v().step).toBe('debt');expect(v().houses[11]).toBe(1);expect(v().cash.p0).toBe(100);
+  expect(g.action('p0',{type:'sell',cell:11}).ok).toBe(true); // +50
+  expect(g.action('p0',{type:'sell',cell:1}).ok).toBe(true); // +30 -> 180
+  expect(v().step).toBe('debt');
+  expect(g.action('p0',{type:'sell',cell:3}).ok).toBe(true); // +30 -> 210 >= 200: tự trả
+  expect(v().step).toBe('wait');expect(v().cash.p0).toBe(10);expect(v().pot).toBe(200);expect(v().owners[11]).toBe('p0');
+  vi.advanceTimersByTime(WAIT);expect(v().currentPlayerId).toBe('p1');
+ });
+ it('debt: an idle player gets helped by the system after a long wait', () => {
+  const {g,v,pl,own,settle}=make(['An','Bình'],[1,3]);
+  pl(0).cash=80;own([1,3,11],'p0'); // bán hết được 130 -> đủ 200
+  g.action('p0',{type:'roll'});settle();expect(v().step).toBe('debt');
+  vi.advanceTimersByTime(60_000);
+  expect(v().step).not.toBe('debt');expect(v().bankrupt).toEqual([]);expect(v().pot).toBe(200);
  });
 });
 

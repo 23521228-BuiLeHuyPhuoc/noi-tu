@@ -2,8 +2,10 @@ import type { Server, Socket } from 'socket.io';
 import type { AuthAck, ClientToServerEvents, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
-import { cleanFun, isScreenTroll, isTroll, RateLimiter, trollExtras } from './fun';
+import { cleanFun, isDisruptive, isHardDisrupt, isScreenTroll, isTroll, pauseMsOf, RateLimiter, trollExtras, WindowLimiter } from './fun';
 import type { Auth } from './auth';
+import { PhotoService } from './avatar';
+import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import type { UserRecord } from './store';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -16,7 +18,7 @@ export function broadcastRoom(io: IO, room: Room): void {
 let funSeq = 0;
 
 /** Gắn các xử lý sự kiện. Server là trọng tài duy nhất: mọi kiểm tra đều ở đây và trong Room/engine. */
-export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): void {
+export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, photos: PhotoService = new PhotoService()): void {
   // socket đang đại diện cho mỗi người chơi ("CODE:playerId" -> socket.id)
   const activeSocket = new Map<string, string>();
   const key = (code: string, playerId: string) => `${code}:${playerId}`;
@@ -29,7 +31,17 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
     const chatLimiter = new RateLimiter(5, 1500);
     // chọc mất dạy: tối đa 4 lần liền, hồi 1 lần mỗi 3 giây
     const trollLimiter = new RateLimiter(4, 3000);
+    // chiêu rung/xoay/sụp nguồn/gián/mực/hối: mỗi người gửi tối đa 3 lần mỗi 15 giây
+    const disruptSender = new WindowLimiter();
     const authLimiter = new RateLimiter(6, 4000);
+    const photoLimiter = new RateLimiter(2, 8000);
+    const profileLimiter = new RateLimiter(8, 2000);
+    /** gốc địa chỉ server (cho ảnh khách giữ trong bộ nhớ) */
+    const origin = () => {
+      const h = socket.handshake.headers;
+      const proto = String(h['x-forwarded-proto'] ?? '').split(',')[0].trim() || (socket.handshake.secure ? 'https' : 'http');
+      return `${proto}://${h.host ?? 'localhost'}`;
+    };
 
     const currentRoom = (): Room | undefined => {
       if (!session) return undefined;
@@ -50,13 +62,19 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       else if (mine) room.setConnected(playerId, false);
     };
 
-    const enter = (room: Room, name: unknown, playerId: unknown) => {
+    const enter = (room: Room, name: unknown, playerId: unknown, guest: { avatar?: unknown; avatarUrl?: unknown } = {}) => {
       // đã đăng nhập: luôn dùng id + tên + ảnh của tài khoản
       const wanted = user ? ACCOUNT_PREFIX + user.id : typeof playerId === 'string' ? playerId : undefined;
       const displayName = user ? user.displayName : name;
+      // khách: mặt đại diện đã chọn và ảnh đã tải lên trước đó (chỉ nhận ảnh do server này cấp)
+      const guestAvatar = Number.isInteger(guest.avatar) && (guest.avatar as number) >= 0 && (guest.avatar as number) < AVATAR_PRESETS.length
+        ? (guest.avatar as number) : undefined;
+      const guestUrl = photos.trusted(guest.avatarUrl) ? guest.avatarUrl : undefined;
       // vào socket room trước để nhận được room:state ngay sau khi thêm người chơi
       socket.join(room.code);
-      const res = room.addPlayer(displayName, wanted, user ? { avatar: user.avatar, avatarUrl: user.avatarUrl, account: true } : undefined);
+      const res = room.addPlayer(displayName, wanted, user
+        ? { avatar: user.avatar, avatarUrl: user.avatarUrl, account: true }
+        : { avatar: guestAvatar, avatarUrl: guestUrl });
       if (!res.ok) {
         socket.leave(room.code);
         return res;
@@ -74,7 +92,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       if (!user && !cleanName(p.name)) return ack({ ok: false, error: 'invalid_name' });
       detach(true);
       const room = manager.create();
-      const res = enter(room, p.name, p.playerId);
+      const res = enter(room, p.name, p.playerId, p);
       if (res.ok && p.gameType) room.configure(res.playerId, p.gameType as GameType);
       ack(res);
     });
@@ -86,7 +104,42 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       if (!room) return ack({ ok: false, error: 'room_not_found' });
       const me = user ? ACCOUNT_PREFIX + user.id : p.playerId;
       if (session && (session.code !== room.code || session.playerId !== me)) detach(true);
-      ack(enter(room, p.name, p.playerId));
+      ack(enter(room, p.name, p.playerId, p));
+    });
+
+    // đổi tên / mặt đại diện ngay trong phòng (khách) — được cả khi đang chơi
+    socket.on('player:profile', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      if (!p || typeof p !== 'object' || user) return ack({ ok: false, error: 'bad_request' });
+      if (!profileLimiter.take()) return ack({ ok: false, error: 'bad_request' });
+      const avatar = Number.isInteger(p.avatar) && p.avatar! >= 0 && p.avatar! < AVATAR_PRESETS.length ? p.avatar : undefined;
+      if (p.avatar !== undefined && avatar === undefined) return ack({ ok: false, error: 'bad_request' });
+      const ok = room.patchProfile(session.playerId, { name: p.name, avatar, explicit: avatar !== undefined });
+      ack(ok ? { ok: true } : { ok: false, error: 'invalid_name' });
+    });
+
+    // ảnh đại diện của khách (hoặc tài khoản khi server chưa có kho ảnh lâu dài): tải ở trang chủ hay giữa ván đều được
+    socket.on('player:photo', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      if (!p || typeof p !== 'object') return ack({ ok: false, error: 'invalid_image' });
+      const room = currentRoom();
+      const playerId = session?.playerId;
+      if (p.remove === true) {
+        if (room && playerId) room.patchProfile(playerId, { avatarUrl: null });
+        return ack({ ok: true });
+      }
+      if (!photoLimiter.take()) return ack({ ok: false, error: 'rate_limited' });
+      const img = PhotoService.decode(p.data);
+      if (!img) return ack({ ok: false, error: 'invalid_image' });
+      photos.saveGuest(img, origin()).then(
+        (avatarUrl) => {
+          if (room && playerId) manager.get(room.code)?.patchProfile(playerId, { avatarUrl });
+          ack({ ok: true, avatarUrl });
+        },
+        () => ack({ ok: false, error: 'avatar_unavailable' }),
+      );
     });
 
     socket.on('room:config', (p, ack) => {
@@ -138,13 +191,34 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
       const f = cleanFun(raw);
       if (!room || !session || !f || room.isSpectator(session.playerId)) return reply({ ok: false });
       if ('to' in f && (!room.has(f.to) || f.to === session.playerId)) return reply({ ok: false });
-      if (!limiter.take()) return reply({ ok: false });
+      if (!limiter.take()) return reply({ ok: false, reason: 'busy' });
+      // chiêu làm rung/lắc/che màn hình: mỗi người chỉ nhận 3 lần mỗi 15 giây, mỗi người gửi 3 lần mỗi 15 giây.
+      // Quá giới hạn: chiêu chỉ để phá (rung, xoay, sụp nguồn, gián, mực, hối) bị chặn; đánh/ném vẫn bay tới avatar nhưng không rung màn hình.
+      const target = 'to' in f ? f.to : null;
+      const disruptive = target !== null && isDisruptive(f);
+      const hard = isHardDisrupt(f.kind);
+      let soft = false;
+      if (disruptive) {
+        const wait = room.disruptLimiter.wait(target);
+        if (hard) {
+          const retryMs = Math.max(wait, disruptSender.wait('me'));
+          if (retryMs > 0) return reply({ ok: false, reason: 'limited', retryMs });
+        } else soft = wait > 0;
+      }
       if (isTroll(f.kind)) {
-        if (!trollLimiter.take()) return reply({ ok: false });
-        if (isScreenTroll(f.kind) && 'to' in f && !room.screenCooldown.take(f.to)) return reply({ ok: false });
+        if (!trollLimiter.take()) return reply({ ok: false, reason: 'busy' });
+        if (isScreenTroll(f.kind) && target && !room.screenCooldown.take(target)) return reply({ ok: false, reason: 'busy' });
+      }
+      if (disruptive && !soft) {
+        room.disruptLimiter.take(target);
+        if (hard) disruptSender.take('me');
       }
       const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : trollExtras(f);
-      io.to(room.code).emit('fun:event', { ...f, ...extra, id: ++funSeq, from: session.playerId });
+      // người đang tới lượt Nối từ được bù lại thời gian bị phá
+      const pausedMs = disruptive && !soft ? room.disrupt(target, pauseMsOf(f, extra)) : 0;
+      io.to(room.code).emit('fun:event', {
+        ...f, ...extra, ...(soft ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}), id: ++funSeq, from: session.playerId,
+      });
       reply({ ok: true });
     });
 
@@ -203,7 +277,8 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth): 
         (r) => {
           const room = currentRoom();
           if (r.ack.ok && room && session?.playerId === ACCOUNT_PREFIX + uid) {
-            room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar, r.ack.user.avatarUrl);
+            // chính người chơi vừa chọn mặt mới: áp nhân vật theo mặt đó ngay (kể cả đang chơi)
+            room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar, r.ack.user.avatarUrl, p?.avatar !== undefined);
           }
         },
       );

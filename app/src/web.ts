@@ -87,3 +87,35 @@ export function subscribeKeyboard(cb: (inset: number) => void): () => void {
     vv?.removeEventListener('scroll', read);
   };
 }
+
+/**
+ * Thu nhỏ ảnh về khung vuông `size` px (cắt giữa) rồi trả về JPEG base64 (data URL) — chỉ trên web.
+ * Ảnh nhỏ (~20 KB) nên gửi thẳng qua kết nối game, đổi ảnh được cả giữa ván.
+ */
+export async function squareJpeg(src: Blob | string, size = 256, quality = 0.85): Promise<string | null> {
+  if (!isWeb || typeof document === 'undefined') return null;
+  const url = typeof src === 'string' ? src : URL.createObjectURL(src);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('load'));
+      el.src = url;
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    if (!side) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return null;
+  } finally {
+    if (typeof src !== 'string') URL.revokeObjectURL(url);
+  }
+}

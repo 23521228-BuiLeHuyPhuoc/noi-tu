@@ -1,5 +1,5 @@
 import express from 'express';
-import { attachAvatarRoute, cloudinaryUploader, type AvatarUploader } from './avatar';
+import { attachAvatarRoute, cloudinaryUploader, PhotoService, type AvatarUploader } from './avatar';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '../../shared/src/types';
@@ -39,7 +39,13 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   });
   const avatarUploader = opts.avatarUploader ?? cloudinaryUploader();
   attachAvatarRoute(app, store, auth, avatarUploader);
-  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, wordsEn: dict.en?.size ?? 0, rooms: manager.size, db: store.kind, avatarUploads: !!avatarUploader }));
+  const photos = new PhotoService(avatarUploader);
+  photos.attach(app);
+  app.get('/health', (_req, res) => res.json({
+    ok: true, words: dict.size, wordsEn: dict.en?.size ?? 0, rooms: manager.size, db: store.kind,
+    // avatarUploads: ảnh tài khoản lưu lâu dài (Cloudinary); photoUploads: khách tải ảnh được (bộ nhớ tạm nếu thiếu Cloudinary)
+    avatarUploads: !!avatarUploader, photoUploads: true,
+  }));
   app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
   const http = createServer(app);
 
@@ -62,7 +68,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });
-  attachSocketHandlers(io, manager, auth);
+  attachSocketHandlers(io, manager, auth, photos);
 
   return {
     http,

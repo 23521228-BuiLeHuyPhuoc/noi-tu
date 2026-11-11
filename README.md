@@ -4,11 +4,13 @@ Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối t�
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
-- Nhập tên (chơi khách) hoặc **tạo tài khoản** để giữ tên, mặt đại diện và thành tích các ván đã chơi. Có thể tải ảnh đại diện lên Cloudinary.
+- Nhập tên (chơi khách) hoặc **tạo tài khoản** để giữ tên, mặt đại diện và thành tích các ván đã chơi.
+- **Đổi tên, mặt đại diện, tải ảnh của mình ở bất cứ đâu**: trang chủ (chạm vào ảnh cạnh ô tên), phòng chờ hay giữa ván (nút ✏️ trên thanh trên, hoặc chạm vào avatar của chính mình). Khách cũng tải ảnh được. Tên hiện đầy đủ dưới avatar, dài thì xuống dòng.
 - Chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
 - Chủ phòng đổi game được ngay trong phòng chờ hoặc sau mỗi ván.
 - Nút 💬: **trò chuyện**, thả emoji bay lên, câu khịa có sẵn và 9 mẫu sticker Quỳnh Aka. Tin nhắn hiện thành bong bóng dưới avatar người gửi.
 - Chạm vào avatar bạn bè để **đánh nhau** (tát 🖐️, đấm 👊, đá 🦶, chưởng 🌀; máu ảo, K.O. thì hồi đầy, không ảnh hưởng ván chơi), **ném** 🩴🍅🥚💩🌹💖 hoặc **hối** (rung máy họ).
+- Các chiêu làm rung/xoay/che màn hình (động đất, xoay màn hình, sụp nguồn, gián, mực, hối) **mỗi người chỉ dính tối đa 3 lần trong 15 giây**; đánh/ném quá giới hạn vẫn bay tới avatar nhưng không rung màn hình. Bị chọc đúng lúc đang tới lượt Nối từ thì **được bù lại thời gian** (sụp nguồn +4,5s, xoay +3,5s…, tối đa 15s mỗi lượt).
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
 - Lần đầu mở sau một lúc không ai chơi, server miễn phí cần khoảng 1 phút để thức dậy.
 
@@ -28,7 +30,7 @@ noi-tu/
 - Mỗi từ gồm đúng 2 chữ. Chữ đầu của từ mới phải trùng chữ cuối của từ trước. Không dùng lại từ đã dùng.
 - Chữ đầu được điền sẵn và khóa lại, chỉ cần gõ chữ thứ hai.
 - Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bị loại; người còn lại cuối cùng thắng.
-- Màn hình hiện số từ còn nối được. Mỗi người có 1 quyền **Cứu trợ** xem gợi ý.
+- Màn hình hiện số từ còn nối được. Mỗi người có 1 quyền **Cứu trợ**: bấm là server nối hộ luôn một từ hợp lệ (không cần điền rồi bấm Gửi).
 - Từ có nghĩa mà kho từ chưa có: bấm **Xin cả phòng duyệt** (mỗi lượt 1 lần). Đồng hồ tạm dừng 12 giây cho mọi người bỏ phiếu; đồng ý nhiều hơn phản đối thì từ được tính, thêm vào kho từ và lưu vào CSDL cho các ván sau.
 - Kho từ ~79.600 từ 2 chữ, gộp từ 13 nguồn (từ điển Việt–Việt, Việt–Anh, Wiktionary, lời giải nghĩa Anh–Việt, lượng từ + danh từ như "cái bàn", "quả cam"). Xem `server/scripts/build-dictionary.ts`.
 - Có 25.976 giải nghĩa kèm nguồn; từ chưa có định nghĩa hiện **Chưa có giải nghĩa**.
@@ -36,9 +38,12 @@ noi-tu/
 
 **Nối từ Anh** (1–6 người)
 - Mỗi từ là 1 từ đơn tiếng Anh (`a–z`, tối thiểu 2 ký tự). Chữ cái đầu của từ mới phải trùng chữ cái cuối của từ trước (ví dụ: `art` → `tits` → `sex`). Không dùng lại từ đã dùng.
-- Chữ cái đầu được điền sẵn và khóa lại, người chơi chỉ cần gõ phần còn lại của từ (hoặc gõ cả từ cũng được).
-- Giao diện, đồng hồ 30 giây, quyền **Cứu trợ**, **Xin cả phòng duyệt** và hiển thị **chú thích nghĩa tiếng Việt + phiên âm IPA** ngay bên dưới từ giống hệt game Nối từ tiếng Việt.
-- Kho từ **210.357 từ tiếng Anh** kèm **124.235 mục giải nghĩa tiếng Việt trực tiếp** (cộng thêm tra cứu gốc từ tự động cho dạng số nhiều / chia động từ `-s`, `-es`, `-ed`, `-ing`), tổng hợp từ **ENABLE1** (`dolph/dictionary`), **Wiktionary tiếng Việt** (Kaikki / Wiktextract) và **Từ điển Anh–Việt StarDict** (`catusf/tudien`). Xem `server/scripts/build-en-dictionary.py`.
+- Chữ cái đầu được điền sẵn và khóa lại, người chơi chỉ cần gõ phần còn lại của từ (hoặc gõ cả từ cũng được). Gạch nối được bỏ qua (`x-ray` = `xray`).
+- Quên tắt bộ gõ tiếng Việt cũng không sao: Telex biến `xmas` thành `xmá`, `box` thành `bõ`… server tự dịch ngược; nếu không đoán ra thì nhắc tắt bộ gõ.
+- **Thời gian mỗi lượt giảm dần theo từng người**: 30 giây lúc đầu, mỗi từ tự nối đúng bớt 0,5 giây, tới 30 từ thì còn 15 giây và giữ ở đó.
+- **Cứu trợ**: 1 lần mỗi ván, cứ mỗi 30 từ tự nối đúng được thêm 1 lần; bấm là nối hộ luôn (từ nhờ cứu trợ không tính vào số từ tự nối đúng).
+- **Xin cả phòng duyệt** và **chú thích nghĩa tiếng Việt theo từ loại + phiên âm IPA** giống game Nối từ tiếng Việt; dạng biến đổi ghi rõ gốc (`took` → "quá khứ của take").
+- Kho từ **210.987 từ tiếng Anh** chỉ lấy từ nguồn uy tín: **SCOWL** (bộ từ của aspell/hunspell), **ENABLE1**, **WordNet**, **Wiktionary tiếng Việt** và **Từ điển Anh–Việt FVDP** (Hồ Ngọc Đức); bỏ tên riêng và viết tắt. **130.549 mục giải nghĩa** (khoảng 98% từ thông dụng). Chi tiết: `server/data/DEFINITIONS-SOURCES.md`, cách dựng lại: `server/scripts/build-en-dictionary.py`.
 
 **Bầu cua** (1–6 người, xu ảo)
 - Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây. Tiền của mọi người vun thành chồng xu trên từng ô (mỗi người một màu). Hết giờ **máy tự lắc**, không ai lắc tay.
@@ -115,11 +120,11 @@ Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Vi
 ## 4. Test
 
 ```bash
-cd server && npm test        # 141 test: chuẩn hóa, từ điển Việt & Anh, luật 4 game, phòng, Socket.IO
+cd server && npm test        # chuẩn hóa, từ điển Việt & Anh, luật 4 game, giới hạn chọc, hồ sơ, phòng, Socket.IO
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô). Xem đầu file `play.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô), `en-rules.mjs` (Nối từ Anh: gõ Telex, cứu trợ nối hộ, thời gian giảm dần, đổi tên + ảnh giữa ván, giới hạn chọc, bù giờ). Xem đầu file `play.mjs` để biết cách chạy.
 
 ## Nguồn icon và ảnh (Cờ tỷ phú)
 - Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy).

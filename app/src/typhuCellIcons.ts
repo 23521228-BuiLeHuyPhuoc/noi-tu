@@ -1,5 +1,6 @@
 import { TYPHU_BOARD, type TyPhuCell } from '../../shared/src/typhu';
 import { TWEMOJI } from './typhuIcons';
+import { AIRPORT_ICON, RISK_ICON } from './typhuPictos';
 
 /** Mã Twemoji cho từng địa danh / loại ô (xem thư mục app/assets/typhu-icons). */
 const LAND_ICON: Record<string, string> = {
@@ -28,7 +29,7 @@ const LAND_ICON: Record<string, string> = {
 };
 
 const KIND_ICON: Record<string, string> = {
-  start: '1f3c1', jail: '1f694', rest: '1f375', gotojail: '1f46e',
+  start: '1f3c1', jail: '1f694', gotojail: '1f46e',
   chance: '2753', community: '1f381', station: '1f682', tax: '1f4b8',
 };
 
@@ -40,7 +41,8 @@ export function iconCodeOf(c: TyPhuCell): string {
 }
 
 export const iconUri = (code: string): string => TWEMOJI[code];
-export const ICON_BY_CELL: string[] = TYPHU_BOARD.map((c) => iconUri(iconCodeOf(c)));
+// Sân bay và Rủi ro không có trong bộ Twemoji đóng gói: dùng hình tự vẽ
+export const ICON_BY_CELL: string[] = TYPHU_BOARD.map((c) => (c.kind === 'airport' ? AIRPORT_ICON : c.kind === 'community' ? RISK_ICON : iconUri(iconCodeOf(c))));
 export const FX_ICON = {
   coin: iconUri('1fa99'), bag: iconUri('1f4b0'), bill: iconUri('1f4b5'), siren: iconUri('1f6a8'),
   house: iconUri('1f3e0'), hotel: iconUri('1f3e8'), skull: iconUri('1f480'), dice: iconUri('1f3b2'),

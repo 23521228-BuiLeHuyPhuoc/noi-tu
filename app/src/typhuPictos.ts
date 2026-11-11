@@ -19,6 +19,19 @@ const question = (c: string) =>
        <circle cx="34" cy="55" r="6" fill="${c}" stroke-width="3"/></g>`);
 
 const PICTO = {
+  // Máy bay cất cánh, nhìn nghiêng
+  airport: svg(`
+    <path d="M6 52H58" fill="none" stroke-width="3"/>
+    <path d="M10 38L50 22C55 20 60 22 59 26C58 29 55 30 52 31L18 44Z" fill="#E7F5FF"/>
+    <path d="M26 33L20 16L27 14L38 29Z" fill="#339AF0"/>
+    <path d="M30 40L32 50L38 49L40 37Z" fill="#339AF0"/>
+    <path d="M10 38L6 30L11 29L17 36Z" fill="#339AF0"/>
+    <circle cx="46" cy="27" r="1.6" fill="${K}" stroke-width="0"/><circle cx="41" cy="29" r="1.6" fill="${K}" stroke-width="0"/><circle cx="36" cy="31" r="1.6" fill="${K}" stroke-width="0"/>`),
+  // Biển cảnh báo đỏ: ô Rủi ro (thẻ luôn xấu)
+  risk: svg(`
+    <path d="M32 6L60 56H4Z" fill="#FA5252"/>
+    <path d="M32 22V40" fill="none" stroke="#fff" stroke-width="7"/>
+    <circle cx="32" cy="48" r="4" fill="#fff" stroke-width="0"/>`),
   chanceA: question('#F7941D'),
   chanceB: question('#1E90D6'),
   chanceC: question('#D6338A'),
@@ -110,24 +123,27 @@ const PICTO = {
     <path d="M24 10L27 13L24 16L21 13Z" fill="#FFD43B" stroke-width="1.5"/>`),
 };
 
-/** icon theo đúng vị trí trên bàn 40 ô (như bàn cờ in): mỗi ô Cơ hội, Khí vận, ga có kiểu riêng */
+/** icon theo đúng vị trí trên bàn 40 ô (như bàn cờ in): mỗi ô Cơ hội, ga có kiểu riêng */
 const BY_INDEX: Record<number, string> = {
-  0: PACK.goArrow, 2: PACK.chestBottom, 4: PACK.taxIncome, 5: PACK.trainReading, 7: PACK.chancePink,
-  10: PICTO.jail, 12: PACK.bulb, 15: PACK.trainPenn, 17: PACK.chestLeft,
-  20: PACK.car, 22: PACK.chanceBlue, 25: PACK.trainBo, 28: PACK.tap,
-  30: PICTO.gotojail, 33: PACK.chestRight, 35: PACK.trainShort, 36: PACK.chanceOrange, 38: PACK.ring,
+  0: PACK.goArrow, 2: PICTO.risk, 4: PACK.taxIncome, 5: PACK.trainReading, 7: PACK.chancePink,
+  10: PICTO.jail, 12: PACK.bulb, 15: PACK.trainPenn, 17: PICTO.risk,
+  20: PICTO.airport, 22: PACK.chanceBlue, 25: PACK.trainBo, 28: PACK.tap,
+  30: PICTO.gotojail, 33: PICTO.risk, 35: PACK.trainShort, 36: PACK.chanceOrange, 38: PACK.ring,
 };
+/** biểu tượng ô Sân bay và ô Rủi ro (dùng cả ở bảng chi tiết, thẻ rút) */
+export const AIRPORT_ICON = PICTO.airport;
+export const RISK_ICON = PICTO.risk;
 function pictoOf(c: TyPhuCell, i: number): string {
   if (BY_INDEX[i]) return BY_INDEX[i];
   switch (c.kind) {
     case 'chance': return PACK.chanceOrange;
-    case 'community': return PACK.chestBottom;
+    case 'community': return PICTO.risk;
     case 'station': return PACK.trainReading;
     case 'utility': return c.name.includes('nước') ? PACK.tap : PACK.bulb;
     case 'tax': return c.name.includes('xa xỉ') ? PACK.ring : PACK.taxIncome;
     case 'start': return PACK.goArrow;
     case 'jail': return PICTO.jail;
-    case 'rest': return PACK.car;
+    case 'airport': return PICTO.airport;
     case 'gotojail': return PICTO.gotojail;
     default: return '';
   }

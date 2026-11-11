@@ -34,7 +34,7 @@ export interface CenterLayout {
   wealth: Rect[]; chips: Rect; log: Rect;
   /** hàng nút nhỏ (trò chuyện, âm thanh, tổng kết, rời phòng) */
   tools: Rect;
-  /** vùng thẻ Cơ hội/Khí vận lật to, và chỗ thu nhỏ lại */
+  /** vùng thẻ Cơ hội/Rủi ro lật to, và chỗ thu nhỏ lại */
   cardBig: Rect; cardDock: Rect;
   diceSize: number;
   logRows: number;
