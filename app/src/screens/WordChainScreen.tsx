@@ -275,13 +275,11 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
 
 function Definition({ definition, current = false }: { definition?: WordDefinition; current?: boolean }) {
   const text = definition?.text.trim();
-  const source = definition?.source?.trim();
   // server trả câu "Chưa có giải nghĩa" khi thiếu nghĩa: ẩn hẳn khung
   if (!text || text === 'Chưa có giải nghĩa') return null;
   return (
     <View style={[styles.definition, current && styles.currentDefinition]} testID={current ? 'current-definition' : 'history-definition'}>
-      <T numberOfLines={current ? 2 : undefined} style={styles.definitionText}>{text}</T>
-      {source && <T numberOfLines={current ? 1 : undefined} style={styles.definitionSource}>Nguồn: {source}</T>}
+      <T numberOfLines={current ? 3 : undefined} style={styles.definitionText}>{text}</T>
     </View>
   );
 }
@@ -369,7 +367,6 @@ const styles = StyleSheet.create({
   currentDefinition: { backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
   definitionText: { color: C.ink, fontSize: 14, lineHeight: 21 },
   definitionMissing: { color: C.muted, fontStyle: 'italic' },
-  definitionSource: { color: C.muted, fontSize: 12, lineHeight: 18, flexShrink: 1 },
   wordRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 3 },
   wordText: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
   by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right' },
