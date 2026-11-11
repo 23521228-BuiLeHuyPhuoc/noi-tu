@@ -3,6 +3,7 @@
  * ít màu, nhìn rõ ở cỡ nhỏ. Tự vẽ bằng SVG (không dùng hình của hãng nào).
  */
 import { TYPHU_BOARD, type TyPhuCell } from '../../shared/src/typhu';
+import { PACK } from './typhuIconPack';
 
 const K = '#111';
 const svg = (body: string) =>
@@ -110,19 +111,21 @@ const PICTO = {
 };
 
 let chanceCount = 0;
+let trainCount = 0;
+const TRAINS = [PACK.train1, PACK.train2, PACK.train3, PACK.train4];
 function pictoOf(c: TyPhuCell): string {
   switch (c.kind) {
     case 'chance': {
       const n = chanceCount++ % 3;
-      return n === 0 ? PICTO.chanceA : n === 1 ? PICTO.chanceB : PICTO.chanceC;
+      return n === 0 ? PACK.chanceOrange : n === 1 ? PACK.chanceBlue : PACK.chancePink;
     }
-    case 'community': return PICTO.community;
-    case 'station': return PICTO.station;
-    case 'utility': return c.name.includes('nước') ? PICTO.water : PICTO.electric;
-    case 'tax': return c.name.includes('xa xỉ') ? PICTO.taxLuxury : PICTO.taxIncome;
-    case 'start': return PICTO.start;
+    case 'community': return PACK.chest;
+    case 'station': return TRAINS[trainCount++ % 4];
+    case 'utility': return c.name.includes('nước') ? PACK.tap : PACK.bulb;
+    case 'tax': return c.name.includes('xa xỉ') ? PACK.ring : PACK.taxIncome;
+    case 'start': return PACK.goArrow;
     case 'jail': return PICTO.jail;
-    case 'rest': return PICTO.rest;
+    case 'rest': return PACK.car;
     case 'gotojail': return PICTO.gotojail;
     default: return '';
   }

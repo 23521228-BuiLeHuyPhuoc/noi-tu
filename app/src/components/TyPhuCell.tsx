@@ -86,7 +86,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const icon = Math.max(22, Math.min(p.h - cf - 16, p.w * 0.45, 44));
     return (
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={[...frame, styles.cornerCell]}>
-        <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} />
+        <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
         <T numberOfLines={1} adjustsFontSizeToFit style={[styles.cornerName, { fontSize: cf, lineHeight: cf + 3 }]}>{name}</T>
       </Pressable>
     );
@@ -105,7 +105,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const nameSize = horiz ? Math.max(11, Math.min(14, p.w / 6)) : Math.max(11, Math.min(14, p.h * 0.28));
   const priceSize = horiz ? Math.max(13, Math.min(18, p.h * 0.24)) : Math.max(13, Math.min(17, p.h * 0.34));
   const iconSize = horiz ? Math.max(18, Math.min(priceTxt ? 26 : 34, p.h * (priceTxt ? 0.3 : 0.42))) : Math.max(20, Math.min(30, p.h * 0.55));
-  const iconEl = !isLand ? <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} /> : null;
+  const iconEl = !isLand ? <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" /> : null;
 
   return (
     <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
