@@ -576,8 +576,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
               <T>Chủ: {g.owners[detail] ? nameOf(g.owners[detail]) : 'Chưa có'}</T>
               <T>
                 {d.kind === 'station'
-                  ? 'Tiền thuê theo số ga sở hữu: 25 / 50 / 100 / 200 xu.'
-                  : 'Tiền thuê: tổng xúc xắc × 4; sở hữu cả hai công ty: × 10.'}
+                  ? 'Tiền thuê theo số ga sở hữu: 50 / 100 / 200 / 400 xu.'
+                  : 'Tiền thuê: tổng xúc xắc × 8; sở hữu cả hai công ty: × 20.'}
               </T>
               {g.owners[detail] && (
                 <T>
@@ -650,7 +650,8 @@ const RULES = [
   'Đi qua hoặc dừng ở Xuất phát được +200 xu.',
   'Dừng ở đất chưa ai mua: được mua. Dừng ở đất người khác: trả tiền thuê (đủ bộ màu mà đất trống thì thuê x2).',
   'Dừng ở đất của mình: nâng lên đúng 1 cấp (nhà cấp 1 → 2 → 3 → khách sạn). Lần sau dừng lại mới nâng tiếp.',
-  'Ga: thuê 25/50/100/200 theo số ga cùng chủ. Công ty điện, nước: tổng xúc xắc × 4, có cả hai thì × 10.',
+  'Tiền thuê đất trống bằng 3/4 giá đất; mỗi cấp nhà tăng mạnh (cấp 1 x2, cấp 2 x4, cấp 3 x6, khách sạn x9).',
+  'Ga: thuê 50/100/200/400 theo số ga cùng chủ. Công ty điện, nước: tổng xúc xắc × 8, có cả hai thì × 20.',
   'Thuế và tiền phạt dồn vào hũ ở ô Nghỉ chân; ai dừng ở đó ăn cả hũ.',
   'Vào tù: đổ đôi để ra (đi luôn nhưng không tung thêm), hoặc trả 50 xu trước khi đổ; ngồi đủ 3 lượt thì trả 50 rồi đi.',
   'Thiếu tiền: tự bán nhà rồi bán đất với nửa giá. Vẫn thiếu thì phá sản; nợ người chơi thì người đó nhận hết đất.',
@@ -676,7 +677,7 @@ function DecisionCard(p: {
     const rows: [string, number | string][] = c.kind === 'land'
       ? [['Đất trống', c.rent], ['Đủ bộ màu', c.rent * 2], ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn' : `Nhà cấp ${k + 1}`, c.rent * m] as [string, number])]
       : c.kind === 'station' ? [1, 2, 3, 4].map((n) => [`Có ${n} ga`, stationRent(n)] as [string, number])
-      : [['Có 1 công ty', 'xúc xắc × 4'], ['Có 2 công ty', 'xúc xắc × 10']];
+      : [['Có 1 công ty', 'xúc xắc × 8'], ['Có 2 công ty', 'xúc xắc × 20']];
     const afford = (g.cash[p.me] ?? 0) >= c.price;
     return (
       <View style={dc.wrap} pointerEvents="box-none">

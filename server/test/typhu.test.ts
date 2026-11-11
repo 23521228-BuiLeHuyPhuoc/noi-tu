@@ -82,8 +82,8 @@ describe('Cờ tỷ phú V2', () => {
  });
  it('charges land rent and allows full-group construction', () => {
   const {g,v,own,settle}=make(['An','Bình'],[1,2]); own([1,3],'p1');
-  g.action('p0',{type:'roll'});settle();expect(v().cash.p0).toBe(1488);
-  expect(rentOf(3,2,true)).toBe(90);
+  g.action('p0',{type:'roll'});settle();expect(v().cash.p0).toBe(1410);
+  expect(rentOf(3,2,true)).toBe(180);
   // nâng cấp kiểu Cờ tỷ phú Việt: dừng ở đất của mình thì được xây ngay tại ô đó, không cần đủ bộ
   const b=make(['An','Bình'],[1,2]);b.own([3],'p0');expect(b.g.action('p0',{type:'build',cell:3}).ok).toBe(false);
   b.g.action('p0',{type:'roll'});b.settle();expect(b.v().step).toBe('upgrade');expect(b.v().pendingBuy).toBe(3);
@@ -91,11 +91,11 @@ describe('Cờ tỷ phú V2', () => {
   expect(b.v().houses[3]).toBe(1);expect(b.v().cash.p0).toBe(1450);
  });
  it('buys stations and utilities and scales their rent by owned count', () => {
-  expect([1,2,3,4].map(stationRent)).toEqual([25,50,100,200]);expect(utilityRent(2,7)).toBe(70);
+  expect([1,2,3,4].map(stationRent)).toEqual([50,100,200,400]);expect(utilityRent(2,7)).toBe(140);
   const a=make(['An','Bình'],[2,3]); a.g.action('p0',{type:'roll'});a.settle();
   expect(a.v().pendingBuy).toBe(5); a.g.action('p0',{type:'buy'});expect(a.v().cash.p0).toBe(1300);
-  const b=make(['An','Bình'],[2,3]);b.own([5,15,25],'p1');b.g.action('p0',{type:'roll'});b.settle();expect(b.v().cash.p0).toBe(1400);
-  const c=make(['An','Bình'],[3,4]);c.pl(0).pos=5;c.own([12,28],'p1');c.g.action('p0',{type:'roll'});c.settle();expect(c.v().cash.p0).toBe(1430);
+  const b=make(['An','Bình'],[2,3]);b.own([5,15,25],'p1');b.g.action('p0',{type:'roll'});b.settle();expect(b.v().cash.p0).toBe(1300);
+  const c=make(['An','Bình'],[3,4]);c.pl(0).pos=5;c.own([12,28],'p1');c.g.action('p0',{type:'roll'});c.settle();expect(c.v().cash.p0).toBe(1360);
   expect(c.g.action('p0',{type:'build',cell:12}).ok).toBe(false);
  });
  it('draws community cards separately and preserves doubles', () => {

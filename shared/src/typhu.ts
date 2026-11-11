@@ -26,7 +26,8 @@ export const TYPHU_GROUPS: Record<TyPhuGroup, { color: string; house: number; na
 };
 
 const land = (name: string, group: TyPhuGroup, price: number): TyPhuCell => ({
-  kind: 'land', name, group, price, rent: Math.round(price / 10),
+  // tiền thuê đất trống = 3/4 giá đất (Cần Thơ 60 -> 45, Sài Gòn 400 -> 300): đi vào đất người khác là đau
+  kind: 'land', name, group, price, rent: Math.round((price * 3) / 4),
 });
 
 /** 40 ô theo chiều kim đồng hồ, bắt đầu từ góc dưới-phải (4 góc + 9 ô mỗi cạnh), thứ tự như bàn cờ in cổ điển. */
@@ -92,8 +93,8 @@ export const TYPHU_ROLL_MAX_MS = 2100;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
   return cell.kind === 'land' || cell.kind === 'station' || cell.kind === 'utility';
 }
-export function stationRent(count: number): number { return count > 0 ? 25 * 2 ** (count - 1) : 0; }
-export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 10 : 4) : 0; }
+export function stationRent(count: number): number { return count > 0 ? 50 * 2 ** (count - 1) : 0; }
+export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 20 : 8) : 0; }
 
 export const TYPHU_SIZE = TYPHU_BOARD.length;
 export const TYPHU_JAIL = 10;
@@ -107,7 +108,7 @@ export const TYPHU_MAX_HOUSES = 4; // 4 = khách sạn
 export const TYPHU_TURN_SECONDS = 20;
 export const TYPHU_SPEEDS = [1, 2, 3] as const;
 /** hệ số tiền thuê theo số nhà (1..4) */
-export const TYPHU_HOUSE_MULT = [5, 15, 30, 45];
+export const TYPHU_HOUSE_MULT = [2, 4, 6, 9];
 
 export function groupCells(group: TyPhuGroup): number[] {
   return TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && c.group === group ? [i] : []));

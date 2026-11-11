@@ -130,6 +130,7 @@ function playAudited(n: number, seed: number) {
       }
     }
     if (!dbl || inJail) doublesInRow[cur] = 0;
+    if (r.bankrupt.includes(cur)) expectMove = false; // phá sản vì tiền phạt ra tù thì không đi nữa
     if (expectMove) {
       const m = r.movement;
       if (!m || m.kind !== 'roll') fail(`đổ ${sum} mà không đi`);

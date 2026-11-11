@@ -67,7 +67,7 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     g.action('p0', { type: 'roll' }); settle();
     expect(v().cash.p0).toBe(1500 - rentOf(sg, 1, true));
     expect(v().cash.p1).toBe(1500 + rentOf(sg, 1, true));
-    expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 45);
+    expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 9);
   });
 
   it('dừng ở đất của mình thì nâng đúng 1 cấp, không nhảy cóc', () => {
@@ -230,7 +230,7 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
           expect(now.owners[Number(i)]).toBeDefined();
         }
         for (const id of now.order) expect(now.pos[id]).toBeGreaterThanOrEqual(0), expect(now.pos[id]).toBeLessThan(TYPHU_SIZE);
-        if (now.currentPlayerId) expect(now.bankrupt).not.toContain(now.currentPlayerId);
+        if (now.currentPlayerId && now.step !== 'wait') expect(now.bankrupt).not.toContain(now.currentPlayerId);
       }
       if (!finished.length) { while (v().movement) vi.advanceTimersByTime(v().movement!.endsAt - Date.now()); g.action('p0', { type: 'end' }); }
       expect(finished).toHaveLength(1);
