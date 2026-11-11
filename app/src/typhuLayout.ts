@@ -37,6 +37,8 @@ export interface CenterLayout {
   wide: boolean;
   header: Rect; banner: Rect; action: Rect;
   wealth: Rect[]; chips: Rect; log: Rect;
+  /** hàng nút nhỏ (trò chuyện, âm thanh, tổng kết, rời phòng) */
+  tools: Rect;
   /** vùng thẻ Cơ hội/Khí vận lật to, và chỗ thu nhỏ lại */
   cardBig: Rect; cardDock: Rect;
   diceSize: number;
@@ -72,39 +74,35 @@ export function makeCenterLayout(w: number, h: number, n: number, hasCard: boole
     const log: Rect = { x: pad, y: logY, w: inner, h: Math.max(0, h - pad - logY) };
     const bigY = action.y + action.h + gap;
     return {
-      wide, header, banner, action, wealth, chips, log,
+      wide, header, banner, action, wealth, chips, log, tools: { x: pad, y: pad, w: inner, h: 0 },
       cardBig: { x: pad, y: bigY, w: inner, h: Math.max(90, h - pad - bigY) },
       cardDock: { x: pad, y: chips.y + chips.h + gap, w: inner, h: dock - 3 },
       diceSize: Math.round(Math.min(actionH - 20, (inner * 0.52 - 8) / 2, 76)),
       logRows: Math.max(0, Math.min(6, Math.floor(log.h / ROW))),
     };
   }
-  // màn ngang: 3 cột — [xúc xắc + nút] [tên game, lượt chơi, diễn biến] [tiền từng người, đất của bạn]
-  const c1w = Math.round(w * 0.34);
-  const c2x = pad + c1w + gap;
-  const c2w = Math.round(w * 0.31);
-  const c3x = c2x + c2w + gap;
-  const c3w = w - c3x - pad;
-  const action: Rect = { x: pad, y: pad, w: c1w, h: h - 2 * pad };
-  const header: Rect = { x: c2x, y: pad, w: c2w, h: 26 };
-  const banner: Rect = { x: c2x, y: header.y + header.h + gap, w: c2w, h: 50 };
-  // ≤3 người: mỗi người một dòng cho đủ chỗ tên; đông hơn thì 2 cột
+  // màn ngang: giữa bàn chỉ có khay xúc xắc (trái) + tiền mọi người (phải); hàng nút nhỏ ở góc trên phải
+  const none: Rect = { x: 0, y: 0, w: 0, h: 0 };
+  const lw = Math.round(w * 0.5);
+  const action: Rect = { x: pad, y: pad, w: lw, h: h - 2 * pad };
+  const rx = pad + lw + gap * 2;
+  const rw = w - rx - pad;
+  const tools: Rect = { x: rx, y: pad, w: rw, h: 30 };
+  const top = tools.y + tools.h + gap;
   const cols = n <= 3 ? 1 : 2;
   const rows = Math.ceil(n / cols);
-  const cardH = n > 4 ? 32 : n > 3 ? 38 : 36;
-  const cardW = (c3w - gap * (cols - 1)) / cols;
+  const cardH = Math.min(50, (h - pad - top - 4 * (rows - 1)) / rows);
+  const cardW = (rw - gap * (cols - 1)) / cols;
+  const blockH = rows * cardH + (rows - 1) * 4;
+  const y0 = top + Math.max(0, (h - pad - top - blockH) / 2);
   const wealth: Rect[] = Array.from({ length: n }, (_, i) => ({
-    x: c3x + (i % cols) * (cardW + gap), y: pad + Math.floor(i / cols) * (cardH + 4), w: cardW, h: cardH,
+    x: rx + (i % cols) * (cardW + gap), y: y0 + Math.floor(i / cols) * (cardH + 4), w: cardW, h: cardH,
   }));
-  const wealthH = rows * cardH + (rows - 1) * 4;
-  const chips: Rect = { x: c3x, y: pad + wealthH + gap, w: c3w, h: Math.max(40, h - 2 * pad - wealthH - gap) };
-  const logY = banner.y + banner.h + gap + dock;
-  const log: Rect = { x: c2x, y: logY, w: c2w, h: Math.max(0, h - pad - logY) };
   return {
-    wide, header, banner, action, wealth, chips, log,
-    cardBig: { x: c2x, y: pad, w: w - c2x - pad, h: h - 2 * pad },
-    cardDock: { x: c2x, y: banner.y + banner.h + gap, w: c2w, h: dock - 3 },
+    wide, header: none, banner: none, action, wealth, chips: none, log: none, tools,
+    cardBig: { x: pad, y: pad, w: w - 2 * pad, h: h - 2 * pad },
+    cardDock: none,
     diceSize: 0,
-    logRows: Math.max(0, Math.min(4, Math.floor(log.h / ROW))),
+    logRows: 0,
   };
 }

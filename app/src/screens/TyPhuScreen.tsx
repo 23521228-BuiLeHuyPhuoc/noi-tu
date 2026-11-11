@@ -365,6 +365,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       wide
       fullscreen
       hideStrip
+      bare
       overlay={activeAnn ? <TyPhuAnnounce a={activeAnn} now={now} W={width} H={height} /> : undefined}
       scroll={false}
       game={game}

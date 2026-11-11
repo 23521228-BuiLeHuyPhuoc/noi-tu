@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { GAME_INFO, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
@@ -23,9 +23,21 @@ export interface StripOptions {
   order?: string[];
 }
 
+/** Các nút chung (trò chuyện, âm thanh, rời phòng) cho màn tự vẽ thanh công cụ (vd: Cờ tỷ phú, bỏ thanh trên) */
+export interface ShellTools {
+  openChat: () => void;
+  unread: number;
+  muted: boolean;
+  toggleMute: () => void;
+  leave: () => void;
+  openPlayer: (id: string) => void;
+}
+const ToolsCtx = createContext<ShellTools | null>(null);
+export const useShellTools = () => useContext(ToolsCtx);
+
 /** Khung chung cho mọi màn trong phòng: thanh trên, hàng avatar, nội dung, vùng nút dưới cùng */
 export function Shell({
-  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false,
+  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false, bare = false,
 }: {
   game: Game;
   room: RoomState;
@@ -39,6 +51,8 @@ export function Shell({
   wide?: boolean;
   /** Chế độ toàn màn hình cho bàn Cờ tỷ phú: gọn thanh trên để bàn cờ choán trọn màn hình. */
   fullscreen?: boolean;
+  /** bỏ hẳn thanh trên + hàng avatar; màn tự đặt nút qua useShellTools() */
+  bare?: boolean;
   /** Ẩn hàng avatar (màn thấp: nhường chỗ cho bàn cờ, thông tin người chơi nằm trong bàn) */
   hideStrip?: boolean;
 }) {
@@ -91,7 +105,16 @@ export function Shell({
   ));
 
   return (
+    <ToolsCtx.Provider value={{
+      openChat: () => setChatOpen(true),
+      unread,
+      muted,
+      toggleMute: () => { setMuted(!muted); setMutedState(!muted); },
+      leave: () => setLeaving(true),
+      openPlayer: (id) => { const pl = room.players.find((x) => x.id === id); if (pl && id !== game.me) setTarget(pl); },
+    }}>
     <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
+      {!bare && (<>
       <View style={[styles.top, compactLandscape && styles.topLandscape]}>
         <Button
           testID="room-chip"
@@ -143,6 +166,7 @@ export function Shell({
           {stripItems}
         </ScrollView>
       )}
+      </>)}
 
       {meIsSpectator && (
         <View testID="spectator-banner" style={styles.spectatorBanner}>
@@ -179,6 +203,7 @@ export function Shell({
         </Sheet>
       )}
     </View>
+    </ToolsCtx.Provider>
   );
 }
 

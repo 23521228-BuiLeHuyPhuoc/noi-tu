@@ -4,7 +4,8 @@ import { TYPHU_BOARD, TYPHU_GROUPS, TYPHU_MAX_HOUSES, isTyPhuProperty } from '..
 import { C } from '../theme';
 import { T } from '../ui';
 import { shortCellName } from '../typhuNames';
-import { FX_ICON, ICON_BY_CELL } from '../typhuCellIcons';
+import { FX_ICON } from '../typhuCellIcons';
+import { PICTO_BY_CELL as ICON_BY_CELL } from '../typhuPictos';
 import type { BandSide } from '../typhuLayout';
 
 export interface TyPhuCellProps {
@@ -103,7 +104,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     : p.side === 'left' ? { paddingLeft: bt } : { paddingRight: bt };
   const nameSize = horiz ? Math.max(11, Math.min(14, p.w / 6)) : Math.max(11, Math.min(14, p.h * 0.28));
   const priceSize = horiz ? Math.max(13, Math.min(18, p.h * 0.24)) : Math.max(13, Math.min(17, p.h * 0.34));
-  const iconSize = horiz ? Math.max(14, Math.min(22, p.h * 0.26)) : Math.max(16, Math.min(24, p.h * 0.5));
+  const iconSize = horiz ? Math.max(18, Math.min(priceTxt ? 26 : 34, p.h * (priceTxt ? 0.3 : 0.42))) : Math.max(20, Math.min(30, p.h * 0.55));
   const iconEl = !isLand ? <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} /> : null;
 
   return (

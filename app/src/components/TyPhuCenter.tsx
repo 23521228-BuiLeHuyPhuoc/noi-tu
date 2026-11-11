@@ -9,6 +9,7 @@ import { FX_ICON, ICON_BY_CELL, iconUri } from '../typhuCellIcons';
 import { shortCellName } from '../typhuNames';
 import type { CenterLayout, Rect } from '../typhuLayout';
 import type { DiceRollView, ThrowImpulse } from '../../../shared/src/dice';
+import { useShellTools } from './Shell';
 import { TyPhuDice3D } from './TyPhuDice3D';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
@@ -55,6 +56,15 @@ export interface CenterProps {
   onPlayer: (id: string) => void;
 }
 
+function MiniBtn({ icon, label, onPress, testID, badge }: { icon: string; label: string; onPress: () => void; testID?: string; badge?: number }) {
+  return (
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6} style={styles.mini}>
+      <T style={{ fontSize: 15 }}>{icon}</T>
+      {!!badge && badge > 0 && <View style={styles.miniBadge}><T style={styles.miniBadgeTxt}>{badge > 9 ? '9+' : badge}</T></View>}
+    </Pressable>
+  );
+}
+
 function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps }) {
   const { g } = p;
   const color = p.colorOf(id);
@@ -75,7 +85,7 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
       ]}
     >
       <View style={{ width: rect.h - 4, height: rect.h - 4 }}>
-        <View style={[styles.wAvatar, { borderColor: color, backgroundColor: p.lightColorOf(id), width: rect.h - 8, height: rect.h - 8, borderRadius: rect.h }]}>
+        <View testID={`avatar-${id}`} style={[styles.wAvatar, { borderColor: color, backgroundColor: p.lightColorOf(id), width: rect.h - 8, height: rect.h - 8, borderRadius: rect.h }]}>
           <Image source={{ uri: p.portraitUriOf(id) }} style={{ width: '100%', height: '100%' }} />
         </View>
       </View>
@@ -196,12 +206,24 @@ export function TyPhuCenter(p: CenterProps) {
   const timeTotal = Math.max(1, g.turnSeconds);
   const hot = !p.paused && p.left <= 5;
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
-  const trayH = L.action.h - 44;
+  const tools = useShellTools();
+  const statusH = L.wide ? 30 : 0;
+  const trayH = L.action.h - 44 - statusH;
   const canThrow = showRoll && !p.dice.animating;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* hàng nút nhỏ thay cho thanh trên cùng */}
+      {L.tools.h > 0 && tools && (
+        <View style={[abs(L.tools), styles.tools]}>
+          <MiniBtn testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
+          <MiniBtn label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
+          {p.isHost && <MiniBtn testID="end-open" label="Tổng kết" icon="🏁" onPress={p.onEnd} />}
+          <MiniBtn testID="leave-open" label="Rời phòng" icon="🚪" onPress={tools.leave} />
+        </View>
+      )}
+
       {/* đầu: tên game + nút phụ */}
-      <View style={[abs(L.header), styles.head]}>
+      {L.header.h > 0 && <View style={[abs(L.header), styles.head]}>
         <Image source={{ uri: FX_ICON.bag }} style={{ width: 18, height: 18 }} />
         <T numberOfLines={1} style={styles.logo}>{L.wide ? 'TỶ PHÚ' : 'TỶ PHÚ XÓM LẦY'}</T>
         <View style={{ flex: 1 }} />
@@ -210,10 +232,10 @@ export function TyPhuCenter(p: CenterProps) {
             <T style={styles.miniTxt}>Tổng kết</T>
           </Pressable>
         )}
-      </View>
+      </View>}
 
       {/* người đang chơi */}
-      <View style={[abs(L.banner), styles.banner, { borderColor: cur ? p.colorOf(cur) : C.ink }]}>
+      {L.banner.h > 0 && <View style={[abs(L.banner), styles.banner, { borderColor: cur ? p.colorOf(cur) : C.ink }]}>
         {cur && (
           <View style={[styles.bAvatar, { borderColor: p.colorOf(cur), backgroundColor: p.lightColorOf(cur) }]}>
             <Image source={{ uri: p.portraitUriOf(cur) }} style={{ width: '100%', height: '100%' }} />
@@ -228,10 +250,19 @@ export function TyPhuCenter(p: CenterProps) {
             <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
           </View>
         </View>
-      </View>
+      </View>}
 
       {/* khay xúc xắc 3D + nút hành động */}
       <View style={[abs(L.action), styles.actionBox]}>
+        {L.wide && (
+          <View style={[styles.statusRow, { height: statusH - 4 }]}>
+            <T testID="typhu-status" numberOfLines={1} style={[styles.status, { flex: 1 }, p.myTurn && { color: '#C2410C' }]}>{p.status}</T>
+            <View style={[styles.track, { width: 80, minWidth: 80, flexGrow: 0, flexShrink: 0 }]}>
+              <View style={{ height: '100%', width: `${p.paused ? 100 : clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
+            </View>
+            <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
+          </View>
+        )}
         <View
           testID={`dice-phase-${p.dice.phase}`}
           accessibilityLabel={`Xúc xắc: ${p.dice.phase}`}
@@ -276,7 +307,7 @@ export function TyPhuCenter(p: CenterProps) {
         <PlayerCard key={id} id={id} rect={L.wealth[i]} p={p} />
       ))}
 
-      <MyLands rect={L.chips} p={p} />
+      {L.chips.h > 0 && <MyLands rect={L.chips} p={p} />}
 
       {/* diễn biến gần nhất */}
       {L.log.h > 20 && (
@@ -297,6 +328,11 @@ export function TyPhuCenter(p: CenterProps) {
 }
 
 const styles = StyleSheet.create({
+  tools: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6 },
+  mini: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center' },
+  miniBadge: { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, borderWidth: 1.5, borderColor: C.ink, alignItems: 'center', justifyContent: 'center' },
+  miniBadgeTxt: { fontSize: 9, fontWeight: '900' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   logo: { fontWeight: '900', fontSize: 14, color: C.son, letterSpacing: 0.6 },
   miniBtn: {
