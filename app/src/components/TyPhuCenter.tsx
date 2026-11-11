@@ -3,6 +3,8 @@ import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL_FINE, liquidValueOf, type TyPhuGroup,
 } from '../../../shared/src/typhu';
 import type { TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
+import { doodleUri } from '../avatars';
+import { useFace } from '../funState';
 import { C } from '../theme';
 import { Button, T } from '../ui';
 import { FX_ICON, ICON_BY_CELL, iconUri } from '../typhuCellIcons';
@@ -72,6 +74,7 @@ function MiniBtn({ icon, label, onPress, testID, badge }: { icon: string; label:
 
 function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps }) {
   const { g } = p;
+  const face = useFace(id);
   const color = p.colorOf(id);
   const out = g.bankrupt.includes(id);
   const cur = id === g.currentPlayerId;
@@ -79,6 +82,8 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   const fl = p.flash[id];
   const rc = p.reacts?.[id];
   const showRc = rc && p.now >= rc.from && p.now < rc.until;
+  const wobbleDeg = face.wobble === 'spin' ? `${Math.round(Math.sin(p.now / 65) * 28)}deg` : face.wobble ? `${Math.round(Math.sin(p.now / 35) * 14)}deg` : '0deg';
+  const wobbleX = face.wobble ? Math.round(Math.cos(p.now / 40) * 4) : 0;
   return (
     <>
     <Pressable
@@ -93,8 +98,24 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
       ]}
     >
       <View style={{ width: rect.h - 4, height: rect.h - 4 }}>
-        <View testID={`avatar-${id}`} style={[styles.wAvatar, { borderColor: color, backgroundColor: p.lightColorOf(id), width: rect.h - 8, height: rect.h - 8, borderRadius: rect.h }]}>
+        <View
+          testID={`avatar-${id}`}
+          style={[
+            styles.wAvatar,
+            {
+              borderColor: color,
+              backgroundColor: p.lightColorOf(id),
+              width: rect.h - 8,
+              height: rect.h - 8,
+              borderRadius: rect.h,
+              transform: [{ translateX: wobbleX }, { rotate: wobbleDeg }],
+            },
+          ]}
+        >
           <Image source={{ uri: p.portraitUriOf(id) }} style={{ width: '100%', height: '100%' }} />
+          {face.doodle && (
+            <Image testID={`doodle-${id}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} resizeMode="cover" />
+          )}
         </View>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>

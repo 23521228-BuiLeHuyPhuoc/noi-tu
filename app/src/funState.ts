@@ -7,10 +7,13 @@ import type { DoodleKind, Mood, NicknameId } from '../../shared/src/types';
 
 type Entry<T> = { value: T; until: number };
 
+export type WobbleKind = 'spin' | 'shake' | 'blackout';
+
 const mood = new Map<string, Entry<Mood>>();
 const doodle = new Map<string, Entry<DoodleKind>>();
 const nick = new Map<string, Entry<NicknameId>>();
 const charm = new Map<string, Entry<true>>();
+const wobble = new Map<string, Entry<WobbleKind>>();
 
 let version = 0;
 const listeners = new Set<() => void>();
@@ -36,6 +39,7 @@ export const setMood = (id: string, m: Mood, ms = 3000) => put(mood, id, m, ms);
 export const setDoodle = (id: string, d: DoodleKind, ms: number) => put(doodle, id, d, ms);
 export const setNick = (id: string, n: NicknameId, ms: number) => put(nick, id, n, ms);
 export const setCharm = (id: string, ms: number) => put(charm, id, true, ms);
+export const setWobble = (id: string, w: WobbleKind, ms = 3000) => put(wobble, id, w, ms);
 
 const live = <T,>(map: Map<string, Entry<T>>, id: string): T | undefined => {
   const e = map.get(id);
@@ -50,10 +54,16 @@ function subscribe(cb: () => void) {
 }
 const snapshot = () => version;
 
-export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean };
+export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean; wobble?: WobbleKind };
 
-/** Tâm trạng/hình vẽ/biệt danh/bùa còn hiệu lực của một người; component tự vẽ lại khi có đổi hoặc hết hạn */
+/** Tâm trạng/hình vẽ/biệt danh/bùa/rung xoay còn hiệu lực của một người; component tự vẽ lại khi có đổi hoặc hết hạn */
 export function useFace(id: string): Face {
   useSyncExternalStore(subscribe, snapshot, snapshot);
-  return { mood: live(mood, id) ?? 'normal', doodle: live(doodle, id), nick: live(nick, id), charm: !!live(charm, id) };
+  return {
+    mood: live(mood, id) ?? 'normal',
+    doodle: live(doodle, id),
+    nick: live(nick, id),
+    charm: !!live(charm, id),
+    wobble: live(wobble, id),
+  };
 }

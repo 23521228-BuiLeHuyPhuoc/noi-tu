@@ -183,4 +183,7 @@ export const quip = {
   honk: (a: string, b: string) => `📢 ${a} bật loa vào máy ${b}`,
   cry: (a: string, b: string) => `😭 ${a} khóc thuê hộ ${b}`,
   charm: (a: string) => `✨ ${a} xin vía, đang tỏa hào quang`,
+  blackout: (a: string, b: string) => `🔌 ${a} dập cầu dao, sụp nguồn sáng máy ${b}!`,
+  spin: (a: string, b: string) => `🌀 ${a} xoay mòng mòng màn hình của ${b}!`,
+  quake: (a: string, b: string) => `🌋 ${a} tạo động đất rung lắc máy ${b}!`,
 };

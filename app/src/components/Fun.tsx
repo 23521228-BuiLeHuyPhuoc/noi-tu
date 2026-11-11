@@ -11,7 +11,7 @@ import {
 import type { Game } from '../useGame';
 import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '../messages';
 import { ROACH_URI } from '../avatars';
-import { setCharm, setDoodle, setMood, setNick } from '../funState';
+import { setCharm, setDoodle, setMood, setNick, setWobble } from '../funState';
 import { ViewportContext, useKeyboardInset, useOnNew } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
@@ -21,21 +21,80 @@ import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { STICKERS, stickerOf } from '../stickers';
 
-// ---------- Lắc màn hình ----------
+// ---------- Lắc & Xoay màn hình ----------
 
-const ShakeCtx = createContext<() => void>(() => {});
+export type ShakeMode = 'normal' | 'quake' | 'spin';
+const ShakeCtx = createContext<(mode?: ShakeMode) => void>(() => {});
 export const useShake = () => useContext(ShakeCtx);
 
 export function ShakeProvider({ children }: { children: ReactNode }) {
   const x = useState(() => new Animated.Value(0))[0];
-  const shake = useCallback(() => {
+  const y = useState(() => new Animated.Value(0))[0];
+  const rot = useState(() => new Animated.Value(0))[0];
+
+  const shake = useCallback((mode: ShakeMode = 'normal') => {
+    x.stopAnimation();
+    y.stopAnimation();
+    rot.stopAnimation();
+    if (mode === 'spin') {
+      // Xoay qua xoay lại lắc lư rồi lộn vòng 180° -> 360° cực ức chế
+      Animated.sequence([
+        Animated.timing(rot, { toValue: -28, duration: 180, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 32, duration: 240, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: -42, duration: 240, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 180, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 162, duration: 220, useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 198, duration: 220, useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 180, duration: 200, useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 375, duration: 560, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 350, duration: 180, useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 365, duration: 150, useNativeDriver: false }),
+        Animated.timing(rot, { toValue: 360, duration: 120, useNativeDriver: false }),
+      ]).start(() => rot.setValue(0));
+      return;
+    }
+    if (mode === 'quake') {
+      // Động đất rung lắc dữ dội cả ngang, dọc và nghiêng màn hình
+      const steps: [number, number, number][] = [
+        [18, -14, 3.8], [-20, 15, -4.2], [17, 13, 3.5], [-18, -15, -3.8],
+        [16, -12, 3.2], [-15, 14, -3.0], [14, -10, 2.6], [-13, 11, -2.4],
+        [11, -9, 2.0], [-10, 8, -1.8], [8, -6, 1.4], [-7, 5, -1.1],
+        [5, -4, 0.7], [-3, 2, -0.4], [0, 0, 0],
+      ];
+      Animated.sequence(
+        steps.map(([dx, dy, dr]) =>
+          Animated.parallel([
+            Animated.timing(x, { toValue: dx, duration: 55, useNativeDriver: false }),
+            Animated.timing(y, { toValue: dy, duration: 55, useNativeDriver: false }),
+            Animated.timing(rot, { toValue: dr, duration: 55, useNativeDriver: false }),
+          ]),
+        ),
+      ).start();
+      return;
+    }
     Animated.sequence(
-      [10, -10, 8, -8, 4, 0].map((v) => Animated.timing(x, { toValue: v, duration: 45, useNativeDriver: false })),
+      [
+        [11, -4, 1.2], [-11, 4, -1.2], [9, -3, 0.9], [-9, 3, -0.9], [5, -2, 0.4], [0, 0, 0],
+      ].map(([dx, dy, dr]) =>
+        Animated.parallel([
+          Animated.timing(x, { toValue: dx, duration: 45, useNativeDriver: false }),
+          Animated.timing(y, { toValue: dy, duration: 45, useNativeDriver: false }),
+          Animated.timing(rot, { toValue: dr, duration: 45, useNativeDriver: false }),
+        ]),
+      ),
     ).start();
-  }, [x]);
+  }, [x, y, rot]);
+
+  const rotateDeg = rot.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['-360deg', '360deg'],
+  });
+
   return (
     <ShakeCtx.Provider value={shake}>
-      <Animated.View style={{ flex: 1, transform: [{ translateX: x }] }}>{children}</Animated.View>
+      <Animated.View style={{ flex: 1, transform: [{ translateX: x }, { translateY: y }, { rotate: rotateDeg }] }}>
+        {children}
+      </Animated.View>
     </ShakeCtx.Provider>
   );
 }
@@ -294,6 +353,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const nice = e.item === 'hoa' || e.item === 'tim';
         const hit = () => {
           setMood(e.to, nice ? 'smug' : 'shock', 2200);
+          if (!nice) setWobble(e.to, 'shake', 1400);
           play(nice ? 'coin' : 'splat');
           if (toR) add({ kind: 'splat', emoji, at: toR });
           if (toMe) {
@@ -315,6 +375,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         else feed(`${from}: ${text}`, 'fun');
       } else if (e.kind === 'poke') {
         setMood(e.to, 'angry', 2500);
+        setWobble(e.to, 'shake', 1800);
         if (toMe) {
           vibrate(400);
           shake();
@@ -331,11 +392,12 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const damage = e.damage ?? 0;
         const land = () => {
           setMood(e.to, 'dizzy', 3000);
+          setWobble(e.to, e.ko || e.move === 'chuong' ? 'spin' : 'shake', e.ko ? 2800 : 1800);
           play(e.ko ? 'ko' : 'punch');
           if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
           if (toMe) {
             vibrate(e.ko ? [200, 80, 300] : 150);
-            shake();
+            shake(e.ko ? 'quake' : 'normal');
           }
           if (e.ko) feed(`💥 ${from} hạ đo ván ${toMe ? 'bạn' : nameOf(e.to)}! (hồi đầy máu)`, toMe ? 'bad' : 'fun');
           else if (toMe) feed(`${from} ${move.name.toLowerCase()} bạn ${move.emoji} -${damage} máu`, 'bad');
@@ -353,6 +415,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         play('pop');
         feed(quip.nick(from, toMe ? 'bạn' : nameOf(e.to), nickText(e.nick)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'honk') {
+        setWobble(e.to, 'shake', 1400);
         if (toMe) {
           play(['honk', 'fart', 'boing'][e.variant ?? 0] as 'honk' | 'fart' | 'boing');
           vibrate(120);
@@ -370,6 +433,31 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         if (fromR) add({ kind: 'float', emoji: '✨', at: fromR });
         play('sparkle');
         feed(quip.charm(from === 'bạn' ? 'Bạn' : from), 'fun');
+      } else if (e.kind === 'spin') {
+        setMood(e.to, 'dizzy', 3600);
+        setWobble(e.to, 'spin', 3600);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
+        if (toR) add({ kind: 'float', emoji: '🌀', at: toR });
+        play('spin');
+        if (toMe) {
+          vibrate([120, 60, 180, 60, 140]);
+          shake('spin');
+        }
+        feed(quip.spin(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
+      } else if (e.kind === 'quake') {
+        setMood(e.to, 'shock', 2800);
+        setWobble(e.to, 'shake', 2800);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
+        if (toR) add({ kind: 'float', emoji: '🌋', at: toR });
+        play('quake');
+        if (toMe) {
+          vibrate([180, 50, 220, 50, 180]);
+          shake('quake');
+        }
+        feed(quip.quake(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
+      } else if (e.kind === 'blackout') {
+        setMood(e.to, 'shock', 4200);
+        setWobble(e.to, 'blackout', 4200);
       }
     });
   }, [game, add, feed, shake, say]);
@@ -513,9 +601,65 @@ function InkSplash({ corner, size, onDone: finish }: { corner: number; size: Siz
   );
 }
 
-type Troll = { id: number } & ({ kind: 'roach' } | { kind: 'ink'; corner: number });
+/** Sụp nguồn sáng (cúp điện): nhấp nháy bóng đèn rồi tối sầm màn hình ~4 giây, bấm bật cầu dao để sáng ngay */
+function BlackoutSplash({ onDone: finish }: { onDone: () => void }) {
+  const doneRef = useRef(finish);
+  useEffect(() => { doneRef.current = finish; }, [finish]);
+  const onDone = useCallback(() => doneRef.current(), []);
+  const alpha = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    const anim = Animated.sequence([
+      Animated.timing(alpha, { toValue: 0.92, duration: 70, useNativeDriver: false }),
+      Animated.timing(alpha, { toValue: 0.25, duration: 65, useNativeDriver: false }),
+      Animated.timing(alpha, { toValue: 0.97, duration: 80, useNativeDriver: false }),
+      Animated.timing(alpha, { toValue: 0.4, duration: 60, useNativeDriver: false }),
+      Animated.timing(alpha, { toValue: 0.96, duration: 110, useNativeDriver: false }),
+      Animated.delay(3200),
+      Animated.timing(alpha, { toValue: 0, duration: 420, useNativeDriver: false }),
+    ]);
+    anim.start(({ finished }) => finished && onDone());
+    return () => anim.stop();
+  }, [alpha, onDone]);
+  return (
+    <Animated.View
+      testID="blackout-splash"
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          backgroundColor: 'rgba(4, 6, 14, 0.96)',
+          opacity: alpha,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          gap: 14,
+        },
+      ]}
+    >
+      <Text style={{ fontSize: 54 }}>🔌⚡</Text>
+      <T style={{ color: C.gold, fontSize: 20, fontWeight: '900', textAlign: 'center' }}>SỤP NGUỒN SÁNG!</T>
+      <T style={{ color: '#CED4DA', fontSize: 14, fontWeight: '700', textAlign: 'center' }}>Ai đó vừa giật cầu dao làm tối sầm màn hình của bạn</T>
+      <Pressable
+        testID="blackout-recover"
+        accessibilityRole="button"
+        accessibilityLabel="Bật lại cầu dao"
+        onPress={() => {
+          play('pop');
+          Animated.timing(alpha, { toValue: 0, duration: 160, useNativeDriver: false }).start(onDone);
+        }}
+        style={{
+          marginTop: 6, backgroundColor: C.gold, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
+          borderWidth: 2.5, borderColor: '#FFF',
+        }}
+      >
+        <T style={{ color: C.ink, fontWeight: '900', fontSize: 15 }}>🔦 Bật lại cầu dao</T>
+      </Pressable>
+    </Animated.View>
+  );
+}
 
-/** hiệu ứng gián/mực trên máy người bị chọc; người khác chỉ thấy thông báo nhỏ */
+type Troll = { id: number } & ({ kind: 'roach' } | { kind: 'ink'; corner: number } | { kind: 'blackout' });
+
+/** hiệu ứng gián/mực/sụp nguồn trên máy người bị chọc; người khác chỉ thấy thông báo nhỏ */
 export function TrollLayer({ game, players }: { game: Game; players: PublicPlayer[] }) {
   const [items, setItems] = useState<Troll[]>([]);
   const [size, setSize] = useState<Size>(() => ({
@@ -537,7 +681,7 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
   useEffect(() => {
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
     return game.onFun((e: FunEvent) => {
-      if (e.kind !== 'roach' && e.kind !== 'ink') return;
+      if (e.kind !== 'roach' && e.kind !== 'ink' && e.kind !== 'blackout') return;
       const toMe = e.to === game.me;
       const from = nameOf(e.from);
       if (e.kind === 'roach') {
@@ -547,12 +691,19 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
           const n = e.count ?? 2;
           setItems((xs) => [...xs, ...Array.from({ length: n }, () => ({ id: ++seq.current, kind: 'roach' as const }))]);
         }
-      } else {
+      } else if (e.kind === 'ink') {
         feed(quip.ink(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
         if (toMe) {
           play('inksplash');
           vibrate(120);
           setItems((xs) => [...xs, { id: ++seq.current, kind: 'ink', corner: e.corner ?? 0 }]);
+        }
+      } else {
+        feed(quip.blackout(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
+        if (toMe) {
+          play('blackout');
+          vibrate([100, 50, 220]);
+          setItems((xs) => [...xs.filter((x) => x.kind !== 'blackout'), { id: ++seq.current, kind: 'blackout' }]);
         }
       }
     });
@@ -564,8 +715,10 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
       {items.map((it) =>
         it.kind === 'roach' ? (
           <Roach key={it.id} size={size} onDone={() => drop(it.id)} />
-        ) : (
+        ) : it.kind === 'ink' ? (
           <InkSplash key={it.id} corner={it.corner} size={size} onDone={() => drop(it.id)} />
+        ) : (
+          <BlackoutSplash key={it.id} onDone={() => drop(it.id)} />
         ),
       )}
     </View>
@@ -630,7 +783,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         <Button testID="troll-nick" icon="🏷️" title="Biệt danh" variant={pane === 'nick' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'nick' ? null : 'nick')} />
         <Button testID="troll-honk" icon="📢" title="Bật loa" variant="gold" style={styles.troll} onPress={() => send({ kind: 'honk', to: target.id })} />
         <Button testID="troll-cry" icon="😭" title="Khóc thuê" variant="gold" style={styles.troll} onPress={() => send({ kind: 'cry', to: target.id })} />
-        <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.trollWide} onPress={() => send({ kind: 'charm' })} />
+        <Button testID="troll-blackout" icon="🔌" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
+        <Button testID="troll-spin" icon="🌀" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
+        <Button testID="troll-quake" icon="🌋" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
+        <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
       </View>
       )}
 

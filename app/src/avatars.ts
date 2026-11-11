@@ -327,131 +327,145 @@ const OUTFIT_COLORS: Record<string, string> = {
   vang: '#F59F00',
 };
 
-/** Trang phục vui & đời thường */
+/** Trang phục vui & đời thường (có đổ bóng nếp vải, cổ áo rõ nét trong khung tròn) */
 function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string, look?: CharacterLook): string {
-  const body = (fill: string) => `<path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 Z" fill="${fill}" stroke="${ink}" stroke-width="2.5"/>`;
+  const skinShadow = darken(skin, 0.14);
+  const body = (fill: string) => `<path d="M15 98 C17 76, 31 70, 50 70 C69 70, 83 76, 85 98 Z" fill="${fill}" stroke="${ink}" stroke-width="2.4"/>`;
   const teeCol = look?.outfitcolor && OUTFIT_COLORS[look.outfitcolor] ? OUTFIT_COLORS[look.outfitcolor] : col;
+  const teeDark = darken(teeCol, 0.22);
+  const teeLight = lighten(teeCol, 0.16);
   switch (o) {
     case 'thun':
       return `${body(teeCol)}
-        <path d="M38 71 Q50 81 62 71 Q50 76 38 71 Z" fill="${darken(teeCol, 0.18)}" stroke="${ink}" stroke-width="2"/>
-        <path d="M27 78 L31 98 M73 78 L69 98" stroke="${ink}" stroke-width="1.5" opacity="0.45"/>`;
+        <path d="M22 76 Q30 84 28 98 M78 76 Q70 84 72 98" stroke="${teeDark}" stroke-width="2" fill="none"/>
+        <path d="M36 70 Q50 82 64 70 L61 68.5 Q50 77.5 39 68.5 Z" fill="${teeDark}" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M39 69 Q50 75 61 69" fill="${skinShadow}" stroke="${ink}" stroke-width="1.4"/>
+        <path d="M36 82 Q50 86 64 82" stroke="${teeLight}" stroke-width="1.4" fill="none" opacity="0.45"/>`;
     case 'beo':
       return `${body('#FFFDF9')}
-        <path d="M40 68 L60 68 L61 74 Q50 78 39 74 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
-        <path d="M38 74 q3 3 6 0 q3 3 6 0 q3 3 6 0 q3 3 6 0" fill="none" stroke="${ink}" stroke-width="1.6"/>
-        <path d="M16 82 q5 -4 11 0 q5 4 10 0 M84 82 q-5 -4 -11 0 q-5 4 -10 0" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
-        <path d="M14 90 q6 -4 13 0 q6 4 11 0 M86 90 q-6 -4 -13 0 q-6 4 -11 0" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
-        <circle cx="50" cy="82" r="1.6" fill="#D0C9B8" stroke="${ink}" stroke-width="1"/><circle cx="50" cy="89" r="1.6" fill="#D0C9B8" stroke="${ink}" stroke-width="1"/>`;
+        <path d="M38 69 Q50 78 62 69 L60 67 Q50 74 40 67 Z" fill="${skinShadow}" stroke="${ink}" stroke-width="1.4"/>
+        <path d="M32 71 C34 66, 39 66, 41 71 C43 66, 47 66, 50 71 C53 66, 57 66, 59 71 C61 66, 66 66, 68 71 C66 78, 58 80, 50 80 C42 80, 34 78, 32 71 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M34 74 q4 4 8 0 q4 4 8 0 q4 4 8 0 q4 4 8 0" fill="none" stroke="#D0C9B8" stroke-width="1.5"/>
+        <path d="M16 80 q6 -5 12 0 q6 5 11 0 M84 80 q-6 -5 -12 0 q-6 5 -11 0" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M44 79 L44 96 M56 79 L56 96" stroke="#E9E2D0" stroke-width="1.4"/>
+        <circle cx="50" cy="79" r="2.2" fill="#FFD43B" stroke="${ink}" stroke-width="1.1"/><circle cx="50" cy="79" r="0.9" fill="#FFF"/>
+        <circle cx="50" cy="86" r="1.9" fill="#FFF" stroke="${ink}" stroke-width="1.1"/>`;
     case 'somi':
-      return `${body('#FBF9F3')}
-        <path d="M41 71 L50 86 L59 71 Z" fill="${skin}" stroke="${ink}" stroke-width="1.6"/>
-        <path d="M41 70 L33 78 L43 83 L50 86 Z M59 70 L67 78 L57 83 L50 86 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.9" stroke-linejoin="round"/>
+      return `${body('#FBF9F5')}
+        <path d="M40 69 L50 86 L60 69 Z" fill="${skin}" stroke="${ink}" stroke-width="1.6"/>
+        <path d="M45 73 L50 83 L55 73" fill="none" stroke="${skinShadow}" stroke-width="1.4"/>
+        <path d="M39 68 L30 78 L42 84 L50 86 Z M61 68 L70 78 L58 84 L50 86 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
         <line x1="50" y1="86" x2="50" y2="98" stroke="${ink}" stroke-width="1.6"/>
-        <circle cx="50" cy="90" r="1.4" fill="${ink}"/><circle cx="50" cy="95" r="1.4" fill="${ink}"/>
-        <path d="M18 90 L28 88 L29 93 L17 95 Z M82 90 L72 88 L71 93 L83 95 Z" fill="#EDE8DC" stroke="${ink}" stroke-width="1.5"/>`;
+        <circle cx="50" cy="90" r="1.5" fill="${ink}"/><circle cx="50" cy="95" r="1.5" fill="${ink}"/>
+        <path d="M25 78 L29 98 M75 78 L71 98" stroke="#D8D2C5" stroke-width="1.6"/>`;
     case 'balden':
-      return `<path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 Z" fill="${skin}" stroke="${ink}" stroke-width="2.5"/>
-        <path d="M27 98 C29 85, 33 77, 35 71 L41 71 C41 86, 59 86, 59 71 L65 71 C67 77, 71 85, 73 98 Z" fill="#18181B" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>`;
+      return `<path d="M15 98 C17 76, 31 70, 50 70 C69 70, 83 76, 85 98 Z" fill="${skin}" stroke="${ink}" stroke-width="2.4"/>
+        <path d="M37 72 Q50 77 63 72" stroke="${skinShadow}" stroke-width="1.8" fill="none"/>
+        <path d="M27 98 C29 84, 33 76, 35 70 L41 70 C41 85, 59 85, 59 70 L65 70 C67 76, 71 84, 73 98 Z" fill="#18181B" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M41 72 C42 83, 58 83, 59 72" fill="none" stroke="#3F3F46" stroke-width="1.2"/>`;
     case 'aohoa':
-      return `${body('#19B5A5')}
-        <path d="M38 71 L50 90 L62 71 Z" fill="${skin}" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M34 72 L46 92 M66 72 L54 92" stroke="${ink}" stroke-width="1.6"/>
-        <circle cx="27" cy="86" r="4" fill="#FF6B8A"/><circle cx="27" cy="86" r="1.5" fill="#FFD43B"/>
-        <circle cx="73" cy="84" r="4.4" fill="#FFA94D"/><circle cx="73" cy="84" r="1.6" fill="#FFF3BF"/>
-        <circle cx="35" cy="94" r="3.6" fill="#FFD43B"/><circle cx="66" cy="94" r="3.6" fill="#FF6B8A"/>
-        <path d="M22 78 q5 -3 8 1 q-5 3 -8 -1 Z M78 92 q-5 -3 -8 1 q5 3 8 -1 Z" fill="#2B8A3E"/>`;
+      return `${body('#0CA678')}
+        <path d="M38 70 L50 89 L62 70 Z" fill="${skin}" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M38 69 L30 79 L42 84 L50 89 Z M62 69 L70 79 L58 84 L50 89 Z" fill="#12B886" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="27" cy="83" r="4.5" fill="#FF6B8A"/><circle cx="27" cy="83" r="1.7" fill="#FFD43B"/>
+        <circle cx="73" cy="82" r="4.8" fill="#FFA94D"/><circle cx="73" cy="82" r="1.8" fill="#FFF3BF"/>
+        <circle cx="36" cy="91" r="3.8" fill="#FFD43B"/><circle cx="65" cy="91" r="3.8" fill="#FF6B8A"/>
+        <path d="M21 77 q5 -3 9 1 q-5 3 -9 -1 Z M79 89 q-5 -3 -9 1 q5 3 9 -1 Z" fill="#2B8A3E"/>`;
     case 'dobo':
-      return `${body('#A5D8FF')}
-        <path d="M24 78 L30 98 M34 74 L38 98 M44 72 L46 98 M56 72 L54 98 M66 74 L62 98 M76 78 L70 98" stroke="#FFF" stroke-width="2.4"/>
-        <path d="M40 71 Q50 79 60 71" fill="#FFF" stroke="${ink}" stroke-width="2"/>
-        <circle cx="50" cy="84" r="1.8" fill="${ink}"/><circle cx="50" cy="92" r="1.8" fill="${ink}"/>
-        <path d="M70 82 q-3 0 -3 4 q3 2 5 -1 q-3 0 -2 -3 Z" fill="#FFD43B" stroke="${ink}" stroke-width="0.8"/>`;
+      return `${body('#E599F7')}
+        <path d="M24 76 L29 98 M34 73 L37 98 M44 71 L45 98 M56 71 L55 98 M66 73 L63 98 M76 76 L71 98" stroke="#FFF" stroke-width="2" opacity="0.75"/>
+        <circle cx="31" cy="82" r="2.2" fill="#FFF0F6"/><circle cx="69" cy="81" r="2.2" fill="#FFF0F6"/>
+        <circle cx="39" cy="89" r="2" fill="#FFF0F6"/><circle cx="61" cy="89" r="2" fill="#FFF0F6"/>
+        <path d="M38 70 Q50 80 62 70 L59 68.5 Q50 76 41 68.5 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <circle cx="50" cy="82" r="1.8" fill="#FFD43B" stroke="${ink}" stroke-width="1"/><circle cx="50" cy="89" r="1.8" fill="#FFD43B" stroke="${ink}" stroke-width="1"/>`;
     case 'bala':
-      return `<path d="M17 98 C19 77, 32 71, 50 71 C68 71, 81 77, 83 98 Z" fill="${skin}" stroke="${ink}" stroke-width="2.5"/>
-        <path d="M27 98 C30 86, 34 78, 36 72 L43 72 Q50 87 57 72 L64 72 C66 78, 70 86, 73 98 Z" fill="#FFF" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>
-        <path d="M38 90 Q50 95 62 90" stroke="#DEE2E6" stroke-width="1.5" fill="none"/>`;
+      return `<path d="M15 98 C17 76, 31 70, 50 70 C69 70, 83 76, 85 98 Z" fill="${skin}" stroke="${ink}" stroke-width="2.4"/>
+        <path d="M27 98 C30 85, 34 77, 36 71 L43 71 Q50 86 57 71 L64 71 C66 77, 70 85, 73 98 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M38 88 Q50 93 62 88" stroke="#DEE2E6" stroke-width="1.5" fill="none"/>`;
     case 'vestbong':
       return `${body('#1B2A63')}
-        <path d="M40 71 L50 96 L60 71 Z" fill="#FFF"/>
-        <path d="M34 72 L46 98 L38 98 L26 82 Z M66 72 L54 98 L62 98 L74 82 Z" fill="#3B4FA0" stroke="${ink}" stroke-width="1.6" stroke-linejoin="round"/>
-        <path d="M44 74 L50 79 L44 83 Z M56 74 L50 79 L56 83 Z" fill="#E03131" stroke="${ink}" stroke-width="1.3"/><circle cx="50" cy="79" r="1.8" fill="#C92A2A"/>
-        <path d="M24 90 L30 82 M72 84 L77 90" stroke="#FFF" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/>
-        <path d="M30 76 l2 -4 l2 4 l4 2 l-4 2 l-2 4 l-2 -4 l-4 -2 Z" fill="#FFF" opacity="0.8"/>`;
+        <path d="M40 70 L50 95 L60 70 Z" fill="#FFFFFF"/>
+        <path d="M34 71 L46 98 L37 98 L25 81 Z M66 71 L54 98 L63 98 L75 81 Z" fill="#3B5BDB" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M43 73 L50 78 L43 82 Z M57 73 L50 78 L57 82 Z" fill="#E03131" stroke="${ink}" stroke-width="1.4"/><circle cx="50" cy="78" r="2" fill="#FFD43B" stroke="${ink}" stroke-width="0.9"/>
+        ${sparkle(30, 80, 3.2)}${sparkle(70, 80, 3.2)}${sparkle(34, 89, 2.4, '#FFD43B')}${sparkle(66, 89, 2.4, '#FFD43B')}`;
     case 'aodai':
       return `${body(col)}
-        <path d="M42 77 L74 92 L76 98" stroke="${ink}" stroke-width="2" fill="none"/>
-        <path d="M39 70 Q50 77 61 70 L60 78 Q50 84 40 78 Z" fill="#FFF3BF" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="62" cy="86" r="1.6" fill="#FFD43B"/><circle cx="68" cy="89" r="1.6" fill="#FFD43B"/>
-        <circle cx="30" cy="88" r="2.4" fill="#FFD43B" opacity="0.9"/><circle cx="38" cy="94" r="2" fill="#FFD43B" opacity="0.9"/>`;
+        <path d="M41 76 L73 91 L75 98" stroke="${ink}" stroke-width="2" fill="none"/>
+        <path d="M39 69 Q50 76 61 69 L60 77 Q50 83 40 77 Z" fill="#FFF3BF" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="61" cy="84" r="1.8" fill="#FFD43B" stroke="${ink}" stroke-width="0.8"/><circle cx="67" cy="87" r="1.8" fill="#FFD43B" stroke="${ink}" stroke-width="0.8"/>
+        <circle cx="31" cy="85" r="2.6" fill="#FFD43B"/><circle cx="38" cy="91" r="2.2" fill="#FFD43B"/>`;
     case 'dongphuc':
-      return `${body('#FFF')}
-        <path d="M38 71 L50 80 L62 71 L58 68 L50 74 L42 68 Z" fill="#F1F3F5" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M40 72 L60 72 L50 91 Z" fill="#E03131" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M46 78 Q50 74 54 78 Q50 83 46 78Z" fill="#C92A2A" stroke="${ink}" stroke-width="1.2"/>
-        <path d="M24 84 L28 98 M76 84 L72 98" stroke="#DEE2E6" stroke-width="1.5"/>`;
+      return `${body('#FFFFFF')}
+        <path d="M37 70 L50 79 L63 70 L59 67.5 L50 73.5 L41 67.5 Z" fill="#F1F3F5" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M38 71 L62 71 L50 90 Z" fill="#E03131" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M45.5 77 Q50 73 54.5 77 Q50 82.5 45.5 77 Z" fill="#C92A2A" stroke="${ink}" stroke-width="1.3"/>
+        <path d="M24 82 L28 98 M76 82 L72 98" stroke="#DEE2E6" stroke-width="1.6"/>`;
     case 'aomua':
-      return `<path d="M30 64 Q50 56 70 64 L76 82 Q50 72 24 82 Z" fill="#F59F00" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>
+      return `<path d="M29 64 Q50 56 71 64 L77 82 Q50 72 23 82 Z" fill="#F59F00" stroke="${ink}" stroke-width="2.2" stroke-linejoin="round"/>
         ${body('#FFD43B')}
-        <path d="M34 76 Q50 90 66 76" fill="none" stroke="${ink}" stroke-width="2"/>
-        <path d="M50 84 L50 98" stroke="${ink}" stroke-width="1.6"/>
-        <circle cx="50" cy="87" r="1.8" fill="#F59F00" stroke="${ink}" stroke-width="0.8"/><circle cx="50" cy="94" r="1.8" fill="#F59F00" stroke="${ink}" stroke-width="0.8"/>
-        <path d="M26 84 l3 4 M72 82 l3 4 M36 92 l3 4 M64 94 l3 4" stroke="#FFF" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>`;
+        <path d="M34 75 Q50 89 66 75" fill="none" stroke="${ink}" stroke-width="2"/>
+        <path d="M50 83 L50 98" stroke="${ink}" stroke-width="1.6"/>
+        <circle cx="50" cy="86" r="1.9" fill="#F59F00" stroke="${ink}" stroke-width="0.9"/>
+        <path d="M26 83 l3 4 M72 81 l3 4 M36 90 l3 4 M64 91 l3 4" stroke="#FFF" stroke-width="1.6" stroke-linecap="round"/>`;
     case 'dayvang':
-      return `${body(col)}
-        <path d="M38 71 Q50 83 62 71" fill="#FFF" stroke="${ink}" stroke-width="2"/>
-        <path d="M33 72 Q50 100 67 72" fill="none" stroke="#F59F00" stroke-width="4.6" stroke-linecap="round"/>
-        <path d="M33 72 Q50 100 67 72" fill="none" stroke="#FFE066" stroke-width="2" stroke-linecap="round"/>
-        <circle cx="50" cy="91" r="5.6" fill="#FFD43B" stroke="${ink}" stroke-width="1.8"/><text x="50" y="94.5" font-size="9" font-weight="900" text-anchor="middle" fill="${ink}" font-family="sans-serif">$</text>`;
+      return `${body(teeCol)}
+        <path d="M38 70 Q50 81 62 70" fill="#18181B" stroke="${ink}" stroke-width="2"/>
+        <path d="M34 70 Q50 91 66 70" fill="none" stroke="${ink}" stroke-width="6.4" stroke-linecap="round"/>
+        <path d="M34 70 Q50 91 66 70" fill="none" stroke="url(#goldG)" stroke-width="4.4" stroke-linecap="round"/>
+        <path d="M34 70 Q50 91 66 70" fill="none" stroke="#FFF3BF" stroke-width="1.4" stroke-dasharray="2.5 2.5" stroke-linecap="round"/>
+        <circle cx="50" cy="83.5" r="6.2" fill="url(#goldG)" stroke="${ink}" stroke-width="1.9"/>
+        <circle cx="50" cy="83.5" r="4.6" fill="none" stroke="#FFF9DB" stroke-width="0.9"/>
+        <text x="50" y="86.8" font-size="9.5" font-weight="900" text-anchor="middle" fill="${ink}" font-family="sans-serif">$</text>
+        ${sparkle(44, 79, 2.8)}${sparkle(56, 81, 2.4)}`;
     default:
       return '';
   }
 }
 
-/** Hình xăm trừu tượng màu đen xám ám xanh trên vai / bắp tay */
+/** Hình xăm vảy rồng / mây cuộn màu mực xanh đen rõ nét trên vai & bắp tay */
 function tattooSvg(look?: CharacterLook): string {
   if (look?.tattoo !== 'co') return '';
   const left = look.tattooside !== 'phai';
   const big = look.tattoosize === 'vaibap';
-  const x = left ? 22 : 78;
+  const x = left ? 25 : 75;
   const dir = left ? 1 : -1;
-  return `<g stroke="#283E4A" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.78">
-    <path d="M${x} 76 q${4 * dir} 3 ${2 * dir} 8 q${-3 * dir} 4 ${2 * dir} 8"/>
-    <path d="M${x - 3 * dir} 79 q${5 * dir} -2 ${8 * dir} 3 q${-2 * dir} 5 ${-6 * dir} 4"/>
-    <circle cx="${x + 2 * dir}" cy="83" r="1.4" fill="#283E4A"/>
-    ${big ? `<path d="M${x - 2 * dir} 88 q${6 * dir} 3 ${3 * dir} 9 M${x - 5 * dir} 91 l${7 * dir} 4"/>` : ''}
+  return `<g stroke="#1D3540" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.88">
+    <path d="M${x} 72 C${x + 6 * dir} 74, ${x + 7 * dir} 80, ${x + 2 * dir} 83 C${x - 4 * dir} 85, ${x - 2 * dir} 91, ${x + 4 * dir} 93"/>
+    <path d="M${x - 4 * dir} 76 Q${x + 3 * dir} 73 ${x + 8 * dir} 78 Q${x + 4 * dir} 83 ${x - 2 * dir} 81" fill="#2A4B58" fill-opacity="0.35"/>
+    <circle cx="${x + 2 * dir}" cy="78" r="1.6" fill="#1D3540"/>
+    ${big ? `<path d="M${x - 3 * dir} 84 Q${x + 5 * dir} 86 ${x + 3 * dir} 92 M${x - 6 * dir} 87 L${x + 2 * dir} 90"/>` : ''}
   </g>`;
 }
 
 /** Chi tiết khuôn mặt (nốt ruồi cạnh môi/má/cằm, tàn nhang, răng thỏ, má lúm) */
 function detailSvg(d: CharacterDetail | undefined, ink: string, mood: Mood, look?: CharacterLook): string {
   const pos = look?.molepos ?? 'moi';
-  const [mx, my] = pos === 'ma' ? [65.5, 53.5] : pos === 'cam' ? [54, 67] : [60.5, 58];
+  const [mx, my] = pos === 'ma' ? [65.5, 53.5] : pos === 'cam' ? [54.5, 67] : [60.2, 57.5];
   const mole = d === 'notruoi' || look?.molepos
-    ? `<circle cx="${mx}" cy="${my}" r="1.8" fill="#3B231A"/><circle cx="${mx - 0.4}" cy="${my - 0.5}" r="0.45" fill="#FFF" opacity="0.6"/>`
+    ? `<circle cx="${mx}" cy="${my}" r="1.85" fill="#2B1810"/><circle cx="${mx - 0.45}" cy="${my - 0.45}" r="0.5" fill="#FFF" opacity="0.65"/>`
     : '';
   switch (d) {
     case 'notruoi':
       return mole;
     case 'tannhang':
-      return mole + [[32, 55], [36, 58], [40, 55.5], [34, 61], [60, 55.5], [64, 58], [68, 55], [66, 61], [46, 53.5], [54, 53.5], [50, 56]]
-        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.1" fill="#B8733B"/>`).join('');
+      return mole + [[31.5, 54.5], [35.5, 57.2], [39.5, 55], [33.5, 59.8], [60.5, 55], [64.5, 57.2], [68.5, 54.5], [66.5, 59.8], [46.5, 53], [53.5, 53], [50, 55.2]]
+        .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.15" fill="#A86432" opacity="0.85"/>`).join('');
     case 'longmay':
-      return mole + `<path d="M32 42.5 Q42 38.5 50 42.5 Q58 38.5 68 42.5" stroke="${ink}" stroke-width="4.8" fill="none" stroke-linecap="round"/>`;
+      return mole + `<path d="M31 41.8 Q42 37.5 50 42 Q58 37.5 69 41.8" stroke="${ink}" stroke-width="4.8" fill="none" stroke-linecap="round"/>`;
     case 'ranghe':
       return mole + (mood === 'normal' || mood === 'smug'
-        ? `<path d="M45.5 60.5 L45.5 66 Q45.5 67.2 47.4 67.2 L49.6 67.2 L49.6 60.5 Z M50.4 60.5 L50.4 67.2 L52.6 67.2 Q54.5 67.2 54.5 66 L54.5 60.5 Z" fill="#FFF" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`
+        ? `<path d="M45.6 60.2 L45.6 65.8 Q45.6 67 47.5 67 L49.7 67 L49.7 60.2 Z M50.3 60.2 L50.3 67 L52.5 67 Q54.4 67 54.4 65.8 L54.4 60.2 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`
         : '');
     case 'malum':
-      return mole + `<path d="M37.5 56 Q35 59.5 37.5 63 M62.5 56 Q65 59.5 62.5 63" stroke="#A66E4E" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
+      return mole + `<path d="M36.8 56.2 Q34.2 59.8 37 63.2 M63.2 56.2 Q65.8 59.8 63 63.2" stroke="#9C6344" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
     default:
       return mole;
   }
 }
 
-const HEAD_FILL = (skin: string, ink: string) => `fill="${skin}" stroke="${ink}" stroke-width="2.5"`;
+const HEAD_FILL = (ink: string) => `fill="url(#skinG)" stroke="${ink}" stroke-width="2.4"`;
 
-/** Dáng mặt (10 dáng) + đường hàm, cằm, má, nếp cười, má hồng trang điểm */
+/** Dáng mặt (10 dáng giải phẫu có khối thái dương, gò má, xương hàm, cằm 3D) */
 function faceShape(
   f: CharacterFace | undefined,
   nhi: boolean,
@@ -460,356 +474,511 @@ function faceShape(
   ink: string,
   look?: CharacterLook,
 ): { head: string; earL: number; earR: number; extras: string } {
-  const a = HEAD_FILL(skin, ink);
+  const a = HEAD_FILL(ink);
+  const skinDeep = darken(skin, 0.24);
+  const skinLight = lighten(skin, 0.22);
   let head = '';
   let earL = 24;
   let earR = 76;
   switch (f) {
     case 'tron':
-      head = `<ellipse cx="50" cy="47.5" rx="27" ry="${nhi ? 22 : 23.5}" ${a}/>`;
+      head = `<path d="M23 46 C22.5 29, 34 21, 50 21 C66 21, 77.5 29, 77 46 C77.5 59, 67 70.5, 50 70.5 C33 70.5, 22.5 59, 23 46 Z" ${a}/>`;
       earL = 22.5; earR = 77.5;
       break;
     case 'ovalngan':
-      head = `<path d="M23.5 46 C23.5 28 35 21 50 21 C65 21 76.5 28 76.5 46 C76.5 62 65 70.5 50 70.5 C35 70.5 23.5 62 23.5 46 Z" ${a}/>`;
-      earL = 23; earR = 77;
+      head = `<path d="M24 45 C23.5 28, 35 21, 50 21 C65 21, 76.5 28, 76 45 C76 58, 66.5 68, 56 70.2 C52 71, 48 71, 44 70.2 C33.5 68, 24 58, 24 45 Z" ${a}/>`;
+      earL = 23.5; earR = 76.5;
       break;
     case 'oval':
-      head = `<ellipse cx="50" cy="46.5" rx="23.5" ry="${nhi ? 24 : 26}" ${a}/>`;
+      head = `<path d="M26 44 C25.5 27, 35.5 20, 50 20 C64.5 20, 74.5 27, 74 44 C74 57.5, 65.5 69.5, 55 72.2 C51.5 73, 48.5 73, 45 72.2 C34.5 69.5, 26 57.5, 26 44 Z" ${a}/>`;
       earL = 25.5; earR = 74.5;
       break;
     case 'ovaldai':
-      head = `<path d="M25.5 45 C25.5 26 36 19.5 50 19.5 C64 19.5 74.5 26 74.5 45 C75.5 61 65 74 50 74 C35 74 24.5 61 25.5 45 Z" ${a}/>`;
-      earL = 25; earR = 75;
+      head = `<path d="M26 43 C25.5 25.5, 36 19, 50 19 C64 19, 74.5 25.5, 74 43 C74.5 56, 66.5 68.5, 55.5 73 C52 74.4, 48 74.4, 44.5 73 C33.5 68.5, 25.5 56, 26 43 Z" ${a}/>`;
+      earL = 25.5; earR = 74.5;
       break;
     case 'ovalvuong':
-      head = `<path d="M25 42 C25 25 36 20.5 50 20.5 C64 20.5 75 25 75 42 L74 57 Q73.5 69.5 61 71.5 L39 71.5 Q26.5 69.5 26 57 Z" ${a}/>`;
-      earL = 24.5; earR = 75.5;
+      head = `<path d="M25.5 41 C25 25, 36 20, 50 20 C64 20, 75 25, 74.5 41 L74 56.5 C73.8 64.5, 68 69.8, 58 71.5 C53 72.3, 47 72.3, 42 71.5 C32 69.8, 26.2 64.5, 26 56.5 Z" ${a}/>`;
+      earL = 25; earR = 75;
       break;
     case 'dai':
-      head = `<ellipse cx="50" cy="48" rx="21" ry="${nhi ? 26 : 28.5}" ${a}/>`;
-      earL = 28; earR = 72;
+      head = `<path d="M28 43 C27.5 25, 36.5 18.5, 50 18.5 C63.5 18.5, 72.5 25, 72 43 C72 58.5, 64.5 71.5, 55 75 C51.5 76.2, 48.5 76.2, 45 75 C35.5 71.5, 28 58.5, 28 43 Z" ${a}/>`;
+      earL = 27.5; earR = 72.5;
       break;
     case 'vuong':
-      head = `<path d="M25.5 32 Q25.5 21 37 21 L63 21 Q74.5 21 74.5 32 L74.5 56 Q74.5 71.5 62 71.5 L38 71.5 Q25.5 71.5 25.5 56 Z" ${a} stroke-linejoin="round"/>`;
+      head = `<path d="M25.5 34 C25.5 23, 35 20, 50 20 C65 20, 74.5 23, 74.5 34 L74.5 56.5 C74.5 65.5, 68.5 70.5, 59 71.8 L41 71.8 C31.5 70.5, 25.5 65.5, 25.5 56.5 Z" ${a} stroke-linejoin="round"/>`;
       earL = 25; earR = 75;
       break;
     case 'bau':
-      head = `<path d="M22.5 46 C22 29 36 21 50 21 C64 21 78 29 77.5 46 C79 62 67 71 50 71 C33 71 21 62 22.5 46 Z" ${a}/><ellipse cx="31" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/><ellipse cx="69" cy="57" rx="6" ry="4.5" fill="#FF8787" opacity="0.35"/>`;
-      earL = 21; earR = 79;
+      head = `<path d="M24 43 C23.5 27, 35.5 20.5, 50 20.5 C64.5 20.5, 76.5 27, 76 43 C78.8 54, 76 64.5, 65 69.8 C58 72.5, 42 72.5, 35 69.8 C24 64.5, 21.2 54, 24 43 Z" ${a}/>`;
+      earL = 22; earR = 78;
       break;
     case 'nhon':
-      head = `<path d="M26 37 C26 25 37 21 50 21 C63 21 74 25 74 37 C74 52 63 66 50 77.5 C37 66 26 52 26 37 Z" ${a}/>`;
-      earL = 25; earR = 75;
+      head = `<path d="M26 38 C25.5 24.5, 36.5 20, 50 20 C63.5 20, 74.5 24.5, 74 38 C74 50.5, 65 63.5, 54.5 73.2 C51.5 75.8, 48.5 75.8, 45.5 73.2 C35 63.5, 26 50.5, 26 38 Z" ${a}/>`;
+      earL = 25.5; earR = 74.5;
       break;
     default:
-      head = `<ellipse cx="50" cy="46" rx="24" ry="${nhi ? 23 : 25}" ${a}/>`;
-      earL = 24; earR = 76;
+      head = `<path d="M25.5 43 C25 26.5, 35.5 20, 50 20 C64.5 20, 75 26.5, 74.5 43 C74.5 56.5, 65.5 68, 55.5 71.5 C52 72.6, 48 72.6, 44.5 71.5 C34.5 68, 25.5 56.5, 25.5 43 Z" ${a}/>`;
+      earL = 25; earR = 75;
   }
 
-  let extras = '';
+  // Khối sáng tối 3D trên trán, gò má và xương hàm để khuôn mặt có chiều sâu như người thật
+  let extras = `<ellipse cx="50" cy="33" rx="14" ry="5.5" fill="${skinLight}" opacity="0.28"/>
+    <ellipse cx="34" cy="52" rx="5.5" ry="3.2" fill="${skinLight}" opacity="0.24"/>
+    <ellipse cx="66" cy="52" rx="5.5" ry="3.2" fill="${skinLight}" opacity="0.24"/>
+    <path d="M30 61 Q40 69.5 50 70.5 Q60 69.5 70 61" fill="none" stroke="${skinShadow}" stroke-width="2" opacity="0.45" stroke-linecap="round"/>`;
+
+  if (f === 'bau') {
+    extras += `<ellipse cx="31" cy="56.5" rx="6.2" ry="4.4" fill="#FF8787" opacity="0.32"/><ellipse cx="69" cy="56.5" rx="6.2" ry="4.4" fill="#FF8787" opacity="0.32"/>`;
+  }
+  if (nhi) {
+    extras += `<ellipse cx="32" cy="55" rx="5.2" ry="3.2" fill="#FF8787" opacity="0.35"/><ellipse cx="68" cy="55" rx="5.2" ry="3.2" fill="#FF8787" opacity="0.35"/>`;
+  }
   if (look?.jaw === 'ro') {
-    extras += `<path d="M28 55 L34 65 M72 55 L66 65" stroke="${skinShadow}" stroke-width="2" stroke-linecap="round"/>`;
+    extras += `<path d="M27.5 53 L32.5 64.5 L41 69 M72.5 53 L67.5 64.5 L59 69" fill="none" stroke="${skinDeep}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>`;
   }
   if (look?.chin === 'rong') {
-    extras += `<path d="M43 68.5 L57 68.5" stroke="${skinShadow}" stroke-width="2.2" stroke-linecap="round"/>`;
+    extras += `<path d="M43 68.5 L57 68.5" stroke="${skinDeep}" stroke-width="2" stroke-linecap="round" opacity="0.65"/>`;
   } else if (look?.chin === 'bo') {
-    extras += `<path d="M45 67.5 Q50 70.5 55 67.5" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+    extras += `<path d="M45 67.5 Q50 70.2 55 67.5 M50 67.8 L50 70.5" fill="none" stroke="${skinDeep}" stroke-width="1.7" stroke-linecap="round" opacity="0.7"/>`;
   } else if (look?.chin === 'nho') {
-    extras += `<path d="M47 68 Q50 70 53 68" fill="none" stroke="${skinShadow}" stroke-width="1.6" stroke-linecap="round"/>`;
+    extras += `<path d="M46.5 67.8 Q50 69.8 53.5 67.8" fill="none" stroke="${skinDeep}" stroke-width="1.5" stroke-linecap="round" opacity="0.65"/>`;
   }
   if (look?.cheek === 'thon') {
-    extras += `<path d="M31 52 Q34 57 32 62 M69 52 Q66 57 68 62" fill="none" stroke="${skinShadow}" stroke-width="1.7" stroke-linecap="round"/>`;
+    extras += `<path d="M30.5 52 Q34 57.5 31.5 62.5 M69.5 52 Q66 57.5 68.5 62.5" fill="none" stroke="${skinDeep}" stroke-width="1.7" stroke-linecap="round" opacity="0.6"/>`;
   } else if (look?.cheek === 'phinh') {
-    extras += `<path d="M26 54 Q23 59 29 63 M74 54 Q77 59 71 63" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+    extras += `<path d="M25.5 53.5 Q22.5 59 28.5 63.5 M74.5 53.5 Q77.5 59 71.5 63.5" fill="none" stroke="${skinDeep}" stroke-width="1.8" stroke-linecap="round" opacity="0.65"/>`;
   } else if (look?.cheek === 'go') {
-    extras += `<path d="M28 51 Q34 54 37 51 M72 51 Q66 54 63 51" fill="none" stroke="${skinShadow}" stroke-width="1.9" stroke-linecap="round"/>`;
+    extras += `<path d="M28 50.5 Q33.5 54.2 37.5 51 M72 50.5 Q66.5 54.2 62.5 51" fill="none" stroke="${skinDeep}" stroke-width="1.8" stroke-linecap="round" opacity="0.65"/>
+      <ellipse cx="33" cy="49.5" rx="4.5" ry="2" fill="#FFFFFF" opacity="0.28"/><ellipse cx="67" cy="49.5" rx="4.5" ry="2" fill="#FFFFFF" opacity="0.28"/>`;
   } else if (look?.cheek === 'day') {
-    extras += `<ellipse cx="32" cy="55" rx="5" ry="3.2" fill="#FFF" opacity="0.18"/><ellipse cx="68" cy="55" rx="5" ry="3.2" fill="#FFF" opacity="0.18"/>`;
+    extras += `<ellipse cx="32.5" cy="54.5" rx="5.5" ry="3.4" fill="#FFFFFF" opacity="0.22"/><ellipse cx="67.5" cy="54.5" rx="5.5" ry="3.4" fill="#FFFFFF" opacity="0.22"/>`;
   }
   if (look?.nepcuoi === 'co') {
-    extras += `<path d="M42 52 Q38 57 40 62 M58 52 Q62 57 60 62" fill="none" stroke="${skinShadow}" stroke-width="1.8" stroke-linecap="round"/>`;
+    extras += `<path d="M42.5 52.5 Q37.5 56.8 39.2 62.5 M57.5 52.5 Q62.5 56.8 60.8 62.5" fill="none" stroke="${skinDeep}" stroke-width="1.7" stroke-linecap="round" opacity="0.72"/>`;
   }
   if (look?.maphan === 'co') {
-    extras += `<ellipse cx="32" cy="54.5" rx="6.2" ry="3.4" fill="#FF758F" opacity="0.48"/><ellipse cx="68" cy="54.5" rx="6.2" ry="3.4" fill="#FF758F" opacity="0.48"/>`;
+    extras += `<ellipse cx="32.5" cy="54.2" rx="6.8" ry="3.8" fill="#FF5C8A" opacity="0.42"/><ellipse cx="67.5" cy="54.2" rx="6.8" ry="3.8" fill="#FF5C8A" opacity="0.42"/>`;
   }
   return { head, earL, earR, extras };
 }
 
-/** Mắt chi tiết: dáng mắt, mí mắt, độ mở, viền + mi, màu mắt, hướng nhìn, lệch tự nhiên */
+/** Mắt người thật có khóe mắt, bầu mí trên/dưới, bọng mắt nhẹ, tròng mắt 3 lớp + 2 đốm sáng, eyeliner & lông mi */
 function detailedEyesSvg(c: CharacterConfig, ink: string, skin: string): string {
   const look = c.look;
   const female = c.gender === 'nu';
+  const skinShadow = darken(skin, 0.16);
   const shape = look?.eyeshape ?? (c.eyes === 'hip' ? 'hip' : c.eyes === 'to' ? 'tron' : c.eyes === 'motmi' ? 'hanhhep' : 'hanhnhan');
   const open = look?.open ?? 'mo';
   const lid = look?.lid ?? (c.eyes === 'motmi' ? 'mot' : 'hai');
   const liner = look?.liner === 'co' || (female && look?.liner === undefined);
-  const irisCol = look?.eyecolor === 'nau' ? '#422514' : ink;
-  const gx = look?.gaze === 'trai' ? -1.8 : look?.gaze === 'phai' ? 1.8 : 0;
+  const irisOuter = look?.eyecolor === 'nau' ? '#2B170A' : '#120E0C';
+  const irisInner = look?.eyecolor === 'nau' ? '#63371B' : '#2E231D';
+  const gx = look?.gaze === 'trai' ? -1.6 : look?.gaze === 'phai' ? 1.6 : 0;
   const asym = look?.asym === 'co';
 
   if (shape === 'hip') {
-    return `<path d="M33 49 Q39 44.2 45 49 M55 ${asym ? 49.8 : 49} Q61 ${asym ? 45.2 : 44.2} 67 ${asym ? 49.8 : 49}" stroke="${ink}" stroke-width="${liner ? 3.5 : 3}" fill="none" stroke-linecap="round"/>`;
+    const ry2 = asym ? 49.6 : 48.8;
+    return `<path d="M32.5 48.8 Q39 43.2 45.5 48.8 M54.5 ${ry2} Q61 ${asym ? 44.2 : 43.2} 67.5 ${ry2}" stroke="${ink}" stroke-width="${liner ? 3.2 : 2.7}" fill="none" stroke-linecap="round"/>
+      <path d="M34 50.8 Q39 48.8 44 50.6 M56 50.8 Q61 48.8 66 50.6" stroke="${skinShadow}" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+      ${liner ? `<path d="M32.5 48.8 L30.2 47.2 M67.5 ${ry2} L69.8 ${ry2 - 1.6}" stroke="${ink}" stroke-width="2" stroke-linecap="round"/>` : ''}`;
   }
 
-  const rx = shape === 'tron' ? 5.8 : shape === 'nho' ? 4.4 : 5.4;
-  const baseRy = shape === 'tron' ? 5.4 : shape === 'hanhhep' ? 2.6 : shape === 'nho' ? 2.2 : 3.9;
-  const ry = open === 'nheo' ? baseRy * 0.62 : open === 'tru' ? baseRy * 0.78 : baseRy;
+  const rx = shape === 'tron' ? 6 : shape === 'nho' ? 4.6 : 5.6;
+  const baseRy = shape === 'tron' ? 4.8 : shape === 'hanhhep' ? 2.6 : shape === 'nho' ? 2.3 : 3.7;
+  const ry = open === 'nheo' ? baseRy * 0.64 : open === 'tru' ? baseRy * 0.78 : baseRy;
   const ryR = asym ? ry * 0.86 : ry;
-  const cyR = asym ? 48.6 : 48;
+  const cyR = asym ? 48.5 : 48;
 
   const drawOne = (cx: number, cy: number, erx: number, ery: number, left: boolean) => {
+    const outerX = left ? cx - erx : cx + erx;
+    const innerX = left ? cx + erx * 0.94 : cx - erx * 0.94;
     const dir = left ? -1 : 1;
-    const irisR = Math.min(3.5, ery * 0.85 + 0.6);
+    const irisR = Math.min(3.5, ery * 0.86 + 0.55);
+    const scleraPath = `M${innerX} ${cy + 0.4} C${cx + dir * erx * 0.25} ${cy - ery * 1.25}, ${cx + dir * erx * 0.75} ${cy - ery * 1.15}, ${outerX} ${cy - 0.1} C${cx + dir * erx * 0.65} ${cy + ery * 1.15}, ${cx - dir * erx * 0.25} ${cy + ery * 1.15}, ${innerX} ${cy + 0.4} Z`;
     const lidCrease = lid === 'hai'
-      ? `<path d="M${cx - erx + 0.5} ${cy - ery - 1.4} Q${cx} ${cy - ery - 3.2} ${cx + erx - 0.5} ${cy - ery - 1.4}" stroke="${ink}" stroke-width="1.1" fill="none" opacity="0.65" stroke-linecap="round"/>`
-      : '';
+      ? `<path d="M${innerX - dir * 0.4} ${cy - ery * 0.75} Q${cx} ${cy - ery * 1.55 - 1} ${outerX - dir * 0.3} ${cy - ery * 0.65}" stroke="${skinShadow}" stroke-width="1.25" fill="none" stroke-linecap="round"/>`
+      : `<path d="M${cx - erx * 0.7} ${cy - ery - 0.8} Q${cx} ${cy - ery - 1.6} ${cx + erx * 0.7} ${cy - ery - 0.8}" stroke="${skinShadow}" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>`;
+    const underBag = `<path d="M${cx - erx * 0.75} ${cy + ery + 1.3} Q${cx} ${cy + ery + 2.5} ${cx + erx * 0.75} ${cy + ery + 1.3}" stroke="${skinShadow}" stroke-width="1.1" fill="none" opacity="0.55" stroke-linecap="round"/>`;
     const droop = open === 'tru'
-      ? `<path d="M${cx - erx - 0.5} ${cy - ery * 0.3} L${cx + erx + 0.5} ${cy - ery * 0.1}" stroke="${ink}" stroke-width="2" stroke-linecap="round"/><rect x="${cx - erx}" y="${cy - ery - 1}" width="${erx * 2}" height="${ery * 0.75}" fill="${skin}"/>`
+      ? `<path d="M${cx - erx - 0.5} ${cy - ery * 0.25} L${cx + erx + 0.5} ${cy - ery * 0.1}" stroke="${ink}" stroke-width="2" stroke-linecap="round"/><rect x="${cx - erx}" y="${cy - ery - 1}" width="${erx * 2}" height="${ery * 0.72}" fill="${skin}"/>`
       : '';
+    const upperLine = `<path d="M${innerX} ${cy + 0.4} C${cx - dir * erx * 0.25} ${cy - ery * 1.25}, ${cx + dir * erx * 0.75} ${cy - ery * 1.15}, ${outerX} ${cy - 0.1}" stroke="${ink}" stroke-width="${liner ? 2.5 : 1.9}" fill="none" stroke-linecap="round"/>`;
     const lash = liner
-      ? `<path d="M${cx - erx} ${cy} Q${cx} ${cy - ery - 1.5} ${cx + erx} ${cy} L${cx + erx + 2.4 * dir} ${cy - 2}" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
+      ? `<path d="M${outerX - dir * 0.4} ${cy - 0.2} L${outerX + dir * 2.6} ${cy - 2.1} M${cx + dir * erx * 0.45} ${cy - ery * 0.85} L${cx + dir * (erx * 0.45 + 1.2)} ${cy - ery * 0.85 - 1.8}" stroke="${ink}" stroke-width="1.9" stroke-linecap="round"/>`
       : '';
-    return `${lidCrease}
-      <ellipse cx="${cx}" cy="${cy}" rx="${erx}" ry="${ery}" fill="#FFFFFF" stroke="${ink}" stroke-width="${liner ? 2.1 : 1.6}"/>
-      <circle cx="${cx + gx}" cy="${cy}" r="${irisR}" fill="${irisCol}"/>
-      <circle cx="${cx + gx}" cy="${cy}" r="${irisR * 0.48}" fill="#090808"/>
-      <circle cx="${cx + gx + 1.1}" cy="${cy - 1.1}" r="1.15" fill="#FFFFFF"/>
-      ${droop}${lash}`;
+    return `${lidCrease}${underBag}
+      <path d="${scleraPath}" fill="#FCFBF9" stroke="${ink}" stroke-width="1.35" stroke-linejoin="round"/>
+      <circle cx="${innerX - dir * 0.7}" cy="${cy + 0.35}" r="0.75" fill="#E88D8D"/>
+      <circle cx="${cx + gx}" cy="${cy - 0.1}" r="${irisR}" fill="${irisOuter}"/>
+      <circle cx="${cx + gx}" cy="${cy - 0.1}" r="${irisR * 0.74}" fill="${irisInner}"/>
+      <circle cx="${cx + gx}" cy="${cy - 0.1}" r="${irisR * 0.44}" fill="#070606"/>
+      <circle cx="${cx + gx + 1.05}" cy="${cy - 1.1}" r="1.15" fill="#FFFFFF"/>
+      <circle cx="${cx + gx - 0.85}" cy="${cy + 0.85}" r="0.55" fill="#FFFFFF" opacity="0.85"/>
+      ${droop}${upperLine}${lash}`;
   };
 
-  return drawOne(39, 48, rx, ry, true) + drawOne(61, cyR, rx, ryR, false);
+  return drawOne(38.8, 48, rx, ry, true) + drawOne(61.2, cyR, rx, ryR, false);
 }
 
-/** Lông mày: 5 dáng (ngang, cong nhẹ đuôi, cong mềm đuôi thuôn, ngang gấp nhẹ, lá liễu) × 3 độ dày */
+/** Lông mày người thật có đầu mày dày, đỉnh cong tự nhiên, đuôi thuôn nhọn & phẩy sợi */
 function detailedBrowsSvg(c: CharacterConfig, ink: string): string {
   const look = c.look;
   const shape = look?.browshape ?? (c.brows === 'lieu' ? 'lieu' : c.brows === 'ray' ? 'ngang' : c.gender === 'nu' ? 'cong' : 'ngang');
   const thick = look?.browthick ?? (c.brows === 'ray' ? 'day' : c.brows === 'lieu' ? 'mong' : 'vua');
-  const sw = thick === 'day' ? 4.6 : thick === 'mong' ? 1.8 : 2.8;
+  const h = thick === 'day' ? 3.2 : thick === 'mong' ? 1.5 : 2.3;
   switch (shape) {
     case 'cong':
-      return `<path d="M32.5 42.2 Q38.5 38.2 44.5 41.2 M55.5 41.2 Q61.5 38.2 67.5 42.2" stroke="${ink}" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+      return `<path d="M44.5 41.2 C40 39.2, 35 39.2, 31.2 42.4 C34.8 40.8, 39.8 41, 44.5 42.6 Z M55.5 41.2 C60 39.2, 65 39.2, 68.8 42.4 C65.2 40.8, 60.2 41, 55.5 42.6 Z" fill="${ink}" stroke="${ink}" stroke-width="${h * 0.45}" stroke-linejoin="round"/>`;
     case 'mem':
-      return `<path d="M44.5 41 C39 39 34 40 31.5 42.8 C34.5 41.2 39.5 41.5 44.5 42.5 Z M55.5 41 C61 39 66 40 68.5 42.8 C65.5 41.2 60.5 41.5 55.5 42.5 Z" fill="${ink}" stroke="${ink}" stroke-width="${sw * 0.55}" stroke-linejoin="round"/>`;
+      return `<path d="M44.5 41 C39.5 38.8, 34 39.5, 31 42.8 C34.5 41, 39.8 41.3, 44.5 42.5 Z M55.5 41 C60.5 38.8, 66 39.5, 69 42.8 C65.5 41, 60.2 41.3, 55.5 42.5 Z" fill="${ink}" stroke="${ink}" stroke-width="${h * 0.48}" stroke-linejoin="round"/>`;
     case 'gap':
-      return `<path d="M44.5 41.8 L35.5 40.2 L31.5 43 M55.5 41.8 L64.5 40.2 L68.5 43" stroke="${ink}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      return `<path d="M44.8 41.6 L35.2 39.2 L30.8 42.8 L35.5 41.2 L44.8 43 Z M55.2 41.6 L64.8 39.2 L69.2 42.8 L64.5 41.2 L55.2 43 Z" fill="${ink}" stroke="${ink}" stroke-width="${h * 0.45}" stroke-linejoin="round"/>`;
     case 'lieu':
-      return `<path d="M32 42.5 Q38.5 36.8 45 41.5 M55 41.5 Q61.5 36.8 68 42.5" stroke="${ink}" stroke-width="${Math.min(2.2, sw)}" fill="none" stroke-linecap="round"/>`;
+      return `<path d="M31.5 42.6 Q38.2 36.2 45 41.4 M55 41.4 Q61.8 36.2 68.5 42.6" stroke="${ink}" stroke-width="${Math.min(2, h)}" fill="none" stroke-linecap="round"/>`;
     default:
-      return `<path d="M32.5 41.5 L44.5 42.2 M55.5 42.2 L67.5 41.5" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`;
+      return `<path d="M44.8 41.2 L32 40.5 L31.2 42.4 L44.8 42.8 Z M55.2 41.2 L68 40.5 L68.8 42.4 L55.2 42.8 Z" fill="${ink}" stroke="${ink}" stroke-width="${h * 0.5}" stroke-linejoin="round"/>`;
   }
 }
 
-/** Mũi: sống mũi thấp/vừa/rõ, đầu mũi nhỏ/tròn/tròn đầy, cánh mũi hẹp/vừa/rộng */
+/** Mũi giải phẫu 3D: sống mũi nối chân mày, ánh sáng dọc sống mũi, chóp mũi, hai lỗ mũi, cánh mũi và nhân trung */
 function noseSvg(look: CharacterLook | undefined, skinShadow: string, ink: string): string {
   const bridge = look?.nose ?? 'vua';
   const tip = look?.nosetip ?? 'tron';
   const nostril = look?.nostril ?? 'vua';
+  const shadowDark = darken(skinShadow, 0.22);
   const bridgePath =
     bridge === 'ro'
-      ? `<path d="M49 44 L48.5 52.5" stroke="${skinShadow}" stroke-width="2.2" stroke-linecap="round"/><path d="M50.5 44.5 L50.5 52" stroke="#FFF" stroke-width="1.1" opacity="0.55" stroke-linecap="round"/>`
+      ? `<path d="M46.5 42.2 Q48.2 45 48.2 52.2" stroke="${shadowDark}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+         <path d="M53.5 42.2 Q51.8 45 51.8 52.2" stroke="${skinShadow}" stroke-width="1.2" fill="none" opacity="0.65" stroke-linecap="round"/>
+         <path d="M50 43.8 L50 52.2" stroke="#FFFFFF" stroke-width="1.4" opacity="0.65" stroke-linecap="round"/>`
       : bridge === 'thap'
-        ? `<path d="M49.2 49.5 L49 52.5" stroke="${skinShadow}" stroke-width="1.6" stroke-linecap="round"/>`
-        : `<path d="M49 47 L48.8 52.5" stroke="${skinShadow}" stroke-width="1.9" stroke-linecap="round"/>`;
-  const tipR = tip === 'day' ? 3.2 : tip === 'nho' ? 1.8 : 2.4;
-  const wingW = nostril === 'rong' ? 5.2 : nostril === 'hep' ? 2.8 : 3.9;
+        ? `<path d="M48.8 48.5 L48.5 52.2" stroke="${shadowDark}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+           <path d="M50.2 49 L50.2 52" stroke="#FFFFFF" stroke-width="1.1" opacity="0.45" stroke-linecap="round"/>`
+        : `<path d="M47.5 44.5 Q48.5 48 48.4 52.2" stroke="${shadowDark}" stroke-width="1.65" fill="none" stroke-linecap="round"/>
+           <path d="M50.1 45.2 L50.1 52.2" stroke="#FFFFFF" stroke-width="1.25" opacity="0.55" stroke-linecap="round"/>`;
+  const tipR = tip === 'day' ? 3.4 : tip === 'nho' ? 2 : 2.6;
+  const wingW = nostril === 'rong' ? 5.4 : nostril === 'hep' ? 3.2 : 4.3;
+  const philtrum = `<path d="M48.8 55.2 L48.5 57.6 M51.2 55.2 L51.5 57.6" stroke="${skinShadow}" stroke-width="1.1" opacity="0.7" stroke-linecap="round"/>`;
   return `${bridgePath}
-    <ellipse cx="50" cy="53" rx="${tipR}" ry="${tipR * 0.78}" fill="${skinShadow}" opacity="0.45"/>
-    <path d="M${50 - wingW} 53.2 Q50 ${54.5 + tipR * 0.35} ${50 + wingW} 53.2" stroke="#B68663" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-    ${nostril === 'rong' ? `<circle cx="${50 - wingW + 0.8}" cy="53.6" r="1" fill="${ink}" opacity="0.45"/><circle cx="${50 + wingW - 0.8}" cy="53.6" r="1" fill="${ink}" opacity="0.45"/>` : ''}`;
+    <ellipse cx="50" cy="52.8" rx="${tipR}" ry="${tipR * 0.78}" fill="${skinShadow}" opacity="0.5"/>
+    <circle cx="50" cy="52.2" r="${tipR * 0.45}" fill="#FFFFFF" opacity="0.45"/>
+    <path d="M${50 - wingW} 52.2 C${50 - wingW - 1.2} 54.2, ${50 - wingW + 0.8} 55.2, ${50 - 1.8} 54.6 Q50 55.6 ${50 + 1.8} 54.6 C${50 + wingW - 0.8} 55.2, ${50 + wingW + 1.2} 54.2, ${50 + wingW} 52.2" stroke="${shadowDark}" stroke-width="1.65" fill="none" stroke-linecap="round"/>
+    <ellipse cx="${50 - wingW * 0.52}" cy="54.1" rx="${nostril === 'rong' ? 1.35 : 0.95}" ry="0.65" fill="${ink}" opacity="0.55"/>
+    <ellipse cx="${50 + wingW * 0.52}" cy="54.1" rx="${nostril === 'rong' ? 1.35 : 0.95}" ry="0.65" fill="${ink}" opacity="0.55"/>
+    ${philtrum}`;
 }
 
-/** Môi & biểu cảm nền: độ dày môi, màu môi, miệng khép/cười lộ răng/cười tươi má nhô/hé đang nói */
+/** Đôi môi 3D có viền tim (Cupid's bow), môi dưới căng bóng, khóe miệng, hàm răng & hõm cằm */
 function mouthSvg(c: CharacterConfig, ink: string): string {
   const look = c.look;
   const female = c.gender === 'nu';
   const col =
     look?.lipcolor === 'do'
-      ? '#DE283B'
+      ? '#D91E36'
       : look?.lipcolor === 'cam'
-        ? '#D96B4E'
+        ? '#DF5A3C'
         : look?.lipcolor === 'hongnau'
-          ? '#BC6C64'
+          ? '#B85D57'
           : female
             ? '#D6336C'
-            : '#A85852';
+            : '#A65650';
+  const upperCol = darken(col, 0.14);
+  const lowerCol = lighten(col, 0.08);
   const thick = look?.lipthick ?? (female ? 'duoi' : 'mong');
   const exp = look?.mouth ?? 'khep';
-  const lw = thick === 'day' ? 3.4 : thick === 'duoi' ? 2.6 : 1.9;
+  const lw = thick === 'day' ? 2.6 : thick === 'duoi' ? 2.1 : 1.6;
+  const chinCrease = `<path d="M46.5 66.2 Q50 65.2 53.5 66.2" stroke="#B68663" stroke-width="1.2" fill="none" opacity="0.55" stroke-linecap="round"/>`;
 
   if (exp === 'cuoirang') {
-    return `<path d="M41.5 58.5 Q50 60.5 58.5 58.5 Q57 65.5 50 65.5 Q43 65.5 41.5 58.5 Z" fill="#FFFFFF" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
-      <line x1="43" y1="62" x2="57" y2="62" stroke="${ink}" stroke-width="1" opacity="0.45"/>`;
+    return `<path d="M40.5 58.6 C44 57.2, 47.5 57.8, 50 58.3 C52.5 57.8, 56 57.2, 59.5 58.6 C58 65.8, 54 66.5, 50 66.5 C46 66.5, 42 65.8, 40.5 58.6 Z" fill="#59111D" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
+      <path d="M41.8 59 C46 59.8, 54 59.8, 58.2 59 L57.4 62.6 Q50 63.4 42.6 62.6 Z" fill="#FFFFFF"/>
+      <path d="M45.5 59.2 L45.5 62.5 M50 59.4 L50 62.8 M54.5 59.2 L54.5 62.5" stroke="#DEE2E6" stroke-width="0.8"/>
+      <path d="M43 65.2 Q50 66.8 57 65.2" stroke="#FFFFFF" stroke-width="1.1" fill="none" opacity="0.55" stroke-linecap="round"/>
+      <path d="M38.5 57.2 Q40 59 41 60.5 M61.5 57.2 Q60 59 59 60.5" stroke="#9C6644" stroke-width="1.4" fill="none" stroke-linecap="round"/>`;
   }
   if (exp === 'cuoitu') {
-    return `<path d="M39.5 58 Q50 60 60.5 58 Q58.5 67 50 67 Q41.5 67 39.5 58 Z" fill="#8C1D2E" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
-      <path d="M41 58.6 Q50 60.2 59 58.6 L58 62 L42 62 Z" fill="#FFFFFF"/>
-      <ellipse cx="50" cy="65.2" rx="4.2" ry="1.8" fill="#FF8FA3"/>
-      <path d="M36.5 56.5 Q38.5 58.5 39.5 60.5 M63.5 56.5 Q61.5 58.5 60.5 60.5" stroke="#B68663" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+    return `<path d="M39 58 C43 56.8, 47 57.5, 50 58 C53 57.5, 57 56.8, 61 58 C59.2 66.8, 54.5 67.5, 50 67.5 C45.5 67.5, 40.8 66.8, 39 58 Z" fill="#6E1423" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round"/>
+      <path d="M40.6 58.4 Q50 59.8 59.4 58.4 L58.4 62 L41.6 62 Z" fill="#FFFFFF"/>
+      <ellipse cx="50" cy="65.2" rx="4.5" ry="2" fill="#FF8FA3"/>
+      <path d="M36.5 56.2 Q38.5 58.5 39.5 60.8 M63.5 56.2 Q61.5 58.5 60.5 60.8" stroke="#9C6644" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
   }
   if (exp === 'he') {
-    return `<ellipse cx="50" cy="61" rx="5.8" ry="3.8" fill="#7A1B2B" stroke="${col}" stroke-width="${lw}"/>
-      <path d="M45.5 58.6 L54.5 58.6 L54 60.6 L46 60.6 Z" fill="#FFFFFF"/>
-      <ellipse cx="50" cy="63.2" rx="3.2" ry="1.4" fill="#FF8FA3"/>`;
+    return `<path d="M42.5 59.2 C45.5 56.8, 48 56.8, 50 57.8 C52 56.8, 54.5 56.8, 57.5 59.2 C56 64.6, 53 65.4, 50 65.4 C47 65.4, 44 64.6, 42.5 59.2 Z" fill="#6E1423" stroke="${col}" stroke-width="${lw + 0.4}" stroke-linejoin="round"/>
+      <path d="M44.5 58.6 L55.5 58.6 L54.8 60.6 L45.2 60.6 Z" fill="#FFFFFF"/>
+      <ellipse cx="50" cy="63" rx="3.4" ry="1.5" fill="#FF8FA3"/>
+      <path d="M46.5 64.5 Q50 65.4 53.5 64.5" stroke="#FFFFFF" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+      ${chinCrease}`;
   }
-  // 'khep': miệng khép nhẹ
-  return `${thick === 'day' ? `<path d="M43 59.5 Q47 57.2 50 58.4 Q53 57.2 57 59.5 Q50 63.8 43 59.5 Z" fill="${col}" opacity="0.85"/>` : ''}
-    ${thick === 'duoi' ? `<path d="M44 60 Q50 64.2 56 60" stroke="${col}" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.75"/>` : ''}
-    <path d="M43 59.2 Q50 62.6 57 59.2" stroke="${look?.lipcolor === 'do' ? '#9C1423' : female ? col : ink}" stroke-width="2.3" fill="none" stroke-linecap="round"/>`;
+  // 'khep': đôi môi khép có viền tim rõ nét
+  const upH = thick === 'day' ? 2.6 : thick === 'duoi' ? 1.9 : 1.3;
+  const lowH = thick === 'day' ? 4.2 : thick === 'duoi' ? 3.4 : 2.1;
+  return `<path d="M42.5 59.6 C45 59.6 - ${upH}, 48 ${59.4 - upH}, 50 ${59.9 - upH * 0.55} C52 ${59.4 - upH}, 55 ${59.6 - upH}, 57.5 59.6 Q50 60.6 42.5 59.6 Z" fill="${upperCol}"/>
+    <path d="M42.8 59.6 Q50 60.6 57.2 59.6 C55.8 ${59.6 + lowH}, 44.2 ${59.6 + lowH}, 42.8 59.6 Z" fill="${lowerCol}"/>
+    <path d="M46.8 ${60.4 + lowH * 0.42} Q50 ${60.9 + lowH * 0.45} 53.2 ${60.4 + lowH * 0.42}" stroke="#FFFFFF" stroke-width="1.1" fill="none" opacity="0.58" stroke-linecap="round"/>
+    <path d="M42 59.5 Q46 60.3 50 59.8 Q54 60.3 58 59.5" stroke="${look?.lipcolor === 'do' ? '#7A0C18' : ink}" stroke-width="1.65" fill="none" stroke-linecap="round"/>
+    <circle cx="42" cy="59.4" r="0.8" fill="${ink}" opacity="0.5"/><circle cx="58" cy="59.4" r="0.8" fill="${ink}" opacity="0.5"/>
+    ${chinCrease}`;
 }
 
-/** Râu vẽ bằng các nét ngắn tự nhiên (không mảng đen): ria mép, râu dưới môi/cằm, râu dọc đường hàm */
+/** Râu vẽ bằng các lớp sợi tự nhiên: ria mép, râu dưới môi/cằm, râu quai nón dọc đường hàm */
 function beardSvg(look: CharacterLook | undefined, ink: string): string {
   if (!look) return '';
   let out = '';
   if (look.ria && look.ria !== 'khong') {
-    const sw = look.ria === 'vua' ? 1.5 : 0.95;
-    const strokes = [-7, -5, -3, -1.5, 1.5, 3, 5, 7]
-      .map((dx) => `<line x1="${50 + dx}" y1="55.2" x2="${50 + dx * 1.12}" y2="57.4" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
+    const sw = look.ria === 'vua' ? 1.65 : 1.05;
+    const base = look.ria === 'vua' ? `<path d="M41.5 57.2 Q46 55.2 50 56.4 Q54 55.2 58.5 57.2" stroke="${ink}" stroke-width="2.2" fill="none" opacity="0.35" stroke-linecap="round"/>` : '';
+    const strokes = [-7.5, -5.8, -4.1, -2.5, -1.1, 1.1, 2.5, 4.1, 5.8, 7.5]
+      .map((dx) => `<line x1="${50 + dx * 0.92}" y1="55.3" x2="${50 + dx * 1.12}" y2="57.7" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
       .join('');
-    out += `<g opacity="0.85">${strokes}</g>`;
+    out += `<g opacity="0.88">${base}${strokes}</g>`;
   }
   if (look.raucam && look.raucam !== 'khong') {
-    const sw = look.raucam === 'vua' ? 1.5 : 0.95;
-    const soul = [-2, 0, 2].map((dx) => `<line x1="${50 + dx}" y1="63.5" x2="${50 + dx}" y2="65.6" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('');
-    const chin = [-6, -4, -2, 0, 2, 4, 6]
-      .map((dx) => `<line x1="${50 + dx}" y1="${68.2 - Math.abs(dx) * 0.15}" x2="${50 + dx * 1.08}" y2="${71 - Math.abs(dx) * 0.15}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
+    const sw = look.raucam === 'vua' ? 1.6 : 1;
+    const soul = [-2, -0.7, 0.7, 2].map((dx) => `<line x1="${50 + dx}" y1="63.6" x2="${50 + dx * 1.1}" y2="65.8" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('');
+    const chin = [-6.5, -4.8, -3.2, -1.6, 0, 1.6, 3.2, 4.8, 6.5]
+      .map((dx) => `<line x1="${50 + dx}" y1="${68.4 - Math.abs(dx) * 0.14}" x2="${50 + dx * 1.08}" y2="${71.4 - Math.abs(dx) * 0.14}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`)
       .join('');
-    out += `<g opacity="0.85">${soul}${chin}</g>`;
+    out += `<g opacity="0.88">${soul}${chin}</g>`;
   }
   if (look.rauham && look.rauham !== 'khong') {
-    const sw = look.rauham === 'vua' ? 1.45 : 0.9;
+    const sw = look.rauham === 'vua' ? 1.55 : 0.95;
     const pts: [number, number][] = [
-      [27, 54], [28.5, 57.5], [30.5, 61], [33, 64], [36, 66.8], [39.5, 68.8],
-      [73, 54], [71.5, 57.5], [69.5, 61], [67, 64], [64, 66.8], [60.5, 68.8],
+      [26.8, 53.5], [28, 57], [29.8, 60.5], [32.2, 63.8], [35.2, 66.6], [38.8, 68.8],
+      [73.2, 53.5], [72, 57], [70.2, 60.5], [67.8, 63.8], [64.8, 66.6], [61.2, 68.8],
     ];
-    out += `<g opacity="0.8">${pts.map(([x, y]) => `<line x1="${x}" y1="${y}" x2="${x + (x < 50 ? 0.8 : -0.8)}" y2="${y + 2.2}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('')}</g>`;
+    out += `<g opacity="0.84">${pts.map(([x, y]) => `<line x1="${x}" y1="${y}" x2="${x + (x < 50 ? 0.9 : -0.9)}" y2="${y + 2.4}" stroke="${ink}" stroke-width="${sw}" stroke-linecap="round"/>`).join('')}</g>`;
   }
   return out;
 }
 
 /** Các kiểu tóc mở rộng: gồm cả buộc thấp có tóc con, chải ngược phồng + xoăn gáy, vuốt lệch phồng trước, rất ngắn dựng chỏm */
 function extraHair(h: CharacterHair, f: string, ink: string, accent: string): { back: string; front: string } | null {
-  const st = `fill="${f}" stroke="${ink}" stroke-width="2.4"`;
+  const st = `fill="${f}" stroke="${ink}" stroke-width="2.3"`;
+  const shine = `<path d="M35 20 Q50 15 65 20" stroke="#FFFFFF" stroke-width="1.5" fill="none" opacity="0.22" stroke-linecap="round"/>`;
   switch (h) {
     case 'dinh':
-      return { back: '', front: `<path d="M26 39 C25 23 37 19 50 19.5 C63 19 75 23 74 39 C68 31 32 31 26 39 Z" fill="${f}" opacity="0.8"/>` };
+      return {
+        back: '',
+        front: `<path d="M26 38 C25 22, 37 18.5, 50 19 C63 18.5, 75 22, 74 38 C68 30, 32 30, 26 38 Z" fill="${f}" stroke="${ink}" stroke-width="1.8" opacity="0.88"/>
+          <path d="M34 24 L34 27 M42 22 L42 25 M50 21.5 L50 24.5 M58 22 L58 25 M66 24 L66 27" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/>`,
+      };
     case 'mohican':
-      return { back: '', front: `<path d="M27 38 C28 28 38 26 50 27 C62 26 72 28 73 38 C66 33 34 33 27 38 Z" fill="${f}" opacity="0.35"/><path d="M42 30 L40 11 L46 17 L50 3 L54 17 L60 11 L58 30 Z" ${st} stroke-linejoin="round"/>` };
+      return {
+        back: `<path d="M23 56 L20 67 L26 65 Z M77 56 L80 67 L74 65 Z" fill="${f}" stroke="${ink}" stroke-width="1.8"/>`,
+        front: `<path d="M26 38 C27 27, 38 25, 50 26 C62 25, 73 27, 74 38 C66 32, 34 32, 26 38 Z" fill="${f}" opacity="0.32"/>
+          <path d="M38 31 L36 14 L43 19 L46 6 L50 15 L54 4 L58 18 L64 12 L62 31 Q50 27 38 31 Z" ${st} stroke-linejoin="round"/>
+          <path d="M45 14 L48 26 M55 12 L52 26" stroke="#FFFFFF" stroke-width="1.2" opacity="0.25" stroke-linecap="round"/>`,
+      };
     case 'buicu':
-      return { back: `<circle cx="50" cy="10" r="9" ${st}/><path d="M43 17 Q50 20 57 17" stroke="${accent}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`, front: `<path d="M25 40 C24 23 36 18 50 18 C64 18 76 23 75 40 C68 30 58 27 50 28 C42 27 32 30 25 40 Z" ${st}/>` };
+      return {
+        back: `<circle cx="50" cy="10" r="9.5" ${st}/><path d="M45 8 Q50 4 55 8" stroke="#FFFFFF" stroke-width="1.4" fill="none" opacity="0.28"/><path d="M42 17 Q50 20.5 58 17" stroke="${accent}" stroke-width="3.6" fill="none" stroke-linecap="round"/>`,
+        front: `<path d="M24.5 40 C23.5 22, 36 17.5, 50 17.5 C64 17.5, 76.5 22, 75.5 40 C68 29.5, 58 26.5, 50 28 C42 26.5, 32 29.5, 24.5 40 Z" ${st}/>${shine}`,
+      };
     case 'afro':
-      return { back: `<circle cx="50" cy="31" r="34" ${st}/>`, front: `<path d="M25 41 C24 25 36 21 50 21 C64 21 76 25 75 41 C67 33 33 33 25 41 Z" fill="${f}"/>` };
+      return {
+        back: `<path d="M18 42 C12 28, 20 12, 35 9 C44 4, 56 4, 65 9 C80 12, 88 28, 82 42 C86 52, 80 62, 73 63 L27 63 C20 62, 14 52, 18 42 Z" ${st}/>`,
+        front: `<path d="M24 40 C23 24, 36 20, 50 20 C64 20, 77 24, 76 40 C67 32, 33 32, 24 40 Z" fill="${f}"/>
+          <circle cx="34" cy="18" r="4" fill="none" stroke="#FFFFFF" stroke-width="1.1" opacity="0.2"/><circle cx="64" cy="19" r="4" fill="none" stroke="#FFFFFF" stroke-width="1.1" opacity="0.2"/>`,
+      };
     case 'maibang':
-      return { back: `<path d="M22 44 C19 62 23 72 30 74 L70 74 C77 72 81 62 78 44 Z" ${st}/>`, front: `<path d="M23 46 C21 22 37 15 50 15 C63 15 79 22 77 46 L72 46 L72 33 Q50 38 28 33 L28 46 Z" ${st}/>` };
+      return {
+        back: `<path d="M21 43 C17 62, 21 75, 29 78 L71 78 C79 75, 83 62, 79 43 Z" ${st}/>`,
+        front: `<path d="M22.5 45 C20.5 21, 36 14.5, 50 14.5 C64 14.5, 79.5 21, 77.5 45 L72.5 45 L72 33.5 Q50 37.5 28 33.5 L27.5 45 Z" ${st}/>
+          <path d="M36 24 L35 34 M45 23 L45 35 M55 23 L55 35 M64 24 L65 34" stroke="${ink}" stroke-width="1.1" opacity="0.45" stroke-linecap="round"/>${shine}`,
+      };
     case 'highlight':
-      return { back: '', front: `<path d="M24 42 C22 22, 38 16, 50 18 C62 16, 78 22, 76 42 C70 30, 58 26, 50 35 C42 26, 30 30, 24 42 Z" ${st}/><path d="M33 22 Q36 29 38 35 M41 20 Q43 27 44 32 M63 21 Q66 28 67 34" stroke="${accent}" stroke-width="3.2" fill="none" stroke-linecap="round"/>` };
+      return {
+        back: '',
+        front: `<path d="M23.5 42 C21.5 21, 37.5 15, 50 17.5 C62.5 15, 78.5 21, 76.5 42 C70 29.5, 58 25.5, 50 34.5 C42 25.5, 30 29.5, 23.5 42 Z" ${st}/>
+          <path d="M32 21 Q36 28 38 35 M40 19 Q43 26 44 32 M62 19 Q66 26 67 34 M68 22 Q71 29 72 36" stroke="${accent}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`,
+      };
     case 'nam':
-      return { back: '', front: `<path d="M21 47 C19 21 36 13 50 13 C64 13 81 21 79 47 C75 41 73 35 70 35 C58 38 42 38 30 35 C27 35 25 41 21 47 Z" ${st}/>` };
+      return {
+        back: '',
+        front: `<path d="M20.5 46 C18.5 20, 35.5 12.5, 50 12.5 C64.5 12.5, 81.5 20, 79.5 46 C75 40, 73 34.5, 69.5 34.5 C58 37.5, 42 37.5, 30.5 34.5 C27 34.5, 25 40, 20.5 46 Z" ${st}/>${shine}`,
+      };
     case 'dailung':
-      return { back: `<path d="M19 44 C10 66 12 90 21 99 L79 99 C88 90 90 66 81 44 Z" ${st}/>`, front: `<path d="M23 44 C22 21, 36 16, 50 16 C64 16, 78 21, 77 44 C71 31, 61 28, 50 30 C39 28, 29 31, 23 44 Z" ${st}/>` };
+      return {
+        back: `<path d="M18 43 C9 66, 11 90, 20 99 L80 99 C89 90, 91 66, 82 43 Z" ${st}/>
+          <path d="M22 58 Q18 76 24 94 M78 58 Q82 76 76 94" stroke="#FFFFFF" stroke-width="1.3" fill="none" opacity="0.2"/>`,
+        front: `<path d="M22.5 44 C21.5 20.5, 35.5 15.5, 50 15.5 C64.5 15.5, 78.5 20.5, 77.5 44 C71 30.5, 61 27.5, 50 29.5 C39 27.5, 29 30.5, 22.5 44 Z" ${st}/>${shine}`,
+      };
     case 'buocthap':
       return {
-        back: `<ellipse cx="50" cy="64" rx="13" ry="8" ${st}/><path d="M40 60 Q50 64 60 60" stroke="${accent}" stroke-width="3" fill="none"/>`,
-        front: `<path d="M24 42 C23 22, 36 17, 50 17.5 C64 17, 77 22, 76 42 C69 30, 58 26, 50 28 C42 26, 31 30, 24 42 Z" ${st}/>
-          <path d="M27 38 q-3 6 0 11 M73 38 q3 6 0 11 M36 29 q-2 4 1 7 M64 29 q2 4 -1 7" stroke="${f}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+        back: `<ellipse cx="50" cy="64" rx="15" ry="9" ${st}/>
+          <path d="M38 60 Q50 65 62 60" stroke="url(#goldG)" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+        front: `<path d="M23.5 43 C21.5 20, 35 13.5, 50 14.5 C65 13.5, 78.5 20, 76.5 43 C70.5 29.5, 60.5 25, 50 26.8 C39.5 25, 29.5 29.5, 23.5 43 Z" ${st}/>
+          <path d="M32 21 Q42 16 50 18 Q58 16 68 21" stroke="#FFFFFF" stroke-width="1.6" fill="none" opacity="0.28" stroke-linecap="round"/>
+          <path d="M26 37 C22 43, 23 50, 26.5 54 M74 37 C78 43, 77 50, 73.5 54 M35 28 q-2.5 4.5 0.8 7.5 M65 28 q2.5 4.5 -0.8 7.5" stroke="${f}" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,
       };
     case 'chaingoc':
       return {
-        back: `<path d="M23 55 q-5 5 -1 10 q4 4 0 8 M77 55 q5 5 1 10 q-4 4 0 8" stroke="${f}" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
-        front: `<path d="M24 40 C20 18, 35 8, 52 9 C68 10, 79 20, 76 40 C69 27, 57 24, 48 25 C37 25, 29 30, 24 40 Z" ${st}/>
-          <path d="M36 16 Q50 11 64 17" stroke="#FFF" stroke-width="1.6" fill="none" opacity="0.28" stroke-linecap="round"/>`,
+        back: `<path d="M24 50 C17 55, 18 63, 23 67 C18 71, 20 77, 26 78 M76 50 C83 55, 82 63, 77 67 C82 71, 80 77, 74 78" stroke="${ink}" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+          <path d="M24 50 C17 55, 18 63, 23 67 C18 71, 20 77, 26 78 M76 50 C83 55, 82 63, 77 67 C82 71, 80 77, 74 78" stroke="${f}" stroke-width="4.2" fill="none" stroke-linecap="round"/>`,
+        front: `<path d="M23.5 41 C19 17, 34 7, 51.5 8 C68.5 9, 80.5 19, 76.5 41 C70 26.5, 58 23, 48.5 24.2 C37.5 24.2, 29 29.5, 23.5 41 Z" ${st}/>
+          <path d="M33 17 Q50 10 66 17 M38 22 Q51 16 63 21" stroke="#FFFFFF" stroke-width="1.5" fill="none" opacity="0.28" stroke-linecap="round"/>`,
       };
     case 'vuotlech':
       return {
         back: '',
-        front: `<path d="M24 38 L24 31 Q26 24 31 24 M76 38 L76 31 Q74 24 69 24" stroke="${f}" stroke-width="3.5" fill="none" opacity="0.45"/>
-          <path d="M27 35 C27 17, 42 10, 65 14 C75 16, 77 26, 73 35 C63 26, 48 25, 36 31 L34 24 L32 33 Z" ${st}/>`,
+        front: `<path d="M24.5 39 L24.5 30 Q26.5 23 32 23 M75.5 39 L75.5 30 Q73.5 23 68 23" stroke="${f}" stroke-width="3.8" fill="none" opacity="0.42"/>
+          <path d="M26.5 35.5 C26.5 16.5, 41.5 9.5, 65.5 13.5 C75.5 15.5, 77.5 25.5, 73.5 35.5 C63.5 25.5, 48 24.5, 36.5 30.5 L34.2 22.5 L32 32.5 Z" ${st} stroke-linejoin="round"/>
+          <path d="M34 22.5 L41 16" stroke="#FFFFFF" stroke-width="1.4" opacity="0.3" stroke-linecap="round"/>`,
       };
     case 'dungchom':
       return {
         back: '',
-        front: `<path d="M26 38 C26 24, 36 20, 44 20 L46 12 L50 17 L53 10 L56 18 L60 13 L59 20 C67 21, 74 25, 74 38 C66 30, 34 30, 26 38 Z" ${st} stroke-linejoin="round"/>`,
+        front: `<path d="M25.5 38 C25.5 23.5, 35 19.5, 43 19.5 L45.5 11 L49.5 16.5 L53 9.5 L56.5 17.5 L60.5 12 L59.5 19.5 C67.5 20.5, 74.5 24.5, 74.5 38 C66.5 29.5, 33.5 29.5, 25.5 38 Z" ${st} stroke-linejoin="round"/>`,
       };
     default:
       return null;
   }
 }
 
-/** Phụ kiện trang sức (bông tai đá/hoa, nhẫn hoa, đồng hồ bạc/tối, găng tay nhựa trong) & tư thế tay */
+/** Phụ kiện trang sức (bông tai kim cương/hoa vàng, nhẫn hoa kim cương, đồng hồ sang trọng, găng tay nilon mukbang) & tư thế tay trong khung tròn */
 function jewelryAndPoseSvg(look: CharacterLook | undefined, earL: number, earR: number, skin: string, ink: string): string {
   if (!look) return '';
+  const skinShadow = darken(skin, 0.16);
   let out = '';
   if (look.earring === 'da') {
-    for (const x of [earL, earR]) {
-      out += `<g><circle cx="${x}" cy="53.5" r="2.3" fill="#E7F5FF" stroke="${ink}" stroke-width="1"/>
-        <circle cx="${x - 1.2}" cy="55.2" r="1.4" fill="#74C0FC" stroke="${ink}" stroke-width="0.8"/>
-        <circle cx="${x + 1.2}" cy="55.2" r="1.4" fill="#74C0FC" stroke="${ink}" stroke-width="0.8"/></g>`;
+    for (const [idx, x] of [earL - 1.2, earR + 1.2].entries()) {
+      const dir = idx === 0 ? -1 : 1;
+      out += `<g>
+        <circle cx="${x}" cy="53.2" r="2.8" fill="#FFFFFF" stroke="${ink}" stroke-width="1.2"/>
+        <polygon points="${x},51.2 ${x + 2 * dir},53.2 ${x},55.2 ${x - 2 * dir},53.2" fill="#A5D8FF"/>
+        <path d="M${x} 56 L${x - 2.3} 60.2 L${x} 62.6 L${x + 2.3} 60.2 Z" fill="#E7F5FF" stroke="${ink}" stroke-width="1.15" stroke-linejoin="round"/>
+        <polygon points="${x},57 ${x + 1.4},60 ${x},61.6 ${x - 1.4},60" fill="#74C0FC"/>
+        ${sparkle(x + 2.6 * dir, 52.5, 2.5)}${sparkle(x + 2.2 * dir, 60.8, 2.1, '#E7F5FF')}
+      </g>`;
     }
   } else if (look.earring === 'hoa') {
-    for (const x of [earL, earR]) {
-      out += `<g><circle cx="${x - 1.3}" cy="53.5" r="1.5" fill="#FF8787"/><circle cx="${x + 1.3}" cy="53.5" r="1.5" fill="#FF8787"/>
-        <circle cx="${x}" cy="52" r="1.5" fill="#FF8787"/><circle cx="${x}" cy="55" r="1.5" fill="#FF8787"/>
-        <circle cx="${x}" cy="53.5" r="1.2" fill="#FFD43B" stroke="${ink}" stroke-width="0.7"/></g>`;
+    for (const x of [earL - 1, earR + 1]) {
+      out += `<g>
+        <circle cx="${x - 1.7}" cy="53.6" r="1.8" fill="#FF6B8A" stroke="${ink}" stroke-width="0.9"/>
+        <circle cx="${x + 1.7}" cy="53.6" r="1.8" fill="#FF6B8A" stroke="${ink}" stroke-width="0.9"/>
+        <circle cx="${x}" cy="51.9" r="1.8" fill="#FF6B8A" stroke="${ink}" stroke-width="0.9"/>
+        <circle cx="${x}" cy="55.3" r="1.8" fill="#FF6B8A" stroke="${ink}" stroke-width="0.9"/>
+        <circle cx="${x}" cy="53.6" r="1.45" fill="url(#goldG)" stroke="${ink}" stroke-width="0.9"/>
+      </g>`;
     }
   }
-  const hasHand = look.pose === 'chongcam' || look.pose === 'chumnguc' || (look.ring && look.ring !== 'khong') || (look.watch && look.watch !== 'khong') || look.glove === 'co';
-  if (hasHand) {
-    const handFill = look.glove === 'co' ? '#E7F5FF' : skin;
-    const handOp = look.glove === 'co' ? '0.82' : '1';
-    const hy = look.pose === 'chongcam' ? 74 : 88;
+
+  const hasHand =
+    look.pose === 'chongcam' ||
+    look.pose === 'chumnguc' ||
+    look.pose === 'baochan' ||
+    (look.ring && look.ring !== 'khong') ||
+    (look.watch && look.watch !== 'khong') ||
+    look.glove === 'co';
+  if (!hasHand) return out;
+
+  const isGlove = look.glove === 'co';
+  const handFill = isGlove ? '#E3F6FF' : skin;
+  const handStroke = isGlove ? '#228BE6' : ink;
+  const handOp = isGlove ? '0.88' : '1';
+
+  // Tất cả tư thế tay được đặt ở y = 66..85 để luôn hiển thị trọn vẹn và nổi bật bên trong khung tròn avatar
+  if (look.pose === 'chongcam' || isGlove) {
+    const hx = 61;
+    const hy = 69;
     out += `<g opacity="${handOp}">
-      <rect x="56" y="${hy}" width="15" height="9" rx="4.5" fill="${handFill}" stroke="${ink}" stroke-width="1.8"/>
-      ${look.pose === 'chumnguc' ? `<rect x="35" y="${hy}" width="15" height="9" rx="4.5" fill="${handFill}" stroke="${ink}" stroke-width="1.8"/>` : ''}
-      ${look.glove === 'co' ? `<path d="M58 ${hy + 2} L66 ${hy + 2}" stroke="#FFF" stroke-width="1.4" stroke-linecap="round"/>` : ''}
+      ${isGlove ? `<path d="M55 79 L52 87 L72 87 L69 78 Z" fill="#D0EBFF" stroke="${handStroke}" stroke-width="1.6" stroke-linejoin="round"/>` : `<path d="M57 78 L55 88 L68 88 L67 78 Z" fill="${skinShadow}" stroke="${ink}" stroke-width="1.8"/>`}
+      <path d="M53 ${hy + 3} C51 ${hy - 2}, 55 ${hy - 5}, 58 ${hy - 1} L58 ${hy - 5.5} C58 ${hy - 8}, 61.5 ${hy - 8}, 61.5 ${hy - 5.5} L61.5 ${hy - 2} C63.5 ${hy - 6}, 67 ${hy - 5.5}, 66.5 ${hy - 1} C69 ${hy - 4}, 71.5 ${hy - 2.5}, 70 ${hy + 2} C69.5 ${hy + 7}, 65 ${hy + 9.5}, 59 ${hy + 9.5} C54.5 ${hy + 9.5}, 53 ${hy + 6.5}, 53 ${hy + 3} Z" fill="${handFill}" stroke="${handStroke}" stroke-width="1.8" stroke-linejoin="round"/>
+      ${isGlove ? `<path d="M56 ${hy + 1} L65 ${hy + 1} M57 ${hy + 4.5} L66 ${hy + 3.5} M54 83 L68 82" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M49 62 C45 59, 45 54, 49 52 C53 50, 57 53, 56 58 L59 62 L56 64 L53 60 Z" fill="#F59F00" stroke="${ink}" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="58.5" cy="63.5" r="1.8" fill="#FFF9DB" stroke="${ink}" stroke-width="1.1"/>` : ''}
     </g>`;
     if (look.ring === 'hoa') {
-      out += `<g><circle cx="61" cy="${hy + 3.5}" r="2.4" fill="#FFD43B" stroke="${ink}" stroke-width="0.9"/><circle cx="61" cy="${hy + 3.5}" r="1" fill="#E03131"/></g>`;
+      out += `<g>
+        <circle cx="${hx}" cy="${hy + 1.5}" r="3.1" fill="url(#goldG)" stroke="${ink}" stroke-width="1.1"/>
+        <circle cx="${hx}" cy="${hy + 1.5}" r="1.8" fill="#E7F5FF" stroke="#1C7ED6" stroke-width="0.7"/>
+        ${sparkle(hx + 2.5, hy - 1, 2.6)}
+      </g>`;
     }
     if (look.watch && look.watch !== 'khong') {
-      const wCol = look.watch === 'bac' ? '#DEE2E6' : '#212529';
+      const wBand = look.watch === 'bac' ? '#DEE2E6' : '#212529';
       const wFace = look.watch === 'bac' ? '#FFFFFF' : '#343A40';
-      out += `<g><rect x="67" y="${hy - 1}" width="5" height="11" rx="1.5" fill="${wCol}" stroke="${ink}" stroke-width="1.2"/>
-        <circle cx="69.5" cy="${hy + 4.5}" r="3.4" fill="${wFace}" stroke="${ink}" stroke-width="1.2"/></g>`;
+      out += `<g>
+        <rect x="55.5" y="${hy + 9}" width="13" height="5.2" rx="1.8" fill="${wBand}" stroke="${ink}" stroke-width="1.3"/>
+        <circle cx="62" cy="${hy + 11.6}" r="3.8" fill="${wFace}" stroke="url(#goldG)" stroke-width="1.4"/>
+        <path d="M62 ${hy + 9.6} L62 ${hy + 11.6} L63.6 ${hy + 11.6}" stroke="${look.watch === 'bac' ? ink : '#FFD43B'}" stroke-width="1" stroke-linecap="round"/>
+      </g>`;
+    }
+  } else if (look.pose === 'baochan') {
+    out += `<g>
+      <path d="M26 83 Q50 75 74 83 L72 91 Q50 84 28 91 Z" fill="${skin}" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M30 80 Q50 86 70 80" stroke="${skinShadow}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    </g>`;
+    if (look.watch && look.watch !== 'khong') {
+      const wBand = look.watch === 'bac' ? '#DEE2E6' : '#212529';
+      out += `<g><rect x="61" y="78" width="5.5" height="9.5" rx="1.5" fill="${wBand}" stroke="${ink}" stroke-width="1.3"/>
+        <circle cx="63.8" cy="82.8" r="3.5" fill="#FFD43B" stroke="${ink}" stroke-width="1.2"/></g>`;
+    }
+  } else {
+    // 'chumnguc' hoặc mặc định có nhẫn / đồng hồ (Cô Phương Hằng đan hai tay trước ngực khoe nhẫn kim cương & đồng hồ bạc)
+    const hy = 77;
+    out += `<g opacity="${handOp}">
+      <path d="M31 ${hy + 4} C31 ${hy - 1}, 36 ${hy - 2.5}, 48 ${hy - 1.5} C51 ${hy - 1}, 51 ${hy + 6.5}, 47 ${hy + 7.5} L34 ${hy + 7.5} Z" fill="${handFill}" stroke="${handStroke}" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M69 ${hy + 4} C69 ${hy - 1}, 64 ${hy - 2.5}, 51 ${hy - 1.5} C48 ${hy - 1}, 48 ${hy + 6.5}, 53 ${hy + 7.5} L66 ${hy + 7.5} Z" fill="${handFill}" stroke="${handStroke}" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M44 ${hy + 1} L54 ${hy + 1} M45 ${hy + 3.5} L55 ${hy + 3.5} M46 ${hy + 6} L54 ${hy + 6}" stroke="${skinShadow}" stroke-width="1.3" stroke-linecap="round"/>
+    </g>`;
+    if (look.ring === 'hoa') {
+      out += `<g>
+        <circle cx="55.5" cy="${hy + 2.2}" r="3.4" fill="url(#goldG)" stroke="${ink}" stroke-width="1.15"/>
+        <circle cx="55.5" cy="${hy + 2.2}" r="2" fill="#E7F5FF" stroke="#1C7ED6" stroke-width="0.8"/>
+        ${sparkle(58.5, hy - 0.8, 3)}${sparkle(52.5, hy + 4.2, 2.2, '#E7F5FF')}
+      </g>`;
+    }
+    if (look.watch && look.watch !== 'khong') {
+      const wBand = look.watch === 'bac' ? '#E9ECEF' : '#212529';
+      const wFace = look.watch === 'bac' ? '#FFFFFF' : '#343A40';
+      out += `<g>
+        <rect x="63.5" y="${hy - 1.8}" width="5.6" height="10.5" rx="1.6" fill="${wBand}" stroke="${ink}" stroke-width="1.3"/>
+        <circle cx="66.3" cy="${hy + 3.4}" r="3.8" fill="${wFace}" stroke="${ink}" stroke-width="1.3"/>
+        <circle cx="66.3" cy="${hy + 3.4}" r="2.5" fill="none" stroke="#74C0FC" stroke-width="0.7"/>
+        ${sparkle(69.5, hy + 0.5, 2.3)}
+      </g>`;
     }
   }
   return out;
 }
 
-/** Phụ kiện "lầy": đội trên đầu (vẽ sau tóc) và đeo trên mặt (vẽ sau cùng) */
+/** Phụ kiện "lầy": đội trên đầu (vẽ sau tóc) và đeo trên mặt (vẽ sau cùng, rõ nét và không che khuất biểu cảm) */
 function accessoryParts(acc: CharacterAccessory | undefined, hairFill: string, ink: string, skin: string) {
   const parts = { behind: '', hat: '', face: '' };
   switch (acc) {
     case 'kinhden':
-      parts.face = `<path d="M24 46 L30 45 M70 45 L76 46" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>
-        <rect x="29.5" y="42" width="18" height="12" rx="5" fill="#15110F" stroke="#000" stroke-width="1.5"/>
-        <rect x="52.5" y="42" width="18" height="12" rx="5" fill="#15110F" stroke="#000" stroke-width="1.5"/>
-        <path d="M47 46 Q50 44 53 46" stroke="#15110F" stroke-width="2.4" fill="none"/>
-        <path d="M33 45 L38 45 M56 45 L61 45" stroke="#FFF" stroke-width="2" stroke-linecap="round" opacity="0.8"/>`;
+      parts.face = `<path d="M23.5 45.5 L29.5 44.5 M70.5 44.5 L76.5 45.5" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M29 41.5 L47.5 41.5 L46.5 52.5 Q38 54.5 30 51.5 Z" fill="#14110F" stroke="url(#goldG)" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M52.5 41.5 L71 41.5 L70 51.5 Q62 54.5 53.5 52.5 Z" fill="#14110F" stroke="url(#goldG)" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M47 43.5 Q50 41.5 53 43.5" stroke="url(#goldG)" stroke-width="2.2" fill="none"/>
+        <path d="M32 43.8 L37 50.5 M35.5 43.8 L39 48.5 M55.5 43.8 L60.5 50.5 M59 43.8 L62.5 48.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" opacity="0.78"/>`;
       break;
     case 'raukem':
-      parts.face = `<path d="M43 63.5 Q50 67 57 63.5 Q57 78 50 79 Q43 78 43 63.5 Z" fill="${hairFill}" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M44 62 Q50 65 56 62" stroke="#FFF" stroke-width="1.6" fill="none" opacity="0.55"/>`;
+      parts.face = `<path d="M42.5 63.5 Q50 67.5 57.5 63.5 Q58 78.5 50 80 Q42 78.5 42.5 63.5 Z" fill="${hairFill}" stroke="${ink}" stroke-width="1.9" stroke-linejoin="round"/>
+        <path d="M46 66 L46 77 M50 66.5 L50 78.5 M54 66 L54 77" stroke="#FFFFFF" stroke-width="1.1" opacity="0.35" stroke-linecap="round"/>`;
       break;
     case 'ria':
-      parts.face = `<path d="M50 54.5 Q44 51 36 55 Q31 58 33 62 Q38 58 46 58.5 Q49 58.5 50 57.5 Q51 58.5 54 58.5 Q62 58 67 62 Q69 58 64 55 Q56 51 50 54.5 Z" fill="${hairFill}" stroke="${ink}" stroke-width="1.6" stroke-linejoin="round"/>`;
+      parts.face = `<path d="M50 55 Q43.5 50.5 35 54.8 Q29.5 57.8 32 62.2 Q37.5 58 46 58.8 Q49 58.8 50 57.5 Q51 58.8 54 58.8 Q62.5 58 68 62.2 Q70.5 57.8 65 54.8 Q56.5 50.5 50 55 Z" fill="${hairFill}" stroke="${ink}" stroke-width="1.7" stroke-linejoin="round"/>`;
       break;
     case 'nonla':
-      parts.hat = `<path d="M50 -2 L95 38 Q50 47 5 38 Z" fill="#EBCB8B" stroke="${ink}" stroke-width="2.5" stroke-linejoin="round"/>
-        <path d="M50 -2 L30 42 M50 -2 L70 42 M50 -2 L50 44 M50 -2 L14 40 M50 -2 L86 40" stroke="#C9A25A" stroke-width="1.4"/>
-        <path d="M16 29 Q50 38 84 29" stroke="#C9A25A" stroke-width="1.4" fill="none"/>
-        <path d="M27 41 Q30 64 40 71 M73 41 Q70 64 60 71" stroke="#E64980" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      parts.hat = `<path d="M50 0 L94 36 Q50 45 6 36 Z" fill="#EBCB8B" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M50 0 L28 39 M50 0 L72 39 M50 0 L50 40.5 M50 0 L14 37 M50 0 L86 37" stroke="#C0964B" stroke-width="1.35"/>
+        <path d="M22 24 Q50 31 78 24 M13 31 Q50 39 87 31" stroke="#C0964B" stroke-width="1.3" fill="none"/>
+        <path d="M26 39 Q29 63 40 70 M74 39 Q71 63 60 70" stroke="#F06595" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+        <path d="M46 70 Q50 73 54 70" stroke="#F06595" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
       break;
     case 'nonbh':
-      parts.hat = `<path d="M20 40 C16 6 84 6 80 40 Z" fill="#FFD43B" stroke="${ink}" stroke-width="2.5" stroke-linejoin="round"/>
-        <path d="M50 11 L50 38" stroke="#FFF" stroke-width="5"/>
-        <path d="M17 41 Q50 34 83 41 L83 36 Q50 29 17 36 Z" fill="#F59F00" stroke="${ink}" stroke-width="2"/>
-        <path d="M24 41 Q24 62 34 69 M76 41 Q76 62 66 69" stroke="${ink}" stroke-width="2" fill="none"/>`;
+      parts.hat = `<path d="M20 39 C16 6, 84 6, 80 39 Z" fill="#FFD43B" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M46 9 L54 9 L54 37 L46 37 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.2"/>
+        <path d="M17 40 Q50 33 83 40 L83 35 Q50 28 17 35 Z" fill="#F59F00" stroke="${ink}" stroke-width="2"/>
+        <path d="M24 40 Q24 61 34 68 M76 40 Q76 61 66 68" stroke="${ink}" stroke-width="2" fill="none"/>`;
       break;
     case 'bangdo':
-      parts.hat = `<path d="M25 30 Q50 21 75 30 L75.5 37 Q50 28 24.5 37 Z" fill="#E03131" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M74 31 L90 24 L86 33 L92 41 L75 36 Z" fill="#E03131" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="50" cy="27" r="3.6" fill="#FFF"/>`;
+      parts.hat = `<path d="M24.5 30 Q50 20.5 75.5 30 L76 37 Q50 27.5 24 37 Z" fill="#E03131" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M74 30.5 L90 23.5 L86 32.5 L92 40.5 L75 35.5 Z" fill="#E03131" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="38" cy="29" r="2" fill="#FFF"/><circle cx="50" cy="27" r="2.8" fill="#FFF"/><circle cx="62" cy="29" r="2" fill="#FFF"/>`;
       break;
     case 'khautrang':
       parts.face = `<path d="M30 52 L24 49 M70 52 L76 49" stroke="#74C0FC" stroke-width="2" stroke-linecap="round"/>
@@ -817,38 +986,38 @@ function accessoryParts(acc: CharacterAccessory | undefined, hairFill: string, i
         <path d="M33 59 Q50 63 67 59 M34 65 Q50 70 66 65" stroke="#74C0FC" stroke-width="1.5" fill="none"/>`;
       break;
     case 'muihe':
-      parts.face = `<circle cx="50" cy="53" r="7.5" fill="#F03E3E" stroke="${ink}" stroke-width="2"/><circle cx="47.5" cy="50.5" r="2.2" fill="#FFF" opacity="0.85"/>`;
+      parts.face = `<circle cx="50" cy="53" r="7.2" fill="#F03E3E" stroke="${ink}" stroke-width="2"/><circle cx="47.5" cy="50.5" r="2.3" fill="#FFF" opacity="0.88"/>`;
       break;
     case 'taitho':
-      parts.behind = `<g transform="rotate(-14 36 14)"><ellipse cx="36" cy="12" rx="7.5" ry="17" fill="#FFF" stroke="${ink}" stroke-width="2.3"/><ellipse cx="36" cy="14" rx="3.6" ry="11" fill="#FFA8C5"/></g>
-        <g transform="rotate(14 64 14)"><ellipse cx="64" cy="12" rx="7.5" ry="17" fill="#FFF" stroke="${ink}" stroke-width="2.3"/><ellipse cx="64" cy="14" rx="3.6" ry="11" fill="#FFA8C5"/></g>`;
+      parts.behind = `<g transform="rotate(-14 36 14)"><ellipse cx="36" cy="12" rx="7.5" ry="17" fill="#FFF" stroke="${ink}" stroke-width="2.3"/><ellipse cx="36" cy="14" rx="3.8" ry="11.5" fill="#FFA8C5"/></g>
+        <g transform="rotate(14 64 14)"><ellipse cx="64" cy="12" rx="7.5" ry="17" fill="#FFF" stroke="${ink}" stroke-width="2.3"/><ellipse cx="64" cy="14" rx="3.8" ry="11.5" fill="#FFA8C5"/></g>`;
       break;
     case 'bangcanhan':
-      parts.face = `<g transform="rotate(-28 66 57)"><rect x="56" y="52.5" width="20" height="9" rx="4" fill="#F4C79A" stroke="${ink}" stroke-width="1.6"/>
-        <rect x="62.5" y="52.5" width="7" height="9" fill="#E3A56F"/><circle cx="60" cy="57" r="0.9" fill="#B87942"/><circle cx="72.5" cy="57" r="0.9" fill="#B87942"/></g>
-        <path d="M33 33 L38 39" stroke="#C25B5B" stroke-width="1.8" stroke-linecap="round"/>`;
+      parts.face = `<g transform="rotate(-24 66 56)"><rect x="56" y="51.5" width="19" height="8.5" rx="3.8" fill="#F4C79A" stroke="${ink}" stroke-width="1.6"/>
+        <rect x="62" y="51.5" width="7" height="8.5" fill="#E3A56F"/><circle cx="59.5" cy="55.8" r="0.9" fill="#B87942"/><circle cx="72" cy="55.8" r="0.9" fill="#B87942"/></g>
+        <path d="M32 34 L38 40 M36 33 L33 40" stroke="#C92A2A" stroke-width="1.8" stroke-linecap="round"/>`;
       break;
     case 'troc':
-      parts.face = `<path d="M33 31 Q38 22.5 50 21.5" stroke="#FFF" stroke-width="3.4" fill="none" stroke-linecap="round" opacity="0.95"/>
-        <path d="M61 25 l2 -5 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2 Z" fill="#FFF" stroke="${ink}" stroke-width="0.8"/>
-        <path d="M50 21 q-1 -6 -5 -7 M50 21 q2 -6 6 -6" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+      parts.face = `<path d="M33 30.5 Q38 22 50 21" stroke="#FFF" stroke-width="3.6" fill="none" stroke-linecap="round" opacity="0.95"/>
+        ${sparkle(63, 24, 4.5)}
+        <path d="M50 20.5 q-1 -6 -5 -7 M50 20.5 q2 -6 6 -6" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
       break;
     case 'mahong':
-      parts.face = `<circle cx="30" cy="55" r="6.5" fill="#FF6B8A" opacity="0.8"/><circle cx="70" cy="55" r="6.5" fill="#FF6B8A" opacity="0.8"/>
-        <path d="M27 53 l2 4 M31 52 l2 4 M67 52 l2 4 M71 53 l2 4" stroke="#FFF" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>`;
+      parts.face = `<circle cx="30.5" cy="55" r="6.5" fill="#FF6B8A" opacity="0.78"/><circle cx="69.5" cy="55" r="6.5" fill="#FF6B8A" opacity="0.78"/>
+        <path d="M27.5 53 l2 4 M31.5 52 l2 4 M66.5 52 l2 4 M70.5 53 l2 4" stroke="#FFF" stroke-width="1.3" stroke-linecap="round" opacity="0.88"/>`;
       break;
     case 'prideghim':
-      parts.face = `<g><rect x="59" y="79" width="16" height="10.5" rx="1.5" fill="#FFF" stroke="${ink}" stroke-width="1.6"/>
-        ${PRIDE.map((c, i) => `<rect x="60" y="${80 + i * 1.5}" width="14" height="1.5" fill="${c}"/>`).join('')}
-        <circle cx="59" cy="79" r="1.6" fill="#ADB5BD" stroke="${ink}" stroke-width="0.8"/></g>`;
+      parts.face = `<g><rect x="58" y="75" width="16" height="10.5" rx="1.8" fill="#FFF" stroke="${ink}" stroke-width="1.6"/>
+        ${PRIDE.map((c, i) => `<rect x="59" y="${76 + i * 1.5}" width="14" height="1.5" fill="${c}"/>`).join('')}
+        <circle cx="58" cy="75" r="1.7" fill="url(#goldG)" stroke="${ink}" stroke-width="0.9"/></g>`;
       break;
     case 'prideco':
-      parts.face = `<g transform="rotate(10 78 78)"><line x1="74" y1="68" x2="74" y2="96" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>
-        <rect x="74" y="68" width="18" height="12" rx="1.5" fill="#FFF" stroke="${ink}" stroke-width="1.5"/>
-        ${PRIDE.map((c, i) => `<rect x="74.8" y="${68.8 + i * 1.8}" width="16.4" height="1.8" fill="${c}"/>`).join('')}</g>`;
+      parts.face = `<g transform="rotate(8 75 74)"><line x1="71" y1="64" x2="71" y2="90" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>
+        <rect x="71" y="64" width="17" height="11.5" rx="1.5" fill="#FFF" stroke="${ink}" stroke-width="1.5"/>
+        ${PRIDE.map((c, i) => `<rect x="71.8" y="${64.8 + i * 1.7}" width="15.4" height="1.7" fill="${c}"/>`).join('')}</g>`;
       break;
     case 'pridetoc':
-      parts.hat = `<g stroke-linecap="round" fill="none" stroke-width="2.1">${PRIDE.map((c, i) => `<path d="M${27 + i * 2.2} ${22 - i * 0.6} Q${25 + i * 2.2} ${33} ${29 + i * 2.2} ${44 + i}" stroke="${c}"/>`).join('')}</g>`;
+      parts.hat = `<g stroke-linecap="round" fill="none" stroke-width="2.3">${PRIDE.map((c, i) => `<path d="M${26 + i * 2.3} ${22 - i * 0.6} Q${24 + i * 2.3} 33 ${28 + i * 2.3} ${45 + i}" stroke="${c}"/>`).join('')}</g>`;
       break;
     case 'pridebang':
       parts.hat = `<defs><linearGradient id="pr" gradientUnits="userSpaceOnUse" x1="0" y1="22" x2="0" y2="38">${PRIDE.map((c, i) => `<stop offset="${(i / 6).toFixed(3)}" stop-color="${c}"/><stop offset="${((i + 1) / 6).toFixed(3)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>
@@ -933,19 +1102,26 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
           : '';
 
   // Tóc mái phía trước + chi tiết tóc (độ phồng, ngôi lệch, hai bên mai, tóc con, highlight)
+  const hairSheen = lighten(hairFill, 0.24);
   const baseFrontHair = bald ? '' : xh ? xh.front :
     c.hair === 'han'
-      ? `<path d="M24 42 C22 22, 38 16, 50 18 C62 16, 78 22, 76 42 C70 30, 58 26, 50 35 C42 26, 30 30, 24 42 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
+      ? `<path d="M24 42 C22 22, 38 16, 50 18 C62 16, 78 22, 76 42 C70 30, 58 26, 50 35 C42 26, 30 30, 24 42 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+         <path d="M31 24 Q41 20 48 28 M53 27 Q60 20 69 24" stroke="${hairSheen}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.45"/>`
       : c.hair === 'xoan'
-        ? `<path d="M23 41 C20 23, 35 15, 50 16 C65 15, 80 23, 77 41 C72 35, 65 38, 60 32 C55 38, 45 38, 40 32 C35 38, 28 35, 23 41 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>
-           <circle cx="34" cy="24" r="7" fill="${hairFill}"/><circle cx="50" cy="21" r="8" fill="${hairFill}"/><circle cx="66" cy="24" r="7" fill="${hairFill}"/>`
+        ? `<path d="M23 41 C20 23, 35 15, 50 16 C65 15, 80 23, 77 41 C72 35, 65 38, 60 32 C55 38, 45 38, 40 32 C35 38, 28 35, 23 41 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+           <circle cx="34" cy="24" r="7" fill="${hairFill}"/><circle cx="50" cy="21" r="8" fill="${hairFill}"/><circle cx="66" cy="24" r="7" fill="${hairFill}"/>
+           <path d="M31 23 Q35 19 39 23 M46 20 Q50 16 54 20 M61 23 Q65 19 69 23" stroke="${hairSheen}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.45"/>`
         : c.hair === 'dai'
-          ? `<path d="M23 44 C22 21, 36 16, 50 16 C64 16, 78 21, 77 44 C71 31, 61 28, 50 30 C39 28, 29 31, 23 44 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
+          ? `<path d="M23 44 C22 21, 36 16, 50 16 C64 16, 78 21, 77 44 C71 31, 61 28, 50 30 C39 28, 29 31, 23 44 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+             <path d="M31 24 Q42 19 50 23 Q58 19 69 24" stroke="${hairSheen}" stroke-width="1.7" fill="none" stroke-linecap="round" opacity="0.45"/>`
           : c.hair === 'bui'
-            ? `<path d="M24 42 C24 22, 36 18, 50 18 C64 18, 76 22, 76 42 C68 30, 58 27, 50 29 C42 27, 32 30, 24 42 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
+            ? `<path d="M24 42 C24 22, 36 18, 50 18 C64 18, 76 22, 76 42 C68 30, 58 27, 50 29 C42 27, 32 30, 24 42 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+               <path d="M33 24 Q50 19 67 24" stroke="${hairSheen}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.42"/>`
             : c.hair === 'undercut'
-              ? `<path d="M28 36 C28 18, 45 12, 68 16 C75 18, 76 28, 72 34 C62 28, 42 28, 28 36 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`
-              : `<path d="M24 40 C24 21, 36 17, 50 17 C64 17, 76 21, 76 40 C66 31, 34 31, 24 40 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.4"/>`;
+              ? `<path d="M28 36 C28 18, 45 12, 68 16 C75 18, 76 28, 72 34 C62 28, 42 28, 28 36 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+                 <path d="M35 23 Q50 16 66 20" stroke="${hairSheen}" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.48"/>`
+              : `<path d="M24 40 C24 21, 36 17, 50 17 C64 17, 76 21, 76 40 C66 31, 34 31, 24 40 Z" fill="${hairFill}" stroke="${hairStroke}" stroke-width="2.1"/>
+                 <path d="M34 23 Q50 19 66 23" stroke="${hairSheen}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>`;
 
   const hairVolY = look?.volume === 'cao' ? 1.1 : look?.volume === 'sat' ? 0.92 : 1;
   const foreheadShift = look?.forehead === 'rong' ? -2.2 : 0;
@@ -963,8 +1139,22 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
   const mouth = mf ? mf.mouth : mouthSvg(c, hairStroke);
   const tiltDeg = look?.tilt === 'trai' ? -5.5 : look?.tilt === 'phai' ? 5.5 : 0;
   const headTransform = tiltDeg !== 0 ? `transform="rotate(${tiltDeg} 50 52)"` : '';
+  const skinHi = lighten(skin, 0.12);
+  const earDeep = darken(skin, 0.24);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <radialGradient id="skinG" cx="46%" cy="38%" r="58%">
+        <stop offset="0%" stop-color="${skinHi}"/>
+        <stop offset="68%" stop-color="${skin}"/>
+        <stop offset="100%" stop-color="${skinShadow}"/>
+      </radialGradient>
+      <linearGradient id="goldG" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#FFF3BF"/>
+        <stop offset="50%" stop-color="#FCC419"/>
+        <stop offset="100%" stop-color="#E67700"/>
+      </linearGradient>
+    </defs>
     <rect width="100" height="100" rx="50" fill="${col.light}"/>
     <circle cx="50" cy="50" r="46" fill="none" stroke="${col.hex}" stroke-width="4" opacity="0.35"/>
     <g ${headTransform}>
@@ -973,13 +1163,14 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
     </g>
     <g transform="translate(50 0) scale(${sx} 1) translate(-50 0)">
       ${muscle}
-      <rect x="${50 - neckW / 2}" y="61" width="${neckW}" height="14" rx="5" fill="${skinShadow}" stroke="${hairStroke}" stroke-width="2"/>
+      <rect x="${50 - neckW / 2}" y="61" width="${neckW}" height="15" rx="5" fill="${skin}" stroke="${hairStroke}" stroke-width="1.9"/>
+      <path d="M${50 - neckW / 2 + 0.5} 62 Q50 69 ${50 + neckW / 2 - 0.5} 62 L${50 + neckW / 2 - 0.5} 68 Q50 73 ${50 - neckW / 2 + 0.5} 68 Z" fill="${skinShadow}" opacity="0.72"/>
+      <path d="M${50 - neckW / 2 + 2.5} 71 Q50 74 ${50 + neckW / 2 - 2.5} 71" stroke="${earDeep}" stroke-width="0.9" fill="none" opacity="0.45"/>
       ${outfit}
       ${tattooSvg(look)}
     </g>
     <g ${headTransform}>
-      <circle cx="${fshape.earL}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
-      <circle cx="${fshape.earR}" cy="49" r="5.5" fill="${skin}" stroke="${hairStroke}" stroke-width="2.2"/>
+      ${earsSvg(fshape.earL, fshape.earR, skin, skinShadow, earDeep, hairStroke)}
       ${fshape.head}
       ${fshape.extras}
       ${mf?.tint ?? ''}

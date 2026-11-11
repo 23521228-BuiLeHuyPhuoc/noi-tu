@@ -8,7 +8,9 @@ describe('cleanFun: chiêu "chọc mất dạy"', () => {
   it('nhận đúng các giá trị trong danh sách', () => {
     for (const d of DOODLES) expect(cleanFun({ kind: 'doodle', to: 'x', doodle: d })).toEqual({ kind: 'doodle', to: 'x', doodle: d });
     for (const n of NICKNAMES) expect(cleanFun({ kind: 'nick', to: 'x', nick: n })).toEqual({ kind: 'nick', to: 'x', nick: n });
-    for (const k of ['roach', 'ink', 'honk', 'cry'] as const) expect(cleanFun({ kind: k, to: 'x', junk: 1 })).toEqual({ kind: k, to: 'x' });
+    for (const k of ['roach', 'ink', 'honk', 'cry', 'blackout', 'spin', 'quake'] as const) {
+      expect(cleanFun({ kind: k, to: 'x', junk: 1 })).toEqual({ kind: k, to: 'x' });
+    }
     expect(cleanFun({ kind: 'charm', to: 'x' })).toEqual({ kind: 'charm' });
   });
 

@@ -33,7 +33,10 @@ export function cleanFun(raw: unknown): FunSend | null {
   if (f.kind === 'nick' && typeof f.to === 'string' && NICKNAMES.includes(f.nick as NicknameId)) {
     return { kind: 'nick', to: f.to, nick: f.nick as NicknameId };
   }
-  if ((f.kind === 'roach' || f.kind === 'ink' || f.kind === 'honk' || f.kind === 'cry') && typeof f.to === 'string') {
+  if (
+    (f.kind === 'roach' || f.kind === 'ink' || f.kind === 'honk' || f.kind === 'cry' || f.kind === 'blackout' || f.kind === 'spin' || f.kind === 'quake') &&
+    typeof f.to === 'string'
+  ) {
     return { kind: f.kind, to: f.to };
   }
   if (f.kind === 'charm') return { kind: 'charm' };
@@ -41,7 +44,7 @@ export function cleanFun(raw: unknown): FunSend | null {
 }
 
 /** "chọc mất dạy": nhóm chiêu có giới hạn riêng (chặt hơn ném đồ) */
-export const TROLL_KINDS: FunSend['kind'][] = ['doodle', 'roach', 'ink', 'nick', 'honk', 'cry', 'charm'];
+export const TROLL_KINDS: FunSend['kind'][] = ['doodle', 'roach', 'ink', 'nick', 'honk', 'cry', 'charm', 'blackout', 'spin', 'quake'];
 /** chiêu phủ lên màn hình người bị chọc: mỗi người bị chọc chỉ nhận 1 lần mỗi SCREEN_COOLDOWN_MS (từ bất kỳ ai) */
 export const SCREEN_KINDS: FunSend['kind'][] = ['roach', 'ink'];
 export const SCREEN_COOLDOWN_MS = 8000;

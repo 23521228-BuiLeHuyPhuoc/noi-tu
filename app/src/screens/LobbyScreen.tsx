@@ -822,6 +822,19 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
             options={[{ id: 'khong', label: 'Tay trần' }, { id: 'co', label: '🧤 Găng nilon trong suốt' }]}
             onPick={(v) => updateLook('glove', v)}
           />
+          <LookRow
+            label="Tư thế tay"
+            prefix="pose"
+            value={myLook.pose ?? 'thang'}
+            color={myColor.hex}
+            options={[
+              { id: 'thang', label: 'Bình thường' },
+              { id: 'chongcam', label: '💁 Chống cằm' },
+              { id: 'chumnguc', label: '🙏 Đan tay trước ngực' },
+              { id: 'baochan', label: '💪 Khoanh tay' },
+            ]}
+            onPick={(v) => updateLook('pose', v)}
+          />
         </SectionBox>
 
         <SectionBox id="hinhxam" title="🐉 Hình xăm (bờ vai & bắp tay)" open={openSections.hinhxam} onToggle={() => toggleSection('hinhxam')}>
