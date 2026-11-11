@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
 import type { RoomState, WordChainView, WordDefinition, WordHistoryItem, WordVote } from '../../../shared/src/types';
 import type { Game } from '../useGame';
@@ -97,6 +97,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setSending(true);
     const r = await game.act({ type: 'submit', word: w });
     setSending(false);
+    inputRef.current?.focus();
     if (!r.ok) {
       setError(actionText[r.reason]);
       setRejected(r.reason === 'not_in_dictionary' ? w : null);
@@ -186,7 +187,10 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                   blurOnSubmit={false}
                 />
               </View>
-              <Button testID="submit-btn" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 76, marginBottom: 0 }} />
+              {/* giữ con trỏ trong ô nhập khi bấm Gửi: trên Android, mất focus làm bàn phím đóng, nút tụt xuống và cú chạm trượt khỏi nút */}
+              <View onPointerDown={(e) => { if (Platform.OS === 'web') e.preventDefault(); }}>
+                <Button testID="submit-btn" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 76, marginBottom: 0 }} />
+              </View>
             </View>
             {error && <T testID="word-error" style={styles.error}>{error}</T>}
             {rejected && !voting && (

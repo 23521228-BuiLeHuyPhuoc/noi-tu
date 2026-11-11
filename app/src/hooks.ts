@@ -60,20 +60,38 @@ export function useKeyboardInset(): number {
 export function useKeyboardLift(ref: React.RefObject<ComponentRef<typeof View> | null>): number {
   const [lift, setLift] = useState(0);
   const liftRef = useRef(0);
-  useEffect(
-    () =>
-      subscribeKeyboard((inset) => {
-        const el = ref.current as unknown as HTMLElement | null;
-        let next = 0;
-        if (inset > 0 && el?.getBoundingClientRect) {
-          const base = el.getBoundingClientRect().bottom + liftRef.current;
-          next = Math.max(0, Math.round(base + 10 - (window.innerHeight - inset)));
+  useEffect(() => {
+    let inset = 0;
+    const recompute = () => {
+      const el = ref.current as unknown as HTMLElement | null;
+      let next = 0;
+      if (inset > 0 && el?.getBoundingClientRect) {
+        // Lấy độ nhích ĐANG THỰC SỰ áp lên phần tử (đọc từ transform đã vẽ), không dùng giá trị vừa tính:
+        // Android bắn nhiều sự kiện bàn phím liên tiếp trước khi React kịp vẽ lại, cộng dồn sẽ đẩy ô nhập vọt lên quá cao.
+        let applied = 0;
+        const t = window.getComputedStyle(el).transform;
+        if (t && t !== 'none') {
+          const m = t.match(/matrix(3d)?\(([^)]+)\)/);
+          if (m) { const v = m[2].split(',').map(Number); applied = m[1] ? v[13] : v[5]; }
         }
-        liftRef.current = next;
-        setLift(next);
-      }),
-    [ref],
-  );
+        const base = el.getBoundingClientRect().bottom - (Number.isFinite(applied) ? applied : 0);
+        next = Math.max(0, Math.round(base + 10 - (window.innerHeight - inset)));
+      }
+      if (next === liftRef.current) return;
+      liftRef.current = next;
+      setLift(next);
+    };
+    const off = subscribeKeyboard((v) => { inset = v; recompute(); });
+    // bố cục đổi lúc bàn phím đang mở (từ mới, lỗi hiện ra, nghĩa dài/ngắn) thì tính lại vị trí
+    const ro = typeof ResizeObserver !== 'undefined' && typeof document !== 'undefined' ? new ResizeObserver(() => recompute()) : null;
+    if (ro) {
+      ro.observe(document.body);
+      // khối ô nhập cao thêm (vd. hiện dòng báo lỗi) thì nâng thêm để dòng đó không bị bàn phím che
+      const own = ref.current as unknown as Element | null;
+      if (own && own instanceof Element) ro.observe(own);
+    }
+    return () => { off(); ro?.disconnect(); };
+  }, [ref]);
   return lift;
 }
 
