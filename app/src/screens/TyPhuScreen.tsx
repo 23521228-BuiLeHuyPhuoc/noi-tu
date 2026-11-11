@@ -97,6 +97,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const [cardFx, setCardFx] = useState<CardFx | null>(null);
   const prevCashRef = useRef<Record<string, number>>({ ...g.cash });
   const [reacts, setReacts] = useState<Record<string, Reaction>>({});
+  const [rulesOpen, setRulesOpen] = useState(false);
   const prevOwnersRef = useRef<Record<number, string>>({ ...g.owners });
   const prevHousesRef = useRef<Record<number, number>>({ ...g.houses });
   const lastLogRef = useRef(g.log.at(-1)?.id ?? 0);
@@ -469,6 +470,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 onEnd={() => setEnding(true)}
                 onAct={(a) => void act({ type: a })}
                 speed={speed}
+                onRules={() => setRulesOpen(true)}
                 onSpeed={() => void act({ type: 'speed', value: speed >= 3 ? 1 : speed + 1 })}
                 onCell={setDetail}
                 onPlayer={(id) => { if (id !== me) setThrowAt(id); }}
@@ -613,6 +615,13 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         <ThrowSheet game={game} target={playerById.get(throwAt)!} onClose={() => setThrowAt(null)} />
       )}
 
+      {rulesOpen && (
+        <Sheet title="Luật chơi Cờ tỷ phú" onClose={() => setRulesOpen(false)}>
+          {RULES.map((r) => <T key={r} style={{ fontSize: 13, lineHeight: 19 }}>• {r}</T>)}
+          <Button title="Đã hiểu" variant="ink" onPress={() => setRulesOpen(false)} />
+        </Sheet>
+      )}
+
       {ending && (
         <Sheet title="Tổng kết ván cờ?" onClose={() => setEnding(false)}>
           <T style={{ color: C.muted }}>Ván sẽ dừng lại và xếp hạng theo tổng tài sản (tiền mặt + đất + nhà).</T>
@@ -633,6 +642,20 @@ const REACT_LOSS = [
 const REACT_GAIN = [
   'Phê vãi! 🤑', 'Sướng vãi chưởng 😎', 'Sướng vãi l*n 🤑', 'Tiền về, phê pha 💸', 'Sướng tê người 😍',
   'Giàu rồi anh em ơi! 🤑', 'Ngon lành cành đào 😎', 'Phê như con tê tê 🤤',
+];
+
+const RULES = [
+  'Mỗi người có 1.500 xu. Đổ 2 xúc xắc rồi đi theo chiều kim đồng hồ.',
+  'Đổ đôi được tung thêm lượt; đổ đôi 3 lần liên tiếp thì vào tù.',
+  'Đi qua hoặc dừng ở Xuất phát được +200 xu.',
+  'Dừng ở đất chưa ai mua: được mua. Dừng ở đất người khác: trả tiền thuê (đủ bộ màu mà đất trống thì thuê x2).',
+  'Dừng ở đất của mình: nâng lên đúng 1 cấp (nhà cấp 1 → 2 → 3 → khách sạn). Lần sau dừng lại mới nâng tiếp.',
+  'Ga: thuê 25/50/100/200 theo số ga cùng chủ. Công ty điện, nước: tổng xúc xắc × 4, có cả hai thì × 10.',
+  'Thuế và tiền phạt dồn vào hũ ở ô Nghỉ chân; ai dừng ở đó ăn cả hũ.',
+  'Vào tù: đổ đôi để ra (đi luôn nhưng không tung thêm), hoặc trả 50 xu trước khi đổ; ngồi đủ 3 lượt thì trả 50 rồi đi.',
+  'Thiếu tiền: tự bán nhà rồi bán đất với nửa giá. Vẫn thiếu thì phá sản; nợ người chơi thì người đó nhận hết đất.',
+  'Thắng luôn khi: có đủ 4 ga, hoặc mọi ô đất trên một cạnh bàn, hoặc 3 bộ màu. Không thì người cuối cùng còn trụ lại thắng.',
+  'Nút x1/x2/x3 chỉnh tốc độ cho cả bàn. Chủ phòng có thể Tổng kết sớm: xếp theo tổng tài sản.',
 ];
 
 const money = (n: number) => n.toLocaleString('vi-VN');
@@ -684,7 +707,8 @@ function DecisionCard(p: {
     const cost = TYPHU_GROUPS[c.group].house;
     const cash = g.cash[p.me] ?? 0;
     const full = groupCells(c.group).every((x) => g.owners[x] === p.me);
-    const options = Array.from({ length: TYPHU_MAX_HOUSES - h }, (_, k) => k + 1).filter((n) => n * cost <= cash);
+    // mỗi lần dừng chỉ lên đúng 1 cấp: đất trống -> cấp 1 -> cấp 2 -> cấp 3 -> khách sạn
+    const afford = cash >= cost;
     const label = (lv: number) => (lv >= TYPHU_MAX_HOUSES ? 'Khách sạn' : `Nhà cấp ${lv}`);
     return (
       <View style={dc.wrap} pointerEvents="box-none">
@@ -695,15 +719,14 @@ function DecisionCard(p: {
           </View>
           <View style={dc.body}>
             <View style={dc.rentRow}><T style={dc.rentK}>Tiền thuê hiện tại</T><T style={dc.rentV}>{money(rentOf(i, h, full))} xu</T></View>
-            {options.map((n) => (
-              <View key={n} style={dc.buildRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <T numberOfLines={1} style={dc.rentV}>{label(h + n)}</T>
-                  <T style={dc.rentK}>Thuê {money(rentOf(i, h + n, full))} xu</T>
-                </View>
-                <Button testID={`build-${h + n}`} small variant="gold" title={`-${money(n * cost)}`} style={{ minHeight: 30, paddingVertical: 2 }} onPress={() => p.onAct({ type: 'build', cell: i, levels: n })} />
+            <View style={dc.buildRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <T numberOfLines={1} style={dc.rentV}>Lên {label(h + 1)}</T>
+                <T style={dc.rentK}>Thuê {money(rentOf(i, h + 1, full))} xu</T>
               </View>
-            ))}
+              <Button testID="build-btn" small variant="gold" disabled={!afford} title={`-${money(cost)}`} style={{ minHeight: 30, paddingVertical: 2 }} onPress={() => p.onAct({ type: 'build', cell: i })} />
+            </View>
+            {h + 1 < TYPHU_MAX_HOUSES && <T style={dc.note}>Lần sau dừng ở đây mới lên tiếp {label(h + 2)}</T>}
             <Button testID="skip-btn" small variant="paper" title="Để sau" onPress={() => p.onAct({ type: 'skip' })} />
           </View>
         </View>

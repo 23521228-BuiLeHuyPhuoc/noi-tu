@@ -70,7 +70,7 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 45);
   });
 
-  it('dừng ở đất của mình thì nâng cấp ngay, một lúc nhiều cấp, tối đa khách sạn', () => {
+  it('dừng ở đất của mình thì nâng đúng 1 cấp, không nhảy cóc', () => {
     const { g, v, own, settle, push } = make(2);
     own([3], 'p0');
     expect(g.action('p0', { type: 'build', cell: 3 }).ok).toBe(false); // chưa tới ô thì chưa xây được
@@ -78,10 +78,10 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     g.action('p0', { type: 'roll' }); settle();
     expect(v().step).toBe('upgrade');
     expect(g.action('p0', { type: 'build', cell: 1 }).ok).toBe(false); // chỉ ô đang đứng
-    expect(g.action('p0', { type: 'build', cell: 3, levels: 5 }).ok).toBe(false); // quá khách sạn
-    expect(g.action('p0', { type: 'build', cell: 3, levels: 2 }).ok).toBe(true);
-    expect(v().houses[3]).toBe(2);
-    expect(v().cash.p0).toBe(1500 - 2 * TYPHU_GROUPS.nau.house);
+    expect(g.action('p0', { type: 'build', cell: 3, levels: 2 }).ok).toBe(false); // không nhảy cóc 2 cấp
+    expect(g.action('p0', { type: 'build', cell: 3 }).ok).toBe(true);
+    expect(v().houses[3]).toBe(1);
+    expect(v().cash.p0).toBe(1500 - TYPHU_GROUPS.nau.house);
     expect(v().step).not.toBe('upgrade');
   });
 
@@ -210,7 +210,7 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
         } else if (s.step === 'buy') {
           g.action(cur, { type: pickR() < 0.75 ? 'buy' : 'skip' });
         } else if (s.step === 'upgrade') {
-          if (pickR() < 0.7) g.action(cur, { type: 'build', cell: s.pendingBuy!, levels: 1 + Math.floor(pickR() * 2) });
+          if (pickR() < 0.7) g.action(cur, { type: 'build', cell: s.pendingBuy! });
           if (v().step === 'upgrade') g.action(cur, { type: 'skip' });
         } else {
           vi.advanceTimersByTime(2000);

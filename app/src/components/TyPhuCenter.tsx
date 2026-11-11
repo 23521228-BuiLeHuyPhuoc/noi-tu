@@ -55,6 +55,7 @@ export interface CenterProps {
   /** câu cảm thán của từng người khi tiền thay đổi */
   speed?: number;
   onSpeed?: () => void;
+  onRules?: () => void;
   reacts?: Record<string, { text: string; kind: 'gain' | 'loss'; from: number; until: number }>;
   onCell: (i: number) => void;
   onPlayer: (id: string) => void;
@@ -230,6 +231,7 @@ export function TyPhuCenter(p: CenterProps) {
       {L.tools.h > 0 && tools && (
         <View style={[abs(L.tools), styles.tools]}>
           <MiniBtn testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
+          {p.onRules && <MiniBtn testID="rules-open" label="Luật chơi" icon="📖" onPress={p.onRules} />}
           {p.onSpeed && <MiniBtn testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
           <MiniBtn label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
           {p.isHost && <MiniBtn testID="end-open" label="Tổng kết" icon="🏁" onPress={p.onEnd} />}

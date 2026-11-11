@@ -143,6 +143,7 @@ export class TyPhuGame implements GameEngine {
         this.owners[this.pendingBuy] = me.id;
         this.addLog('buy', `${me.name} mua ${c.name} giá ${fmt(c.price)} xu`);
         this.pendingBuy = null;
+        if (this.checkMonopoly(me)) return { ok: true };
         this.afterLanding();
         return { ok: true };
       }
@@ -218,20 +219,21 @@ export class TyPhuGame implements GameEngine {
   }
 
   /**
-   * Nâng cấp nhà kiểu Cờ tỷ phú Việt: dừng ở đất của mình thì được xây thêm ngay tại ô đó
-   * (một lúc nhiều cấp nếu đủ tiền), không cần đủ bộ màu. Cấp 4 = khách sạn.
+   * Nâng cấp nhà kiểu Cờ tỷ phú Việt: dừng ở đất của mình thì được nâng thêm đúng 1 cấp ngay tại ô đó,
+   * không cần đủ bộ màu. Cấp 4 = khách sạn.
    */
-  private build(me: TPlayer, cell: unknown, levels: unknown = 1): ActionResult {
+  private build(me: TPlayer, cell: unknown, levels?: unknown): ActionResult {
     if (this.step !== 'upgrade' || this.pendingBuy === null || cell !== this.pendingBuy) return { ok: false, reason: 'cannot_build' };
     const c = TYPHU_BOARD[cell];
     if (c.kind !== 'land' || this.owners[cell] !== me.id) return { ok: false, reason: 'cannot_build' };
     const cur = this.houses[cell] ?? 0;
-    const n = typeof levels === 'number' && Number.isInteger(levels) ? levels : 1;
-    if (n < 1 || cur + n > TYPHU_MAX_HOUSES) return { ok: false, reason: 'cannot_build' };
-    const cost = n * TYPHU_GROUPS[c.group].house;
+    // nâng lần lượt từng cấp: đất trống -> nhà cấp 1 -> cấp 2 -> cấp 3 -> khách sạn, mỗi lần dừng chỉ lên 1 cấp
+    const n = levels === undefined ? 1 : levels;
+    if (n !== 1 || cur + 1 > TYPHU_MAX_HOUSES) return { ok: false, reason: 'cannot_build' };
+    const cost = TYPHU_GROUPS[c.group].house;
     if (me.cash < cost) return { ok: false, reason: 'no_money' };
     me.cash -= cost;
-    this.houses[cell] = cur + n;
+    this.houses[cell] = cur + 1;
     const h = this.houses[cell];
     this.addLog('build', h === TYPHU_MAX_HOUSES ? `${me.name} xây khách sạn ở ${c.name} 🏨` : `${me.name} nâng ${c.name} lên nhà cấp ${h}`);
     this.pendingBuy = null;
@@ -405,7 +407,8 @@ export class TyPhuGame implements GameEngine {
       return this.wait(() => this.nextPlayer());
     }
     if (card.goto !== undefined) return this.moveTo(card.goto);
-    if (card.move) return this.moveBy(card.move, false, 'card');
+    // lùi 3 ô mà rơi vào Khí vận thì vẫn rút thẻ như luật gốc (thẻ Khí vận không có lệnh di chuyển nên không lặp)
+    if (card.move) return this.moveBy(card.move, !community, 'card');
     this.afterLanding();
   }
 
@@ -526,6 +529,30 @@ export class TyPhuGame implements GameEngine {
     this.addLog('bankrupt', `${p.name} ${why}, phá sản 💸${to ? ` (chủ nợ: ${to.name})` : ''}`);
   }
 
+  /**
+   * Thắng nhanh kiểu Cờ tỷ phú Việt: độc quyền cả 4 nhà ga, hoặc mọi ô đất trên một cạnh bàn cờ,
+   * hoặc 3 bộ màu trọn vẹn. Trả về true nếu ván vừa kết thúc.
+   */
+  private checkMonopoly(p: TPlayer): boolean {
+    const mine = (i: number) => this.owners[i] === p.id;
+    let why = '';
+    const stations = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'station' ? [i] : []));
+    if (stations.every(mine)) why = 'độc quyền cả 4 nhà ga';
+    for (const [a, b] of [[1, 9], [11, 19], [21, 29], [31, 39]]) {
+      if (why) break;
+      const lands = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && i >= a && i <= b ? [i] : []));
+      if (lands.every(mine)) why = 'độc quyền trọn một cạnh bàn cờ';
+    }
+    if (!why) {
+      const sets = (Object.keys(TYPHU_GROUPS) as (keyof typeof TYPHU_GROUPS)[]).filter((gr) => groupCells(gr).every(mine));
+      if (sets.length >= 3) why = 'gom đủ 3 bộ màu';
+    }
+    if (!why) return false;
+    this.addLog('info', `${p.name} ${why}, thắng luôn! 🏆`);
+    this.end(p, why);
+    return true;
+  }
+
   private checkEnd(): boolean {
     const alive = this.players.filter((p) => !p.bankrupt);
     if (alive.length > 1) return false;
@@ -584,7 +611,7 @@ export class TyPhuGame implements GameEngine {
     return w;
   }
 
-  private end(winner: TPlayer | null): void {
+  private end(winner: TPlayer | null, why?: string): void {
     if (this.over) return;
     this.over = true;
     this.movement = null;
@@ -596,7 +623,7 @@ export class TyPhuGame implements GameEngine {
     const top = winner ?? ranked.find((p) => !p.bankrupt) ?? null;
     this.ctx.finish({
       winnerId: top?.id ?? null,
-      headline: top ? `${top.name} trở thành tỷ phú với ${fmt(this.worth(top))} xu!` : 'Cả bàn phá sản',
+      headline: top ? (why ? `${top.name} ${why}, thắng ván!` : `${top.name} trở thành tỷ phú với ${fmt(this.worth(top))} xu!`) : 'Cả bàn phá sản',
       ranking: ranked.map((p) => ({
         playerId: p.id,
         name: p.name,
