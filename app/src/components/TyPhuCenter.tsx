@@ -52,6 +52,8 @@ export interface CenterProps {
   isHost: boolean;
   onEnd: () => void;
   onAct: (a: 'roll' | 'buy' | 'skip' | 'endTurn' | 'payJail') => void;
+  /** câu cảm thán của từng người khi tiền thay đổi */
+  reacts?: Record<string, { text: string; kind: 'gain' | 'loss'; from: number; until: number }>;
   onCell: (i: number) => void;
   onPlayer: (id: string) => void;
 }
@@ -72,7 +74,10 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   const cur = id === g.currentPlayerId;
   const lands = Object.values(g.owners).filter((o) => o === id).length;
   const fl = p.flash[id];
+  const rc = p.reacts?.[id];
+  const showRc = rc && p.now >= rc.from && p.now < rc.until;
   return (
+    <>
     <Pressable
       testID={`wealth-card-${id}`}
       accessibilityRole="button"
@@ -111,6 +116,13 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
         <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
       </View>
     </Pressable>
+    {showRc && (
+      <View pointerEvents="none" style={[styles.react, { left: rect.x + 4, top: rect.y - 30, maxWidth: rect.w + 30, borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]}>
+        <T numberOfLines={1} style={[styles.reactTxt, { color: rc.kind === 'loss' ? '#C92A2A' : '#2B8A3E' }]}>{rc.text}</T>
+        <View style={[styles.reactTail, { borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]} />
+      </View>
+    )}
+    </>
   );
 }
 
@@ -357,6 +369,9 @@ const styles = StyleSheet.create({
   },
   sumTxt: { fontWeight: '900', fontSize: 14, color: C.ink },
   fillBtn: { flex: 1, minHeight: 34 },
+  react: { position: 'absolute', zIndex: 30, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 14, borderWidth: 2, boxShadow: '0px 3px 8px rgba(0,0,0,0.25)' },
+  reactTxt: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
+  reactTail: { position: 'absolute', left: 16, bottom: -6, width: 10, height: 10, borderRightWidth: 2, borderBottomWidth: 2, transform: [{ rotate: '45deg' }] },
   countdown: {
     position: 'absolute', top: 8, left: 8, minWidth: 54, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12,
     backgroundColor: 'rgba(17,17,17,0.78)', alignItems: 'center', borderWidth: 2, borderColor: '#fff',

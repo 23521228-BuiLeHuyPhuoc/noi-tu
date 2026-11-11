@@ -31,19 +31,37 @@ const INK = '#111';
 
 const svgUri = (body: string, vb: string) =>
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}"><g stroke="#111" stroke-width="2" stroke-linejoin="round">${body}</g></svg>`)}`;
-/** nhà xanh mái nhọn và khách sạn đỏ kiểu quân nhà của bàn cờ in */
-const HOUSE = svgUri('<path d="M2 11L10 3L18 11V19H2Z" fill="#2FB344"/><path d="M2 11L10 3L18 11" fill="none"/><rect x="8" y="13" width="4" height="6" fill="#1B7A2E"/>', '0 0 20 21');
-const HOTEL = svgUri('<path d="M2 9L8 3H28L34 9V19H2Z" fill="#E03131"/><path d="M2 9H34" fill="none"/><rect x="15" y="12" width="6" height="7" fill="#A61E1E"/><rect x="6" y="11" width="4" height="4" fill="#FFE3E3" stroke-width="1.2"/><rect x="26" y="11" width="4" height="4" fill="#FFE3E3" stroke-width="1.2"/>', '0 0 36 21');
+/** làm tối một màu hex (cho cửa/mái) */
+function shade(hex: string, k = 0.6): string {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v: number) => Math.round(v * k);
+  return `rgb(${f(n >> 16)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+}
+const houseCache = new Map<string, { house: string; hotel: string }>();
+/** nhà mái nhọn và khách sạn theo đúng màu người chơi sở hữu */
+function buildingsOf(color: string) {
+  let v = houseCache.get(color);
+  if (!v) {
+    const dark = shade(color);
+    v = {
+      house: svgUri(`<path d="M2 11L10 3L18 11V19H2Z" fill="${color}"/><path d="M2 11L10 3L18 11" fill="none"/><rect x="8" y="13" width="4" height="6" fill="${dark}"/>`, '0 0 20 21'),
+      hotel: svgUri(`<path d="M2 9L8 2H28L34 9V19H2Z" fill="${color}"/><path d="M8 2H28L34 9H2Z" fill="#FFD43B"/><rect x="15" y="12" width="6" height="7" fill="${dark}"/><rect x="6" y="11" width="4" height="4" fill="#fff" stroke-width="1.2"/><rect x="26" y="11" width="4" height="4" fill="#fff" stroke-width="1.2"/><path d="M18 3.5l1 2 2 .3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2L15 5.8l2-.3z" fill="#fff" stroke-width="0.8"/>`, '0 0 36 21'),
+    };
+    houseCache.set(color, v);
+  }
+  return v;
+}
 
-/** Nhà cấp 1-3: nhà xanh nhỏ; cấp 4: khách sạn đỏ. `vertical`: xếp dọc (ô ở cạnh bên). */
-function Houses({ n, size, vertical }: { n: number; size: number; vertical: boolean }) {
+/** Nhà cấp 1-3: nhà nhỏ màu chủ đất; cấp 4: khách sạn mái vàng có sao. `vertical`: xếp dọc (ô ở cạnh bên). */
+function Houses({ n, size, vertical, color }: { n: number; size: number; vertical: boolean; color: string }) {
   if (n <= 0) return null;
+  const b = buildingsOf(color);
   if (n >= TYPHU_MAX_HOUSES) {
-    return <Image source={{ uri: HOTEL }} style={vertical ? { width: size * 1.05, height: size * 0.62 } : { width: size * 1.75, height: size * 1.02 }} resizeMode="contain" />;
+    return <Image source={{ uri: b.hotel }} style={vertical ? { width: size * 1.05, height: size * 0.62 } : { width: size * 1.75, height: size * 1.02 }} resizeMode="contain" />;
   }
   return (
     <View style={{ flexDirection: vertical ? 'column' : 'row', gap: 1 }}>
-      {Array.from({ length: n }, (_, k) => <Image key={k} source={{ uri: HOUSE }} style={{ width: size, height: size * 1.05 }} resizeMode="contain" />)}
+      {Array.from({ length: n }, (_, k) => <Image key={k} source={{ uri: b.house }} style={{ width: size, height: size * 1.05 }} resizeMode="contain" />)}
     </View>
   );
 }
@@ -94,7 +112,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const iconSize = Math.min(W * 0.8, p.h * 0.4);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>
-        <Houses n={p.houses} size={Math.min(bandH - 2, (W - 6) / 3.3)} vertical={false} />
+        <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(bandH - 2, (W - 6) / 3.3)} vertical={false} />
       </View>
     ) : null;
     return (
@@ -122,7 +140,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const sidePrice = priceTxt.replace(' xu', '');
   const bandEl = band ? (
     <View style={[styles.bandV, { backgroundColor: band }, p.side === 'right' ? styles.bandBorderL : styles.bandBorderR]}>
-      <Houses n={p.houses} size={Math.min(12, (H - 6) / 3.3)} vertical />
+      <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(12, (H - 6) / 3.3)} vertical />
     </View>
   ) : null;
   return (

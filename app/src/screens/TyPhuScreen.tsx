@@ -95,6 +95,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const [fx, setFx] = useState<Fx[]>([]);
   const [cardFx, setCardFx] = useState<CardFx | null>(null);
   const prevCashRef = useRef<Record<string, number>>({ ...g.cash });
+  const [reacts, setReacts] = useState<Record<string, Reaction>>({});
   const prevOwnersRef = useRef<Record<number, string>>({ ...g.owners });
   const prevHousesRef = useRef<Record<number, number>>({ ...g.houses });
   const lastLogRef = useRef(g.log.at(-1)?.id ?? 0);
@@ -122,6 +123,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     ...fx.map(fxEnd),
     ...announces.map((x) => x.end),
     cardFx ? cardFx.at + 3600 : 0,
+    ...Object.values(reacts).map((r) => r.until),
   );
   const animationEndsAt = reducedMotion ? 0 : Math.max(
     movement?.endsAt ?? 0,
@@ -271,6 +273,18 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         announce('bankrupt', t0 + msUntilArrive(), { title: l.text, portrait: portraitUriOf(who), color: colorOf(who) });
         feed(l.text, 'bad');
       }
+    }
+    // người chơi chửi thề khi mất tiền, sướng rơn khi được tiền
+    const ids = Object.keys(deltas);
+    if (ids.length) {
+      // nói sau khi thông báo to của sự kiện này tắt
+      const start = anns.length && !reducedMotion ? Math.max(t0, lastAnnEnd.current - 400) : t0;
+      const picked: Record<string, Reaction> = {};
+      for (const id of ids) {
+        const lines = deltas[id] < 0 ? REACT_LOSS : REACT_GAIN;
+        picked[id] = { text: lines[(seqId() * 7 + Math.abs(deltas[id])) % lines.length], kind: deltas[id] < 0 ? 'loss' : 'gain', from: start, until: start + 2800 };
+      }
+      setReacts((o) => ({ ...o, ...picked }));
     }
     if (anns.length && !reducedMotion) setAnnounces((old) => [...old.filter((x) => x.end > t0), ...anns]);
     for (const [id, delta] of Object.entries(deltas)) {
@@ -442,6 +456,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 clockOffset={game.clockOffset}
                 onThrow={(impulse) => void act({ type: 'roll', impulse })}
                 flash={flash}
+                reacts={reacts}
                 card={cardFx}
                 reducedMotion={reducedMotion}
                 error={error}
@@ -603,6 +618,16 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   );
 }
 
+
+export type Reaction = { text: string; kind: 'gain' | 'loss'; from: number; until: number };
+const REACT_LOSS = [
+  'Đ*t! Cay vãi 🤬', 'Mẹ nó, mất tiền rồi! 😡', 'Đ* má, xui vãi 🤬', 'Đ*o chịu nổi! 😤', 'Cay như ớt hiểm 🌶️',
+  'Trời ơi tiền của tui 😭', 'Vãi c*, nghèo rồi 😩', 'Ức chế vãi chưởng 😤', 'Thôi xong, đ*t mẹ 🤬',
+];
+const REACT_GAIN = [
+  'Phê vãi! 🤑', 'Sướng vãi chưởng 😎', 'Sướng vãi l*n 🤑', 'Tiền về, phê pha 💸', 'Sướng tê người 😍',
+  'Giàu rồi anh em ơi! 🤑', 'Ngon lành cành đào 😎', 'Phê như con tê tê 🤤',
+];
 
 const money = (n: number) => n.toLocaleString('vi-VN');
 
