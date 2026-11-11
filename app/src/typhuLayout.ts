@@ -11,21 +11,21 @@ export interface BoardGeo {
   side: BandSide[];
 }
 
-/** Bàn vuông 9 × 9 kiểu bàn cờ in: 4 ô góc vuông to, 7 ô mỗi cạnh, các ô sát nhau. */
+/** Bàn vuông 11 × 11 kiểu bàn cờ in: 4 ô góc vuông to, 9 ô mỗi cạnh, các ô sát nhau. */
 export function makeGeo(S: number): BoardGeo {
-  const d = Math.round(S * 0.16);
-  const m = (S - 2 * d) / 7;
-  const pos = (k: number) => (k === 0 ? 0 : k === 8 ? d + 7 * m : d + (k - 1) * m);
-  const len = (k: number) => (k === 0 || k === 8 ? d : m);
+  const d = Math.round(S * 0.135);
+  const m = (S - 2 * d) / 9;
+  const pos = (k: number) => (k === 0 ? 0 : k === 10 ? d + 9 * m : d + (k - 1) * m);
+  const len = (k: number) => (k === 0 || k === 10 ? d : m);
   const rect: Rect[] = [];
   const side: BandSide[] = [];
   for (let i = 0; i < TYPHU_SIZE; i++) {
     const [r, c] = typhuCellPos(i);
     rect.push({ x: pos(c), y: pos(r), w: len(c), h: len(r) });
-    const corner = (r === 0 || r === 8) && (c === 0 || c === 8);
-    side.push(corner ? 'corner' : r === 8 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
+    const corner = (r === 0 || r === 10) && (c === 0 || c === 10);
+    side.push(corner ? 'corner' : r === 10 ? 'top' : r === 0 ? 'bottom' : c === 0 ? 'right' : 'left');
   }
-  return { W: S, H: S, cw: d, ch: d, wm: m, hm: m, rect, side, center: { x: d + 3, y: d + 3, w: 7 * m - 6, h: 7 * m - 6 } };
+  return { W: S, H: S, cw: d, ch: d, wm: m, hm: m, rect, side, center: { x: d + 3, y: d + 3, w: 9 * m - 6, h: 9 * m - 6 } };
 }
 
 export interface CenterLayout {

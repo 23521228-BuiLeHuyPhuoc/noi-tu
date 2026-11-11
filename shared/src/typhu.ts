@@ -29,41 +29,45 @@ const land = (name: string, group: TyPhuGroup, price: number): TyPhuCell => ({
   kind: 'land', name, group, price, rent: Math.round(price / 10),
 });
 
-/** 32 ô theo chiều kim đồng hồ, bắt đầu từ góc dưới-phải (4 góc + 7 ô mỗi cạnh). */
+/** 40 ô theo chiều kim đồng hồ, bắt đầu từ góc dưới-phải (4 góc + 9 ô mỗi cạnh), thứ tự như bàn cờ in cổ điển. */
 export const TYPHU_BOARD: TyPhuCell[] = [
-  // hàng dưới (phải → trái)
   { kind: 'start', name: 'Xuất phát' },
-  land('Cần Thơ', 'nau', 60),
-  { kind: 'community', name: 'Khí vận' },
   land('Cà Mau', 'nau', 60),
+  { kind: 'community', name: 'Khí vận' },
+  land('Bạc Liêu', 'nau', 60),
   { kind: 'tax', name: 'Thuế thu nhập', amount: 200 },
   { kind: 'station', name: 'Ga miền Tây', price: 200 },
-  land('Vũng Tàu', 'troi', 100),
-  land('Nha Trang', 'troi', 100),
-  // cạnh trái (dưới → trên)
+  land('Châu Đốc', 'troi', 100),
+  { kind: 'chance', name: 'Cơ hội' },
+  land('Cần Thơ', 'troi', 100),
+  land('Vĩnh Long', 'troi', 120),
   { kind: 'jail', name: 'Nhà tù' },
-  land('Hội An', 'hong', 140),
+  land('Quy Nhơn', 'hong', 140),
   { kind: 'utility', name: 'Công ty điện', price: 150 },
-  land('Đà Nẵng', 'hong', 140),
+  land('Nha Trang', 'hong', 140),
+  land('Phan Thiết', 'hong', 160),
   { kind: 'station', name: 'Ga miền Trung', price: 200 },
   land('Huế', 'cam', 180),
   { kind: 'community', name: 'Khí vận' },
-  land('Hạ Long', 'cam', 200),
-  // hàng trên (trái → phải)
+  land('Hội An', 'cam', 180),
+  land('Đà Nẵng', 'cam', 200),
   { kind: 'rest', name: 'Nghỉ chân' },
-  land('Hải Phòng', 'do', 220),
+  land('Hạ Long', 'do', 220),
   { kind: 'chance', name: 'Cơ hội' },
+  land('Hải Phòng', 'do', 220),
   land('Sa Pa', 'do', 240),
   { kind: 'station', name: 'Ga miền Bắc', price: 200 },
   land('Đà Lạt', 'vang', 260),
-  { kind: 'utility', name: 'Công ty nước', price: 150 },
   land('Buôn Ma Thuột', 'vang', 260),
-  // cạnh phải (trên → dưới)
+  { kind: 'utility', name: 'Công ty nước', price: 150 },
+  land('Pleiku', 'vang', 280),
   { kind: 'gotojail', name: 'Vào tù' },
   land('Biên Hòa', 'luc', 300),
-  land('Bình Dương', 'luc', 320),
-  { kind: 'chance', name: 'Cơ hội' },
+  land('Bình Dương', 'luc', 300),
+  { kind: 'community', name: 'Khí vận' },
+  land('Vũng Tàu', 'luc', 320),
   { kind: 'station', name: 'Ga miền Nam', price: 200 },
+  { kind: 'chance', name: 'Cơ hội' },
   land('Hà Nội', 'lam', 350),
   { kind: 'tax', name: 'Thuế xa xỉ', amount: 100 },
   land('Sài Gòn', 'lam', 400),
@@ -92,10 +96,10 @@ export function stationRent(count: number): number { return count > 0 ? 25 * 2 *
 export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 10 : 4) : 0; }
 
 export const TYPHU_SIZE = TYPHU_BOARD.length;
-export const TYPHU_JAIL = 8;
-/** bàn vuông 9 × 9: 4 góc + 7 ô mỗi cạnh */
-export const TYPHU_COLS = 9;
-export const TYPHU_ROWS = 9;
+export const TYPHU_JAIL = 10;
+/** bàn vuông 11 × 11: 4 góc + 9 ô mỗi cạnh */
+export const TYPHU_COLS = 11;
+export const TYPHU_ROWS = 11;
 export const TYPHU_START_CASH = 1500;
 export const TYPHU_PASS_START = 200;
 export const TYPHU_JAIL_FINE = 50;
@@ -118,8 +122,8 @@ export function rentOf(cell: number, houses: number, fullGroup: boolean): number
 
 /** Toạ độ (hàng, cột) trên lưới 9×9. */
 export function typhuCellPos(i: number): [number, number] {
-  if (i <= 8) return [8, 8 - i];
-  if (i <= 15) return [16 - i, 0];
-  if (i <= 24) return [0, i - 16];
-  return [i - 24, 8];
+  if (i <= 10) return [10, 10 - i];
+  if (i <= 19) return [20 - i, 0];
+  if (i <= 30) return [0, i - 20];
+  return [i - 30, 10];
 }

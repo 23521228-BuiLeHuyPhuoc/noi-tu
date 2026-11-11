@@ -278,24 +278,22 @@ export function TyPhuCenter(p: CenterProps) {
             onThrow={p.onThrow}
           />
           {canThrow && <T style={styles.trayHint}>Vuốt để tung, hoặc chạm</T>}
+          {g.step === 'roll' && idle && !p.dice.animating && (
+            <View testID="roll-countdown" style={[styles.countdown, hot && { backgroundColor: C.danger }]} pointerEvents="none">
+              <T style={styles.countdownNum}>{p.left}</T>
+              <T style={styles.countdownLbl}>{p.myTurn ? 'giây để tung' : `${p.nameOf(cur ?? '')} tung`}</T>
+            </View>
+          )}
           {g.dice && !p.dice.animating && !p.moving && <View style={styles.sumPill}><T style={styles.sumTxt}>{g.dice[0] + g.dice[1]}</T></View>}
         </View>
         <View style={styles.btnRow}>
           {showRoll ? (
             <>
-              {p.inJail && <Button testID="pay-jail" small variant="paper" title={`Nộp ${TYPHU_JAIL_FINE} xu ra tù`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
+              {p.inJail && <Button testID="pay-jail" small variant="paper" title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
               <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
-          ) : showBuy ? (
-            <>
-              <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={styles.fillBtn} onPress={() => p.onAct('skip')} />
-              <Button testID="buy-btn" small variant="jade" title={`Mua giá ${fmt(p.buyable!.price)}`} style={styles.fillBtn} onPress={() => p.onAct('buy')} />
-            </>
-          ) : showEnd ? (
-            <>
-              <T style={[styles.hint, { flex: 1 }]}>Chạm ô đất của bạn để xây nhà</T>
-              <Button testID="end-turn" small variant="gold" title="Xong lượt" icon="✓" style={styles.fillBtn} onPress={() => p.onAct('endTurn')} />
-            </>
+          ) : showBuy || showEnd ? (
+            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : 'Chọn xây nhà ở bảng thông tin'}</T>
           ) : (
             <T style={[styles.hint, { flex: 1 }]}>{p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}
@@ -359,6 +357,12 @@ const styles = StyleSheet.create({
   },
   sumTxt: { fontWeight: '900', fontSize: 14, color: C.ink },
   fillBtn: { flex: 1, minHeight: 34 },
+  countdown: {
+    position: 'absolute', top: 8, left: 8, minWidth: 54, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12,
+    backgroundColor: 'rgba(17,17,17,0.78)', alignItems: 'center', borderWidth: 2, borderColor: '#fff',
+  },
+  countdownNum: { color: '#fff', fontSize: 24, lineHeight: 28, fontWeight: '900' },
+  countdownLbl: { color: '#fff', fontSize: 9, lineHeight: 11, fontWeight: '800' },
   hint: { fontSize: 11, fontWeight: '700', color: C.muted, textAlign: 'center' },
   error: { fontSize: 11, fontWeight: '800', color: C.ink, backgroundColor: C.gold, borderRadius: 6, padding: 3, textAlign: 'center' },
   wealth: {

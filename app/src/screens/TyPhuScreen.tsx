@@ -84,7 +84,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(18, Math.min(28, geo.wm * 0.62));
+  const pawnBase = Math.max(18, Math.min(26, geo.wm * 0.66));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -139,11 +139,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const cellMid = (i: number) => {
     const r = geo.rect[i];
     const sd = geo.side[i];
-    // mũi ghim quân cờ cắm ở phần dưới ô (theo hướng nhìn), phần thân nổi lên trên
+    // mũi ghim quân cờ cắm ở phần dưới ô, thân nổi lên trên
     if (sd === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h * 0.62 };
-    if (sd === 'top' || sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h * 0.7 };
-    return { x: r.x + r.w / 2, y: r.y + r.h * 0.82 };
-  };;
+    if (sd === 'top' || sd === 'bottom') return { x: r.x + r.w / 2, y: r.y + r.h * 0.72 };
+    return { x: r.x + r.w / 2, y: r.y + r.h * 0.9 };
+  };;;
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
     const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
     if (!movement || movement.playerId !== id || serverNow >= movement.endsAt || reducedMotion) return still();
@@ -481,6 +481,17 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
           <TyPhuFxLayer fx={reducedMotion ? [] : fx} now={now} cells={geo.rect} W={boardW} H={boardH} center={geo.center} />
         </View>
+
+        {/* bảng thông tin nổi khi tới ô mua được hoặc được xây nhà (không nghiêng theo bàn) */}
+        {myTurn && !moving && (g.step === 'buy' || g.step === 'manage') && (
+          <DecisionCard
+            g={g}
+            me={me}
+            left={left}
+            canBuild={canBuild}
+            onAct={(a) => void act(a)}
+          />
+        )}
       </View>
 
       {d && detail !== null && (
@@ -568,7 +579,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
               {d.kind === 'gotojail' && 'Dừng ở đây là vào tù ngay.'}
               {d.kind === 'community' && 'Rút thẻ khí vận dành cho cộng đồng: nhận tiền, trả phí hoặc di chuyển.'}
               {d.kind === 'chance' && 'Rút một thẻ cơ hội: có thể được tiền, mất tiền hoặc bị đưa đi chỗ khác.'}
-              {d.kind === 'tax' && `Nộp ${fmt(d.amount)} xu cho ngân hàng.`}
+              {d.kind === 'tax' && `Dừng ở đây: -${fmt(d.amount)} xu.`}
             </T>
           )}
               <T style={styles.credit}>Nguồn icon/ảnh: icon Twemoji (CC-BY 4.0, jdecked/twemoji); ảnh địa danh từ Wikimedia Commons / Wikipedia.</T>
@@ -592,6 +603,113 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   );
 }
 
+
+const money = (n: number) => n.toLocaleString('vi-VN');
+
+/** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, hoặc xây nhà, có đếm ngược. */
+function DecisionCard(p: {
+  g: TyPhuView;
+  me: string;
+  left: number;
+  canBuild: (i: number) => boolean;
+  onAct: (a: Parameters<Game['act']>[0]) => void;
+}) {
+  const { g } = p;
+  const total = Math.max(1, g.turnSeconds);
+  const hot = p.left <= 5;
+  const timer = (
+    <View style={dc.timerRow}>
+      <View style={dc.track}><View style={{ height: '100%', width: `${Math.max(0, Math.min(1, p.left / total)) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} /></View>
+      <T style={[dc.secs, hot && { color: C.danger }]}>{p.left}s</T>
+    </View>
+  );
+  if (g.step === 'buy' && g.pendingBuy !== null) {
+    const i = g.pendingBuy;
+    const c = TYPHU_BOARD[i];
+    if (!isTyPhuProperty(c)) return null;
+    const color = c.kind === 'land' ? TYPHU_GROUPS[c.group].color : '#495057';
+    const rows: [string, number | string][] = c.kind === 'land'
+      ? [['Đất trống', c.rent], ['Đủ bộ màu', c.rent * 2], ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn' : `Nhà cấp ${k + 1}`, c.rent * m] as [string, number])]
+      : c.kind === 'station' ? [1, 2, 3, 4].map((n) => [`Có ${n} ga`, stationRent(n)] as [string, number])
+      : [['Có 1 công ty', 'xúc xắc × 4'], ['Có 2 công ty', 'xúc xắc × 10']];
+    const afford = (g.cash[p.me] ?? 0) >= c.price;
+    return (
+      <View style={dc.wrap} pointerEvents="box-none">
+        <View style={dc.card}>
+          <View style={[dc.head, { backgroundColor: color }]}>
+            <T style={dc.headSub}>{c.kind === 'land' ? TYPHU_GROUPS[c.group].name.toUpperCase() : c.kind === 'station' ? 'NHÀ GA' : 'CÔNG TY'}</T>
+            <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
+          </View>
+          <View style={dc.body}>
+            {rows.map(([k, v]) => (
+              <View key={k} style={dc.rentRow}><T style={dc.rentK}>{k}</T><T style={dc.rentV}>{typeof v === 'number' ? `${money(v)} xu` : v}</T></View>
+            ))}
+            {c.kind === 'land' && <T style={dc.note}>Mỗi nhà: -{money(TYPHU_GROUPS[c.group].house)} xu</T>}
+            {timer}
+            <View style={dc.btns}>
+              <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
+              <Button testID="buy-btn" small variant="jade" disabled={!afford} title={`Mua -${money(c.price)}`} style={{ flex: 1.3 }} onPress={() => p.onAct({ type: 'buy' })} />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+  if (g.step === 'manage') {
+    const cells = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && p.canBuild(i) ? [i] : []));
+    return (
+      <View style={dc.wrap} pointerEvents="box-none">
+        <View style={dc.card}>
+          <View style={[dc.head, { backgroundColor: '#2F9E44' }]}>
+            <T style={dc.headSub}>LƯỢT CỦA BẠN</T>
+            <T style={dc.headName}>NÂNG CẤP NHÀ</T>
+          </View>
+          <View style={dc.body}>
+            {cells.length === 0 && <T style={dc.note}>Chưa đủ tiền để xây thêm.</T>}
+            {cells.slice(0, 5).map((i) => {
+              const c = TYPHU_BOARD[i];
+              if (c.kind !== 'land') return null;
+              const h = g.houses[i] ?? 0;
+              const next = h + 1 >= TYPHU_MAX_HOUSES ? 'Khách sạn' : `Nhà cấp ${h + 1}`;
+              return (
+                <View key={i} style={dc.buildRow}>
+                  <View style={[dc.dot, { backgroundColor: TYPHU_GROUPS[c.group].color }]} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <T numberOfLines={1} style={dc.rentV}>{c.name}</T>
+                    <T style={dc.rentK}>{h === 0 ? 'Đất trống' : `Nhà cấp ${h}`} → {next}</T>
+                  </View>
+                  <Button testID={`build-${i}`} small variant="gold" title={`Xây -${money(TYPHU_GROUPS[c.group].house)}`} onPress={() => p.onAct({ type: 'build', cell: i })} />
+                </View>
+              );
+            })}
+            {timer}
+            <Button testID="end-turn" small variant="ink" title="Xong lượt" onPress={() => p.onAct({ type: 'endTurn' })} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+  return null;
+}
+
+const dc = StyleSheet.create({
+  wrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40, backgroundColor: 'rgba(0,0,0,0.25)' },
+  card: { width: 260, backgroundColor: '#FFFDF6', borderRadius: 12, borderWidth: 2.5, borderColor: '#111', overflow: 'hidden', boxShadow: '0px 10px 24px rgba(0,0,0,0.4)' },
+  head: { paddingVertical: 6, alignItems: 'center', borderBottomWidth: 2, borderColor: '#111' },
+  headSub: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 },
+  headName: { color: '#fff', fontSize: 17, lineHeight: 22, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 3 },
+  body: { padding: 8, gap: 3 },
+  rentRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  rentK: { fontSize: 11, lineHeight: 15, color: C.muted, fontWeight: '700' },
+  rentV: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '800' },
+  note: { fontSize: 11, lineHeight: 15, color: C.muted, textAlign: 'center' },
+  timerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: '#E9ECEF', overflow: 'hidden', borderWidth: 1, borderColor: '#111' },
+  secs: { fontSize: 13, lineHeight: 16, fontWeight: '900', color: '#111', minWidth: 28, textAlign: 'right' },
+  btns: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  buildRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  dot: { width: 12, height: 12, borderRadius: 3, borderWidth: 1, borderColor: '#111' },
+});
 
 /** góc nghiêng bàn cờ 3D (nhìn từ phía người chơi) */
 const TILT_DEG = 36;

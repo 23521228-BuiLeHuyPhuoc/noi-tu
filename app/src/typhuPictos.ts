@@ -110,17 +110,19 @@ const PICTO = {
     <path d="M24 10L27 13L24 16L21 13Z" fill="#FFD43B" stroke-width="1.5"/>`),
 };
 
-let chanceCount = 0;
-let trainCount = 0;
-const TRAINS = [PACK.train1, PACK.train2, PACK.train3, PACK.train4];
-function pictoOf(c: TyPhuCell): string {
+/** icon theo đúng vị trí trên bàn 40 ô (như bàn cờ in): mỗi ô Cơ hội, Khí vận, ga có kiểu riêng */
+const BY_INDEX: Record<number, string> = {
+  0: PACK.goArrow, 2: PACK.chestBottom, 4: PACK.taxIncome, 5: PACK.trainReading, 7: PACK.chancePink,
+  10: PICTO.jail, 12: PACK.bulb, 15: PACK.trainPenn, 17: PACK.chestLeft,
+  20: PACK.car, 22: PACK.chanceBlue, 25: PACK.trainBo, 28: PACK.tap,
+  30: PICTO.gotojail, 33: PACK.chestRight, 35: PACK.trainShort, 36: PACK.chanceOrange, 38: PACK.ring,
+};
+function pictoOf(c: TyPhuCell, i: number): string {
+  if (BY_INDEX[i]) return BY_INDEX[i];
   switch (c.kind) {
-    case 'chance': {
-      const n = chanceCount++ % 3;
-      return n === 0 ? PACK.chanceOrange : n === 1 ? PACK.chanceBlue : PACK.chancePink;
-    }
-    case 'community': return PACK.chest;
-    case 'station': return TRAINS[trainCount++ % 4];
+    case 'chance': return PACK.chanceOrange;
+    case 'community': return PACK.chestBottom;
+    case 'station': return PACK.trainReading;
     case 'utility': return c.name.includes('nước') ? PACK.tap : PACK.bulb;
     case 'tax': return c.name.includes('xa xỉ') ? PACK.ring : PACK.taxIncome;
     case 'start': return PACK.goArrow;
@@ -132,4 +134,4 @@ function pictoOf(c: TyPhuCell): string {
 }
 
 /** biểu tượng theo vị trí ô (rỗng với ô đất) */
-export const PICTO_BY_CELL: string[] = TYPHU_BOARD.map(pictoOf);
+export const PICTO_BY_CELL: string[] = TYPHU_BOARD.map((c, i) => pictoOf(c, i));
