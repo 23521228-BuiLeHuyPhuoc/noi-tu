@@ -25,7 +25,6 @@ export interface TyPhuCellProps {
   isStepTarget: boolean;
   onPress: (i: number) => void;
   /** hũ tiền (chỉ ô Xuất phát) */
-  pot?: number;
 }
 
 const BOARD_BG = '#CDE6D0';
@@ -81,7 +80,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const isLand = c.kind === 'land';
   const price = isTyPhuProperty(c) ? c.price : c.kind === 'tax' ? c.amount : null;
   const name = shortCellName(c.name).toUpperCase();
-  const label = `${p.index + 1}. ${c.name}${p.ownerName ? `, thuộc ${p.ownerName}` : ''}${price !== null ? `, ${c.kind === 'tax' ? 'mất' : 'giá'} ${price} xu` : ''}`;
+  const label = `${p.index + 1}. ${c.name}${p.ownerName ? `, thuộc ${p.ownerName}` : ''}${price !== null ? `, ${c.kind === 'tax' ? 'mất' : 'giá'} ${price}$` : ''}`;
   const frame = [
     styles.cell,
     { left: p.x, top: p.y, width: p.w, height: p.h, backgroundColor: owned ? p.ownerLight! : BOARD_BG },
@@ -92,7 +91,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const isStation = c.kind === 'station';
   // ga có sao vẫn hiện mặt chủ (sao vẽ riêng); đất có nhà thì nhà thay cho mặt chủ
   const face = owned && (p.houses === 0 || isStation) ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
-  const priceTxt = price === null ? (c.kind === 'start' ? `+${TYPHU_PASS_START}` : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
+  const priceTxt = price === null ? (c.kind === 'start' ? `+${TYPHU_PASS_START}$` : '') : c.kind === 'tax' ? `-${price}$` : `${price}$`;
   const minus = c.kind === 'tax';
 
   if (p.side === 'corner') {
@@ -104,7 +103,6 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
           <T numberOfLines={2} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.2) }]}>{name}</T>
           <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
           {priceTxt !== '' && <T style={[styles.price, styles.plus, { fontSize: fs, lineHeight: Math.round(fs * 1.25) }]}>{priceTxt}</T>}
-          {c.kind === 'start' && !!p.pot && <T numberOfLines={1} style={[styles.price, styles.pot, { fontSize: fs * 0.9, lineHeight: Math.round(fs * 1.15) }]}>HŨ {p.pot}</T>}
         </View>
         {overlay}
       </Pressable>
@@ -149,7 +147,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const nameSize = Math.max(6.5, Math.min(9.5, H / 5));
   const priceSize = Math.max(7, Math.min(10, H / 4.6));
   const iconSize = Math.min(H * 0.6, p.w * 0.3);
-  const sidePrice = priceTxt.replace(' xu', '');
+  const sidePrice = priceTxt;
   const bandEl = band ? (
     <View style={[styles.bandV, { backgroundColor: band }, p.side === 'right' ? styles.bandBorderL : styles.bandBorderR]}>
       <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(12, (H - 6) / 3.3)} vertical />
@@ -196,7 +194,6 @@ const styles = StyleSheet.create({
   price: { color: INK, fontWeight: '800', textAlign: 'center' },
   minus: { color: '#C92A2A' },
   plus: { color: '#2B8A3E' },
-  pot: { color: '#B45309' },
   stars: { color: '#F59F00', fontWeight: '900', textAlign: 'center', textShadowColor: '#111', textShadowRadius: 1.5, letterSpacing: -0.5 },
   sideIconWrap: { marginLeft: 2, alignItems: 'center', justifyContent: 'center' },
   sideFace: { position: 'absolute', right: -3, bottom: -2, transform: [{ scale: 0.8 }] },

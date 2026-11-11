@@ -1,6 +1,6 @@
 import { Image, Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL_FINE, liquidValueOf, type TyPhuGroup,
+  TYPHU_BOARD, TYPHU_GROUPS, type TyPhuGroup,
 } from '../../../shared/src/typhu';
 import type { TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
 import { doodleUri } from '../avatars';
@@ -41,7 +41,7 @@ export function fitName(name: string, w: number, h: number, maxFs = 11): { fs: n
 }
 
 const LOG_ICON: Record<TyPhuLogKind, string> = {
-  buy: iconUri('1f3e0'), rent: iconUri('1f4b0'), jail: iconUri('1f694'), card: iconUri('2728'), pot: iconUri('1f36f'),
+  buy: iconUri('1f3e0'), rent: iconUri('1f4b0'), jail: iconUri('1f694'), card: iconUri('2728'),
   bankrupt: iconUri('1f480'), start: iconUri('1f3c1'), build: iconUri('1f3d8'), tax: iconUri('1f4b8'), info: iconUri('2b50'),
 };
 
@@ -75,7 +75,7 @@ export interface CenterProps {
   error: string | null;
   isHost: boolean;
   onEnd: () => void;
-  onAct: (a: 'roll' | 'buy' | 'skip' | 'endTurn' | 'payJail') => void;
+  onAct: (a: 'roll' | 'buy' | 'skip' | 'endTurn') => void;
   /** câu cảm thán của từng người khi tiền thay đổi */
   speed?: number;
   onSpeed?: () => void;
@@ -107,6 +107,7 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   const wobbleDeg = face.wobble === 'spin' ? `${Math.round(Math.sin(p.now / 65) * 28)}deg` : face.wobble ? `${Math.round(Math.sin(p.now / 35) * 14)}deg` : '0deg';
   const wobbleX = face.wobble ? Math.round(Math.cos(p.now / 40) * 4) : 0;
   const name = p.nameOf(id);
+  const tix = g.tickets?.[id] ?? 0;
   const icons = (id in g.jail ? 15 : 0) + (cur ? 15 : 0);
   // chỗ cho tên: trừ avatar, khoảng cách, viền; chừa 1 dòng tiền ở dưới
   const fit = fitName(name, Math.max(24, rect.w - (rect.h - 4) - 14 - icons), Math.max(10, rect.h - 6 - 15));
@@ -115,7 +116,7 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
     <Pressable
       testID={`wealth-card-${id}`}
       accessibilityRole="button"
-      accessibilityLabel={`${p.nameOf(id)}: ${fmt(g.cash[id] ?? 0)} xu, ${lands} đất`}
+      accessibilityLabel={`${p.nameOf(id)}: ${fmt(g.cash[id] ?? 0)}$, ${lands} đất${tix ? `, ${tix} vé ra tù` : ''}`}
       onPress={() => p.onPlayer(id)}
       style={[
         abs(rect), styles.wealth,
@@ -156,11 +157,13 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
           ) : (
             <>
               <Image source={{ uri: FX_ICON.coin }} style={styles.tiny} />
-              <T numberOfLines={1} style={[styles.wCash, { flexShrink: 1 }]}>{fmt(g.cash[id] ?? 0)}</T>
+              {/* số tiền không được co lại (trước đây có lúc bị co về 0 px nên mất chữ) */}
+              <T testID={`wealth-cash-${id}`} numberOfLines={1} style={[styles.wCash, { flexShrink: 0 }]}>{fmt(g.cash[id] ?? 0)}$</T>
+              {tix > 0 && <T testID={`ticket-${id}`} style={styles.wCash}> 🎫{tix > 1 ? tix : ''}</T>}
             </>
           )}
-          <View style={{ flex: 1 }} />
-          <View style={[styles.landChip, { backgroundColor: color }]}>
+          <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 2 }} />
+          <View style={[styles.landChip, { backgroundColor: color, flexShrink: 0 }]}>
             <T style={styles.landTxt}>{lands}</T>
             <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
           </View>
@@ -254,7 +257,9 @@ export function TyPhuCenter(p: CenterProps) {
   const { layout: L, g } = p;
   const cur = g.currentPlayerId;
   const idle = !p.moving;
-  const showRoll = idle && p.myTurn && g.step === 'roll';
+  const showRoll = idle && p.myTurn && g.step === 'roll' && !p.inJail;
+  const showJail = idle && p.myTurn && g.step === 'roll' && p.inJail;
+  const showTicket = idle && p.myTurn && g.step === 'ticket';
   const showBuy = idle && p.myTurn && g.step === 'buy' && p.buyable;
   const showEnd = idle && p.myTurn && (g.step === 'manage' || g.step === 'upgrade');
   const showDebt = idle && p.myTurn && g.step === 'debt';
@@ -265,7 +270,6 @@ export function TyPhuCenter(p: CenterProps) {
   const statusH = L.wide ? 30 : 0;
   const trayH = L.action.h - 44 - statusH;
   const canThrow = showRoll && !p.dice.animating;
-  const canPayJail = (g.cash[p.me] ?? 0) + liquidValueOf(p.me, g.owners, g.houses) >= TYPHU_JAIL_FINE;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* hàng nút nhỏ thay cho thanh trên cùng */}
@@ -337,12 +341,12 @@ export function TyPhuCenter(p: CenterProps) {
         </View>
         <View style={styles.btnRow}>
           {showRoll ? (
-            <>
-              {p.inJail && <Button testID="pay-jail" small variant="paper" disabled={!canPayJail} title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
-              <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
-            </>
-          ) : showBuy || showEnd || showDebt ? (
-            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : showDebt ? 'Thiếu tiền: chọn nhà đất để bán ở bảng thông tin' : 'Chọn nâng cấp ở bảng thông tin'}</T>
+            <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
+          ) : showBuy || showEnd || showDebt || showJail || showTicket ? (
+            <T style={[styles.hint, { flex: 1 }]}>
+              {showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : showDebt ? 'Thiếu tiền: chọn nhà đất để bán ở bảng giữa'
+                : showJail ? 'Đang ở tù: trả tiền / dùng vé để đổ, hoặc ở lại' : showTicket ? 'Mua vé ra tù không?' : 'Chọn nâng cấp ở bảng thông tin'}
+            </T>
           ) : (
             <T style={[styles.hint, { flex: 1 }]}>{p.dice.animating ? 'Đang đổ xúc xắc...' : p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}

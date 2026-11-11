@@ -317,7 +317,7 @@ export interface BauCuaView {
 
 // ================= Cờ tỷ phú =================
 
-export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'start' | 'build' | 'tax' | 'info' | 'pot';
+export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'start' | 'build' | 'tax' | 'info';
 
 export interface TyPhuView {
   type: 'typhu';
@@ -333,14 +333,18 @@ export interface TyPhuView {
   owners: Record<number, string>;
   houses: Record<number, number>;
   currentPlayerId: string | null;
-  /** upgrade: vừa dừng ở đất/ga của mình, được chọn nâng cấp ngay tại ô đó; debt: thiếu tiền, phải tự chọn bán nhà đất */
-  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait' | 'debt';
+  /**
+   * upgrade: vừa dừng ở đất/ga của mình, được chọn nâng cấp ngay tại ô đó; debt: thiếu tiền, phải tự chọn bán nhà đất;
+   * ticket: rút được thẻ Cơ hội "vé ra tù", chọn mua hay không.
+   * Đang ở tù mà tới lượt (step roll): phải trả tiền / dùng vé ra tù mới được đổ, hoặc chọn ở lại.
+   */
+  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait' | 'debt' | 'ticket';
   dice: [number, number] | null;
   rollId: number;
   /** ô đang chờ quyết định mua (step buy) hoặc nâng cấp (step upgrade) */
   pendingBuy: number | null;
-  /** hũ tiền ở ô Xuất phát: thuế và tiền phạt dồn vào, ai dừng đúng ô Xuất phát thì ăn cả hũ */
-  pot?: number;
+  /** số vé ra tù mỗi người đang cất trong túi */
+  tickets?: Record<string, number>;
   /** khoản người đang tới lượt phải trả mà chưa đủ tiền mặt (step debt): tự bán nhà đất từng ô cho tới khi đủ */
   debt?: { amount: number; to: string | null; why: string } | null;
   turnEndsAt: number | null;
@@ -372,9 +376,12 @@ export type GameAction =
   | { type: 'buy' }
   | { type: 'skip' }
   | { type: 'build'; cell: number; levels?: number }
-  | { type: 'sell'; cell: number }
+  /** bán ở ô `cell`: `levels` = bán bớt chừng này cấp nhà/sao; `land` = bán cả lô (đất + nhà); không có gì = bán 1 lần (1 cấp, hết nhà thì bán đất) */
+  | { type: 'sell'; cell: number; levels?: number; land?: boolean }
   | { type: 'endTurn' }
   | { type: 'payJail' }
+  | { type: 'useTicket' }
+  | { type: 'stayJail' }
   | { type: 'speed'; value: number }
   | { type: 'end' };
 

@@ -1,20 +1,21 @@
 /**
  * Cờ tỷ phú (bản gọn cho điện thoại):
  * - Đổ 2 xúc xắc. Đổ đôi được đổ tiếp; 3 lần đôi liên tiếp thì vào tù.
- * - Dừng ở đất trống: mua hoặc bỏ qua. Dừng ở đất người khác: trả tiền thuê
- *   (gấp đôi nếu họ có đủ bộ màu; có nhà thì nhân theo số nhà).
+ * - Dừng ở đất trống: mua hoặc bỏ qua. Dừng ở đất người khác: trả tiền thuê theo số nhà,
+ *   luôn x2 nếu chủ có đủ bộ cùng màu. Chủ đang ngồi tù thì không thu được tiền thuê.
  * - Dừng ở đất của mình: nâng 1 cấp nhà (tối đa 3 nhà + 1 khách sạn). Dừng ở ga của mình: nâng 1 sao (tối đa 3 sao).
- * - Đi bộ vượt qua Xuất phát nhận 500 xu; dừng đúng Xuất phát thì ăn hũ thuế/tiền phạt.
- * - Cơ hội: thẻ luôn tốt. Rủi ro: thẻ luôn xấu. Sân bay: máy bay đưa tới một ô ngẫu nhiên.
- * - Ở tù: đổ đôi để ra, hoặc nộp 50 xu; ngồi 3 lượt thì nộp phạt rồi đi.
- * - Thiếu tiền trả: người chơi tự chọn bán từng cấp nhà / từng ô đất (nửa giá) tới khi đủ;
+ * - Ga: thuê 50$ × số ga cùng chủ (đủ 4 ga = gấp 4), mỗi sao x2.
+ * - Chỉ đi VƯỢT QUA Xuất phát mới nhận 500$; dừng đúng ô Xuất phát không được gì. Thuế, phạt nộp ngân hàng.
+ * - Cơ hội: thẻ luôn tốt (có vé ra tù mua nửa giá). Rủi ro: thẻ luôn xấu. Sân bay: máy bay đưa tới một ô ngẫu nhiên.
+ * - Ở tù: phải trả 200$ (hoặc dùng vé) mới được đổ; được ở lại tối đa 3 lượt, tới lượt thứ 4 bắt buộc trả.
+ * - Thiếu tiền trả: người chơi tự chọn bán từng cấp nhà / cả lô đất (nửa giá) tới khi đủ;
  *   chỉ phá sản khi đã bán hết mà vẫn thiếu. Treo máy quá lâu thì hệ thống bán giúp.
  * - Chỉ người cuối cùng còn trụ lại mới thắng; chủ phòng có thể tổng kết sớm (xếp theo tổng tài sản).
  */
 import {
-  TYPHU_AIRPORT, TYPHU_BOARD, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
+  TYPHU_AIRPORT, TYPHU_BOARD, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_JAIL_MAX, TYPHU_JAIL_TICKET, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
   TYPHU_START_CASH, TYPHU_TURN_SECONDS, groupCells, rentOf, isTyPhuProperty, stationRent, utilityRent,
-  liquidValueOf, maxLevelOf, upgradeCostOf, TYPHU_MOVE_STEP_MS, TYPHU_ROLL_MIN_MS, type TyPhuMovement,
+  liquidValueOf, maxLevelOf, upgradeCostOf, sellValueOf, TYPHU_MOVE_STEP_MS, TYPHU_ROLL_MIN_MS, type TyPhuMovement,
 } from '../../../shared/src/typhu';
 import type { ActionResult, GameAction, TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
 import { DICE_DEFAULT_IMPULSE, sanitizeImpulse, type DiceRollView, type ThrowImpulse } from '../../../shared/src/dice';
@@ -32,7 +33,7 @@ const FLY_MS = 1300;
 
 interface Card {
   text: string;
-  /** dương: nhận từ ngân hàng; âm: nộp vào hũ ở Xuất phát */
+  /** dương: nhận từ ngân hàng; âm: nộp cho ngân hàng */
   money?: number;
   /** mỗi người khác mừng mình chừng này (chỉ trả bằng tiền mặt đang có, không phải bán nhà) */
   each?: number;
@@ -43,35 +44,37 @@ interface Card {
   jail?: boolean;
   /** nộp chừng này cho mỗi cấp nhà / sao ga đang có (ít nhất 1 lần) */
   perLevel?: number;
-  /** đi bộ tới đất/ga gần nhất phía trước của mình; chưa có đất thì nhận `fallback` xu */
+  /** đi bộ tới đất/ga gần nhất phía trước của mình; chưa có đất thì nhận `fallback` $ */
   ownLand?: boolean;
   fallback?: number;
+  /** được mua vé ra tù (nửa tiền ra tù), cất trong túi để dùng sau */
+  ticket?: boolean;
 }
 
 const cellNamed = (name: string) => TYPHU_BOARD.findIndex((c) => c.name === name);
 
 /** Thẻ Cơ hội: luôn có lợi */
 export const TYPHU_CARDS: Card[] = [
-  { text: 'Trúng vé số! Nhận 150 xu', money: 150 },
-  { text: 'Được thưởng Tết 100 xu', money: 100 },
-  { text: 'Nhặt được ví, trả lại được thưởng 50 xu', money: 50 },
-  { text: 'Được hoàn thuế 100 xu', money: 100 },
-  { text: 'Nhận học bổng 150 xu', money: 150 },
-  { text: 'Sinh nhật bạn! Mỗi người mừng bạn 30 xu', each: 30 },
-  { text: `Bay thẳng về Xuất phát, nhận ${TYPHU_PASS_START} xu`, goto: 0, money: TYPHU_PASS_START },
-  { text: 'Tiến tới đất gần nhất của bạn để nâng cấp (chưa có đất thì nhận 100 xu)', ownLand: true, fallback: 100 },
+  { text: 'Trúng vé số! Nhận 150$', money: 150 },
+  { text: 'Được thưởng Tết 100$', money: 100 },
+  { text: 'Nhặt được ví, trả lại được thưởng 50$', money: 50 },
+  { text: 'Được hoàn thuế 100$', money: 100 },
+  { text: 'Nhận học bổng 150$', money: 150 },
+  { text: 'Sinh nhật bạn! Mỗi người mừng bạn 30$', each: 30 },
+  { text: `Vé ra tù nửa giá: mua ${TYPHU_JAIL_TICKET}$ (thay vì ${TYPHU_JAIL_FINE}$), cất trong túi, lúc ở tù dùng để ra ngay`, ticket: true },
+  { text: 'Tiến tới đất gần nhất của bạn để nâng cấp (chưa có đất thì nhận 100$)', ownLand: true, fallback: 100 },
 ];
 
 /** Thẻ Rủi ro: luôn bất lợi */
 export const TYPHU_COMMUNITY_CARDS: Card[] = [
-  { text: 'Quên đội mũ bảo hiểm, nộp phạt 50 xu', money: -50 },
-  { text: 'Bị bồ đá, tiêu 80 xu đi spa chữa lành', money: -80 },
-  { text: 'Viện phí 100 xu', money: -100 },
-  { text: 'Dính phạt nguội 120 xu', money: -120 },
+  { text: 'Quên đội mũ bảo hiểm, nộp phạt 50$', money: -50 },
+  { text: 'Bị bồ đá, tiêu 80$ đi spa chữa lành', money: -80 },
+  { text: 'Viện phí 100$', money: -100 },
+  { text: 'Dính phạt nguội 120$', money: -120 },
   { text: 'Đua xe bị tóm! Vào tù', jail: true },
   { text: 'Quên ví, lùi lại 3 ô', move: -3 },
   { text: 'Bị gọi lên Cục thuế: bay tới ô Thuế thu nhập', goto: cellNamed('Thuế thu nhập') },
-  { text: 'Sửa nhà mùa mưa: 30 xu mỗi cấp nhà/sao (ít nhất 30 xu)', perLevel: 30 },
+  { text: 'Sửa nhà mùa mưa: 30$ mỗi cấp nhà/sao (ít nhất 30$)', perLevel: 30 },
 ];
 
 /** khoản người đang tới lượt phải trả mà chưa đủ tiền mặt */
@@ -80,8 +83,6 @@ interface Debt {
   /** chủ nợ (null = ngân hàng) */
   to: TPlayer | null;
   why: string;
-  /** trả cho ngân hàng thì dồn vào hũ ở Xuất phát */
-  toPot: boolean;
   /** trả xong thì chạy tiếp */
   then: () => void;
 }
@@ -113,8 +114,8 @@ export class TyPhuGame implements GameEngine {
   private movement: TyPhuMovement | null = null;
   private movementSeq = 0;
   private pendingBuy: number | null = null;
-  /** hũ tiền ở ô Xuất phát: thuế và tiền phạt dồn vào */
-  private pot = 0;
+  /** số vé ra tù mỗi người đang cất */
+  private tickets: Record<string, number> = {};
   private debt: Debt | null = null;
   private turnEndsAt: number | null = null;
   private log: TyPhuView['log'] = [];
@@ -156,7 +157,8 @@ export class TyPhuGame implements GameEngine {
     if (!me || me.id !== playerId) return { ok: false, reason: 'not_your_turn' };
     switch (a.type) {
       case 'roll':
-        if (this.step !== 'roll') return { ok: false, reason: 'bad_action' };
+        // đang ở tù: phải trả tiền / dùng vé ra tù trước mới được đổ
+        if (this.step !== 'roll' || me.jail !== null) return { ok: false, reason: 'bad_action' };
         this.roll(sanitizeImpulse(a.impulse));
         return { ok: true };
       case 'payJail':
@@ -164,23 +166,43 @@ export class TyPhuGame implements GameEngine {
         // không tự bán nhà đất: thiếu tiền mặt thì người chơi tự bán trước
         if (me.cash < TYPHU_JAIL_FINE) return { ok: false, reason: 'no_money' };
         me.cash -= TYPHU_JAIL_FINE;
-        this.pot += TYPHU_JAIL_FINE;
         me.jail = null;
-        this.addLog('jail', `${me.name} nộp ${TYPHU_JAIL_FINE} xu để ra tù`);
-        this.ctx.changed();
+        this.addLog('jail', `${me.name} trả ${fmt(TYPHU_JAIL_FINE)}$ để ra tù`);
+        this.rollStep();
+        return { ok: true };
+      case 'useTicket':
+        if (this.step !== 'roll' || me.jail === null || !((this.tickets[me.id] ?? 0) > 0)) return { ok: false, reason: 'bad_action' };
+        this.useTicket(me);
+        this.rollStep();
+        return { ok: true };
+      case 'stayJail':
+        if (this.step !== 'roll' || me.jail === null || me.jail >= TYPHU_JAIL_MAX) return { ok: false, reason: 'bad_action' };
+        this.stayJail(me);
         return { ok: true };
       case 'buy': {
+        if (this.step === 'ticket') {
+          if (me.cash < TYPHU_JAIL_TICKET) return { ok: false, reason: 'no_money' };
+          me.cash -= TYPHU_JAIL_TICKET;
+          this.tickets[me.id] = (this.tickets[me.id] ?? 0) + 1;
+          this.addLog('jail', `${me.name} mua vé ra tù giá ${fmt(TYPHU_JAIL_TICKET)}$ 🎫`);
+          this.afterLanding();
+          return { ok: true };
+        }
         if (this.step !== 'buy' || this.pendingBuy === null) return { ok: false, reason: 'bad_action' };
         const c = TYPHU_BOARD[this.pendingBuy];
         if (!isTyPhuProperty(c) || me.cash < c.price) return { ok: false, reason: 'no_money' };
         me.cash -= c.price;
         this.owners[this.pendingBuy] = me.id;
-        this.addLog('buy', `${me.name} mua ${c.name} giá ${fmt(c.price)} xu`);
+        this.addLog('buy', `${me.name} mua ${c.name} giá ${fmt(c.price)}$`);
         this.pendingBuy = null;
         this.afterLanding();
         return { ok: true };
       }
       case 'skip':
+        if (this.step === 'ticket') {
+          this.skipTicket();
+          return { ok: true };
+        }
         if (this.step === 'upgrade') {
           this.skipUpgrade();
           return { ok: true };
@@ -191,7 +213,7 @@ export class TyPhuGame implements GameEngine {
       case 'build':
         return this.build(me, a.cell, a.levels);
       case 'sell':
-        return this.sell(me, a.cell);
+        return this.sell(me, a.cell, a.levels, a.land);
       case 'endTurn':
         if (this.step !== 'manage') return { ok: false, reason: 'bad_action' };
         this.nextPlayer();
@@ -238,7 +260,7 @@ export class TyPhuGame implements GameEngine {
       dice: this.dice ? [...this.dice] : null,
       rollId: this.rollId,
       pendingBuy: this.step === 'buy' || this.step === 'upgrade' ? this.pendingBuy : null,
-      pot: this.pot,
+      tickets: Object.fromEntries(this.players.map((p) => [p.id, this.tickets[p.id] ?? 0])),
       debt: this.step === 'debt' && this.debt ? { amount: this.debt.amount, to: this.debt.to?.id ?? null, why: this.debt.why } : null,
       turnEndsAt: this.over ? null : this.turnEndsAt,
       turnSeconds: this.turnMs / 1000,
@@ -286,8 +308,12 @@ export class TyPhuGame implements GameEngine {
     return { ok: true };
   }
 
-  /** Người chơi tự bán: bán bớt 1 cấp nhà / 1 sao ga (nếu có), không thì bán đất cho ngân hàng (đều nửa giá). */
-  private sell(me: TPlayer, cell: unknown): ActionResult {
+  /**
+   * Người chơi tự bán (mọi thứ nửa giá mua, đất và nhà tính riêng):
+   * `levels` = bán bớt chừng này cấp nhà / sao ga (giữ đất); `land` = bán cả lô (đất + mọi nhà/sao trên đó);
+   * không truyền gì = bán 1 lần (1 cấp nếu có, hết nhà thì bán đất).
+   */
+  private sell(me: TPlayer, cell: unknown, levels?: unknown, land?: unknown): ActionResult {
     if (this.step !== 'roll' && this.step !== 'buy' && this.step !== 'upgrade' && this.step !== 'manage' && this.step !== 'debt') {
       return { ok: false, reason: 'bad_action' };
     }
@@ -301,12 +327,40 @@ export class TyPhuGame implements GameEngine {
     if (this.step === 'upgrade' && this.pendingBuy === cell) {
       return { ok: false, reason: 'bad_action' };
     }
-    this.sellOne(me, cell);
+    const lv = this.houses[cell] ?? 0;
+    if (land === true) this.sellLot(me, cell);
+    else if (levels !== undefined && levels !== null) {
+      if (typeof levels !== 'number' || !Number.isInteger(levels) || levels < 1 || levels > lv) return { ok: false, reason: 'bad_action' };
+      this.sellLevels(me, cell, levels);
+    } else this.sellOne(me, cell);
     // đang nợ: đủ tiền thì trả luôn rồi chơi tiếp, bán hết vẫn thiếu thì phá sản; còn thiếu thì chờ bán tiếp
     if (this.step === 'debt' && this.settleDebt()) return { ok: true };
     this.armIdle();
     this.ctx.changed();
     return { ok: true };
+  }
+
+  /** Bán bớt `n` cấp nhà / sao ở ô `cell` (giữ đất), mỗi cấp nửa giá xây. */
+  private sellLevels(p: TPlayer, cell: number, n: number): void {
+    const c = TYPHU_BOARD[cell];
+    const lv = this.houses[cell] ?? 0;
+    const k = Math.min(lv, n);
+    if (k <= 0) return;
+    p.cash += sellValueOf(cell, lv, { levels: k });
+    if (lv - k > 0) this.houses[cell] = lv - k;
+    else delete this.houses[cell];
+    this.addLog('info', c.kind === 'station' ? `${p.name} bán ${k} sao ở ${c.name}` : `${p.name} bán ${k === lv ? 'hết' : k} nhà ở ${c.name}`);
+  }
+
+  /** Bán cả lô: đất + mọi nhà/sao trên đó (từng thứ nửa giá mua). */
+  private sellLot(p: TPlayer, cell: number): void {
+    const c = TYPHU_BOARD[cell];
+    if (!isTyPhuProperty(c)) return;
+    const lv = this.houses[cell] ?? 0;
+    p.cash += sellValueOf(cell, lv, { land: true });
+    delete this.owners[cell];
+    delete this.houses[cell];
+    this.addLog('info', `${p.name} bán cả lô ${c.name} cho ngân hàng`);
   }
 
   /** Bán 1 lần ở ô `cell`: còn cấp nhà/sao thì bán bớt 1 cấp, hết thì bán đất. */
@@ -346,24 +400,6 @@ export class TyPhuGame implements GameEngine {
     this.card = null;
     const isDouble = d1 === d2;
     this.rolledDouble = false;
-
-    if (me.jail !== null) {
-      if (isDouble) {
-        me.jail = null;
-        this.addLog('jail', `${me.name} đổ đôi, vượt ngục thành công!`);
-        return this.moveBy(d1 + d2);
-      }
-      me.jail++;
-      if (me.jail < 3) {
-        this.addLog('jail', `${me.name} vẫn bóc lịch (${me.jail}/3)`);
-        return this.wait(() => this.nextPlayer(), this.rollMs);
-      }
-      me.jail = null;
-      return this.pay(me, TYPHU_JAIL_FINE, null, 'nộp phạt ra tù', true, () => {
-        this.addLog('jail', `${me.name} ngồi đủ 3 lượt, nộp phạt rồi đi tiếp`);
-        this.moveBy(d1 + d2);
-      });
-    }
 
     if (isDouble) {
       me.doubles++;
@@ -414,7 +450,21 @@ export class TyPhuGame implements GameEngine {
 
   private passStart(me: TPlayer): void {
     me.cash += TYPHU_PASS_START;
-    this.addLog('start', `${me.name} qua Xuất phát, nhận ${fmt(TYPHU_PASS_START)} xu`);
+    this.addLog('start', `${me.name} qua Xuất phát, nhận ${fmt(TYPHU_PASS_START)}$`);
+  }
+
+  /** Ở tù: chọn ngồi thêm lượt này (tối đa TYPHU_JAIL_MAX lượt) */
+  private stayJail(me: TPlayer): void {
+    if (me.jail === null) return;
+    me.jail++;
+    this.addLog('jail', `${me.name} ở lại tù (${me.jail}/${TYPHU_JAIL_MAX} lượt)`);
+    this.wait(() => this.nextPlayer());
+  }
+
+  private useTicket(me: TPlayer): void {
+    this.tickets[me.id] = Math.max(0, (this.tickets[me.id] ?? 0) - 1);
+    me.jail = null;
+    this.addLog('jail', `${me.name} dùng vé ra tù 🎫`);
   }
 
   /** Tiền thuê khi dừng ở ô `cell` của `owner` */
@@ -457,25 +507,26 @@ export class TyPhuGame implements GameEngine {
           }
         } else {
           const o = this.players.find((p) => p.id === owner)!;
+          // chủ đang ngồi tù thì không thu được tiền thuê
+          if (o.jail !== null) {
+            this.addLog('info', `${o.name} đang ngồi tù, ${me.name} vào ${c.name} không mất tiền thuê`);
+            break;
+          }
           const rent = this.rentAt(me.pos, owner);
-          return this.pay(me, rent, o, `trả tiền thuê ${c.name}`, false, () => {
-            this.addLog('rent', `${me.name} trả ${fmt(rent)} xu tiền thuê ${c.name} cho ${o.name}`);
+          return this.pay(me, rent, o, `trả tiền thuê ${c.name}`, () => {
+            this.addLog('rent', `${me.name} trả ${fmt(rent)}$ tiền thuê ${c.name} cho ${o.name}`);
             this.afterLanding();
           });
         }
         break;
       }
       case 'tax':
-        return this.pay(me, c.amount, null, `nộp ${c.name}`, true, () => {
-          this.addLog('tax', `${me.name} nộp ${c.name} ${fmt(c.amount)} xu (vào hũ ở Xuất phát)`);
+        return this.pay(me, c.amount, null, `nộp ${c.name}`, () => {
+          this.addLog('tax', `${me.name} nộp ${c.name} ${fmt(c.amount)}$`);
           this.afterLanding();
         });
       case 'start':
-        if (this.pot > 0) {
-          me.cash += this.pot;
-          this.addLog('pot', `${me.name} dừng đúng Xuất phát, ăn trọn hũ ${fmt(this.pot)} xu 🍯`);
-          this.pot = 0;
-        }
+        // dừng đúng ô Xuất phát: không được đồng nào (chỉ đi vượt qua mới được thưởng)
         break;
       case 'airport': {
         const dest = this.pickFlight();
@@ -524,12 +575,24 @@ export class TyPhuGame implements GameEngine {
       cost += Math.max(1, n) * card.perLevel;
     }
     const next = () => this.cardEffect(card);
-    if (cost > 0) return this.pay(me, cost, null, 'trả thẻ Rủi ro', true, next);
+    if (cost > 0) return this.pay(me, cost, null, 'trả thẻ Rủi ro', next);
     next();
   }
 
   private cardEffect(card: Card): void {
     const me = this.players[this.current];
+    if (card.ticket) {
+      // chỉ mua bằng tiền mặt đang có, không bắt bán nhà
+      if (me.cash >= TYPHU_JAIL_TICKET) {
+        this.step = 'ticket';
+        this.pendingBuy = null;
+        this.armIdle();
+        this.ctx.changed();
+        return;
+      }
+      this.addLog('info', `${me.name} không đủ ${fmt(TYPHU_JAIL_TICKET)}$ tiền mặt để mua vé ra tù`);
+      return this.afterLanding();
+    }
     if (card.jail) {
       this.sendToJail(me, 'theo thẻ Rủi ro');
       return this.wait(() => this.nextPlayer());
@@ -542,7 +605,7 @@ export class TyPhuGame implements GameEngine {
       }
       if (card.fallback) {
         me.cash += card.fallback;
-        this.addLog('info', `${me.name} chưa có đất, nhận ${fmt(card.fallback)} xu`);
+        this.addLog('info', `${me.name} chưa có đất, nhận ${fmt(card.fallback)}$`);
       }
       return this.afterLanding();
     }
@@ -555,6 +618,12 @@ export class TyPhuGame implements GameEngine {
     const me = this.players[this.current];
     this.addLog('info', `${me.name} bỏ qua ${TYPHU_BOARD[this.pendingBuy].name}`);
     this.pendingBuy = null;
+    this.afterLanding();
+  }
+
+  private skipTicket(): void {
+    if (this.step !== 'ticket') return;
+    this.addLog('info', `${this.players[this.current].name} không mua vé ra tù`);
     this.afterLanding();
   }
 
@@ -591,32 +660,31 @@ export class TyPhuGame implements GameEngine {
   // ---------- trả tiền & nợ ----------
 
   /**
-   * `payer` (người đang tới lượt) phải trả `amount` cho `to` (hoặc ngân hàng, dồn vào hũ nếu `toPot`).
+   * `payer` (người đang tới lượt) phải trả `amount` cho `to` (null = ngân hàng).
    * Đủ tiền mặt: trả luôn rồi chạy `then`. Thiếu: chuyển sang bước "debt", người chơi tự chọn bán
    * nhà đất từng ô cho tới khi đủ. Không còn gì để bán mà vẫn thiếu thì phá sản.
    */
-  private pay(payer: TPlayer, amount: number, to: TPlayer | null, why: string, toPot: boolean, then: () => void): void {
+  private pay(payer: TPlayer, amount: number, to: TPlayer | null, why: string, then: () => void): void {
     if (amount <= 0) return then();
     if (payer.cash >= amount) {
-      this.transfer(payer, amount, to, toPot);
+      this.transfer(payer, amount, to);
       return then();
     }
     if (!this.hasAssets(payer)) {
-      this.goBroke(payer, to, why, toPot);
+      this.goBroke(payer, to, why);
       return this.afterBankrupt();
     }
-    this.debt = { amount, to, why, toPot, then };
+    this.debt = { amount, to, why, then };
     this.step = 'debt';
     this.pendingBuy = null;
-    this.addLog('info', `${payer.name} thiếu ${fmt(amount - payer.cash)} xu để ${why}, phải bán nhà đất`);
+    this.addLog('info', `${payer.name} thiếu ${fmt(amount - payer.cash)}$ để ${why}, phải bán nhà đất`);
     this.armIdle();
     this.ctx.changed();
   }
 
-  private transfer(payer: TPlayer, amount: number, to: TPlayer | null, toPot: boolean): void {
+  private transfer(payer: TPlayer, amount: number, to: TPlayer | null): void {
     payer.cash -= amount;
     if (to) to.cash += amount;
-    else if (toPot) this.pot += amount;
   }
 
   /** Sau mỗi lần bán ở bước "debt": đủ tiền thì trả rồi chơi tiếp; hết nhà đất mà vẫn thiếu thì phá sản. */
@@ -626,13 +694,13 @@ export class TyPhuGame implements GameEngine {
     if (!d || !me) return false;
     if (me.cash >= d.amount) {
       this.debt = null;
-      this.transfer(me, d.amount, d.to, d.toPot);
+      this.transfer(me, d.amount, d.to);
       d.then();
       return true;
     }
     if (!this.hasAssets(me)) {
       this.debt = null;
-      this.goBroke(me, d.to, d.why, d.toPot);
+      this.goBroke(me, d.to, d.why);
       this.afterBankrupt();
       return true;
     }
@@ -653,10 +721,9 @@ export class TyPhuGame implements GameEngine {
   }
 
   /** Trả hết tiền mặt còn lại cho chủ nợ rồi phá sản */
-  private goBroke(p: TPlayer, to: TPlayer | null, why: string, toPot: boolean): void {
+  private goBroke(p: TPlayer, to: TPlayer | null, why: string): void {
     const paid = Math.max(0, p.cash);
     if (to) to.cash += paid;
-    else if (toPot) this.pot += paid;
     p.cash = 0;
     this.bankrupt(p, to, `không đủ tiền ${why}`);
   }
@@ -684,6 +751,7 @@ export class TyPhuGame implements GameEngine {
   private bankrupt(p: TPlayer, to: TPlayer | null, why: string): void {
     p.bankrupt = true;
     p.jail = null;
+    delete this.tickets[p.id];
     for (const [i, owner] of Object.entries(this.owners)) {
       if (owner === p.id) {
         delete this.owners[Number(i)];
@@ -719,10 +787,28 @@ export class TyPhuGame implements GameEngine {
   private beginRoll(): void {
     this.movement = null;
     this.throwView = null;
-    this.step = 'roll';
     this.pendingBuy = null;
     this.debt = null;
-    // không đếm ngược lúc tung: chỉ tự tung khi người chơi treo máy quá lâu
+    const me = this.players[this.current];
+    // ngồi tù đủ lượt tối đa: bắt buộc ra (có vé thì dùng vé, không thì trả tiền; thiếu thì tự chọn bán tài sản)
+    if (me && me.jail !== null && me.jail >= TYPHU_JAIL_MAX) {
+      if ((this.tickets[me.id] ?? 0) > 0) this.useTicket(me);
+      else {
+        return this.pay(me, TYPHU_JAIL_FINE, null, 'trả tiền ra tù', () => {
+          me.jail = null;
+          this.addLog('jail', `${me.name} ngồi đủ ${TYPHU_JAIL_MAX} lượt, trả ${fmt(TYPHU_JAIL_FINE)}$ ra tù`);
+          this.rollStep();
+        });
+      }
+    }
+    this.rollStep();
+  }
+
+  /** chờ người đang tới lượt đổ xúc xắc (hoặc, nếu đang ở tù, chọn trả tiền / dùng vé / ở lại) */
+  private rollStep(): void {
+    this.step = 'roll';
+    this.pendingBuy = null;
+    // không đếm ngược lúc tung: chỉ làm giúp khi người chơi treo máy quá lâu
     this.armIdle();
     this.ctx.changed();
   }
@@ -738,7 +824,12 @@ export class TyPhuGame implements GameEngine {
 
   /** hẹn giờ làm giúp khi người chơi treo máy (hoặc mất kết nối) ở bước đang chờ họ quyết định */
   private armIdle(): void {
-    if (this.step === 'roll') this.armTimer(() => this.roll(), ROLL_IDLE_MS);
+    const me = this.players[this.current];
+    if (this.step === 'roll') {
+      // treo máy khi đang ở tù: coi như chọn ở lại (đủ lượt tối đa thì beginRoll đã bắt trả tiền)
+      if (me && me.jail !== null) this.armTimer(() => this.stayJail(me), ROLL_IDLE_MS);
+      else this.armTimer(() => this.roll(), ROLL_IDLE_MS);
+    } else if (this.step === 'ticket') this.armTimer(() => this.skipTicket(), ROLL_IDLE_MS);
     else if (this.step === 'buy') this.armTimer(() => this.skipBuy(), ROLL_IDLE_MS);
     else if (this.step === 'upgrade') this.armTimer(() => this.skipUpgrade(), ROLL_IDLE_MS);
     else if (this.step === 'debt') this.armTimer(() => this.autoSettle(), ROLL_IDLE_MS);
@@ -776,11 +867,11 @@ export class TyPhuGame implements GameEngine {
     const top = winner ?? ranked.find((p) => !p.bankrupt) ?? null;
     this.ctx.finish({
       winnerId: top?.id ?? null,
-      headline: top ? `${top.name} trở thành tỷ phú với ${fmt(this.worth(top))} xu!` : 'Cả bàn phá sản',
+      headline: top ? `${top.name} trở thành tỷ phú với ${fmt(this.worth(top))}$!` : 'Cả bàn phá sản',
       ranking: ranked.map((p) => ({
         playerId: p.id,
         name: p.name,
-        detail: p.bankrupt ? 'phá sản' : `tài sản ${fmt(this.worth(p))} xu`,
+        detail: p.bankrupt ? 'phá sản' : `tài sản ${fmt(this.worth(p))}$`,
       })),
     });
   }

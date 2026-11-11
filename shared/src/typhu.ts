@@ -95,8 +95,9 @@ export const TYPHU_ROLL_MAX_MS = 2100;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
   return cell.kind === 'land' || cell.kind === 'station' || cell.kind === 'utility';
 }
-/** tiền thuê ga: 50/100/200/400 theo số ga cùng chủ, mỗi sao nâng cấp của ga đó nhân đôi */
-export function stationRent(count: number, stars = 0): number { return count > 0 ? 50 * 2 ** (count - 1) * 2 ** stars : 0; }
+/** tiền thuê ga: 50$ × số ga cùng chủ (1 ga 50, 2 ga 100, 3 ga 150, đủ 4 ga 200 = gấp 4), mỗi sao của ga đó nhân đôi */
+export function stationRent(count: number, stars = 0): number { return count > 0 ? 50 * count * 2 ** stars : 0; }
+/** công ty điện / nước: thuê = tổng xúc xắc người dừng vừa đổ × 8 (có cả hai công ty thì × 20) */
 export function utilityRent(count: number, diceTotal: number): number { return count > 0 ? diceTotal * (count >= 2 ? 20 : 8) : 0; }
 
 export const TYPHU_SIZE = TYPHU_BOARD.length;
@@ -106,9 +107,14 @@ export const TYPHU_COLS = 11;
 export const TYPHU_ROWS = 11;
 export const TYPHU_START_CASH = 1500;
 export const TYPHU_PASS_START = 500;
-export const TYPHU_JAIL_FINE = 50;
+/** tiền ra tù; phải trả (hoặc dùng vé) mới được đổ xúc xắc */
+export const TYPHU_JAIL_FINE = 200;
+/** ngồi tối đa chừng này lượt, tới lượt kế tiếp bắt buộc trả tiền ra tù (thiếu thì tự chọn bán tài sản) */
+export const TYPHU_JAIL_MAX = 3;
+/** vé ra tù (thẻ Cơ hội): mua bằng nửa tiền ra tù, cất trong túi, dùng để ra tù miễn phí */
+export const TYPHU_JAIL_TICKET = TYPHU_JAIL_FINE / 2;
 export const TYPHU_MAX_HOUSES = 4; // 4 = khách sạn
-/** nhà ga chỉ nâng sao (không xây nhà): tối đa 3 sao, mỗi sao 100 xu */
+/** nhà ga chỉ nâng sao (không xây nhà): tối đa 3 sao, mỗi sao 100$ */
 export const TYPHU_STATION_MAX = 3;
 export const TYPHU_STATION_UPGRADE = 100;
 /** máy bay ở ô Sân bay bay tới các ô này (mọi ô trừ chính Sân bay) */
@@ -122,12 +128,12 @@ export function groupCells(group: TyPhuGroup): number[] {
   return TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && c.group === group ? [i] : []));
 }
 
-/** Tiền thuê một ô đất (đã biết chủ có đủ bộ màu hay không và số nhà) */
+/** Tiền thuê một ô đất: theo số nhà, và luôn x2 nếu chủ có đủ bộ cùng màu (kể cả khi đã xây nhà) */
 export function rentOf(cell: number, houses: number, fullGroup: boolean): number {
   const c = TYPHU_BOARD[cell];
   if (c.kind !== 'land') return 0;
-  if (houses > 0) return c.rent * TYPHU_HOUSE_MULT[houses - 1];
-  return fullGroup ? c.rent * 2 : c.rent;
+  const base = houses > 0 ? c.rent * TYPHU_HOUSE_MULT[houses - 1] : c.rent;
+  return fullGroup ? base * 2 : base;
 }
 
 /** cấp tối đa của ô: đất 4 (khách sạn), ga 3 sao, ô khác không nâng được */
@@ -147,6 +153,18 @@ export function sellRefundOf(cell: number, level: number): number {
   const c = TYPHU_BOARD[cell];
   if (!c || !isTyPhuProperty(c)) return 0;
   return level > 0 ? upgradeCostOf(cell) / 2 : c.price / 2;
+}
+
+/**
+ * Tiền thu về khi bán ở ô `cell` đang có `level` cấp nhà/sao (mọi thứ đều nửa giá mua, tính riêng từng thứ):
+ * `levels` = bán bớt chừng này cấp nhà/sao (giữ đất); `land` = bán cả lô (đất + toàn bộ nhà/sao trên đó).
+ */
+export function sellValueOf(cell: number, level: number, opt: { levels?: number; land?: boolean }): number {
+  const c = TYPHU_BOARD[cell];
+  if (!c || !isTyPhuProperty(c)) return 0;
+  const per = upgradeCostOf(cell) / 2;
+  if (opt.land) return c.price / 2 + level * per;
+  return Math.max(0, Math.min(level, opt.levels ?? 0)) * per;
 }
 
 export interface TyPhuSaleItem {
@@ -176,7 +194,7 @@ export function liquidValueOf(
   return v;
 }
 
-/** Danh sách tài sản có thể bán của người chơi (kèm đánh dấu những ô hệ thống đề xuất bán trước để đủ `needTotal` xu). */
+/** Danh sách tài sản có thể bán của người chơi (kèm đánh dấu những ô hệ thống đề xuất bán trước để đủ `needTotal`). */
 export function suggestSales(
   playerId: string,
   needTotal: number,

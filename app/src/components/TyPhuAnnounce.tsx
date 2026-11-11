@@ -12,7 +12,7 @@ export type Announce = {
   end: number;
   title: string;
   sub?: string;
-  /** số xu (dương: nhận, âm: mất) */
+  /** số tiền $ (dương: nhận, âm: mất) */
   amount?: number;
   portrait?: string;
   color?: string;
@@ -92,7 +92,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
         {a.kind === 'reward' && (
           <>
             {portrait}
-            <T style={[styles.huge, { color: '#FFE066' }]}>{a.amount ? `+${fmt(a.amount)} xu` : a.title}</T>
+            <T style={[styles.huge, { color: '#FFE066' }]}>{a.amount ? `+${fmt(a.amount)}$` : a.title}</T>
             <T style={styles.sub}>{a.title}</T>
             {a.sub ? <T style={styles.sub2}>{a.sub}</T> : null}
           </>
@@ -107,7 +107,7 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
               }}
             />
             <T style={[styles.huge, { color: '#B2F2BB', transform: [{ translateX: Math.sin(el / 45) * (p < 0.3 ? 4 : 1) }] }]}>
-              {a.amount ? `-${fmt(Math.abs(a.amount))} xu` : a.title}
+              {a.amount ? `-${fmt(Math.abs(a.amount))}$` : a.title}
             </T>
             <T style={[styles.sub, { color: '#C0EBD0' }]}>{a.amount ? a.title : a.sub}</T>
             {a.amount && a.sub ? <T style={[styles.sub2, { color: '#8FD1AA' }]}>{a.sub}</T> : null}

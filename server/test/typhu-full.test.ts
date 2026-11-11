@@ -67,7 +67,7 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     g.action('p0', { type: 'roll' }); settle();
     expect(v().cash.p0).toBe(1500 - rentOf(sg, 1, true));
     expect(v().cash.p1).toBe(1500 + rentOf(sg, 1, true));
-    expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 9);
+    expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 9 * 2); // đủ bộ màu: luôn x2
   });
 
   it('dừng ở đất của mình thì nâng đúng 1 cấp, không nhảy cóc', () => {
@@ -99,17 +99,18 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     expect(b.v().houses[3] ?? 0).toBe(0);
   });
 
-  it('thuế và tiền phạt vào hũ, dừng đúng Xuất phát thì ăn cả hũ (không có thưởng qua Xuất phát)', () => {
+  it('thuế nộp ngân hàng; dừng đúng Xuất phát thì không được đồng nào', () => {
     const { g, v, pl, settle, push } = make(2);
     push(1, 3); // ô 4: thuế thu nhập 200
     g.action('p0', { type: 'roll' }); settle();
-    expect(v().pot).toBe(200);
+    expect(v().cash.p0).toBe(1300);
+    expect(v().cash.p1).toBe(1500);
     vi.advanceTimersByTime(3000);
     pl(1).pos = 37;
     push(1, 2); // tới đúng ô 0 Xuất phát
     g.action('p1', { type: 'roll' }); settle();
-    expect(v().cash.p1).toBe(1700);
-    expect(v().pot).toBe(0);
+    expect(v().pos.p1).toBe(0);
+    expect(v().cash.p1).toBe(1500);
   });
 
   it('thiếu tiền thì KHÔNG tự bán: chờ người chơi chọn bán từng cấp nhà', () => {
@@ -129,7 +130,6 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     g.action('p0', { type: 'sell', cell: nau[0] }); // 220: đủ thì tự trả
     expect(v().step).toBe('wait');
     expect(v().cash.p0).toBe(20);
-    expect(v().pot).toBe(200);
     expect(nau.map((i) => v().owners[i])).toEqual(['p0', 'p0']);
   });
 
@@ -222,8 +222,13 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
         const cur = s.currentPlayerId!;
         if (s.movement) { vi.advanceTimersByTime(s.movement.endsAt - Date.now()); continue; }
         if (s.step === 'roll') {
-          if (cur in s.jail && pickR() < 0.3) g.action(cur, { type: 'payJail' });
-          else g.action(cur, { type: 'roll' });
+          if (cur in s.jail) {
+            const k = pickR();
+            const r1 = k < 0.3 ? g.action(cur, { type: 'payJail' }) : k < 0.5 ? g.action(cur, { type: 'useTicket' }) : { ok: false };
+            if (!r1.ok) expect(g.action(cur, { type: 'stayJail' }).ok).toBe(true);
+          } else g.action(cur, { type: 'roll' });
+        } else if (s.step === 'ticket') {
+          g.action(cur, { type: pickR() < 0.6 ? 'buy' : 'skip' });
         } else if (s.step === 'buy') {
           g.action(cur, { type: pickR() < 0.75 ? 'buy' : 'skip' });
         } else if (s.step === 'upgrade') {
@@ -232,7 +237,9 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
         } else if (s.step === 'debt') {
           // tự chọn bán ngẫu nhiên một ô của mình
           const mine = Object.entries(s.owners).filter(([, o]) => o === cur).map(([i]) => Number(i));
-          g.action(cur, { type: 'sell', cell: mine[Math.floor(pickR() * mine.length)] });
+          const cell = mine[Math.floor(pickR() * mine.length)];
+          const k = pickR();
+          g.action(cur, k < 0.3 ? { type: 'sell', cell, land: true } : k < 0.6 && (s.houses[cell] ?? 0) > 0 ? { type: 'sell', cell, levels: s.houses[cell] } : { type: 'sell', cell });
         } else {
           vi.advanceTimersByTime(2000);
         }

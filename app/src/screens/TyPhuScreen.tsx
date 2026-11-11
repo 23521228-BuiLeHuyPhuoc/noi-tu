@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Image, Pressable, StyleSheet, View } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_PASS_START, TYPHU_STATION_MAX, TYPHU_STATION_UPGRADE,
-  isTyPhuProperty, stationRent, utilityRent, maxLevelOf, upgradeCostOf,
-  TYPHU_HOUSE_MULT, TYPHU_MAX_HOUSES, groupCells, rentOf, liquidValueOf, suggestSales, type TyPhuSaleItem,
+  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_JAIL_MAX, TYPHU_JAIL_TICKET, TYPHU_PASS_START, TYPHU_STATION_MAX,
+  TYPHU_STATION_UPGRADE, isTyPhuProperty, stationRent, utilityRent, maxLevelOf, upgradeCostOf, sellValueOf,
+  TYPHU_HOUSE_MULT, TYPHU_MAX_HOUSES, groupCells, rentOf, liquidValueOf, suggestSales,
 } from '../../../shared/src/typhu';
-import { shortCellName } from '../typhuNames';
 import type { Game } from '../useGame';
 import { actionText } from '../messages';
 import { characterSvgUri, playerColorOf } from '../avatars';
@@ -48,7 +47,10 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const [detail, setDetail] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
-  const [jailSellOpen, setJailSellOpen] = useState(false);
+  // bảng bán tài sản (từng lô một): tự mở khi thiếu tiền; lúc khác mở bằng nút "Bán tài sản"
+  const [sellOpen, setSellOpen] = useState(false);
+  const [sellFocus, setSellFocus] = useState<number | null>(null);
+  const [sellKey, setSellKey] = useState('');
   const [throwAt, setThrowAt] = useState<string | null>(null);
   const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -227,7 +229,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       return !!name && (text === name || text.startsWith(`${name} `) || text.startsWith(`${name},`));
     });
     const parseXu = (s: string): number | null => {
-      const m = s.match(/([\d.]+)\s*xu/);
+      const m = s.match(/([\d.]+)\s*\$/);
       if (!m) return null;
       const n = Number(m[1].replace(/\./g, ''));
       return Number.isFinite(n) ? n : null;
@@ -244,7 +246,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         const price = isTyPhuProperty(cell) ? cell.price : 0;
         // thông báo mua to chỉ hiện cho chính người mua; người khác chỉ thấy dấu "ĐÃ MUA" trên ô
         if (owner === me) announce('buy', t0, {
-          title: cell.name, sub: `${nameOf(owner)} · ${fmt(price)} xu`, amount: price, portrait: portraitUriOf(owner), color: colorOf(owner), icon: ICON_BY_CELL[i],
+          title: cell.name, sub: `${nameOf(owner)} · ${fmt(price)}$`, amount: price, portrait: portraitUriOf(owner), color: colorOf(owner), icon: ICON_BY_CELL[i],
         });
       } else if (owner && houses > (prevHousesRef.current[i] ?? 0)) {
         const station = cell.kind === 'station';
@@ -284,7 +286,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         }
       } else if (l.kind === 'card') {
         const text = g.card?.text ?? l.text;
-        const parsed = parseXu(text) ?? 0;
+        // thẻ vé ra tù: số tiền trên thẻ là giá vé (mua hay không là tuỳ), không phải tiền nhận
+        const parsed = /vé ra tù/i.test(text) ? 0 : parseXu(text) ?? 0;
         const netWho = (deltas[who] ?? 0) - (passedStartIds.has(who) ? TYPHU_PASS_START : 0);
         // Cơ hội luôn tốt, Rủi ro luôn xấu: biết ngay từ loại thẻ
         const good = g.card?.good ?? netWho > 0;
@@ -301,12 +304,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       } else if (l.kind === 'tax') {
         const amount = -(parseXu(l.text) ?? Math.abs(deltas[who] ?? 0));
         if (mine) {
-          announce('loss', t0 + msUntilArrive(), { title: TYPHU_BOARD[g.pos[who] ?? 0]?.name ?? 'Thuế', sub: 'Tiền vào hũ ở ô Xuất phát', amount, portrait: portraitUriOf(who), color: colorOf(who) });
-        }
-      } else if (l.kind === 'pot') {
-        const amount = parseXu(l.text) ?? Math.max(0, deltas[who] ?? 0);
-        if (mine) {
-          announce('reward', t0 + msUntilArrive(), { title: 'Bạn ăn trọn hũ ở Xuất phát!', amount, portrait: portraitUriOf(who), color: colorOf(who) });
+          announce('loss', t0 + msUntilArrive(), { title: TYPHU_BOARD[g.pos[who] ?? 0]?.name ?? 'Thuế', sub: 'Nộp cho ngân hàng', amount, portrait: portraitUriOf(who), color: colorOf(who) });
         }
       } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
         const delay = msUntilArrive();
@@ -331,7 +329,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     // chỉ phản ứng khi mất/được tiền vì dừng ô, bị thu tiền thuê, thẻ, thuế; tự mua đất / xây nhà / nộp tiền ra tù thì không
     const spenders = new Set(
       newLogs
-        .filter((l) => l.kind === 'buy' || l.kind === 'build' || (l.kind === 'jail' && l.text.includes('để ra tù')))
+        .filter((l) => l.kind === 'buy' || l.kind === 'build' || (l.kind === 'jail' && (l.text.includes('để ra tù') || l.text.includes('mua vé ra tù'))))
         .map((l) => idOfName(l.text))
         .filter(Boolean),
     );
@@ -409,21 +407,48 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
 
   const pending = g.pendingBuy !== null ? TYPHU_BOARD[g.pendingBuy] : null;
+
+  // ---- bán tài sản từng lô ----
+  // sang lượt / bước khác thì đóng bảng bán tự mở
+  const turnKey = `${g.currentPlayerId}|${g.step}`;
+  if (turnKey !== sellKey) {
+    setSellKey(turnKey);
+    if (sellOpen) setSellOpen(false);
+    if (sellFocus !== null) setSellFocus(null);
+  }
+  const myCash = g.cash[me] ?? 0;
+  const sellList = TYPHU_BOARD.flatMap((_, i) => (canSellCell(i) ? [i] : []));
+  const sellMode = !moving && myTurn && sellList.length > 0 && (g.step === 'debt' || sellOpen);
+  // ô đang hỏi bán: lần đầu là ô gợi ý (rẻ nhất), bán hết lô đó thì nhảy sang lô kế tiếp theo vòng bàn
+  const firstPick = g.step === 'debt' && g.debt ? suggestSales(me, g.debt.amount, myCash, g.owners, g.houses)[0]?.cell : undefined;
+  const focusCell = !sellMode ? null
+    : sellFocus === null ? (firstPick !== undefined && sellList.includes(firstPick) ? firstPick : sellList[0])
+    : sellList.includes(sellFocus) ? sellFocus
+    : sellList.find((i) => i > sellFocus) ?? sellList[0];
+  const sellNeed = g.step === 'debt' && g.debt ? g.debt.amount - myCash
+    : g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending.price - myCash
+    : g.step === 'upgrade' && g.pendingBuy !== null ? upgradeCostOf(g.pendingBuy) - myCash
+    : g.step === 'roll' && inJail ? TYPHU_JAIL_FINE - myCash
+    : null;
   const curName = g.currentPlayerId ? nameOf(g.currentPlayerId) : '';
   const status = diceAnimating ? `${g.currentPlayerId ? nameOf(g.currentPlayerId) : 'Người chơi'} đang đổ xúc xắc…`
     : moving ? `${nameOf(movement!.playerId)} đang di chuyển từng ô…` : myTurn
     ? g.step === 'roll'
       ? inJail
-        ? 'Bạn đang ngồi tù: đổ đôi để ra, hoặc nộp tiền'
+        ? `Bạn đang ở tù: trả ${fmt(TYPHU_JAIL_FINE)}$ / dùng vé để đổ, hoặc ở lại`
         : 'Tới lượt bạn, đổ xúc xắc đi!'
+      : g.step === 'ticket'
+        ? `Mua vé ra tù giá ${fmt(TYPHU_JAIL_TICKET)}$ không?`
       : g.step === 'buy'
-        ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)} xu?` : 'Mua miếng đất này không?'
+        ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)}$?` : 'Mua miếng đất này không?'
         : g.step === 'upgrade'
           ? pending?.kind === 'station' ? 'Nâng sao cho nhà ga của bạn?' : 'Nâng cấp nhà ở đất của bạn?'
           : g.step === 'debt' && g.debt
-            ? `Thiếu ${fmt(Math.max(0, g.debt.amount - (g.cash[me] ?? 0)))} xu: chọn nhà đất để bán`
+            ? `Thiếu ${fmt(Math.max(0, g.debt.amount - (g.cash[me] ?? 0)))}$: chọn lô để bán`
             : 'Chờ chút…'
     : g.step === 'debt' ? `${curName} thiếu tiền, đang bán nhà đất…`
+    : g.step === 'ticket' ? `${curName} đang tính mua vé ra tù`
+    : g.step === 'roll' && g.currentPlayerId && g.currentPlayerId in g.jail ? `${curName} đang ở tù`
     : g.step === 'roll' && g.extraRoll ? `${curName} đổ đôi, được tung tiếp 🎲` : `Lượt của ${curName}`;
 
   const d = detail !== null ? TYPHU_BOARD[detail] : null;
@@ -473,7 +498,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         dim: (p) => g.bankrupt.includes(p.id),
         ring: (p) => (g.order.includes(p.id) ? colorOf(p.id) : undefined),
         sub: (p) =>
-          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${fmt(g.cash[p.id])} xu${p.id in g.jail ? ' (tù)' : ''}` : undefined,
+          g.bankrupt.includes(p.id) ? 'phá sản' : p.id in g.cash ? `${fmt(g.cash[p.id])}$${p.id in g.jail ? ' (tù)' : ''}` : undefined,
       }}
     >
       <View
@@ -511,7 +536,6 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 isTrail={activeMovementState?.trail.has(i) ?? false}
                 isStepTarget={activeMovementState?.stepCell === i}
                 onPress={setDetail}
-                pot={TYPHU_BOARD[i].kind === 'start' ? g.pot ?? 0 : undefined}
               />
             );
           })}
@@ -547,14 +571,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 error={error}
                 isHost={isHost}
                 onEnd={() => setEnding(true)}
-                onAct={(a) => {
-                  if (a === 'payJail' && (g.cash[me] ?? 0) < TYPHU_JAIL_FINE) {
-                    setJailSellOpen(true);
-                    return;
-                  }
-                  setJailSellOpen(false);
-                  void act({ type: a });
-                }}
+                onAct={(a) => { void act({ type: a }); }}
                 speed={speed}
                 onRules={() => setRulesOpen(true)}
                 onSpeed={canChangeSpeed ? () => { const next = speedRef.current >= 3 ? 1 : speedRef.current + 1; speedRef.current = next; void act({ type: 'speed', value: next }); } : undefined}
@@ -591,18 +608,35 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
           })}
 
           <TyPhuFxLayer fx={reducedMotion ? [] : fx} now={now} cells={geo.rect} W={boardW} H={boardH} center={geo.center} />
+
+          {/* đang bán tài sản: tối cả bàn, chỉ sáng ô đang hỏi bán */}
+          {focusCell !== null && !activeAnn && detail === null && (
+            <SellSpotlight rect={geo.rect[focusCell]} W={boardW - 4} H={boardH - 4} now={now} />
+          )}
         </View>
 
-        {/* bảng thông tin nổi khi tới ô mua được, được nâng cấp, thiếu tiền phải bán, hoặc bán nhà đất để ra tù (không nghiêng theo bàn) */}
-        {myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade' || g.step === 'debt' || (jailSellOpen && inJail && g.step === 'roll')) && (
+        {/* bán tài sản từng lô: bảng nhỏ nằm giữa bàn (không che ô đang hỏi bán) */}
+        {focusCell !== null && !activeAnn && detail === null ? (
+          <SellPicker
+            g={g}
+            me={me}
+            cell={focusCell}
+            list={sellList}
+            need={sellNeed}
+            debt={g.step === 'debt'}
+            total={myCash + liquidValueOf(me, g.owners, g.houses)}
+            onFocus={setSellFocus}
+            onSell={(opt) => { setSellFocus(focusCell); void act({ type: 'sell', cell: focusCell, ...opt }); }}
+            onClose={g.step === 'debt' ? undefined : () => setSellOpen(false)}
+          />
+        ) : myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade' || g.step === 'ticket' || (g.step === 'roll' && inJail)) && (
+          /* bảng thông tin nổi khi tới ô mua được, được nâng cấp, đang ở tù, rút được vé ra tù (không nghiêng theo bàn) */
           <DecisionCard
             g={g}
             me={me}
-            nameOf={nameOf}
             canBuild={canBuild}
-            jailSell={jailSellOpen && inJail && g.step === 'roll'}
-            onCloseJailSell={() => setJailSellOpen(false)}
             onAct={(a) => void act(a)}
+            onOpenSell={sellList.length ? () => { setSellFocus(null); setSellOpen(true); } : undefined}
           />
         )}
       </View>
@@ -628,7 +662,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 <T style={styles.detailGroup}>{TYPHU_GROUPS[d.group].name}</T>
               </View>
               <T>
-                Giá đất: <T style={{ fontWeight: '900' }}>{fmt(d.price)} xu</T>, xây mỗi nhà {fmt(TYPHU_GROUPS[d.group].house)} xu
+                Giá đất: <T style={{ fontWeight: '900' }}>{fmt(d.price)}$</T>, xây mỗi nhà {fmt(TYPHU_GROUPS[d.group].house)}$. Bán lại: đất và từng nhà đều được nửa giá.
               </T>
               <T>
                 Chủ: <T style={{ fontWeight: '900' }}>{g.owners[detail] ? nameOf(g.owners[detail]) : 'chưa có'}</T>
@@ -637,18 +671,19 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
               <View style={styles.rents}>
                 {[
                   ['Đất trống', d.rent],
-                  ['Đủ bộ màu', d.rent * 2],
+                  ['Đủ bộ cùng màu (mọi mức x2)', d.rent * 2],
                   ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn (Cấp 4)' : `Nhà cấp ${k + 1} (${k + 1} nhà)`, d.rent * m] as [string, number]),
                 ].map(([label, v]) => (
                   <View key={label} style={styles.rentRow}>
                     <T style={{ color: C.muted }}>{label}</T>
-                    <T style={{ fontWeight: '800' }}>{fmt(v as number)} xu</T>
+                    <T style={{ fontWeight: '800' }}>{fmt(v as number)}$</T>
                   </View>
                 ))}
               </View>
               {g.owners[detail] && (
                 <T style={{ color: C.muted }}>
-                  Tiền thuê hiện tại: {fmt(rentOf(detail, g.houses[detail] ?? 0, ownsGroup(g.owners[detail], detail)))} xu
+                  Tiền thuê hiện tại: {fmt(rentOf(detail, g.houses[detail] ?? 0, ownsGroup(g.owners[detail], detail)))}$
+                  {g.owners[detail] in g.jail ? ' (chủ đang ở tù: không thu được)' : ''}
                 </T>
               )}
               {canBuild(detail) && (
@@ -656,7 +691,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   testID="build-btn"
                   icon="🏠"
                   disabled={(g.cash[me] ?? 0) < TYPHU_GROUPS[d.group].house}
-                  title={`Xây ${(g.houses[detail] ?? 0) === TYPHU_MAX_HOUSES - 1 ? 'khách sạn' : 'nhà'} (${fmt(TYPHU_GROUPS[d.group].house)} xu)`}
+                  title={`Xây ${(g.houses[detail] ?? 0) === TYPHU_MAX_HOUSES - 1 ? 'khách sạn' : 'nhà'} (${fmt(TYPHU_GROUPS[d.group].house)}$)`}
                   onPress={() => { void act({ type: 'build', cell: detail }).then((ok) => { if (ok) setDetail(null); }); }}
                 />
               )}
@@ -666,24 +701,19 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   small
                   variant="paper"
                   icon="💰"
-                  title={(g.houses[detail] ?? 0) > 0
-                    ? `Bán 1 cấp nhà (+${fmt(TYPHU_GROUPS[d.group].house / 2)} xu)`
-                    : `Bán đất cho ngân hàng (+${fmt(d.price / 2)} xu)`}
-                  onPress={() => {
-                    const hasHouse = (g.houses[detail] ?? 0) > 0;
-                    void act({ type: 'sell', cell: detail }).then((ok) => { if (ok && !hasHouse) setDetail(null); });
-                  }}
+                  title="Bán nhà / đất ở ô này…"
+                  onPress={() => { setSellFocus(detail); setSellOpen(true); setDetail(null); }}
                 />
               )}
             </View>
           ) : d.kind === 'station' || d.kind === 'utility' ? (
             <View style={{ gap: 10 }}>
-              <T>Giá mua: {fmt(d.price)} xu</T>
+              <T>Giá mua: {fmt(d.price)}$ (bán lại nửa giá)</T>
               <T>Chủ: {g.owners[detail] ? nameOf(g.owners[detail]) : 'Chưa có'}</T>
               <T>
                 {d.kind === 'station'
-                  ? `Tiền thuê theo số ga sở hữu: 50 / 100 / 200 / 400 xu. Ga không xây nhà, chỉ nâng sao: dừng ở ga của mình được nâng 1 sao (${fmt(TYPHU_STATION_UPGRADE)} xu, tối đa ${TYPHU_STATION_MAX} sao), mỗi sao nhân đôi tiền thuê ga đó.`
-                  : 'Tiền thuê: tổng xúc xắc × 8; sở hữu cả hai công ty: × 20.'}
+                  ? `Tiền thuê = 50$ × số ga cùng chủ: 1 ga 50$, 2 ga 100$, 3 ga 150$, đủ 4 ga 200$ (gấp 4). Ga không xây nhà, chỉ nâng sao: dừng ở ga của mình được nâng 1 sao (${fmt(TYPHU_STATION_UPGRADE)}$, tối đa ${TYPHU_STATION_MAX} sao), mỗi sao nhân đôi tiền thuê ga đó.`
+                  : 'Công ty điện / nước là loại đất đặc biệt: không xây nhà được, tiền thuê tính theo xúc xắc. Ai dừng ở đây trả cho chủ: tổng xúc xắc vừa đổ × 8 (chủ có cả 2 công ty: × 20). Ví dụ đổ được 7: trả 56$, nếu chủ có cả 2 công ty thì 140$.'}
               </T>
               {d.kind === 'station' && g.owners[detail] && (
                 <T>Ga này: <T style={{ fontWeight: '900', color: '#E67700' }}>{(g.houses[detail] ?? 0) > 0 ? '★'.repeat(g.houses[detail] ?? 0) : 'chưa có sao'}</T></T>
@@ -698,8 +728,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                           TYPHU_BOARD.filter((c, i) => c.kind === 'utility' && g.owners[i] === g.owners[detail]).length,
                           (g.dice?.[0] ?? 0) + (g.dice?.[1] ?? 0),
                         ),
-                  )}{' '}
-                  xu
+                  )}$
                 </T>
               )}
               {canSellCell(detail) && (
@@ -708,25 +737,20 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   small
                   variant="paper"
                   icon="💰"
-                  title={(g.houses[detail] ?? 0) > 0
-                    ? `Bán 1 sao (+${fmt(TYPHU_STATION_UPGRADE / 2)} xu)`
-                    : `Bán ${d.kind === 'station' ? 'nhà ga' : 'công ty'} (+${fmt(d.price / 2)} xu)`}
-                  onPress={() => {
-                    const hasStar = (g.houses[detail] ?? 0) > 0;
-                    void act({ type: 'sell', cell: detail }).then((ok) => { if (ok && !hasStar) setDetail(null); });
-                  }}
+                  title="Bán nhà / đất ở ô này…"
+                  onPress={() => { setSellFocus(detail); setSellOpen(true); setDetail(null); }}
                 />
               )}
             </View>
           ) : (
             <T style={{ color: C.muted }}>
-              {d.kind === 'start' && `Đi vượt qua ô này được nhận ${fmt(TYPHU_PASS_START)} xu. Dừng đúng ô này thì không có thưởng, nhưng được ăn cả hũ thuế/tiền phạt (đang có ${fmt(g.pot ?? 0)} xu).`}
-              {d.kind === 'jail' && 'Ngồi tù: đổ đôi để ra, hoặc nộp 50 xu. Chỉ đi ngang qua thì không sao.'}
+              {d.kind === 'start' && `Đi vượt qua ô này được nhận ${fmt(TYPHU_PASS_START)}$. Dừng đúng ô này thì không được đồng nào.`}
+              {d.kind === 'jail' && `Bị giam: phải trả ${fmt(TYPHU_JAIL_FINE)}$ (hoặc dùng vé ra tù) mới được đổ xúc xắc. Được ở lại tối đa ${TYPHU_JAIL_MAX} lượt, hết lượt thì bắt buộc trả (thiếu thì tự chọn bán tài sản). Đang ngồi tù thì đất của mình không thu được tiền thuê. Chỉ đi ngang qua thì không sao.`}
               {d.kind === 'airport' && 'Dừng ở đây là lên máy bay, bay tới một ô ngẫu nhiên trên bàn rồi xử lý ô đó (mua đất, trả thuê, rút thẻ…). Bay thì không tính qua Xuất phát.'}
               {d.kind === 'gotojail' && 'Dừng ở đây là vào tù ngay.'}
               {d.kind === 'community' && 'Rút thẻ Rủi ro, luôn xấu: nộp phạt, lùi lại, vào tù, sửa nhà hoặc bị gọi lên Cục thuế.'}
-              {d.kind === 'chance' && 'Rút thẻ Cơ hội, luôn tốt: nhận tiền, bay về Xuất phát lĩnh thưởng, hoặc tiến tới đất của mình để nâng cấp.'}
-              {d.kind === 'tax' && `Dừng ở đây: -${fmt(d.amount)} xu.`}
+              {d.kind === 'chance' && `Rút thẻ Cơ hội, luôn tốt: nhận tiền, được mừng sinh nhật, tiến tới đất của mình để nâng cấp, hoặc được mua vé ra tù nửa giá (${fmt(TYPHU_JAIL_TICKET)}$).`}
+              {d.kind === 'tax' && `Dừng ở đây: nộp ${fmt(d.amount)}$ cho ngân hàng.`}
             </T>
           )}
               <T style={styles.credit}>Nguồn icon/ảnh: icon Twemoji (CC-BY 4.0, jdecked/twemoji); ảnh địa danh từ Wikimedia Commons / Wikipedia.</T>
@@ -769,153 +793,210 @@ const REACT_GAIN = [
 ];
 
 const RULES = [
-  'Mỗi người có 1.500 xu. Đổ 2 xúc xắc rồi đi theo chiều kim đồng hồ.',
+  'Mỗi người có 1.500$. Đổ 2 xúc xắc rồi đi theo chiều kim đồng hồ.',
   'Đổ đôi được tung thêm lượt; đổ đôi 3 lần liên tiếp thì vào tù.',
-  `Đi vượt qua Xuất phát được +${TYPHU_PASS_START} xu; dừng đúng ô Xuất phát thì không được thưởng mà được ăn cả hũ thuế/tiền phạt.`,
-  'Dừng ở đất chưa ai mua: được mua. Dừng ở đất người khác: trả tiền thuê (đủ bộ màu mà đất trống thì thuê x2).',
+  `Chỉ đi VƯỢT QUA Xuất phát mới được +${TYPHU_PASS_START}$; dừng đúng ô Xuất phát thì không được đồng nào. Thuế, tiền phạt nộp cho ngân hàng.`,
+  'Dừng ở đất chưa ai mua: được mua. Dừng ở đất người khác: trả tiền thuê. Chủ có đủ bộ ô cùng màu (dải màu trên đỉnh ô) thì mọi mức thuê luôn x2.',
   'Dừng ở đất của mình: nâng lên đúng 1 cấp (nhà cấp 1 → 2 → 3 → khách sạn). Lần sau dừng lại mới nâng tiếp.',
   'Tiền thuê đất trống bằng 3/4 giá đất; mỗi cấp nhà tăng mạnh (cấp 1 x2, cấp 2 x4, cấp 3 x6, khách sạn x9).',
-  `Ga: thuê 50/100/200/400 theo số ga cùng chủ. Ga không xây nhà mà nâng sao: dừng ở ga của mình được nâng 1 sao (${TYPHU_STATION_UPGRADE} xu, tối đa ${TYPHU_STATION_MAX} sao), mỗi sao x2 tiền thuê ga đó.`,
-  'Công ty điện, nước: tổng xúc xắc × 8, có cả hai thì × 20.',
-  'Cơ hội: thẻ luôn tốt (nhận tiền, bay về Xuất phát, tiến tới đất của mình để nâng cấp). Rủi ro: thẻ luôn xấu (nộp phạt, lùi, vào tù, sửa nhà, lên Cục thuế).',
+  `Ga: thuê 50$ × số ga cùng chủ (đủ 4 ga = 200$, gấp 4). Ga không xây nhà mà nâng sao: dừng ở ga của mình được nâng 1 sao (${TYPHU_STATION_UPGRADE}$, tối đa ${TYPHU_STATION_MAX} sao), mỗi sao x2 tiền thuê ga đó.`,
+  'Công ty điện, nước: không xây nhà, thuê theo xúc xắc: tổng xúc xắc vừa đổ × 8, chủ có cả hai công ty thì × 20.',
+  `Cơ hội: thẻ luôn tốt (nhận tiền, sinh nhật, tiến tới đất của mình, mua vé ra tù nửa giá ${TYPHU_JAIL_TICKET}$). Rủi ro: thẻ luôn xấu (nộp phạt, lùi, vào tù, sửa nhà, lên Cục thuế).`,
   'Sân bay: máy bay đưa bạn tới một ô ngẫu nhiên. Bay thì không tính qua Xuất phát.',
-  'Vào tù: đổ đôi để ra (đi luôn nhưng không tung thêm), hoặc trả 50 xu trước khi đổ; ngồi đủ 3 lượt thì trả 50 rồi đi.',
-  'Thiếu tiền trả: bạn tự chọn bán từng cấp nhà / sao ga / ô đất (nửa giá) cho tới khi đủ. Chỉ phá sản khi đã bán hết mà vẫn thiếu. Treo máy quá 60 giây thì hệ thống bán giúp.',
+  `Vào tù: phải trả ${TYPHU_JAIL_FINE}$ (hoặc dùng vé ra tù) mới được đổ. Được ở lại tối đa ${TYPHU_JAIL_MAX} lượt; hết lượt bắt buộc trả, thiếu tiền thì tự chọn bán tài sản. Đang ở tù thì đất của mình không thu được tiền thuê.`,
+  'Thiếu tiền: bảng bán hiện từng lô một (ô đó được chiếu sáng trên bàn). Chọn bán 1 nhà, 2 nhà… hoặc bán cả lô (đất + nhà); "Bỏ qua" để xem lô tiếp theo. Mọi thứ bán được nửa giá mua. Chỉ phá sản khi đã bán hết mà vẫn thiếu. Treo máy quá 60 giây thì hệ thống bán giúp.',
   'Không có thắng nhanh: chỉ người cuối cùng còn trụ lại mới thắng.',
   'Nút x1/x2/x3 chỉnh tốc độ cho cả bàn. Chủ phòng có thể Tổng kết sớm: xếp theo tổng tài sản.',
 ];
 
 const money = (n: number) => n.toLocaleString('vi-VN');
 
-/** Danh sách nhà đất của mình để TỰ chọn bán: mỗi lần chạm bán 1 cấp nhà / 1 sao ga, hết nhà mới bán đất. */
-function SellSuggestBox({
-  need,
-  items,
-  onSell,
-}: {
-  need: number;
-  items: TyPhuSaleItem[];
-  onSell: (cell: number) => void;
-}) {
-  if (!items.length) return null;
+/**
+ * Phủ tối cả bàn, chỉ chừa sáng đúng ô đang chọn bán + viền vàng nhấp nháy (vẽ trong bàn nên nghiêng theo bàn),
+ * để người chơi nhìn rõ lô đất / ngôi nhà nào đang được hỏi bán.
+ */
+function SellSpotlight({ rect, W, H, now }: { rect: Rect; W: number; H: number; now: number }) {
+  const dim = 'rgba(10,10,20,0.62)';
+  const pad = 3;
+  const x = Math.max(0, rect.x - pad);
+  const y = Math.max(0, rect.y - pad);
+  const w = Math.min(W - x, rect.w + pad * 2);
+  const h = Math.min(H - y, rect.h + pad * 2);
+  const glow = 0.55 + 0.45 * Math.abs(Math.sin(now / 260));
   return (
-    <View testID="sell-suggest-box" style={dc.sellBox}>
-      <T style={dc.sellTitle}>
-        {need > 0 ? `Chọn nhà đất để bán (còn thiếu ${money(need)} xu):` : 'Đã đủ tiền! Có thể bán thêm nếu muốn:'}
-      </T>
-      <ScrollView style={dc.sellScroll} contentContainerStyle={dc.sellList} nestedScrollEnabled>
-        {items.map((it) => {
-          const station = TYPHU_BOARD[it.cell]?.kind === 'station';
-          const what = it.kind === 'house' ? `${station ? '1 sao' : 'Nhà'} ${shortCellName(it.name)}` : shortCellName(it.name);
-          return (
-            <Pressable
-              key={it.cell}
-              testID={`sell-chip-${it.cell}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Bán ${what} nhận ${it.refund} xu`}
-              onPress={() => onSell(it.cell)}
-              style={({ pressed }) => [
-                dc.sellChip,
-                it.suggested ? dc.sellChipSuggested : dc.sellChipNormal,
-                pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] },
-              ]}
-            >
-              <T numberOfLines={1} style={[dc.sellChipTxt, it.suggested && dc.sellChipTxtSuggested]}>
-                {what} +{money(it.refund)}
-              </T>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <T style={dc.sellHint}>Chạm từng ô để bán: mỗi lần 1 cấp nhà (hoặc 1 sao ga), hết nhà mới bán tới đất. Ô màu cam là gợi ý nên bán trước.</T>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]}>
+      <View style={{ position: 'absolute', left: 0, top: 0, width: W, height: y, backgroundColor: dim }} />
+      <View style={{ position: 'absolute', left: 0, top: y + h, width: W, height: Math.max(0, H - y - h), backgroundColor: dim }} />
+      <View style={{ position: 'absolute', left: 0, top: y, width: x, height: h, backgroundColor: dim }} />
+      <View style={{ position: 'absolute', left: x + w, top: y, width: Math.max(0, W - x - w), height: h, backgroundColor: dim }} />
+      <View
+        testID="sell-focus"
+        style={{
+          position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 5, borderWidth: 3.5,
+          borderColor: `rgba(255,212,59,${glow})`, boxShadow: `0px 0px ${Math.round(8 + 10 * glow)}px rgba(255,212,59,${glow})`,
+        }}
+      />
     </View>
   );
 }
 
-/** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, nâng cấp, thiếu tiền phải bán, hoặc bán nhà đất để ra tù. */
+/** Một lựa chọn bán: tên việc ở trên, số tiền thu về ở dưới. */
+function SellOpt(p: { testID: string; label: string; sub?: string; amount: number; tone: 'house' | 'lot'; onPress: () => void }) {
+  return (
+    <Pressable
+      testID={p.testID}
+      accessibilityRole="button"
+      accessibilityLabel={`${p.label}${p.sub ? ` (${p.sub})` : ''}, nhận ${p.amount}$`}
+      onPress={() => { play('pop'); p.onPress(); }}
+      style={({ pressed }) => [dc.opt, p.tone === 'lot' ? dc.optLot : dc.optHouse, pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] }]}
+    >
+      <T numberOfLines={1} style={[dc.optTxt, p.tone === 'lot' && { color: '#fff' }]}>{p.label}</T>
+      <T numberOfLines={1} style={[dc.optAmt, p.tone === 'lot' && { color: '#FFE066' }]}>+{money(p.amount)}${p.sub ? <T style={[dc.optSub, p.tone === 'lot' && { color: '#FFE3E3' }]}> · {p.sub}</T> : null}</T>
+    </Pressable>
+  );
+}
+
+/**
+ * Bảng bán tài sản kiểu "từng lô một": bàn cờ chiếu sáng đúng ô đang hỏi, bảng nhỏ nằm giữa bàn (không che ô đó)
+ * hỏi bán gì ở lô này: bán 1 nhà, 2 nhà, … hết nhà (giữ đất), hoặc bán cả lô (đất + nhà). Mọi thứ nửa giá mua.
+ * "Bỏ qua ▶" chuyển sang lô tiếp theo (không phải huỷ bán); "◀" quay lại lô trước.
+ */
+function SellPicker(p: {
+  g: TyPhuView;
+  me: string;
+  cell: number;
+  list: number[];
+  /** còn thiếu bao nhiêu (null = bán tự do, không có mục tiêu) */
+  need: number | null;
+  debt: boolean;
+  /** tiền mặt + bán hết mọi thứ */
+  total: number;
+  onFocus: (cell: number) => void;
+  onSell: (opt: { levels?: number; land?: boolean }) => void;
+  onClose?: () => void;
+}) {
+  const { g, cell, list } = p;
+  const c = TYPHU_BOARD[cell];
+  if (!isTyPhuProperty(c)) return null;
+  const idx = Math.max(0, list.indexOf(cell));
+  const lv = g.houses[cell] ?? 0;
+  const station = c.kind === 'station';
+  const unit = station ? 'sao' : 'nhà';
+  const per = upgradeCostOf(cell);
+  const cash = g.cash[p.me] ?? 0;
+  const color = c.kind === 'land' ? TYPHU_GROUPS[c.group].color : '#495057';
+  const lvName = c.kind === 'land'
+    ? lv === 0 ? 'Đất trống' : lv >= TYPHU_MAX_HOUSES ? 'Khách sạn (4 nhà)' : `Nhà cấp ${lv} (${lv} nhà)`
+    : station ? (lv ? `Ga ${'★'.repeat(lv)}` : 'Ga chưa có sao') : 'Công ty';
+  const go = (d: number) => p.onFocus(list[(idx + d + list.length) % list.length]);
+  const lotLabel = c.kind === 'land' ? (lv > 0 ? 'Bán cả lô' : 'Bán lô đất') : station ? (lv > 0 ? 'Bán cả ga' : 'Bán nhà ga') : 'Bán công ty';
+  const lotSub = lv > 0 ? `đất + ${lv} ${unit}` : undefined;
+  const short = p.debt && p.total < (g.debt?.amount ?? 0);
+  return (
+    <View style={dc.pickWrap} pointerEvents="box-none">
+      <View testID="sell-picker" style={dc.pick}>
+        <View style={[dc.pickHead, { backgroundColor: color }]}>
+          <T style={dc.headSub}>{p.debt ? 'THIẾU TIỀN · ' : ''}BÁN TÀI SẢN · LÔ {idx + 1}/{list.length}</T>
+          <T testID="sell-picker-name" numberOfLines={1} style={dc.pickName}>{c.name.toUpperCase()}</T>
+        </View>
+        <View style={dc.pickBody}>
+          <View style={dc.rentRow}>
+            <T style={dc.cashK}>Đang có <T style={dc.cashV}>{money(cash)}$</T></T>
+            {p.need !== null && (p.need > 0
+              ? <T testID="sell-need" style={[dc.cashK, { color: C.danger, fontWeight: '900' }]}>{p.debt ? 'Còn thiếu' : 'Cần thêm'} {money(p.need)}$</T>
+              : <T testID="sell-need" style={[dc.cashK, { color: '#2B8A3E', fontWeight: '900' }]}>Đã đủ tiền ✓</T>)}
+          </View>
+          <T style={dc.pickInfo}>
+            {lvName} · đất {money(c.price)}$ (bán {money(c.price / 2)}$){per > 0 && lv > 0 ? ` · mỗi ${unit} ${money(per)}$ (bán ${money(per / 2)}$)` : ''}
+          </T>
+          {short && <T style={[dc.pickInfo, { color: C.danger, fontWeight: '800' }]}>Bán hết cũng chưa đủ: bán xong món cuối là phá sản.</T>}
+          <View style={dc.opts}>
+            {Array.from({ length: lv }, (_, k) => k + 1).map((k) => (
+              <SellOpt
+                key={k}
+                testID={`sell-lv-${k}`}
+                tone="house"
+                label={k === lv && k > 1 ? `Bán cả ${k} ${unit}` : `Bán ${k} ${unit}`}
+                amount={sellValueOf(cell, lv, { levels: k })}
+                onPress={() => p.onSell({ levels: k })}
+              />
+            ))}
+            <SellOpt testID="sell-lot" tone="lot" label={lotLabel} sub={lotSub} amount={sellValueOf(cell, lv, { land: true })} onPress={() => p.onSell({ land: true })} />
+          </View>
+          <View style={dc.btns}>
+            <Button testID="sell-prev" small variant="paper" title="◀" disabled={list.length < 2} style={{ width: 44 }} onPress={() => go(-1)} />
+            <Button testID="sell-next" small variant="paper" title="Bỏ qua, lô tiếp ▶" disabled={list.length < 2} style={{ flex: 1 }} onPress={() => go(1)} />
+            {p.onClose && <Button testID="sell-done" small variant="jade" title="Xong" style={{ width: 64 }} onPress={p.onClose} />}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, nâng cấp, ở tù, mua vé ra tù. */
 function DecisionCard(p: {
   g: TyPhuView;
   me: string;
-  nameOf: (id: string) => string;
   canBuild: (i: number) => boolean;
-  jailSell?: boolean;
-  onCloseJailSell?: () => void;
   onAct: (a: Parameters<Game['act']>[0]) => void;
+  /** mở bảng bán tài sản (không có gì để bán thì undefined) */
+  onOpenSell?: () => void;
 }) {
   const { g } = p;
-  const sell = (cell: number) => p.onAct({ type: 'sell', cell });
-  if (g.step === 'debt' && g.debt) {
-    // thiếu tiền: không tự bán, người chơi chọn bán từng món tới khi đủ; bán hết vẫn thiếu mới phá sản
-    const cash = g.cash[p.me] ?? 0;
-    const need = Math.max(0, g.debt.amount - cash);
-    const total = cash + liquidValueOf(p.me, g.owners, g.houses);
-    const items = suggestSales(p.me, g.debt.amount, cash, g.owners, g.houses);
-    const to = g.debt.to ? p.nameOf(g.debt.to) : null;
+  const cash = g.cash[p.me] ?? 0;
+  const sellBtn = (need: number) => (p.onOpenSell
+    ? <Button testID="open-sell" small variant="paper" icon="💰" title={`Bán tài sản (thiếu ${money(need)}$) ▶`} onPress={p.onOpenSell} />
+    : <T style={[dc.note, { color: C.danger }]}>Không còn gì để bán</T>);
+  if (g.step === 'roll' && p.me in g.jail) {
+    const sat = g.jail[p.me] ?? 0;
+    const tix = g.tickets?.[p.me] ?? 0;
+    const afford = cash >= TYPHU_JAIL_FINE;
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="debt-card" style={[dc.card, dc.cardWide]}>
-          <View style={[dc.head, { backgroundColor: '#C92A2A' }]}>
-            <T style={[dc.headSub, { textAlign: 'center', paddingHorizontal: 6 }]}>{g.debt.why.toUpperCase()}{to ? ` · CHO ${to.toUpperCase()}` : ''}</T>
-            <T numberOfLines={1} style={dc.headName}>THIẾU TIỀN!</T>
+        <View testID="jail-card" style={dc.card}>
+          <View style={[dc.head, { backgroundColor: '#343A40' }]}>
+            <T style={dc.headSub}>LƯỢT Ở TÙ THỨ {sat + 1}/{TYPHU_JAIL_MAX}</T>
+            <T numberOfLines={1} style={dc.headName}>NHÀ TÙ</T>
           </View>
           <View style={dc.body}>
+            <T style={dc.note}>Phải trả {money(TYPHU_JAIL_FINE)}$ (hoặc dùng vé) mới được đổ xúc xắc. Ở lại thì mất lượt này; ngồi đủ {TYPHU_JAIL_MAX} lượt là bắt buộc trả.</T>
             <View testID="decision-cash" style={dc.cashBox}>
-              <View style={dc.rentRow}><T style={dc.cashK}>Phải trả</T><T style={dc.cashV}>{money(g.debt.amount)} xu</T></View>
-              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)} xu</T></View>
-              <View style={dc.rentRow}><T style={dc.cashK}>Còn thiếu</T><T style={[dc.cashV, { color: C.danger }]}>{money(need)} xu</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
+              {tix > 0 && <View style={dc.rentRow}><T style={dc.cashK}>Vé ra tù</T><T style={dc.cashV}>🎫 x{tix}</T></View>}
             </View>
-            {total < g.debt.amount && (
-              <T style={[dc.note, { color: C.danger, fontWeight: '800' }]}>Bán hết cũng chưa đủ: bán xong món cuối cùng là phá sản.</T>
-            )}
-            <SellSuggestBox need={need} items={items} onSell={sell} />
-            {items.length > 0 && (
-              <Button
-                testID="sell-next-btn"
-                small
-                variant="gold"
-                title={`Bán ${items[0].kind === 'house' ? (TYPHU_BOARD[items[0].cell]?.kind === 'station' ? '1 sao ' : '1 nhà ') : ''}${shortCellName(items[0].name)} +${money(items[0].refund)} ▶`}
-                onPress={() => sell(items[0].cell)}
-              />
-            )}
+            {!afford && !tix && sellBtn(TYPHU_JAIL_FINE - cash)}
+            <View style={dc.btns}>
+              <Button testID="stay-jail" small variant="paper" title="Ở lại" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'stayJail' })} />
+              {tix > 0 ? (
+                <Button testID="use-ticket" small variant="jade" title="Dùng vé 🎫" style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'useTicket' })} />
+              ) : (
+                <Button testID="pay-jail" small variant="jade" disabled={!afford} title={`Trả ${money(TYPHU_JAIL_FINE)}$`} style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'payJail' })} />
+              )}
+            </View>
           </View>
         </View>
       </View>
     );
   }
-  if (p.jailSell) {
-    const cash = g.cash[p.me] ?? 0;
-    const afford = cash >= TYPHU_JAIL_FINE;
-    const saleItems = suggestSales(p.me, TYPHU_JAIL_FINE, cash, g.owners, g.houses);
+  if (g.step === 'ticket') {
+    const afford = cash >= TYPHU_JAIL_TICKET;
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View style={[dc.card, saleItems.length > 0 && dc.cardWide]}>
-          <View style={[dc.head, { backgroundColor: '#C92A2A' }]}>
-            <T style={dc.headSub}>ĐANG Ở TÙ · PHÍ BẢO LÃNH {TYPHU_JAIL_FINE} XU</T>
-            <T numberOfLines={1} style={dc.headName}>BÁN NHÀ ĐẤT RA TÙ</T>
+        <View testID="ticket-card" style={dc.card}>
+          <View style={[dc.head, { backgroundColor: '#2B8A3E' }]}>
+            <T style={dc.headSub}>THẺ CƠ HỘI · NỬA GIÁ</T>
+            <T numberOfLines={1} style={dc.headName}>🎫 VÉ RA TÙ</T>
           </View>
           <View style={dc.body}>
+            <T style={dc.note}>Mua vé {money(TYPHU_JAIL_TICKET)}$ (ra tù bình thường {money(TYPHU_JAIL_FINE)}$). Vé cất trong túi, lúc vào tù dùng để ra ngay không mất tiền.</T>
             <View testID="decision-cash" style={dc.cashBox}>
-              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)} xu</T></View>
-              <View style={dc.rentRow}>
-                <T style={dc.cashK}>{afford ? 'Nộp xong còn' : 'Còn thiếu'}</T>
-                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - TYPHU_JAIL_FINE))} xu</T>
-              </View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Mua xong còn</T><T style={dc.cashV}>{money(cash - TYPHU_JAIL_TICKET)}$</T></View>
             </View>
-            <SellSuggestBox need={Math.max(0, TYPHU_JAIL_FINE - cash)} items={saleItems} onSell={sell} />
             <View style={dc.btns}>
-              <Button testID="skip-btn" small variant="paper" title="Để sau" style={{ flex: 1 }} onPress={p.onCloseJailSell} />
-              <Button
-                testID="confirm-pay-jail"
-                small
-                variant="jade"
-                disabled={!afford}
-                title={`Ra tù -${TYPHU_JAIL_FINE}`}
-                style={{ flex: 1.4 }}
-                onPress={() => {
-                  p.onCloseJailSell?.();
-                  p.onAct({ type: 'payJail' });
-                }}
-              />
+              <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
+              <Button testID="buy-btn" small variant="jade" disabled={!afford} title={`Mua vé -${money(TYPHU_JAIL_TICKET)}$`} style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'buy' })} />
             </View>
           </View>
         </View>
@@ -927,43 +1008,42 @@ function DecisionCard(p: {
     const c = TYPHU_BOARD[i];
     if (!isTyPhuProperty(c)) return null;
     const color = c.kind === 'land' ? TYPHU_GROUPS[c.group].color : '#495057';
-    const cash = g.cash[p.me] ?? 0;
     const afford = cash >= c.price;
-    const saleItems = afford ? [] : suggestSales(p.me, c.price, cash, g.owners, g.houses);
     const fullRows: [string, number | string][] = c.kind === 'land'
-      ? [['Đất trống', c.rent], ['Đủ bộ màu', c.rent * 2], ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn' : `Nhà cấp ${k + 1}`, c.rent * m] as [string, number])]
+      ? [['Đất trống', c.rent], ['Đủ bộ cùng màu', `x2 = ${money(c.rent * 2)}$`], ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn' : `Nhà cấp ${k + 1}`, c.rent * m] as [string, number])]
       : c.kind === 'station' ? [1, 2, 3, 4].map((n) => [`Có ${n} ga`, stationRent(n)] as [string, number])
-      : [['Có 1 công ty', 'xúc xắc × 8'], ['Có 2 công ty', 'xúc xắc × 20']];
+      : [['Có 1 công ty', 'tổng xúc xắc × 8'], ['Có 2 công ty', 'tổng xúc xắc × 20']];
     const rows = afford ? fullRows : fullRows.slice(0, 2);
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View style={[dc.card, !afford && dc.cardWide]}>
+        <View style={dc.card}>
           <View style={[dc.head, { backgroundColor: color }]}>
             <T style={dc.headSub}>{c.kind === 'land' ? TYPHU_GROUPS[c.group].name.toUpperCase() : c.kind === 'station' ? 'NHÀ GA' : 'CÔNG TY'}</T>
             <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
           </View>
           <View style={dc.body}>
             {rows.map(([k, v]) => (
-              <View key={k} style={dc.rentRow}><T style={dc.rentK}>{k}</T><T style={dc.rentV}>{typeof v === 'number' ? `${money(v)} xu` : v}</T></View>
+              <View key={k} style={dc.rentRow}><T style={dc.rentK}>{k}</T><T style={dc.rentV}>{typeof v === 'number' ? `${money(v)}$` : v}</T></View>
             ))}
-            {afford && c.kind === 'land' && <T style={dc.note}>Mỗi lần nâng nhà: -{money(TYPHU_GROUPS[c.group].house)} xu</T>}
-            {afford && c.kind === 'station' && <T style={dc.note}>Ga nâng sao: -{money(TYPHU_STATION_UPGRADE)} xu/sao, mỗi sao x2 tiền thuê</T>}
+            {afford && c.kind === 'land' && <T style={dc.note}>Mỗi lần nâng nhà: -{money(TYPHU_GROUPS[c.group].house)}$. Đủ bộ cùng màu: mọi mức thuê x2</T>}
+            {afford && c.kind === 'station' && <T style={dc.note}>Ga nâng sao: -{money(TYPHU_STATION_UPGRADE)}$/sao, mỗi sao x2 tiền thuê</T>}
+            {afford && c.kind === 'utility' && <T style={dc.note}>Ai dừng ở đây trả theo số chấm xúc xắc vừa đổ</T>}
             <View testID="decision-cash" style={dc.cashBox}>
-              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)} xu</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
               <View style={dc.rentRow}>
-                <T style={dc.cashK}>{afford ? 'Mua xong còn' : `Giá ${money(c.price)} · Còn thiếu`}</T>
-                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - c.price))} xu</T>
+                <T style={dc.cashK}>{afford ? 'Mua xong còn' : `Giá ${money(c.price)}$ · Còn thiếu`}</T>
+                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - c.price))}$</T>
               </View>
             </View>
-            {!afford && <SellSuggestBox need={c.price - cash} items={saleItems} onSell={sell} />}
+            {!afford && sellBtn(c.price - cash)}
             <View style={dc.btns}>
-              <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
+              <Button testID="skip-btn" small variant="paper" title="Không mua" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
               <Button
                 testID="buy-btn"
                 small
                 variant="jade"
                 disabled={!afford}
-                title={`Mua -${money(c.price)}`}
+                title={`Mua -${money(c.price)}$`}
                 style={{ flex: 1.4 }}
                 onPress={() => p.onAct({ type: 'buy' })}
               />
@@ -980,33 +1060,31 @@ function DecisionCard(p: {
     const station = c.kind === 'station';
     const h = g.houses[i] ?? 0;
     const cost = upgradeCostOf(i);
-    const cash = g.cash[p.me] ?? 0;
     const full = !station && groupCells(c.group).every((x) => g.owners[x] === p.me);
     const myStations = TYPHU_BOARD.filter((x, k) => x.kind === 'station' && g.owners[k] === p.me).length;
     const rentAt = (lv: number) => (station ? stationRent(myStations, lv) : rentOf(i, lv, full));
     // mỗi lần dừng chỉ lên đúng 1 cấp: đất trống -> cấp 1 -> 2 -> 3 -> khách sạn; ga: 1 -> 2 -> 3 sao
     const afford = cash >= cost;
-    const saleItems = afford ? [] : suggestSales(p.me, cost, cash, g.owners, g.houses, i);
     const label = (lv: number) => (station ? `${lv} sao` : lv >= TYPHU_MAX_HOUSES ? 'Khách sạn' : `Nhà cấp ${lv}`);
     const now = station ? (h === 0 ? 'CHƯA CÓ SAO' : '★'.repeat(h)) : h === 0 ? 'ĐẤT TRỐNG' : label(h).toUpperCase();
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="upgrade-card" style={[dc.card, !afford && dc.cardWide]}>
+        <View testID="upgrade-card" style={dc.card}>
           <View style={[dc.head, { backgroundColor: station ? '#495057' : TYPHU_GROUPS[c.group].color }]}>
             <T style={dc.headSub}>{station ? 'NHÀ GA CỦA BẠN' : 'ĐẤT CỦA BẠN'} · {now}</T>
             <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
           </View>
           <View style={dc.body}>
-            <View style={dc.rentRow}><T style={dc.rentK}>Tiền thuê hiện tại</T><T style={dc.rentV}>{money(rentAt(h))} xu</T></View>
-            <View style={dc.rentRow}><T style={dc.rentK}>Lên {label(h + 1)}</T><T style={dc.rentV}>thuê {money(rentAt(h + 1))} xu</T></View>
+            <View style={dc.rentRow}><T style={dc.rentK}>Tiền thuê hiện tại{full ? ' (đủ bộ x2)' : ''}</T><T style={dc.rentV}>{money(rentAt(h))}$</T></View>
+            <View style={dc.rentRow}><T style={dc.rentK}>Lên {label(h + 1)}</T><T style={dc.rentV}>thuê {money(rentAt(h + 1))}$</T></View>
             <View testID="decision-cash" style={dc.cashBox}>
-              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)} xu</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
               <View style={dc.rentRow}>
-                <T style={dc.cashK}>{afford ? 'Nâng xong còn' : `Giá ${money(cost)} · Còn thiếu`}</T>
-                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - cost))} xu</T>
+                <T style={dc.cashK}>{afford ? 'Nâng xong còn' : `Giá ${money(cost)}$ · Còn thiếu`}</T>
+                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - cost))}$</T>
               </View>
             </View>
-            {!afford && <SellSuggestBox need={cost - cash} items={saleItems} onSell={sell} />}
+            {!afford && sellBtn(cost - cash)}
             {afford && h + 1 < maxLevelOf(i) && <T style={dc.note}>Lần sau dừng ở đây mới lên tiếp {label(h + 2)}</T>}
             {/* nút Nâng cấp nằm bên phải nút Để sau, cùng một hàng cho dễ thấy */}
             <View style={dc.btns}>
@@ -1016,7 +1094,7 @@ function DecisionCard(p: {
                 small
                 variant="gold"
                 disabled={!afford || !p.canBuild(i)}
-                title={`${station ? 'Nâng sao' : 'Nâng cấp'} -${money(cost)}`}
+                title={`${station ? 'Nâng sao' : 'Nâng cấp'} -${money(cost)}$`}
                 style={{ flex: 1.4 }}
                 onPress={() => p.onAct({ type: 'build', cell: i })}
               />
@@ -1046,16 +1124,19 @@ const dc = StyleSheet.create({
   cashK: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '700' },
   cashV: { fontSize: 13, lineHeight: 17, color: '#B45309', fontWeight: '900' },
   dot: { width: 12, height: 12, borderRadius: 3, borderWidth: 1, borderColor: '#111' },
-  sellBox: { backgroundColor: '#FFF4E6', borderRadius: 8, borderWidth: 1.5, borderColor: '#D9480F', paddingHorizontal: 7, paddingVertical: 5, marginTop: 2, gap: 4 },
-  sellTitle: { fontSize: 11, lineHeight: 14, fontWeight: '900', color: '#D9480F' },
-  sellScroll: { maxHeight: 118, flexGrow: 0 },
-  sellList: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  sellChip: { borderRadius: 7, borderWidth: 1.5, paddingHorizontal: 6, paddingVertical: 3 },
-  sellChipSuggested: { backgroundColor: '#FFD8A8', borderColor: '#D9480F' },
-  sellChipNormal: { backgroundColor: '#FFFFFF', borderColor: '#868E96' },
-  sellChipTxt: { fontSize: 10, lineHeight: 13, fontWeight: '800', color: '#111' },
-  sellChipTxtSuggested: { color: '#9C3600', fontWeight: '900' },
-  sellHint: { fontSize: 9.5, lineHeight: 12, color: '#862E08', fontWeight: '700' },
+  pickWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40 },
+  pick: { width: 272, backgroundColor: '#FFFDF6', borderRadius: 12, borderWidth: 2.5, borderColor: '#111', overflow: 'hidden', boxShadow: '0px 10px 24px rgba(0,0,0,0.5)' },
+  pickHead: { paddingVertical: 4, alignItems: 'center', borderBottomWidth: 2, borderColor: '#111' },
+  pickName: { color: '#fff', fontSize: 15, lineHeight: 19, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 3 },
+  pickBody: { paddingHorizontal: 7, paddingVertical: 5, gap: 3 },
+  pickInfo: { fontSize: 10.5, lineHeight: 13, color: '#495057', fontWeight: '700' },
+  opts: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  opt: { flexGrow: 1, flexBasis: '46%', borderRadius: 8, borderWidth: 2, borderColor: '#111', paddingVertical: 3, paddingHorizontal: 4, alignItems: 'center' },
+  optHouse: { backgroundColor: '#FFE8A3' },
+  optLot: { backgroundColor: '#C92A2A' },
+  optTxt: { fontSize: 11, lineHeight: 14, fontWeight: '900', color: '#111' },
+  optAmt: { fontSize: 11, lineHeight: 14, fontWeight: '900', color: '#2B8A3E' },
+  optSub: { fontSize: 9.5, fontWeight: '700', color: '#495057' },
 });
 
 /** góc nghiêng bàn cờ 3D (nhìn từ phía người chơi) */

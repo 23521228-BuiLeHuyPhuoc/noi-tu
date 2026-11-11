@@ -9,7 +9,7 @@ import { TyPhuGame } from '../src/games/typhu';
 import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
+  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_JAIL_MAX, TYPHU_JAIL_TICKET, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
   groupCells, isTyPhuProperty, liquidValueOf, maxLevelOf, rentOf, stationRent, suggestSales, upgradeCostOf, utilityRent,
 } from '../../shared/src/typhu';
 import { smallDict } from './helpers';
@@ -73,6 +73,16 @@ function playAudited(n: number, seed: number) {
     if (s.movement) { settle(); continue; }
     if (s.step === 'wait') { vi.advanceTimersByTime(1500); continue; }
     if (s.step === 'debt') { resolveDebt(); continue; }
+    if (s.step === 'ticket') {
+      const before = s.cash[cur];
+      if (before >= 300 && bot() < 0.6) {
+        g.action(cur, { type: 'buy' });
+        const a = v();
+        if (a.cash[cur] !== before - TYPHU_JAIL_TICKET) fail('mua vé ra tù trừ sai tiền');
+        if ((a.tickets?.[cur] ?? 0) !== (s.tickets?.[cur] ?? 0) + 1) fail('mua vé mà không có vé');
+      } else g.action(cur, { type: 'skip' });
+      continue;
+    }
     if (s.step === 'buy') {
       const c = TYPHU_BOARD[s.pendingBuy!];
       const price = isTyPhuProperty(c) ? c.price : 0;
@@ -111,14 +121,28 @@ function playAudited(n: number, seed: number) {
     turns++;
     const before = s;
     const inJail = cur in before.jail;
-    if (inJail && before.cash[cur] >= 200 && bot() < 0.4) {
-      g.action(cur, { type: 'payJail' });
-      const a = v();
-      if (cur in a.jail) fail('nộp tiền ra tù mà vẫn ở tù');
-      if (a.cash[cur] !== before.cash[cur] - TYPHU_JAIL_FINE) fail('nộp ra tù trừ sai tiền');
-      if ((a.pot ?? 0) !== (before.pot ?? 0) + TYPHU_JAIL_FINE) fail('tiền ra tù không vào hũ');
-      transcript.push(`${cur} nộp ${TYPHU_JAIL_FINE} ra tù`);
-      continue; // vẫn bước 'roll', vòng sau đổ
+    if (inJail) {
+      // ở tù: không được đổ; trả tiền / dùng vé rồi mới đổ, hoặc ở lại (tối đa 3 lượt)
+      if (g.action(cur, { type: 'roll' }).ok) fail('đang ở tù mà vẫn đổ được');
+      if (before.jail[cur] >= TYPHU_JAIL_MAX) fail('ngồi quá số lượt tối đa mà chưa bị bắt trả tiền');
+      if ((before.tickets?.[cur] ?? 0) > 0 && bot() < 0.7) {
+        g.action(cur, { type: 'useTicket' });
+        const a = v();
+        if (cur in a.jail || a.cash[cur] !== before.cash[cur]) fail('dùng vé ra tù sai');
+        transcript.push(`${cur} dùng vé ra tù`);
+      } else if (before.cash[cur] >= TYPHU_JAIL_FINE && bot() < 0.5) {
+        g.action(cur, { type: 'payJail' });
+        const a = v();
+        if (cur in a.jail) fail('nộp tiền ra tù mà vẫn ở tù');
+        if (a.cash[cur] !== before.cash[cur] - TYPHU_JAIL_FINE) fail('nộp ra tù trừ sai tiền');
+        transcript.push(`${cur} nộp ${TYPHU_JAIL_FINE} ra tù`);
+      } else {
+        g.action(cur, { type: 'stayJail' });
+        const a = v();
+        if (a.jail[cur] !== before.jail[cur] + 1 || a.movement) fail('ở lại tù đếm lượt sai');
+        transcript.push(`${cur} ở lại tù (${a.jail[cur]})`);
+      }
+      continue; // ra tù thì vẫn bước 'roll', vòng sau đổ
     }
     const logBefore = before.log.at(-1)?.id ?? 0;
     g.action(cur, { type: 'roll' });
@@ -127,17 +151,9 @@ function playAudited(n: number, seed: number) {
     const sum = d1 + d2;
     const dbl = d1 === d2;
     const from = before.pos[cur];
-    const jailCount = before.jail[cur];
     let expectMove = true;
     let mayRollAgain = dbl;
-    if (inJail) {
-      mayRollAgain = false;
-      if (!dbl && jailCount + 1 < 3) {
-        expectMove = false;
-        if (r.movement) fail(`đang ở tù, đổ ${d1}-${d2} lần ${jailCount + 1} mà vẫn đi`);
-        if (r.jail[cur] !== jailCount + 1) fail('đếm lượt ngồi tù sai');
-      }
-    } else if (dbl) {
+    if (dbl) {
       doublesInRow[cur] = (doublesInRow[cur] ?? 0) + 1;
       if (doublesInRow[cur] >= 3) {
         expectMove = false;
@@ -145,9 +161,7 @@ function playAudited(n: number, seed: number) {
         if (r.pos[cur] !== TYPHU_JAIL || !(cur in r.jail)) fail('đổ đôi 3 lần liên tiếp mà không vào tù');
       }
     }
-    if (!dbl || inJail) doublesInRow[cur] = 0;
-    if (r.step === 'debt') resolveDebt(); // thiếu tiền phạt ra tù: tự bán rồi mới đi
-    if (v().bankrupt.includes(cur)) expectMove = false; // phá sản vì tiền phạt ra tù thì không đi nữa
+    if (!dbl) doublesInRow[cur] = 0;
     if (expectMove) {
       const m = v().movement;
       if (!m || m.kind !== 'roll') fail(`đổ ${sum} mà không đi`);
@@ -172,13 +186,17 @@ function playAudited(n: number, seed: number) {
       if (!viaCard && passed !== hasStart) fail(`qua Xuất phát (${from}+${sum}) nhưng log nhận thưởng: ${hasStart}`);
 
       const owner = before.owners[land];
-      if (isTyPhuProperty(c) && owner && owner !== cur && !a.bankrupt.includes(cur)) {
+      if (isTyPhuProperty(c) && owner && owner !== cur && owner in before.jail) {
+        // chủ đang ngồi tù: không thu tiền thuê
+        if (newLogs.some((l) => l.kind === 'rent')) fail(`chủ ${owner} đang ở tù mà vẫn thu tiền thuê ${c.name}`);
+        if (a.cash[owner] !== before.cash[owner]) fail('chủ đang ở tù mà tiền vẫn đổi');
+      } else if (isTyPhuProperty(c) && owner && owner !== cur && !a.bankrupt.includes(cur)) {
         const count = Object.entries(before.owners).filter(([k, o]) => o === owner && TYPHU_BOARD[Number(k)].kind === c.kind).length;
         const full = c.kind === 'land' && groupCells(c.group).every((k) => before.owners[k] === owner);
         const rent = c.kind === 'station' ? stationRent(count, before.houses[land] ?? 0) : c.kind === 'utility' ? utilityRent(count, sum) : rentOf(land, before.houses[land] ?? 0, full);
         const log = newLogs.find((l) => l.kind === 'rent');
         if (!log) fail(`dừng ở ${c.name} của ${owner} mà không trả tiền thuê`);
-        else if (!log.text.includes(` ${rent.toLocaleString('vi-VN')} xu`)) fail(`tiền thuê ${c.name} phải ${rent}: "${log.text}"`);
+        else if (!log.text.includes(` ${rent.toLocaleString('vi-VN')}$`)) fail(`tiền thuê ${c.name} phải ${rent}: "${log.text}"`);
         if (a.cash[owner] < before.cash[owner] + Math.min(rent, 1)) fail('chủ đất không nhận tiền thuê');
       } else if (isTyPhuProperty(c) && !owner) {
         const canBuy = a.cash[cur] + liquidValueOf(cur, a.owners, a.houses) >= c.price;
@@ -188,13 +206,11 @@ function playAudited(n: number, seed: number) {
         const h = a.houses[land] ?? 0;
         const can = h < maxLevelOf(land) && a.cash[cur] + liquidValueOf(cur, a.owners, a.houses, land) >= upgradeCostOf(land);
         if (can !== (a.step === 'upgrade')) fail(`dừng ở đất của mình ${c.name} (cấp ${h}) mà bước là ${a.step}`);
-      } else if (c.kind === 'tax' && !a.bankrupt.includes(cur)) {
-        if ((a.pot ?? 0) !== (before.pot ?? 0) + c.amount) fail(`thuế ${c.amount} không vào hũ`);
       } else if (c.kind === 'gotojail') {
         if (a.pos[cur] !== TYPHU_JAIL || !(cur in a.jail)) fail('dừng ô Vào tù mà không vào tù');
         mayRollAgain = false;
       } else if (c.kind === 'start') {
-        if ((before.pot ?? 0) > 0 && (a.pot ?? 0) !== 0) fail('dừng đúng Xuất phát mà không ăn hũ');
+        if (a.cash[cur] > before.cash[cur]) fail('dừng đúng Xuất phát mà vẫn được tiền');
       } else if (c.kind === 'airport') {
         if (!newLogs.some((l) => l.text.includes('lên máy bay'))) fail('dừng Sân bay mà không bay');
         if (cur in a.jail) mayRollAgain = false;
@@ -210,6 +226,7 @@ function playAudited(n: number, seed: number) {
       const x = v();
       if (x.movement) { settle(); continue; }
       if (x.step === 'debt') { resolveDebt(); continue; }
+      if (x.step === 'ticket') { g.action(cur, { type: x.cash[cur] >= 300 && bot() < 0.6 ? 'buy' : 'skip' }); continue; }
       if (x.step === 'buy') {
         const c = TYPHU_BOARD[x.pendingBuy!];
         const price = isTyPhuProperty(c) ? c.price : 0;

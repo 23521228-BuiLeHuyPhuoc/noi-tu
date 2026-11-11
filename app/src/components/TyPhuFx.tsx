@@ -144,7 +144,7 @@ export function TyPhuFxLayer({ fx, now, cells, W, H, center }: {
             return (
               <View key={key} pointerEvents="none" style={StyleSheet.absoluteFill}>
                 {coins}
-                <Stamp text={`+${TYPHU_PASS_START}`} color="#0B8A5F" cx={m.x - 8} cy={m.y - 30 - p * 24} p={Math.min(0.7, p)} W={W} H={H} w={92} h={38} font={22} icon={FX_ICON.flag} />
+                <Stamp text={`+${TYPHU_PASS_START}$`} color="#0B8A5F" cx={m.x - 8} cy={m.y - 30 - p * 24} p={Math.min(0.7, p)} W={W} H={H} w={92} h={38} font={22} icon={FX_ICON.flag} />
               </View>
             );
           }

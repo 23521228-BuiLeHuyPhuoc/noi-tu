@@ -83,9 +83,9 @@ export const RULES: Record<GameType, string[]> = {
     'Hết số ván đã chọn (10–30 ván) sòng tự tổng kết: ai nhiều xu nhất (trừ nợ) là người chiến thắng.',
   ],
   typhu: [
-    'Mỗi người 1.500 xu. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',
-    'Dừng ở đất người khác phải trả tiền thuê. Dừng ở đất của mình thì nâng nhà, lên khách sạn.',
-    'Đi qua Xuất phát nhận 500 xu. Thiếu tiền thì tự chọn bán nhà đất; bán hết vẫn thiếu mới phá sản. Người trụ lại cuối cùng thắng.',
+    'Mỗi người 1.500$. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',
+    'Dừng ở đất người khác phải trả tiền thuê (đủ bộ cùng màu thì x2). Dừng ở đất của mình thì nâng nhà, lên khách sạn.',
+    'Đi vượt qua Xuất phát nhận 500$. Thiếu tiền thì tự chọn bán từng lô; bán hết vẫn thiếu mới phá sản. Người trụ lại cuối cùng thắng.',
   ],
 };
 
