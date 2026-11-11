@@ -1,8 +1,10 @@
 import { toSyllables, firstSyllable, lastSyllable } from '../../../shared/src/vi';
+import { normalizeEnWord, firstLetter, lastLetter } from '../../../shared/src/en';
 import {
   TURN_SECONDS, VOTE_SECONDS, WORD_SYLLABLES,
   type ActionResult, type ActionError, type GameAction, type WordChainView, type WordHistoryItem, type WordVote,
 } from '../../../shared/src/types';
+import type { Dictionary, DictLang } from '../dictionary';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const MAX_HISTORY = 300;
@@ -29,21 +31,27 @@ export class WordChainGame implements GameEngine {
   private readonly timer = new Timer();
   private readonly turnMs: number;
   private readonly voteMs: number;
+  private readonly dict: Dictionary;
   /** đang xin duyệt từ; thời gian lượt tạm dừng, còn lại `pausedLeft` ms */
   private vote: WordVote | null = null;
   private pausedLeft = 0;
   /** đã xin duyệt trong lượt này chưa (mỗi lượt 1 lần) */
   private appealedTurn = false;
 
-  constructor(private readonly ctx: EngineContext) {
+  constructor(private readonly ctx: EngineContext, private readonly lang: DictLang = 'vi') {
+    this.dict = lang === 'en' ? (ctx.dict.en ?? ctx.dict) : ctx.dict;
     this.turnMs = ctx.turnMs ?? TURN_SECONDS * 1000;
     this.voteMs = Math.min(VOTE_SECONDS * 1000, this.turnMs);
+  }
+
+  private lastUnit(word: string): string {
+    return this.lang === 'en' ? lastLetter(word) : lastSyllable(word);
   }
 
   start(players: EnginePlayer[]): void {
     this.players = players.map((p) => ({ ...p, eliminated: false, left: false, words: 0, hintUsed: false }));
     this.solo = players.length === 1;
-    const first = this.ctx.dict.randomStart(this.used, this.ctx.rng);
+    const first = this.dict.randomStart(this.used, this.ctx.rng);
     if (!first) throw new Error('Kho từ rỗng');
     this.currentWord = first;
     this.used.add(first);
@@ -77,12 +85,28 @@ export class WordChainGame implements GameEngine {
   /** Kiểm tra từ gửi lên: trả về từ đã chuẩn hóa nếu hợp lệ */
   private check(raw: unknown): string | { reason: ActionError; word: string } {
     if (typeof raw !== 'string' || raw.length > 60) return { reason: 'format', word: '' };
+    if (this.lang === 'en') {
+      const word = normalizeEnWord(raw);
+      if (!word) return { reason: 'format', word: '' };
+      const need = lastLetter(this.currentWord);
+      if (firstLetter(word) !== need) return { reason: 'chain', word };
+      const resolved =
+        !this.dict.has(word) &&
+        word.startsWith(need + need) &&
+        word.length >= 3 &&
+        (this.dict.has(word.slice(1)) || this.used.has(word.slice(1)))
+          ? word.slice(1)
+          : word;
+      if (this.used.has(resolved)) return { reason: 'used', word: resolved };
+      if (!this.dict.has(resolved)) return { reason: 'not_in_dictionary', word: resolved };
+      return resolved;
+    }
     const syl = toSyllables(raw);
     if (!syl || syl.length !== WORD_SYLLABLES) return { reason: 'format', word: '' };
     const word = syl.join(' ');
     if (firstSyllable(word) !== lastSyllable(this.currentWord)) return { reason: 'chain', word };
     if (this.used.has(word)) return { reason: 'used', word };
-    if (!this.ctx.dict.has(word)) return { reason: 'not_in_dictionary', word };
+    if (!this.dict.has(word)) return { reason: 'not_in_dictionary', word };
     return word;
   }
 
@@ -171,7 +195,7 @@ export class WordChainGame implements GameEngine {
     if (!p || p.eliminated) return { ok: false, reason: 'not_playing' };
     if (playerId !== this.currentId) return { ok: false, reason: 'not_your_turn' };
     if (p.hintUsed) return { ok: false, reason: 'hint_used' };
-    const options = this.ctx.dict.nextOptions(lastSyllable(this.currentWord), this.used);
+    const options = this.dict.nextOptions(this.lastUnit(this.currentWord), this.used);
     if (options.length === 0) return { ok: false, reason: 'no_hint' };
     p.hintUsed = true;
     this.push({ kind: 'hint', playerId, name: p.name });
@@ -199,18 +223,18 @@ export class WordChainGame implements GameEngine {
 
   view(): WordChainView {
     return {
-      type: 'wordchain',
+      type: this.lang === 'en' ? 'wordchain_en' : 'wordchain',
       order: this.players.map((p) => p.id),
       eliminated: this.players.filter((p) => p.eliminated).map((p) => p.id),
       words: Object.fromEntries(this.players.map((p) => [p.id, p.words])),
       hintUsed: this.players.filter((p) => p.hintUsed).map((p) => p.id),
       currentWord: this.currentWord,
-      currentDefinition: this.ctx.dict.definition(this.currentWord),
+      currentDefinition: this.dict.definition(this.currentWord),
       currentPlayerId: this.over ? null : this.currentId,
       turnEndsAt: this.over ? null : this.turnEndsAt,
       turnSeconds: this.turnMs / 1000,
-      nextCount: this.ctx.dict.countNext(lastSyllable(this.currentWord), this.used),
-      history: this.history.map((item) => 'word' in item ? { ...item, definition: this.ctx.dict.definition(item.word) } : item),
+      nextCount: this.dict.countNext(this.lastUnit(this.currentWord), this.used),
+      history: this.history.map((item) => 'word' in item ? { ...item, definition: this.dict.definition(item.word) } : item),
       totalWords: this.totalWords,
       vote: this.over ? null : this.vote,
     };
@@ -239,8 +263,8 @@ export class WordChainGame implements GameEngine {
     }
     if (this.checkEnd()) return;
     // ngõ cụt: đổi từ mới để người kế tiếp không bị loại dây chuyền
-    if (this.ctx.dict.countNext(lastSyllable(this.currentWord), this.used) === 0) {
-      const fresh = this.ctx.dict.randomStart(this.used, this.ctx.rng);
+    if (this.dict.countNext(this.lastUnit(this.currentWord), this.used) === 0) {
+      const fresh = this.dict.randomStart(this.used, this.ctx.rng);
       if (!fresh) return this.end();
       this.currentWord = fresh;
       this.used.add(fresh);

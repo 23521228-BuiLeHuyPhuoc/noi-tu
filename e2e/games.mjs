@@ -1,5 +1,5 @@
 // Chạy giống play.mjs (server với TURN_SECONDS=8, bản web ở cổng 8081): node games.mjs
-// E2E Cờ cá ngựa, Bầu cua và tính năng ném/khịa/hối.
+// E2E Nối từ Anh, Bầu cua và tính năng ném/khịa/hối.
 import { chromium } from 'playwright-core';
 import { existsSync } from 'node:fs';
 
@@ -62,45 +62,22 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   await b.page.context().close();
 }
 
-// ---------------- Cờ cá ngựa ----------------
+// ---------------- Nối từ Anh ----------------
 {
-  const [a, b] = await room('ludo', ['An', 'Bình']);
-  await a.t('pieces-2').click();
-  await b.page.getByTestId('pieces-2').evaluate((el) => el.getAttribute('aria-disabled')).catch(() => null);
+  const [a, b] = await room('wordchain_en', ['An', 'Bình']);
   await a.t('start-btn').click();
-  for (const p of [a, b]) await p.t('dice').waitFor();
-  check((await a.page.locator('[data-testid^="piece-"]').count()) === 4, 'chọn 2 ngựa: bàn có 2×2 = 4 con ngựa');
-  let rolls = 0, moved = false, passed = false;
-  for (let i = 0; i < 16 && !(moved && passed); i++) {
-    const cur = (await a.t('roll-btn').count()) ? a : (await b.t('roll-btn').count()) ? b : null;
-    if (!cur) {
-      await a.page.waitForTimeout(300);
-      continue;
-    }
-    await cur.t('roll-btn').click();
-    rolls++;
-    await cur.page.waitForTimeout(250);
-    const status = await cur.t('ludo-status').textContent();
-    if (status.includes('Chạm vào con ngựa')) {
-      const movable = cur.page.locator('[data-testid^="piece-"][role="button"]');
-      const before = await movable.first().boundingBox();
-      await movable.first().click();
-      await cur.page.waitForTimeout(500);
-      moved = true;
-      check(true, `chạm ngựa để đi (trước: ${Math.round(before.x)},${Math.round(before.y)})`);
-    } else if (status.includes('Đang đi')) {
-      moved = true;
-      await cur.page.waitForTimeout(1200);
-    } else {
-      passed = true;
-      await cur.page.waitForTimeout(1600);
-    }
-  }
-  check(rolls > 0, `đổ xúc xắc ${rolls} lần`);
-  check(moved, 'có ngựa ra quân / di chuyển');
-  // người không tới lượt không có nút đổ
-  const both = (await a.t('roll-btn').count()) + (await b.t('roll-btn').count());
-  check(both <= 1, 'chỉ người tới lượt mới có nút "Đổ xúc xắc"');
+  for (const p of [a, b]) await p.t('current-word').waitFor();
+  const initialWord = (await a.t('current-word').textContent()).trim();
+  check(/^[a-z]{2,}$/.test(initialWord), `Nối từ Anh từ mở đầu: ${initialWord}`);
+  check((await a.t('current-definition').count()) > 0, 'Nối từ Anh hiện chú thích nghĩa tiếng Việt');
+  const cur = (await a.t('turn-label').textContent()).includes('Tới lượt bạn') ? a : b;
+  await cur.t('hint-btn').click();
+  await cur.t('hint-word').click();
+  const suffix = await cur.t('word-input').inputValue();
+  const expectedWord = `${initialWord.slice(-1)}${suffix}`;
+  await cur.t('submit-btn').click();
+  await a.page.waitForFunction((w) => document.querySelector('[data-testid="current-word"]')?.textContent.trim() === w, expectedWord);
+  check(true, `Nối từ Anh nối thành công: ${initialWord} -> ${expectedWord}`);
   await a.page.context().close();
   await b.page.context().close();
 }
@@ -134,9 +111,9 @@ const feedHas = (p, text) => p.page.getByTestId('feed').filter({ hasText: text }
   await a.t('end-confirm').click();
   for (const p of [a, b, c]) await p.t('result-title').waitFor();
   check(true, 'tổng kết: cả phòng sang màn kết quả');
-  await a.t('switch-ludo').click();
+  await a.t('switch-wordchain_en').click();
   for (const p of [a, b, c]) await p.t('room-code').waitFor();
-  check((await b.page.getByText('Cờ cá ngựa').count()) > 0, 'đổi game từ màn kết quả: cả phòng về phòng chờ Cờ cá ngựa');
+  check((await b.page.getByText('Nối từ Anh').count()) > 0, 'đổi game từ màn kết quả: cả phòng về phòng chờ Nối từ Anh');
 }
 
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTẤT CẢ ĐỀU QUA');

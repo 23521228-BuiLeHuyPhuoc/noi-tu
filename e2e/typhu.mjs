@@ -45,7 +45,7 @@ await ps[0].page.waitForFunction(() => document.querySelectorAll('[data-testid^=
 await ps[0].page.screenshot({ path: `${SHOTS}/1-lobby.png` });
 await ps[0].t('start-btn').click();
 for (const p of ps) await p.t('cell-0').waitFor();
-check((await ps[0].page.locator('[data-testid^="cell-"]').count()) === 32, 'bàn cờ có 32 ô');
+check((await ps[0].page.locator('[data-testid^="cell-"]').count()) === 40, 'bàn cờ có 40 ô');
 check((await ps[0].page.locator('[data-testid^="token-"]').count()) === 3, '3 quân cờ ở ô Xuất phát');
 await ps[0].page.screenshot({ path: `${SHOTS}/2-start.png` });
 check((await ps[0].page.locator('[data-testid^="cell-"] img').count()) >= 16, 'ô đặc biệt có icon (Twemoji)');
@@ -85,12 +85,12 @@ for (let i = 0; i < 40 && rolls < 6; i++) {
 }
 check(rolls >= 3, `đổ xúc xắc ${rolls} lần, qua nhiều lượt`);
 check(bought >= 1, `mua được ${bought} miếng đất (bỏ qua ${skipped})`);
-const owned = (await Promise.all(ps.map((p) => p.page.locator('[data-testid^="my-land-"]').count()))).reduce((x, y) => x + y, 0);
-check(owned >= 1, `ô đất của người chơi hiện ở mục "Đất của bạn" (${owned} ô)`);
+const owned = await ps[0].page.locator('[data-testid^="cell-"][aria-label*="thuộc"]').count();
+check(owned >= 1, `ô đất của người chơi hiện chủ sở hữu trên bàn (${owned} ô)`);
 await ps[1].page.screenshot({ path: `${SHOTS}/4-board.png` });
 
 // xem chi tiết một ô đất
-await ps[2].t('cell-31').click();
+await ps[2].t('cell-39').click();
 await ps[2].page.getByText('Thành phố lớn').waitFor();
 check((await ps[2].page.getByText('Khách sạn').count()) > 0, 'chạm ô Sài Gòn: hiện bảng giá thuê đến khách sạn');
 await ps[2].page.screenshot({ path: `${SHOTS}/5-detail.png` });

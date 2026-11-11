@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import { Dictionary } from '../src/dictionary';
 import { Room } from '../src/room';
-import type { BauCuaView, LudoView, WordChainView } from '../../shared/src/types';
+import type { BauCuaView, WordChainView } from '../../shared/src/types';
 
 /** Kho từ nhỏ, đủ để dựng các tình huống. */
 export const SMALL_WORDS = [
@@ -12,8 +12,32 @@ export const SMALL_WORDS = [
   'mèo cụt', 'cụt lủn',
 ];
 
+/** Kho từ tiếng Anh nhỏ kèm chú thích nghĩa tiếng Việt */
+export const SMALL_EN_WORDS = [
+  'art', 'tit', 'tits', 'time', 'table', 'sex', 'sun', 'star',
+  'xenon', 'xray', 'xmas', 'night', 'note', 'egg', 'game',
+  // "jazz": không có từ nào trong kho nhỏ bắt đầu bằng "z" -> ngõ cụt
+  'ebony', 'yjazz',
+];
+
+export const SMALL_EN_DEFS: Record<string, string> = {
+  art: '/ɑ:t/ nghệ thuật; mỹ thuật',
+  tit: '/tit/ (thông tục) đầu vú, núm vú; (động vật học) chim sẻ ngô',
+  sex: '/seks/ giới tính; vấn đề sinh lý',
+  xenon: "/'zenɔn/ (hoá học) khí xenon",
+  night: '/nait/ đêm, tối',
+  time: '/taim/ thời gian, thì giờ',
+  table: "/'teibl/ cái bàn",
+};
+
+export function smallEnDict(words = SMALL_EN_WORDS, defs = SMALL_EN_DEFS): Dictionary {
+  return new Dictionary(words, new Set(), defs, 'en');
+}
+
 export function smallDict(words = SMALL_WORDS): Dictionary {
-  return new Dictionary(words);
+  const d = new Dictionary(words);
+  d.en = smallEnDict();
+  return d;
 }
 
 /** rng cố định: luôn trả về 0 */
@@ -33,7 +57,7 @@ export function setup(names: string[], opts: { dict?: Dictionary; rng?: () => nu
     onChange,
     learnWord: (word, by) => {
       learned.push({ word, by });
-      dict.add(word);
+      if (!dict.add(word)) dict.en?.add(word);
     },
     onFinish: (info) => finishes.push(info),
   });
@@ -46,14 +70,14 @@ export function setup(names: string[], opts: { dict?: Dictionary; rng?: () => nu
 }
 
 export const wc = (room: Room) => room.toPublic().game as WordChainView;
-export const ludo = (room: Room) => room.toPublic().game as LudoView;
 export const bc = (room: Room) => room.toPublic().game as BauCuaView;
 export const submit = (room: Room, id: string, word: string) => room.action(id, { type: 'submit', word });
 
 /** Bắt đầu ván Nối từ với từ mở đầu cố định */
 export function startWordChain(room: Room, hostId: string, word: string) {
   const dict = (room as unknown as { dict: Dictionary }).dict;
-  vi.spyOn(dict, 'randomStart').mockReturnValueOnce(word);
+  const target = room.gameType === 'wordchain_en' ? (dict.en ?? dict) : dict;
+  vi.spyOn(target, 'randomStart').mockReturnValueOnce(word);
   const r = room.start(hostId);
   if (!r.ok) throw new Error(r.error);
 }

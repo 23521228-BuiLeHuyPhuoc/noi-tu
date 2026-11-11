@@ -4,7 +4,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { createGameServer, type GameServer } from '../src/app';
 import { smallDict } from './helpers';
 import type {
-  BauCuaView, ClientToServerEvents, FunEvent, LudoView, RoomState, ServerToClientEvents, WordChainView,
+  BauCuaView, ClientToServerEvents, FunEvent, RoomState, ServerToClientEvents, WordChainView,
 } from '../../shared/src/types';
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents> & { state?: RoomState; fun: FunEvent[] };
@@ -48,7 +48,7 @@ async function until(c: Client, pred: (s: RoomState) => boolean, timeout = 3000)
   throw new Error('Hết thời gian chờ trạng thái: ' + JSON.stringify(c.state));
 }
 
-async function roomOf(n: number, gameType?: 'wordchain' | 'ludo' | 'baucua') {
+async function roomOf(n: number, gameType?: 'wordchain' | 'wordchain_en' | 'baucua') {
   const cs = await Promise.all(Array.from({ length: n }, () => client()));
   const created = await cs[0].emitWithAck('room:create', { name: 'P0', gameType });
   if (!created.ok) throw new Error(created.error);
@@ -83,18 +83,20 @@ describe('Server qua Socket.IO', () => {
     await until(cs[1], (s) => s.phase === 'lobby' && s.game === null);
   });
 
-  it('chủ phòng đổi sang Cờ cá ngựa, đổi số ngựa, bắt đầu và đổ xúc xắc', async () => {
+  it('chủ phòng đổi sang Nối từ Anh, bắt đầu và nối chữ cái cuối', async () => {
     const { cs, ids } = await roomOf(2);
-    expect(await cs[1].emitWithAck('room:config', { gameType: 'ludo' })).toEqual({ ok: false, error: 'not_host' });
-    expect(await cs[0].emitWithAck('room:config', { gameType: 'ludo', settings: { ludoPieces: 2 } })).toEqual({ ok: true });
-    await until(cs[1], (s) => s.gameType === 'ludo' && s.settings.ludoPieces === 2);
+    expect(await cs[1].emitWithAck('room:config', { gameType: 'wordchain_en' })).toEqual({ ok: false, error: 'not_host' });
+    expect(await cs[0].emitWithAck('room:config', { gameType: 'wordchain_en' })).toEqual({ ok: true });
+    await until(cs[1], (s) => s.gameType === 'wordchain_en');
     await cs[0].emitWithAck('game:start');
     const s = await until(cs[1], (st) => st.phase === 'playing');
-    const g = s.game as LudoView;
-    expect(g.pieces).toEqual([[-1, -1], [-1, -1]]);
+    const g = s.game as WordChainView;
+    expect(g.type).toBe('wordchain_en');
+    const last = g.currentWord.slice(-1);
+    const ans = smallDict().en!.nextOptions(last, new Set([g.currentWord]))[0];
     const cur = cs[ids.indexOf(g.currentPlayerId!)];
-    expect(await cur.emitWithAck('game:action', { type: 'roll' })).toEqual({ ok: true });
-    await until(cs[0], (st) => (st.game as LudoView).rollId === 1);
+    expect(await cur.emitWithAck('game:action', { type: 'submit', word: ans })).toEqual({ ok: true });
+    await until(cs[0], (st) => (st.game as WordChainView).currentWord === ans);
   });
 
   it('tạo phòng Bầu cua, đặt cược, máy tự lắc rồi mở bát', async () => {

@@ -4,7 +4,7 @@ import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
 import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, rentOf, typhuCellPos, stationRent, utilityRent } from '../../shared/src/typhu';
 import { simulateThrow } from '../src/games/dice3d';
-import { DICE_DEFAULT_IMPULSE, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
+import { DICE_DEFAULT_IMPULSE, DICE_FACES, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
 import { smallDict } from './helpers';
 
 const TURN = 20_000;
@@ -128,8 +128,23 @@ describe('Cờ tỷ phú V2', () => {
   expect(c.v().jail.p0).toBeUndefined();expect(c.v().pos.p0).toBe(13);expect(c.v().cash.p0).toBe(1450);
  });
  it('clears moving callbacks when the current player leaves', () => {
-  const {g,v,settle}=make(['An','Bình','Chi'],[1,2]);g.action('p0',{type:'roll'});g.removePlayer('p0');
+  const {g,v}=make(['An','Bình','Chi'],[1,2]);g.action('p0',{type:'roll'});g.removePlayer('p0');
   expect(v().movement).toBeNull();expect(v().currentPlayerId).toBe('p1');
+ });
+ it('triggers monopoly win and ranks winner #1 when acquiring properties from a bankrupt debtor, and shortens timer on disconnect', () => {
+  const {g,pl,own,finished,settle}=make(['An','Bình','Chi'],[2,3]);
+  own([5,15,25],'p1');own([35],'p0');pl(0).cash=10;pl(2).cash=9999;
+  g.action('p0',{type:'roll'});settle();
+  expect(finished).toHaveLength(1);
+  expect(finished[0].winnerId).toBe('p1');
+  expect(finished[0].ranking[0].playerId).toBe('p1');
+  const away: string[] = [];
+  const d = make(['An','Bình'],[1,2],away);
+  away.push('p0');
+  d.g.onPlayerConnection?.('p0', false);
+  vi.advanceTimersByTime(2600);
+  d.settle();
+  expect(d.v().pos.p0).toBe(3);
  });
 });
 
@@ -150,10 +165,16 @@ describe('Xúc xắc 3D vật lý và nhịp chơi', () => {
       expect(r.ms).toBeLessThanOrEqual(2600);
       expect(r.frames.length / DICE_FRAME_STRIDE).toBe(Math.round((r.ms / 1000) * r.fps));
       const last = r.frames.slice(-DICE_FRAME_STRIDE);
-      for (const o of [0, 7]) {
+      expect(Math.hypot(last[0] - last[7], last[2] - last[9])).toBeGreaterThanOrEqual(1.1);
+      for (const [idx, o] of [0, 7].entries()) {
         expect(Math.abs(last[o])).toBeLessThanOrEqual(TRAY_HX);
         expect(Math.abs(last[o + 2])).toBeLessThanOrEqual(TRAY_HZ);
         expect(last[o + 1]).toBeCloseTo(0.5, 1);
+        const [qx, qy, qz, qw] = [last[o + 3], last[o + 4], last[o + 5], last[o + 6]];
+        const [vx, vy, vz] = DICE_FACES.find((f) => f.v === r.dice[idx])!.n;
+        const tx = 2 * (qy * vz - qz * vy), ty = 2 * (qz * vx - qx * vz), tz = 2 * (qx * vy - qy * vx);
+        const upY = vy + qw * ty + (qz * tx - qx * tz);
+        expect(upY).toBeGreaterThan(0.998);
       }
     }
   });

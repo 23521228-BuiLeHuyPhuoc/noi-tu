@@ -25,7 +25,7 @@ async function openStore(): Promise<Store> {
     const store = await MongoStore.connect(uri, process.env.DATABASE_NAME || 'xomlay');
     const words = await store.listWords();
     let added = 0;
-    for (const w of words) if (dict.add(w)) added++;
+    for (const w of words) if (dict.add(w) || dict.en?.add(w)) added++;
     console.log(`Đã kết nối MongoDB, nạp ${added} từ do người chơi duyệt`);
     return store;
   } catch (e) {
@@ -37,5 +37,5 @@ async function openStore(): Promise<Store> {
 const store = await openStore();
 const server = createGameServer(dict, { store, room: { turnMs: turnSeconds ? turnSeconds * 1000 : undefined } });
 server.http.listen(port, () => {
-  console.log(`Game server: cổng ${port}, ${dict.size} từ, lưu trữ: ${store.kind}${turnSeconds ? `, ${turnSeconds}s/lượt` : ''}`);
+  console.log(`Game server: cổng ${port}, ${dict.size} từ Việt, ${dict.en?.size ?? 0} từ Anh, lưu trữ: ${store.kind}${turnSeconds ? `, ${turnSeconds}s/lượt` : ''}`);
 });

@@ -88,14 +88,14 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const minus = c.kind === 'tax';
 
   if (p.side === 'corner') {
-    const fs = Math.max(7.5, Math.min(12, p.w / 7));
-    const icon = p.w * 0.46;
+    const fs = Math.max(7, Math.min(11, p.w / 7.4));
+    const icon = p.w * (priceTxt !== '' ? 0.38 : 0.44);
     return (
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.corner}>
-          <T numberOfLines={2} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.35) }]}>{name}</T>
+          <T numberOfLines={2} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.2) }]}>{name}</T>
           <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
-          {priceTxt !== '' && <T style={[styles.price, styles.plus, { fontSize: fs, lineHeight: Math.round(fs * 1.4) }]}>{priceTxt}</T>}
+          {priceTxt !== '' && <T style={[styles.price, styles.plus, { fontSize: fs, lineHeight: Math.round(fs * 1.25) }]}>{priceTxt}</T>}
         </View>
         {overlay}
       </Pressable>
@@ -111,7 +111,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const nameSize = Math.max(6.5, Math.min(10, W / 5.2));
     const priceSize = Math.max(7, Math.min(10.5, W / 4.6));
     const bandH = Math.max(13, p.h * 0.24);
-    const iconSize = Math.min(W * 0.8, p.h * 0.4);
+    const iconSize = Math.min(W * (face ? 0.56 : 0.8), p.h * 0.38);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>
         <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(bandH - 2, (W - 6) / 3.3)} vertical={false} />
@@ -121,12 +121,12 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.col}>
           {p.side === 'top' && bandEl}
-          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.4), marginTop: 2 }]}>{name}</T>
+          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.32), marginTop: 1 }]}>{name}</T>
           <View style={styles.mid}>
             {!isLand && <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />}
             {face}
           </View>
-          {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.4), marginBottom: 2 }]}>{priceTxt}</T>}
+          {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.32), marginBottom: 1 }]}>{priceTxt}</T>}
           {p.side === 'bottom' && bandEl}
         </View>
         {overlay}
@@ -149,10 +149,17 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
       <View style={styles.row}>
         {p.side === 'left' && bandEl}
-        {!isLand && <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize, marginLeft: 2 }} resizeMode="contain" />}
+        {!isLand ? (
+          <View style={styles.sideIconWrap}>
+            <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />
+            {face && <View style={styles.sideFace}>{face}</View>}
+          </View>
+        ) : (
+          face && <View style={{ marginLeft: p.side === 'left' ? 1 : 2, marginRight: p.side === 'right' ? 1 : 0 }}>{face}</View>
+        )}
         <View style={styles.rowText}>
-          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.28) }]}>{name}</T>
-          {sidePrice !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.3) }]}>{sidePrice}</T>}
+          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.25) }]}>{name}</T>
+          {sidePrice !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.28) }]}>{sidePrice}</T>}
         </View>
         {p.side === 'right' && bandEl}
       </View>
@@ -174,11 +181,12 @@ const styles = StyleSheet.create({
   bandBorderL: { borderLeftWidth: 0.75, borderColor: INK },
   bandBorderR: { borderRightWidth: 0.75, borderColor: INK },
   name: { color: INK, fontWeight: '700', textAlign: 'center', letterSpacing: -0.2 },
-  mid: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  mid: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 1 },
   price: { color: INK, fontWeight: '800', textAlign: 'center' },
   minus: { color: '#C92A2A' },
   plus: { color: '#2B8A3E' },
-  sideFace: { position: 'absolute', bottom: 1, marginHorizontal: 14, transform: [{ scale: 0.85 }] },
+  sideIconWrap: { marginLeft: 2, alignItems: 'center', justifyContent: 'center' },
+  sideFace: { position: 'absolute', right: -3, bottom: -2, transform: [{ scale: 0.8 }] },
   ownerFace: { width: 13, height: 13, borderRadius: 7, backgroundColor: '#fff', borderWidth: 1.5 },
   corner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1, padding: 2 },
   cornerName: { color: INK, fontWeight: '800', textAlign: 'center' },

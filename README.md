@@ -1,6 +1,6 @@
 # Xóm Lầy
 
-Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Bầu cua**, **Cờ tỷ phú** (và **Cờ cá ngựa**). Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
+Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Nối từ Anh**, **Bầu cua**, **Cờ tỷ phú**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
@@ -14,9 +14,9 @@ Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối t�
 
 ```
 noi-tu/
-  shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt (dùng chung app & server)
+  shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt & tiếng Anh (dùng chung app & server)
   server/   Node.js + Socket.IO, trọng tài của mọi ván chơi
-    src/games/   wordchain.ts, ludo.ts, baucua.ts, typhu.ts (luật từng game)
+    src/games/   wordchain.ts, baucua.ts, typhu.ts (luật từng game)
   app/      giao diện (React Native Web qua Expo), xuất ra trang web cho điện thoại
   e2e/      test giao diện tự động (nhiều trình duyệt chơi thật với nhau)
   docs/     thiết kế
@@ -34,10 +34,11 @@ noi-tu/
 - Có 25.976 giải nghĩa kèm nguồn; từ chưa có định nghĩa hiện **Chưa có giải nghĩa**.
 - Gõ dấu kiểu cũ hay mới đều được (hoà = hòa, thuỷ = thủy).
 
-**Cờ cá ngựa** (2–4 người, chọn 2 hoặc 4 ngựa)
-- Đổ 1 hoặc 6 mới được ra quân. Đổ 6 được đổ thêm; 3 lần 6 liên tiếp thì mất lượt.
-- Không được đi qua đầu ngựa khác. Dừng đúng ô ngựa đối thủ là đá về chuồng.
-- Về đích phải đổ vừa đủ. Ai đưa hết ngựa về đích trước thì thắng. Hết giờ (15 giây) thì máy tự đi thay.
+**Nối từ Anh** (1–6 người)
+- Mỗi từ là 1 từ đơn tiếng Anh (`a–z`, tối thiểu 2 ký tự). Chữ cái đầu của từ mới phải trùng chữ cái cuối của từ trước (ví dụ: `art` → `tits` → `sex`). Không dùng lại từ đã dùng.
+- Chữ cái đầu được điền sẵn và khóa lại, người chơi chỉ cần gõ phần còn lại của từ (hoặc gõ cả từ cũng được).
+- Giao diện, đồng hồ 30 giây, quyền **Cứu trợ**, **Xin cả phòng duyệt** và hiển thị **chú thích nghĩa tiếng Việt + phiên âm IPA** ngay bên dưới từ giống hệt game Nối từ tiếng Việt.
+- Kho từ **210.357 từ tiếng Anh** kèm **124.235 mục giải nghĩa tiếng Việt trực tiếp** (cộng thêm tra cứu gốc từ tự động cho dạng số nhiều / chia động từ `-s`, `-es`, `-ed`, `-ing`), tổng hợp từ **ENABLE1** (`dolph/dictionary`), **Wiktionary tiếng Việt** (Kaikki / Wiktextract) và **Từ điển Anh–Việt StarDict** (`catusf/tudien`). Xem `server/scripts/build-en-dictionary.py`.
 
 **Bầu cua** (1–6 người, xu ảo)
 - Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây. Tiền của mọi người vun thành chồng xu trên từng ô (mỗi người một màu). Hết giờ **máy tự lắc**, không ai lắc tay.
@@ -95,8 +96,8 @@ Trong **noi-tu-server → Environment** trên Render, nhập đủ `CLOUDINARY_C
 
 ## 3. Thêm hoặc bớt từ
 
-- `server/data/extra-words.txt`: thêm từ (mỗi dòng một từ 2 chữ)
-- `server/data/banned-words.txt`: loại từ sai hoặc từ không muốn cho dùng
+- `server/data/extra-words.txt`, `server/data/extra-words-en.txt`: thêm từ tiếng Việt (2 chữ) hoặc tiếng Anh (1 từ đơn)
+- `server/data/banned-words.txt`, `server/data/banned-words-en.txt`: loại từ sai hoặc từ không muốn cho dùng
 
 Sửa xong thì khởi động lại server (trên Render: push lên GitHub rồi bấm Manual Deploy cho `noi-tu-server`). **Không cần build lại app.**
 
@@ -114,11 +115,11 @@ Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Vi
 ## 4. Test
 
 ```bash
-cd server && npm test        # 102 test: chuẩn hóa, từ điển, luật 4 game, phòng, Socket.IO
+cd server && npm test        # 141 test: chuẩn hóa, từ điển Việt & Anh, luật 4 game, phòng, Socket.IO
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Cờ cá ngựa, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô). Xem đầu file `play.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô). Xem đầu file `play.mjs` để biết cách chạy.
 
 ## Nguồn icon và ảnh (Cờ tỷ phú)
 - Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy).

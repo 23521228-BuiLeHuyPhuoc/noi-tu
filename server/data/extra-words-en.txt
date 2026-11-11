@@ -1,0 +1,2 @@
+# Từ tiếng Anh bổ sung thêm vào kho
+# Mỗi dòng một từ đơn tiếng Anh (a-z). Dòng bắt đầu bằng # bị bỏ qua.

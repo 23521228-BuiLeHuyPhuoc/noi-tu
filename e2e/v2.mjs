@@ -152,10 +152,10 @@ try {
     for (const die of await b.t('bc-die').all()) assert.ok(await die.getAttribute('aria-label'));
   }));
 
-  await suite('Ty Phu 32 cells, dice and movement lock', () => room('typhu', async (a, b) => {
+  await suite('Ty Phu 40 cells, dice and movement lock', () => room('typhu', async (a, b) => {
     await a.t('start-btn').click();
-    await a.t('cell-31').waitFor();
-    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 32);
+    await a.t('cell-39').waitFor();
+    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 40);
     assert.equal(await a.page.locator('[data-testid^="token-"]').count(), 2);
     const active = await a.t('roll-btn').count() ? a : b;
     const other = active === a ? b : a;
@@ -183,7 +183,7 @@ try {
     const buy = active.t('buy-btn');
     if (await buy.count()) await buy.click();
     if (await active.t('end-turn').count()) await active.t('end-turn').click();
-    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 32);
+    assert.equal(await a.page.locator('[data-testid^="cell-"]').count(), 40);
   }));
   assert.deepEqual(pageErrors, [], 'No browser runtime errors');
 } catch (error) { failed++; console.error(error); }

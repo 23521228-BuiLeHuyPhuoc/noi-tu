@@ -224,7 +224,33 @@ const star = (x: number, y: number, r: number) => {
 
 function darken(hex: string, f: number): string {
   const h = hex.replace('#', '');
-  return '#' + [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - f)).toString(16).padStart(2, '0')).join('');
+  return '#' + [0, 2, 4].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(h.slice(i, i + 2), 16) * (1 - f)))).toString(16).padStart(2, '0')).join('');
+}
+
+function lighten(hex: string, f: number): string {
+  const h = hex.replace('#', '');
+  return '#' + [0, 2, 4].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16);
+    return Math.max(0, Math.min(255, Math.round(v + (255 - v) * f))).toString(16).padStart(2, '0');
+  }).join('');
+}
+
+const sparkle = (x: number, y: number, r: number, col = '#FFFFFF') =>
+  `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z" fill="${col}"/>`;
+
+/** Đôi tai người thật có vành tai (helix), hốc tai (concha), bình tai (tragus) và dái tai (lobe) */
+function earsSvg(earL: number, earR: number, skin: string, skinShadow: string, skinDeep: string, ink: string): string {
+  const left = `<g transform="rotate(-8 ${earL} 49)">
+    <path d="M${earL + 2} 42 C${earL - 4.5} 40.5, ${earL - 5.5} 47, ${earL - 4.2} 52 C${earL - 3.2} 55.8, ${earL - 0.5} 57.2, ${earL + 2.2} 55.5 Z" fill="${skin}" stroke="${ink}" stroke-width="2"/>
+    <path d="M${earL + 0.8} 44.2 C${earL - 2.6} 44, ${earL - 3} 48.5, ${earL - 1.8} 52.2" stroke="${skinDeep}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="${earL - 0.8}" cy="49.2" rx="1.4" ry="2.2" fill="${skinShadow}"/>
+  </g>`;
+  const right = `<g transform="rotate(8 ${earR} 49)">
+    <path d="M${earR - 2} 42 C${earR + 4.5} 40.5, ${earR + 5.5} 47, ${earR + 4.2} 52 C${earR + 3.2} 55.8, ${earR + 0.5} 57.2, ${earR - 2.2} 55.5 Z" fill="${skin}" stroke="${ink}" stroke-width="2"/>
+    <path d="M${earR - 0.8} 44.2 C${earR + 2.6} 44, ${earR + 3} 48.5, ${earR + 1.8} 52.2" stroke="${skinDeep}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="${earR + 0.8}" cy="49.2" rx="1.4" ry="2.2" fill="${skinShadow}"/>
+  </g>`;
+  return left + right;
 }
 
 /** Mắt, mày, miệng của từng tâm trạng sự kiện (khác "normal") */

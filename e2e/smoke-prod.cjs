@@ -71,19 +71,19 @@ const check = (ok, msg) => {
   check(hint.ok && hint.hint, `cứu trợ gợi ý: ${hint.hint}`);
   check((await cur.emitWithAck('game:action', { type: 'submit', word: hint.hint })).ok, 'nối đúng bằng từ gợi ý');
 
-  // đổi sang Cờ cá ngựa: phải rời ván rồi tạo phòng mới cho nhanh
+  // đổi sang Nối từ Anh: phải rời ván rồi tạo phòng mới cho nhanh
   await a.emitWithAck('room:leave');
   await b.emitWithAck('room:leave');
-  const c2 = await a.emitWithAck('room:create', { name: 'A', gameType: 'ludo' });
+  const c2 = await a.emitWithAck('room:create', { name: 'A', gameType: 'wordchain_en' });
   await b.emitWithAck('room:join', { code: c2.code, name: 'B' });
-  check((await a.emitWithAck('room:config', { settings: { ludoPieces: 2 } })).ok, 'Cờ cá ngựa: chọn 2 ngựa');
-  check((await a.emitWithAck('game:start')).ok, 'bắt đầu Cờ cá ngựa');
+  check((await a.emitWithAck('game:start')).ok, 'bắt đầu Nối từ Anh');
   await wait(400);
-  const lg = a.state.game;
-  const lcur = lg.currentPlayerId === c2.playerId ? a : b;
-  check((await lcur.emitWithAck('game:action', { type: 'roll' })).ok, 'đổ xúc xắc');
-  await wait(400);
-  check(a.state.game.dice >= 1 && a.state.game.dice <= 6, `xúc xắc ra ${a.state.game.dice}`);
+  const eg = a.state.game;
+  check(eg && eg.type === 'wordchain_en' && eg.nextCount > 0, `từ mở đầu tiếng Anh: ${eg && eg.currentWord}`);
+  const ecur = eg.currentPlayerId === c2.playerId ? a : b;
+  const ehint = await ecur.emitWithAck('game:action', { type: 'hint' });
+  check(ehint.ok && ehint.hint, `cứu trợ tiếng Anh: ${ehint.hint}`);
+  check((await ecur.emitWithAck('game:action', { type: 'submit', word: ehint.hint })).ok, 'nối đúng từ tiếng Anh');
 
   // Bầu cua
   await a.emitWithAck('room:leave');

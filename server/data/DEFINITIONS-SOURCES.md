@@ -54,3 +54,25 @@ Absent words retain the application's unavailable-meaning fallback.
 Academic citation requested by Kaikki: Tatu Ylonen (2022), *Wiktextract:
 Wiktionary as Machine-Readable Structured Data*, Proceedings of LREC 2022,
 pp. 1317-1325: https://aclanthology.org/2022.lrec-1.140/ .
+
+---
+
+# English word list and Vietnamese definitions (`words-en.txt`, `definitions-en.json`)
+
+The English Word Chain mode (`wordchain_en`) uses `words-en.txt` (210,357 single-word English entries, `[a-z]{2,}`) and `definitions-en.json` (124,235 direct Vietnamese definitions with IPA and part-of-speech tags, plus runtime morphological lemma fallback for `-s`, `-es`, `-ed`, `-ing` inflections).
+
+## Sources
+
+1. **Vietnamese Wiktionary (`lang_code == "en"`) via Kaikki / Wiktextract**
+   - Source: https://vi.wiktionary.org/ (CC BY-SA 4.0)
+   - Dataset: https://kaikki.org/viwiktionary/raw-wiktextract-data.jsonl.gz
+2. **StarDict English–Vietnamese Dictionary (`star_anhviet.tab` & `TudienAnhVietBeta.tab`)**
+   - Repository: https://github.com/catusf/tudien (Free Vietnamese Dictionary Project / StarDict Anh–Việt, GPL)
+3. **ENABLE1 & Popular English Word Lists**
+   - Repository: https://github.com/dolph/dictionary (`enable1.txt`, `popular.txt`, Public Domain)
+
+## Rebuild
+
+```powershell
+python server/scripts/build-en-dictionary.py <scratch-dir> server/data
+```

@@ -5,7 +5,6 @@ import { useGame } from './src/useGame';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { WordChainScreen } from './src/screens/WordChainScreen';
-import { LudoScreen } from './src/screens/LudoScreen';
 import { BauCuaScreen } from './src/screens/BauCuaScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { TyPhuScreen } from './src/screens/TyPhuScreen';
@@ -24,10 +23,9 @@ export default function App() {
   if (!room) body = <HomeScreen game={game} />;
   else if (room.phase === 'lobby') body = <LobbyScreen game={game} room={room} />;
   else if (room.phase === 'finished' && room.result) body = <ResultScreen game={game} room={room} />;
-  else if (room.game?.type === 'ludo') body = <LudoScreen game={game} room={room} />;
   else if (room.game?.type === 'baucua') body = <BauCuaScreen game={game} room={room} />;
   else if (room.game?.type === 'typhu') body = <TyPhuScreen game={game} room={room} />;
-  else if (room.game?.type === 'wordchain') body = <WordChainScreen game={game} room={room} />;
+  else if (room.game?.type === 'wordchain' || room.game?.type === 'wordchain_en') body = <WordChainScreen game={game} room={room} />;
   else body = <HomeScreen game={game} />;
 
   return (

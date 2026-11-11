@@ -21,7 +21,7 @@ export type Announce = {
   level?: number;
 };
 
-export const ANNOUNCE_MS: Record<Announce['kind'], number> = { buy: 1300, reward: 1400, loss: 1500, build: 1200, bankrupt: 2200 };
+export const ANNOUNCE_MS: Record<Announce['kind'], number> = { buy: 850, reward: 900, loss: 950, build: 800, bankrupt: 1350 };
 const ease = (t: number) => 1 - (1 - t) * (1 - t) * (1 - t);
 const rnd = (id: number, i: number) => ((i * 7919 + id * 104729 + 13) % 1000) / 1000;
 const fmt = (n: number) => n.toLocaleString('vi-VN');
@@ -46,11 +46,11 @@ export function TyPhuAnnounce({ a, now, W, H }: { a: Announce; now: number; W: n
   const el = now - a.start;
   if (el < 0 || el > dur) return null;
   const p = el / dur;
-  const fadeIn = Math.min(1, el / 220);
-  const fadeOut = Math.min(1, (dur - el) / 280);
+  const fadeIn = Math.min(1, el / 140);
+  const fadeOut = Math.min(1, (dur - el) / 180);
   const op = Math.min(fadeIn, fadeOut);
-  const pop = ease(Math.min(1, el / 420));
-  const scale = 0.4 + 0.6 * pop + (el < 420 ? Math.sin((el / 420) * Math.PI) * 0.12 : 0);
+  const pop = ease(Math.min(1, el / 260));
+  const scale = 0.4 + 0.6 * pop + (el < 260 ? Math.sin((el / 260) * Math.PI) * 0.1 : 0);
   const k = Math.min(1, Math.max(0.75, H / 520)); // màn thấp (ngang): thu nhỏ nội dung cho vừa
   const cy = H < 500 ? H * 0.5 : H * 0.4;
   const loss = a.kind === 'loss';
@@ -143,7 +143,7 @@ function CoinBurst({ now, a, W, cy }: { now: number; a: Announce; W: number; cy:
   return (
     <>
       {Array.from({ length: 16 }, (_, k) => {
-        const t = Math.max(0, Math.min(1, (el - 120 - k * 25) / 1100));
+        const t = Math.max(0, Math.min(1, (el - 60 - k * 15) / 700));
         if (t <= 0 || t >= 1) return null;
         const ang = (k / 16) * Math.PI * 2 + rnd(a.id, k);
         const d = ease(t) * (90 + rnd(a.id, k + 5) * 90);
@@ -167,7 +167,7 @@ function Bills({ now, a, W, H }: { now: number; a: Announce; W: number; H: numbe
   return (
     <>
       {Array.from({ length: 22 }, (_, k) => {
-        const t = Math.max(0, Math.min(1, (el - rnd(a.id, k) * 500) / 1900));
+        const t = Math.max(0, Math.min(1, (el - rnd(a.id, k) * 300) / 1100));
         if (t <= 0 || t >= 1) return null;
         return (
           <Image

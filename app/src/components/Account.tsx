@@ -237,7 +237,7 @@ export function ProfileSheet({ game, user, onClose }: { game: Game; user: Public
   );
 }
 
-const ORDER: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
+const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
 export function ProfileCard({ user, onEdit }: { user: PublicUser; onEdit: () => void }) {
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);

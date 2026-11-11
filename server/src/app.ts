@@ -39,7 +39,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   });
   const avatarUploader = opts.avatarUploader ?? cloudinaryUploader();
   attachAvatarRoute(app, store, auth, avatarUploader);
-  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, rooms: manager.size, db: store.kind, avatarUploads: !!avatarUploader }));
+  app.get('/health', (_req, res) => res.json({ ok: true, words: dict.size, wordsEn: dict.en?.size ?? 0, rooms: manager.size, db: store.kind, avatarUploads: !!avatarUploader }));
   app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
   const http = createServer(app);
 
@@ -56,7 +56,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
       },
       // từ được cả phòng duyệt: dùng được ngay và lưu vào CSDL
       learnWord: (word, byName) => {
-        const w = dict.add(word);
+        const w = dict.add(word) ?? dict.en?.add(word) ?? null;
         if (w) store.addWord(w, byName).catch(logErr('addWord'));
       },
     },

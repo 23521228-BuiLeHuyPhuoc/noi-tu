@@ -19,7 +19,7 @@ import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 
-const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
+const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
 const PRESET_ORDER: number[] = [
   16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -150,26 +150,6 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={styles.chosen}>
           <T style={styles.pickEmoji}>{GAME_META[room.gameType].emoji}</T>
           <T style={styles.chosenName}>{info.name}</T>
-        </Card>
-      )}
-
-      {room.gameType === 'ludo' && (
-        <Card style={{ gap: 10 }}>
-          <T style={styles.h3}>Số ngựa mỗi người</T>
-          <View style={styles.row}>
-            {([2, 4] as const).map((k) => (
-              <Button
-                key={k}
-                testID={`pieces-${k}`}
-                small
-                variant={room.settings.ludoPieces === k ? 'ink' : 'paper'}
-                title={k === 2 ? '2 con (nhanh)' : '4 con (chuẩn)'}
-                disabled={!isHost}
-                style={{ flex: 1 }}
-                onPress={() => game.configure({ settings: { ludoPieces: k } })}
-              />
-            ))}
-          </View>
         </Card>
       )}
 

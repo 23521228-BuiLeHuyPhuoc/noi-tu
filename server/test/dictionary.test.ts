@@ -81,5 +81,14 @@ describe('Dictionary', () => {
     expect(d.has('học sinh')).toBe(true);
     expect(d.has('mèo mướp')).toBe(true);
     expect(d.has('mèo bàn')).toBe(false);
+    // kho từ tiếng Anh đi kèm
+    expect(d.en).toBeDefined();
+    expect(d.en!.size).toBeGreaterThan(150_000);
+    expect(d.en!.has('art')).toBe(true);
+    expect(d.en!.has('tits')).toBe(true);
+    expect(d.en!.has('sex')).toBe(true);
+    expect(d.en!.definition('art')?.text).toContain('nghệ thuật');
+    expect(d.en!.definition('tits')?.text).toContain('đầu vú');
+    expect(d.en!.definition('sex')?.text).toContain('giới tính');
   });
 });

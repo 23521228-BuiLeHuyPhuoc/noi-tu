@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Platform, View, useWindowDimensions } from 'react-native';
 import { ViewportContext } from '../hooks';
 import { C } from '../theme';
@@ -9,7 +9,13 @@ import { C } from '../theme';
  * Thử khoá hướng ngang bằng screen.orientation sau lần chạm đầu tiên (thất bại thì bỏ qua).
  */
 export function Rotator({ children }: { children: ReactNode }) {
-  const { width: W, height: H } = useWindowDimensions();
+  const dims = useWindowDimensions();
+  const [stable, setStable] = useState({ width: dims.width, height: dims.height });
+  const keyboardDrop = dims.width === stable.width && stable.height - dims.height > 150;
+  if (!keyboardDrop && (stable.width !== dims.width || stable.height !== dims.height)) {
+    setStable({ width: dims.width, height: dims.height });
+  }
+  const { width: W, height: H } = stable;
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const lock = () => {

@@ -88,18 +88,15 @@ async function newRoom(game, n) {
   return ps;
 }
 
-const L = await newRoom('ludo', 4);
-await shot(L[0], '11-ludo-lobby');
+const L = await newRoom('wordchain_en', 3);
+await shot(L[0], '11-wordchain-en-lobby');
 await L[0].t('start-btn').click();
-for (const p of L) await p.t('dice').waitFor();
+for (const p of L) await p.t('current-word').waitFor();
 await L[0].page.waitForTimeout(400);
 let lc = null;
-for (const p of L) if (await p.t('roll-btn').count()) lc = p;
-await shot(lc, '12-ludo-myturn');
-await lc.t('roll-btn').click();
-await lc.page.waitForTimeout(700);
-await shot(lc, '13-ludo-rolled');
-await shot(L.find((p) => p !== lc), '14-ludo-other');
+for (const p of L) if ((await p.t('turn-label').textContent()).includes('Tới lượt bạn')) lc = p;
+await shot(lc, '12-wordchain-en-myturn');
+await shot(L.find((p) => p !== lc), '14-wordchain-en-other');
 
 const B = await newRoom('baucua', 3);
 await B[0].t('start-btn').click();

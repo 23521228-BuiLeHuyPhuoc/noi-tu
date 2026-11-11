@@ -177,6 +177,15 @@ export class TyPhuGame implements GameEngine {
     else this.ctx.changed();
   }
 
+  onPlayerConnection(playerId: string, _connected: boolean): void {
+    if (this.over || this.movement) return;
+    const me = this.players[this.current];
+    if (!me || me.id !== playerId) return;
+    if (this.step === 'roll') this.armTimer(() => this.roll(), ROLL_IDLE_MS);
+    else if (this.step === 'buy') this.armTimer(() => this.skipBuy(), ROLL_IDLE_MS);
+    else if (this.step === 'upgrade') this.armTimer(() => { this.pendingBuy = null; this.afterLanding(); }, ROLL_IDLE_MS);
+  }
+
   view(): TyPhuView & { movement: TyPhuMovement | null } {
     const by = <T,>(f: (p: TPlayer) => T) => Object.fromEntries(this.players.map((p) => [p.id, f(p)]));
     return {
@@ -294,7 +303,7 @@ export class TyPhuGame implements GameEngine {
     const me = this.players[this.current], from = me.pos;
     const path = Array.from({ length: Math.abs(steps) }, (_, i) => ((from + Math.sign(steps) * (i + 1)) % TYPHU_SIZE + TYPHU_SIZE) % TYPHU_SIZE);
     const startedAt = Date.now();
-    const delay = kind === 'roll' ? this.rollMs : 0;
+    const delay = kind === 'roll' ? this.rollMs : kind === 'card' ? Math.round(650 / this.speed) : 0;
     const duration = delay + Math.max(1, path.length) * Math.round(TYPHU_MOVE_STEP_MS / this.speed);
     this.movement = { id: ++this.movementSeq, playerId: me.id, from, to: path.at(-1) ?? from, path, startedAt, endsAt: startedAt + duration, delay, kind };
     me.pos = this.movement.to;
@@ -349,15 +358,15 @@ export class TyPhuGame implements GameEngine {
           const o = this.players.find((p) => p.id === owner)!;
           const count = Object.entries(this.owners).filter(([i, id]) => id === owner && TYPHU_BOARD[Number(i)].kind === c.kind).length;
           const rent = c.kind === 'station' ? stationRent(count) : c.kind === 'utility' ? utilityRent(count, (this.dice?.[0] ?? 0) + (this.dice?.[1] ?? 0)) : rentOf(me.pos, this.houses[me.pos] ?? 0, this.ownsGroup(owner, me.pos));
-          const paid = this.charge(me, rent, o, `tiền thuê ${c.name}`);
-          this.addLog('rent', `${me.name} trả ${fmt(paid)} xu tiền thuê ${c.name} cho ${o.name}`);
+          const paid = this.charge(me, rent, o, `thuê ${c.name}`);
+          if (!me.bankrupt) this.addLog('rent', `${me.name} trả ${fmt(paid)} xu tiền thuê ${c.name} cho ${o.name}`);
         }
         break;
       }
       case 'tax': {
-        const paid = this.charge(me, c.amount, null, c.name);
+        const paid = this.charge(me, c.amount, null, `nộp ${c.name}`);
         this.pot += paid;
-        this.addLog('tax', `${me.name} nộp ${c.name} ${fmt(c.amount)} xu (vào hũ Nghỉ chân)`);
+        if (!me.bankrupt) this.addLog('tax', `${me.name} nộp ${c.name} ${fmt(c.amount)} xu (vào hũ Nghỉ chân)`);
         break;
       }
       case 'rest':
@@ -423,16 +432,20 @@ export class TyPhuGame implements GameEngine {
 
   /** Sau khi xử lý xong ô đứng: đổ tiếp (nếu đổ đôi), hoặc cho xây nhà, hoặc sang lượt sau */
   private afterLanding(): void {
+    if (this.over) return;
     const me = this.players[this.current];
     if (me.bankrupt) return this.afterBankrupt();
-    // người khác có thể vừa phá sản (vd. thẻ mừng sinh nhật) → kiểm tra kết thúc ván
+    // người khác có thể vừa phá sản (vd. thẻ mừng sinh nhật) → kiểm tra kết thúc ván hoặc độc quyền
     if (this.checkEnd()) return;
+    for (const p of this.players) if (!p.bankrupt && this.checkMonopoly(p)) return;
     if (this.rolledDouble && me.jail === null) return this.beginRoll();
     this.wait(() => this.nextPlayer());
   }
 
   private afterBankrupt(): void {
+    if (this.over) return;
     if (this.checkEnd()) return;
+    for (const p of this.players) if (!p.bankrupt && this.checkMonopoly(p)) return;
     this.wait(() => this.nextPlayer());
   }
 
@@ -618,6 +631,7 @@ export class TyPhuGame implements GameEngine {
     this.movement = null;
     this.timer.clear();
     const ranked = [...this.players].sort((a, b) => {
+      if (winner && (a === winner || b === winner)) return a === winner ? -1 : 1;
       if (a.bankrupt !== b.bankrupt) return a.bankrupt ? 1 : -1;
       return this.worth(b) - this.worth(a);
     });

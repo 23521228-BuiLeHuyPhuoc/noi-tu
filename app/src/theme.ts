@@ -24,5 +24,3 @@ export const sticker = (dy = 4) => ({
   shadowOpacity: 1,
   shadowRadius: 0,
 });
-
-export const LUDO_HEX = { red: '#E5383B', green: '#2BB673', yellow: '#FFC21A', blue: '#2F7DE1' } as const;

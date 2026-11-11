@@ -13,7 +13,6 @@ import { HpBoard, TargetCooldown } from './fun';
 import type { Dictionary, Rng } from './dictionary';
 import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
-import { LudoGame } from './games/ludo';
 import { BauCuaGame } from './games/baucua';
 import { TyPhuGame } from './games/typhu';
 
@@ -289,6 +288,7 @@ export class Room {
     if (p.connected === connected) return;
     p.connected = connected;
     if (!connected && this.phase !== 'playing') this.scheduleRemoval(p);
+    if (this.phase === 'playing') this.engine?.onPlayerConnection?.(playerId, connected);
     this.changed();
   }
 
@@ -411,14 +411,14 @@ export class Room {
       learnWord: (word: string, byName: string) => this.opts.learnWord?.(word, byName),
     };
     switch (this.gameType) {
-      case 'ludo':
-        return new LudoGame(ctx);
+      case 'wordchain_en':
+        return new WordChainGame(ctx, 'en');
       case 'baucua':
         return new BauCuaGame(ctx);
       case 'typhu':
         return new TyPhuGame(ctx);
       default:
-        return new WordChainGame(ctx);
+        return new WordChainGame(ctx, 'vi');
     }
   }
 

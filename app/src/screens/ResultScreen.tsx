@@ -11,7 +11,7 @@ import { Confetti } from '../components/Fun';
 import { Portrait } from '../components/Avatar';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
+const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const r = room.result!;

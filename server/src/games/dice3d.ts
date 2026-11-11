@@ -126,17 +126,33 @@ function solvePlanes(b: Body): void {
 function solvePair(a: Body, b: Body): void {
   const d = sub(b.p, a.p);
   const dist = len(d);
-  const R = 1.1; // bán kính "cầu" xấp xỉ khối
-  if (dist >= R || dist < 1e-6) return;
-  const n = mul(d, 1 / dist);
-  const push = (R - dist) / 2;
-  a.p = sub(a.p, mul(n, push));
-  b.p = add(b.p, mul(n, push));
-  const vn = dot(sub(b.v, a.v), n);
-  if (vn >= 0) return;
-  const j = (-(1 + 0.35) * vn) / 2;
-  a.v = sub(a.v, mul(n, j));
-  b.v = add(b.v, mul(n, j));
+  const R = 1.18; // bán kính "cầu" xấp xỉ khối
+  if (dist < R && dist >= 1e-6) {
+    const n = mul(d, 1 / dist);
+    const push = (R - dist) / 2;
+    a.p = sub(a.p, mul(n, push));
+    b.p = add(b.p, mul(n, push));
+    const vn = dot(sub(b.v, a.v), n);
+    if (vn < 0) {
+      const j = (-(1 + 0.35) * vn) / 2;
+      a.v = sub(a.v, mul(n, j));
+      b.v = add(b.v, mul(n, j));
+    }
+  }
+  // tránh hai viên chồng lên nhau theo phương ngang (x, z) làm che khuất mặt chấm
+  const hx = b.p[0] - a.p[0];
+  const hz = b.p[2] - a.p[2];
+  const hDist = Math.hypot(hx, hz);
+  const minH = 1.28;
+  if (hDist < minH && Math.abs(b.p[1] - a.p[1]) < 1.1) {
+    const ux = hDist > 1e-4 ? hx / hDist : 1;
+    const uz = hDist > 1e-4 ? hz / hDist : 0;
+    const hPush = (minH - hDist) * 0.5;
+    a.p[0] -= ux * hPush;
+    a.p[2] -= uz * hPush;
+    b.p[0] += ux * hPush;
+    b.p[2] += uz * hPush;
+  }
 }
 
 /** Mặt ngửa của một viên theo quaternion hiện tại: chỉ số trong DICE_FACES */
@@ -206,6 +222,12 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
       const damp = 1 - (0.6 + extra) * DT;
       b.w = mul(b.w, damp);
       if (extra > 0) b.v = [b.v[0] * (1 - extra * 0.5 * DT), b.v[1], b.v[2] * (1 - extra * 0.5 * DT)];
+      // khi viên xúc xắc đã chạm sàn và chậm dần, kéo nhẹ về mặt gần nhất để không bị kẹt nghiêng trên cạnh
+      if (t > 0.45 && b.p[1] < 0.78) {
+        const up = qRot(b.q, DICE_FACES[topFace(b.q)].n);
+        const align = cross(up, [0, 1, 0]);
+        b.w = add(b.w, mul(align, 18 * DT));
+      }
       b.p = add(b.p, mul(b.v, DT));
       const dq = qMul([b.w[0] * DT * 0.5, b.w[1] * DT * 0.5, b.w[2] * DT * 0.5, 0], b.q);
       b.q = qNorm([b.q[0] + dq[0], b.q[1] + dq[1], b.q[2] + dq[2], b.q[3] + dq[3]]);
@@ -215,7 +237,7 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
     if (step % STEPS_PER_FRAME === 0) {
       record();
       nFrames++;
-      const still = bodies.every((b) => len(b.v) < 0.12 && len(b.w) < 0.6 && b.p[1] < 0.62);
+      const still = bodies.every((b) => len(b.v) < 0.12 && len(b.w) < 0.6 && b.p[1] < 0.58 && qRot(b.q, DICE_FACES[topFace(b.q)].n)[1] > 0.92);
       calm = still ? calm + 1 : 0;
       if (calm >= 6) { restFrame = nFrames; break; }
     }
@@ -240,8 +262,8 @@ export function simulateThrow(input: ThrowImpulse, rng: () => number): ThrowResu
       frames[o + 3] = q3(q[0]); frames[o + 4] = q3(q[1]); frames[o + 5] = q3(q[2]); frames[o + 6] = q3(q[3]);
     });
   }
-  // giữ khung cuối để tổng thời lượng ≥ TYPHU_ROLL_MIN_MS
-  const minFrames = Math.round((TYPHU_ROLL_MIN_MS / 1000) * DICE_PLAY_FPS);
+  // giữ khung cuối nằm yên hoàn toàn ít nhất 6 khung (~300ms) và tổng thời lượng ≥ TYPHU_ROLL_MIN_MS
+  const minFrames = Math.max(total + 6, Math.round((TYPHU_ROLL_MIN_MS / 1000) * DICE_PLAY_FPS));
   const lastFrame = frames.slice(frames.length - stride);
   while (frames.length / stride < minFrames) frames.push(...lastFrame);
   const ms = Math.round((frames.length / stride / DICE_PLAY_FPS) * 1000);

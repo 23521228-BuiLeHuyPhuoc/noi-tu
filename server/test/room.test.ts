@@ -50,13 +50,12 @@ describe('Room — phòng chờ', () => {
 
   it('chỉ chủ phòng được đổi game, cài đặt và bắt đầu', () => {
     const { room, ids } = setup(['A', 'B']);
-    expect(room.configure(ids[1], 'ludo')).toEqual({ ok: false, error: 'not_host' });
-    expect(room.configure(ids[0], 'ludo', { ludoPieces: 2 })).toEqual({ ok: true });
-    expect(room.toPublic().gameType).toBe('ludo');
-    expect(room.toPublic().settings.ludoPieces).toBe(2);
+    expect(room.configure(ids[1], 'wordchain_en')).toEqual({ ok: false, error: 'not_host' });
+    expect(room.configure(ids[0], 'wordchain_en')).toEqual({ ok: true });
+    expect(room.toPublic().gameType).toBe('wordchain_en');
     expect(room.configure(ids[0], 'baucua', { baucuaRounds: 20 })).toEqual({ ok: true });
     expect(room.toPublic().settings.baucuaRounds).toBe(20);
-    expect(room.configure(ids[0], 'ludo')).toEqual({ ok: true });
+    expect(room.configure(ids[0], 'wordchain_en')).toEqual({ ok: true });
     expect(room.configure(ids[0], 'xyz')).toEqual({ ok: false, error: 'bad_request' });
     expect(room.configure(ids[0], undefined, { ludoPieces: 3 as never })).toEqual({ ok: false, error: 'bad_request' });
     expect(room.configure(ids[0], undefined, { baucuaRounds: 7 as never })).toEqual({ ok: false, error: 'bad_request' });
@@ -66,11 +65,9 @@ describe('Room — phòng chờ', () => {
 
   it('kiểm tra số người theo từng game', () => {
     const { room, ids } = setup(['A']);
-    room.configure(ids[0], 'ludo');
+    room.configure(ids[0], 'typhu');
     expect(room.start(ids[0])).toEqual({ ok: false, error: 'too_few_players' });
-    for (const n of ['B', 'C', 'D', 'E']) room.addPlayer(n);
-    expect(room.start(ids[0])).toEqual({ ok: false, error: 'too_many_players' });
-    room.configure(ids[0], 'baucua');
+    room.configure(ids[0], 'wordchain_en');
     expect(room.start(ids[0]).ok).toBe(true);
   });
 

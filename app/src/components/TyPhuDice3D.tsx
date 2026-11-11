@@ -34,7 +34,7 @@ function restQuat(value: number, yaw: number): Q {
   let q: Q;
   if (d > 0.9999) q = [0, 0, 0, 1];
   else if (d < -0.9999) q = [1, 0, 0, 0];
-  else { const cx = n[2], cz = -n[0]; q = norm([cx, 0, cz, 1 + d]); } // n × y
+  else { const cx = -n[2], cz = n[0]; q = norm([cx, 0, cz, 1 + d]); } // n × y
   return mulQ(axisQ(0, 1, 0, yaw), q);
 }
 
@@ -128,17 +128,21 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
+    drag.current = null;
     const el = root.current;
     if (!roll || !roll.frames.length) { restPoseOn(el, S, live.current.values); return; }
     const n = roll.frames.length / DICE_FRAME_STRIDE;
     const f = roll.frames;
     let raf = 0;
+    // neo thời gian bắt đầu theo đồng hồ máy để hoạt ảnh xúc xắc không bị nhảy khung nếu clockOffset đổi giữa chừng
+    const initialElapsed = Math.max(0, Math.min(roll.ms * 0.35, Date.now() + live.current.offset - roll.startedAt));
+    const localStart = performance.now() - initialElapsed;
     const at = (idx: number, i: number): [number, number, number, Q] => {
       const o = idx * DICE_FRAME_STRIDE + i * 7;
       return [f[o], f[o + 1], f[o + 2], [f[o + 3], f[o + 4], f[o + 5], f[o + 6]]];
     };
     const tick = () => {
-      const t = ((Date.now() + live.current.offset - roll.startedAt) / 1000) * roll.fps;
+      const t = ((performance.now() - localStart) / 1000) * roll.fps;
       const k = Math.max(0, Math.min(n - 1, t));
       const a = Math.floor(k);
       const b = Math.min(n - 1, a + 1);
@@ -182,6 +186,7 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
     hold(0, 0); // nhấc hai viên lên khỏi mặt khay như đang cầm trong tay
   };
   const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!live.current.canThrow) { drag.current = null; return; }
     const d = drag.current;
     if (!d) return;
     d.pts.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
@@ -211,7 +216,10 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
-      onPointerCancel={() => { drag.current = null; restPoseOn(root.current, S, live.current.values); }}
+      onPointerCancel={() => {
+        drag.current = null;
+        if (live.current.canThrow) restPoseOn(root.current, S, live.current.values);
+      }}
       style={{
         position: 'relative', width, height, perspective: `${Math.round(width * 2.4)}px`, perspectiveOrigin: '50% 20%',
         touchAction: 'none', userSelect: 'none', cursor: canThrow ? 'grab' : 'default',

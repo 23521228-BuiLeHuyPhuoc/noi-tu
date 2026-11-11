@@ -17,11 +17,12 @@ import { useShake } from '../components/Fun';
 
 export function WordChainScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as WordChainView;
+  const isEn = g.type === 'wordchain_en';
   const myTurn = g.currentPlayerId === game.me;
   const isSpectator = !g.order.includes(game.me ?? '');
   const meOut = g.eliminated.includes(game.me ?? '');
   const word = g.currentWord;
-  const [first, last] = word.split(' ');
+  const [first, last] = isEn ? [word.slice(0, -1), word.slice(-1)] : word.split(' ');
   const feed = useFeed();
   const shake = useShake();
 
@@ -46,6 +47,14 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
 
   /** ghép chữ đầu đã khóa với phần người chơi gõ (bỏ chữ đầu nếu lỡ gõ lại) */
   const fullWord = (typed: string) => {
+    if (isEn) {
+      const clean = typed.normalize('NFC').trim().toLowerCase();
+      if (!clean) return '';
+      if (clean.length >= 2 && clean.startsWith(last) && (!/^[aeol]$/.test(last) || clean.startsWith(last + last))) {
+        return clean;
+      }
+      return `${last}${clean}`;
+    }
     const parts = typed.normalize('NFC').trim().split(/\s+/).filter(Boolean);
     if (parts.length > 1) {
       const a = toSyllables(parts[0])?.[0];
@@ -99,7 +108,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setSending(false);
     inputRef.current?.focus();
     if (!r.ok) {
-      setError(actionText[r.reason]);
+      setError(r.reason === 'format' && isEn ? 'Từ phải là 1 từ đơn tiếng Anh (a–z).' : actionText[r.reason]);
       setRejected(r.reason === 'not_in_dictionary' ? w : null);
       play('error');
     } else play('coin');
@@ -143,7 +152,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${shortName(current.name, 14)}` : ''}
         </T>
         <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
-          {first} <T style={styles.last}>{last}</T>
+          {isEn ? first : `${first} `}<T style={styles.last}>{last}</T>
         </T>
         <Definition definition={g.currentDefinition} current />
         <T testID="next-count" style={styles.count}>
@@ -178,7 +187,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                     setError(null);
                     setRejected(null);
                   }}
-                  placeholder="chữ tiếp…"
+                  placeholder={isEn ? 'nối tiếp…' : 'chữ tiếp…'}
                   placeholderTextColor={C.muted}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -203,7 +212,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               small
               variant="paper"
               title={`Gợi ý: ${hint} (chạm để điền)`}
-              onPress={() => setText(hint.split(' ').slice(1).join(' '))}
+              onPress={() => setText(isEn ? hint.slice(1) : hint.split(' ').slice(1).join(' '))}
             />
           ) : (
             !g.hintUsed.includes(game.me ?? '') && (

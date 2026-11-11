@@ -92,7 +92,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
-  if (g.roll && g.roll.id !== playback?.id) setPlayback(g.roll);
+  if (g.roll && g.roll !== playback) setPlayback(g.roll);
+  else if (!g.roll && playback && playback.id !== g.rollId) setPlayback(null);
   const [announces, setAnnounces] = useState<Announce[]>([]);
   const lastAnnEnd = useRef(0);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -118,8 +119,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const moving = !!movement && serverNow < movement.endsAt;
   const rollInfo = g.roll ? { startedAt: g.roll.startedAt, ms: g.roll.ms }
     : movement?.kind === 'roll' ? { startedAt: movement.startedAt, ms: movement.delay } : null;
-  const rollElapsed = rollInfo ? serverNow - rollInfo.startedAt : 1e9;
-  const diceAnimating = !reducedMotion && !!rollInfo && rollElapsed >= 0 && rollElapsed < rollInfo.ms;
+  const rollElapsed = rollInfo ? Math.max(0, serverNow - rollInfo.startedAt) : 1e9;
+  const diceAnimating = !reducedMotion && !!rollInfo && rollElapsed < rollInfo.ms;
   const dicePhase: 'roll' | 'bounce' | 'reveal' = diceAnimating && rollInfo
     ? rollElapsed < rollInfo.ms - 600 ? 'roll' : rollElapsed < rollInfo.ms - 180 ? 'bounce' : 'reveal'
     : 'reveal';
@@ -127,7 +128,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     0,
     ...fx.map(fxEnd),
     ...announces.map((x) => x.end),
-    cardFx ? cardFx.at + Math.round(2400 / speed) : 0,
+    cardFx ? cardFx.at + Math.round(2200 / speed) : 0,
     ...Object.values(reacts).map((r) => r.until),
   );
   const animationEndsAt = reducedMotion ? 0 : Math.max(
@@ -148,13 +149,13 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     // đặt mặt quân cờ (vòng tròn avatar) nằm giữa ô để nhìn rõ quân đang ở ô nào; mũi ghim nhô xuống dưới
     return { x: r.x + r.w / 2, y: r.y + r.h / 2 + pawnBase * 0.24 };
   };
-  const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number> } => {
-    const still = () => ({ ...cellMid(g.pos[id]), hop: 0, active: false, stepCell: null, trail: new Set<number>() });
+  const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number>; visualCell: number } => {
+    const still = (cell = g.pos[id]) => ({ ...cellMid(cell), hop: 0, active: false, stepCell: null, trail: new Set<number>(), visualCell: cell });
     if (!movement || movement.playerId !== id || serverNow >= movement.endsAt || reducedMotion) return still();
     const delay = movement.delay;
     const elapsed = serverNow - movement.startedAt - delay;
     if (elapsed <= 0 || !movement.path.length) {
-      return { ...cellMid(movement.from), hop: 0, active: true, stepCell: movement.from, trail: new Set([movement.from]) };
+      return still(movement.from);
     }
     const duration = Math.max(1, movement.endsAt - movement.startedAt - delay);
     const progress = Math.min(movement.path.length, (elapsed / duration) * movement.path.length);
@@ -168,6 +169,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       x: a.x + (b.x - a.x) * sub, y: a.y + (b.y - a.y) * sub,
       hop: Math.sin(sub * Math.PI) * 15, active: true, stepCell: to,
       trail: new Set<number>([movement.from, ...movement.path.slice(0, Math.min(movement.path.length, step + 1))]),
+      visualCell: -1,
     };
   };
   const activeMovementState = movement && moving ? tokenMoveState(movement.playerId) : null;
@@ -204,18 +206,30 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     const newLogs = g.log.filter((l) => l.id > lastLogRef.current);
     if (newLogs.length) lastLogRef.current = newLogs[newLogs.length - 1].id;
     const bankruptNow = newLogs.some((l) => l.kind === 'bankrupt');
-    // thông báo lớn: xếp hàng nối đuôi nhau, không chồng lên nhau
+    // thông báo lớn: chỉ hiện cho người liên quan và hiện nhanh, xếp hàng nối đuôi nhau
     const anns: Announce[] = [];
     const SOUND: Record<Announce['kind'], Parameters<typeof play>[0]> = { buy: 'stamp', reward: 'win', loss: 'sad', build: 'cash', bankrupt: 'boom' };
     const announce = (kind: Announce['kind'], at: number, data: Omit<Announce, 'id' | 'kind' | 'start' | 'end'>) => {
       const start = Math.max(at, lastAnnEnd.current);
-      const dur = Math.round((ANNOUNCE_MS[kind] / speed) * (start > at + 800 ? 0.72 : 1));
-      lastAnnEnd.current = start + dur + 100;
+      const dur = Math.round((ANNOUNCE_MS[kind] / speed) * (start > at + 500 ? 0.72 : 1));
+      lastAnnEnd.current = start + dur + 60;
       anns.push({ id: seqId(), kind, start, end: start + dur, ...data });
       later(start - t0, () => play(SOUND[kind]));
     };
-    const idOfName = (text: string) => Object.keys(g.names).find((id) => text.startsWith(g.names[id]));
+    // khớp tên dài trước ("An 2" trước "An") và phải theo sau bởi khoảng trắng để tránh trùng tiền tố
+    const sortedIds = Object.keys(g.names).sort((a, b) => (g.names[b]?.length ?? 0) - (g.names[a]?.length ?? 0));
+    const idOfName = (text: string) => sortedIds.find((id) => {
+      const name = g.names[id];
+      return !!name && (text === name || text.startsWith(`${name} `) || text.startsWith(`${name},`));
+    });
+    const parseXu = (s: string): number | null => {
+      const m = s.match(/([\d.]+)\s*xu/);
+      if (!m) return null;
+      const n = Number(m[1].replace(/\./g, ''));
+      return Number.isFinite(n) ? n : null;
+    };
     const cur = g.currentPlayerId ?? '';
+    const passedStartIds = new Set(newLogs.filter((l) => l.kind === 'start').map((l) => idOfName(l.text) ?? cur));
     // đất & nhà
     for (let i = 0; i < TYPHU_BOARD.length; i++) {
       const owner = g.owners[i];
@@ -238,58 +252,98 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       prevHousesRef.current[i] = houses;
     }
     for (const l of newLogs) {
-      const mine = l.text.startsWith(g.names[me] ?? '\u0000');
       const who = idOfName(l.text) ?? cur;
+      const mine = who === me;
       if (l.kind === 'rent') {
-        const ids = Object.keys(deltas);
-        const payer = ids.find((id) => deltas[id] < 0);
-        const taker = ids.find((id) => deltas[id] > 0);
+        const payer = who;
+        const taker = sortedIds.find((id) => l.text.endsWith(` cho ${g.names[id]}`))
+          ?? Object.keys(deltas).find((id) => id !== payer && deltas[id] > 0);
+        const amount = parseXu(l.text) ?? (taker ? Math.abs(deltas[taker] ?? 0) : 0);
         const delay = msUntilArrive();
-        if (payer && taker) {
+        if (payer && taker && amount > 0) {
           consumed.add(payer); consumed.add(taker);
-          adds.push({ k: 'rent', id: seqId(), at: t0 + delay, from: wealthRectOf(payer), to: wealthRectOf(taker), fromId: payer, toId: taker, amount: deltas[taker] });
+          adds.push({ k: 'rent', id: seqId(), at: t0 + delay, from: wealthRectOf(payer), to: wealthRectOf(taker), fromId: payer, toId: taker, amount });
           const cellName = TYPHU_BOARD[g.pos[payer]]?.name ?? '';
           if (taker === me) {
-            announce('reward', t0 + delay, { title: `${nameOf(payer)} trả tiền thuê ${cellName}`, amount: deltas[taker], portrait: portraitUriOf(taker), color: colorOf(taker) });
-          } else {
-            announce('loss', t0 + delay, { title: payer === me ? `Bạn trả tiền thuê ${cellName}` : `${nameOf(payer)} trả tiền thuê ${cellName}`, sub: `cho ${nameOf(taker)}`, amount: -deltas[taker], portrait: portraitUriOf(payer), color: colorOf(payer) });
+            announce('reward', t0 + delay, { title: `${nameOf(payer)} trả tiền thuê ${cellName}`, amount, portrait: portraitUriOf(taker), color: colorOf(taker) });
+          } else if (payer === me) {
+            announce('loss', t0 + delay, { title: `Bạn trả tiền thuê ${cellName}`, sub: `cho ${nameOf(taker)}`, amount: -amount, portrait: portraitUriOf(payer), color: colorOf(payer) });
           }
         }
       } else if (l.kind === 'start') {
-        announce('reward', t0 + msUntilReach(0), { title: `${nameOf(who)} qua Xuất phát`, amount: 200, portrait: portraitUriOf(who), color: colorOf(who) });
+        const reach = t0 + msUntilReach(0);
+        adds.push({ k: 'start', id: seqId(), at: reach });
+        if (mine) {
+          announce('reward', reach, { title: 'Qua Xuất phát!', amount: 200, portrait: portraitUriOf(who), color: colorOf(who) });
+        }
       } else if (l.kind === 'card') {
-        const d = deltas[cur];
         const text = g.card?.text ?? l.text;
-        if (d > 0) announce('reward', t0 + msUntilArrive() + Math.round(600 / speed), { title: 'Thẻ may mắn!', sub: text, amount: d, portrait: portraitUriOf(cur), color: colorOf(cur) });
-        else if (d < 0) announce('loss', t0 + msUntilArrive() + Math.round(600 / speed), { title: 'Thẻ xui xẻo!', sub: text, amount: d, portrait: portraitUriOf(cur), color: colorOf(cur) });
+        const parsed = parseXu(text) ?? 0;
+        const netWho = (deltas[who] ?? 0) - (passedStartIds.has(who) ? 200 : 0);
+        const cardDelta = /Nhận|thưởng|hoàn thuế|học bổng/i.test(text) ? parsed
+          : /nộp phạt|tiêu|Viện phí/i.test(text) ? -parsed
+          : netWho;
+        const cardAt = t0 + (movement?.kind === 'card' ? 0 : msUntilArrive()) + Math.round(450 / speed);
+        if (mine) {
+          if (cardDelta > 0) announce('reward', cardAt, { title: 'Thẻ may mắn!', sub: text, amount: cardDelta, portrait: portraitUriOf(who), color: colorOf(who) });
+          else if (cardDelta < 0) announce('loss', cardAt, { title: 'Thẻ xui xẻo!', sub: text, amount: cardDelta, portrait: portraitUriOf(who), color: colorOf(who) });
+        } else if (/mỗi người/i.test(text) && (deltas[me] ?? 0) !== 0) {
+          const myDelta = deltas[me];
+          if (myDelta > 0) announce('reward', cardAt, { title: `${nameOf(who)} mừng cưới!`, sub: text, amount: myDelta, portrait: portraitUriOf(me), color: colorOf(me) });
+          else if (myDelta < 0) announce('loss', cardAt, { title: `Mừng sinh nhật ${nameOf(who)}`, sub: text, amount: myDelta, portrait: portraitUriOf(me), color: colorOf(me) });
+        }
       } else if (l.kind === 'tax') {
-        const d = deltas[who];
-        announce('loss', t0 + msUntilArrive(), { title: TYPHU_BOARD[g.pos[who] ?? 0]?.name ?? 'Thuế', sub: 'Tiền vào hũ ở ô Nghỉ chân', amount: d ?? 0, portrait: portraitUriOf(who), color: colorOf(who) });
+        const amount = -(parseXu(l.text) ?? Math.abs(deltas[who] ?? 0));
+        if (mine) {
+          announce('loss', t0 + msUntilArrive(), { title: TYPHU_BOARD[g.pos[who] ?? 0]?.name ?? 'Thuế', sub: 'Tiền vào hũ ở ô Nghỉ chân', amount, portrait: portraitUriOf(who), color: colorOf(who) });
+        }
       } else if (l.kind === 'pot') {
-        announce('reward', t0 + msUntilArrive(), { title: `${nameOf(who)} ăn trọn hũ Nghỉ chân`, amount: deltas[who] ?? 0, portrait: portraitUriOf(who), color: colorOf(who) });
+        const amount = parseXu(l.text) ?? Math.max(0, deltas[who] ?? 0);
+        if (mine) {
+          announce('reward', t0 + msUntilArrive(), { title: 'Bạn ăn trọn hũ Nghỉ chân!', amount, portrait: portraitUriOf(who), color: colorOf(who) });
+        }
       } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
         const delay = msUntilArrive();
         adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: TYPHU_JAIL });
-        announce('loss', t0 + delay, { title: 'VÀO TÙ!', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
         later(delay, () => play('siren'));
         feed(l.text, 'bad');
-        if (mine) shake();
+        if (mine) {
+          announce('loss', t0 + delay, { title: 'VÀO TÙ!', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
+          shake();
+        }
       } else if (l.kind === 'bankrupt') {
-        announce('bankrupt', t0 + msUntilArrive(), { title: l.text, portrait: portraitUriOf(who), color: colorOf(who) });
+        const delay = msUntilArrive();
+        adds.push({ k: 'bankrupt', id: seqId(), at: t0 + delay, name: nameOf(who) });
+        const creditorMe = !!g.names[me] && l.text.includes(`(chủ nợ: ${g.names[me]})`);
+        if (mine || creditorMe) {
+          announce('bankrupt', t0 + delay, { title: l.text, portrait: portraitUriOf(who), color: colorOf(who) });
+        }
         feed(l.text, 'bad');
       }
     }
     // người chơi chửi thề khi mất tiền, sướng rơn khi được tiền
-    // chỉ phản ứng khi mất/được tiền vì dừng ô, bị thu tiền thuê, thẻ, thuế; mua đất / xây nhà thì không
-    const spenders = new Set(newLogs.filter((l) => l.kind === 'buy' || l.kind === 'build').map((l) => idOfName(l.text)).filter(Boolean));
+    // chỉ phản ứng khi mất/được tiền vì dừng ô, bị thu tiền thuê, thẻ, thuế; tự mua đất / xây nhà / nộp tiền ra tù thì không
+    const spenders = new Set(
+      newLogs
+        .filter((l) => l.kind === 'buy' || l.kind === 'build' || (l.kind === 'jail' && l.text.includes('để ra tù')))
+        .map((l) => idOfName(l.text))
+        .filter(Boolean),
+    );
+    const liquidated = new Set(
+      newLogs
+        .filter((l) => l.kind === 'info' && l.text.includes('bán '))
+        .map((l) => idOfName(l.text))
+        .filter(Boolean),
+    );
     const ids = Object.keys(deltas).filter((id) => !spenders.has(id));
     if (ids.length) {
       // nói sau khi thông báo to của sự kiện này tắt
-      const start = anns.length && !reducedMotion ? Math.max(t0, lastAnnEnd.current - 400) : t0;
+      const start = anns.length && !reducedMotion ? Math.max(t0, lastAnnEnd.current - 250) : t0;
       const picked: Record<string, Reaction> = {};
       for (const id of ids) {
-        const lines = deltas[id] < 0 ? REACT_LOSS : REACT_GAIN;
-        picked[id] = { text: lines[(seqId() * 7 + Math.abs(deltas[id])) % lines.length], kind: deltas[id] < 0 ? 'loss' : 'gain', from: start, until: start + Math.round(2400 / speed) };
+        const isLoss = deltas[id] < 0 || liquidated.has(id);
+        const lines = isLoss ? REACT_LOSS : REACT_GAIN;
+        picked[id] = { text: lines[(seqId() * 7 + Math.abs(deltas[id])) % lines.length], kind: isLoss ? 'loss' : 'gain', from: start, until: start + Math.round(2200 / speed) };
       }
       setReacts((o) => ({ ...o, ...picked }));
     }
@@ -300,7 +354,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     }
     if (g.card && g.card.id !== (cardFx?.id ?? 0)) {
       const kindCell = TYPHU_BOARD[movement?.kind === 'card' ? movement.from : g.pos[g.currentPlayerId ?? ''] ?? 0];
-      const delay = msUntilArrive();
+      const delay = movement?.kind === 'card' ? 0 : msUntilArrive();
       setCardFx({ id: g.card.id, text: g.card.text, title: kindCell?.kind === 'community' ? 'KHÍ VẬN' : 'CƠ HỘI', at: t0 + delay });
       later(delay, () => play('flip'));
     }
@@ -370,15 +424,21 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     if (f.k === 'float') flash[f.who] = f.delta > 0 ? 'gain' : 'loss';
   }
 
-  // quân cờ: chia chỗ khi nhiều người chung một ô
+  // quân cờ: chia chỗ khi nhiều người chung một ô (hỗ trợ tối đa 6 người)
   const alive = g.order.filter((id) => !g.bankrupt.includes(id));
+  const moveStates = Object.fromEntries(alive.map((id) => [id, tokenMoveState(id)]));
+  const isParticipant = g.order.includes(me);
+  const canChangeSpeed = isParticipant && !g.bankrupt.includes(me);
   const offsetsFor = (n: number, size: number, cellW: number): [number, number][] => {
     const dx = Math.min(size * 0.5, cellW * 0.32);
     const dy = size * 0.3;
     if (n === 1) return [[0, 0]];
     if (n === 2) return [[-dx, 0], [dx, 0]];
     if (n === 3) return [[-dx, -dy], [dx, -dy], [0, dy]];
-    return [[-dx, -dy], [dx, -dy], [-dx, dy], [dx, dy]];
+    if (n === 4) return [[-dx, -dy], [dx, -dy], [-dx, dy], [dx, dy]];
+    const dx3 = Math.min(size * 0.56, cellW * 0.36);
+    if (n === 5) return [[-dx3, -dy], [0, -dy], [dx3, -dy], [-dx * 0.7, dy], [dx * 0.7, dy]];
+    return [[-dx3, -dy], [0, -dy], [dx3, -dy], [-dx3, dy], [0, dy], [dx3, dy]];
   };
 
   return (
@@ -474,20 +534,21 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 onAct={(a) => void act({ type: a })}
                 speed={speed}
                 onRules={() => setRulesOpen(true)}
-                onSpeed={() => { const next = speedRef.current >= 3 ? 1 : speedRef.current + 1; speedRef.current = next; void act({ type: 'speed', value: next }); }}
+                onSpeed={canChangeSpeed ? () => { const next = speedRef.current >= 3 ? 1 : speedRef.current + 1; speedRef.current = next; void act({ type: 'speed', value: next }); } : undefined}
                 onCell={setDetail}
-                onPlayer={(id) => { if (id !== me) setThrowAt(id); }}
+                onPlayer={(id) => { if (isParticipant && id !== me) setThrowAt(id); }}
               />
             </View>
           </View>
 
           {/* quân cờ */}
           {alive.map((id) => {
-            const st = tokenMoveState(id);
-            const here = alive.filter((o) => g.pos[o] === g.pos[id]);
+            const st = moveStates[id];
+            const here = st.visualCell >= 0 ? alive.filter((o) => moveStates[o].visualCell === st.visualCell) : [id];
             const stacked = !st.active && here.length > 1;
-            const size = pawnBase * (stacked ? 0.84 : 1);
-            const off = stacked ? offsetsFor(Math.min(4, here.length), size, geo.rect[g.pos[id]].w)[Math.min(3, here.indexOf(id))] : [0, 0];
+            const size = pawnBase * (stacked ? (here.length > 4 ? 0.76 : 0.84) : 1);
+            const cellRect = geo.rect[st.visualCell >= 0 ? st.visualCell : g.pos[id]];
+            const off = stacked ? offsetsFor(Math.min(6, here.length), size, cellRect.w)[Math.min(5, here.indexOf(id))] : [0, 0];
             return (
               <Pawn
                 key={id}
@@ -510,7 +571,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         </View>
 
         {/* bảng thông tin nổi khi tới ô mua được hoặc được xây nhà (không nghiêng theo bàn) */}
-        {myTurn && !moving && !activeAnn && (g.step === 'buy' || g.step === 'upgrade') && (
+        {myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade') && (
           <DecisionCard
             g={g}
             me={me}
@@ -569,7 +630,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   testID="build-btn"
                   icon="🏠"
                   title={`Xây ${(g.houses[detail] ?? 0) === TYPHU_MAX_HOUSES - 1 ? 'khách sạn' : 'nhà'} (${fmt(TYPHU_GROUPS[d.group].house)} xu)`}
-                  onPress={() => act({ type: 'build', cell: detail })}
+                  onPress={() => { void act({ type: 'build', cell: detail }).then((ok) => { if (ok) setDetail(null); }); }}
                 />
               )}
             </View>

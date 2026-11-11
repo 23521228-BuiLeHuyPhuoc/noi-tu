@@ -9,7 +9,7 @@ import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { AuthSheet, ProfileCard, ProfileSheet } from '../components/Account';
 
-const GAMES: GameType[] = ['wordchain', 'baucua', 'typhu', 'ludo'];
+const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
 export function HomeScreen({ game }: { game: Game }) {
   const [name, setName] = useState('');
@@ -70,7 +70,7 @@ export function HomeScreen({ game }: { game: Game }) {
       <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <T style={styles.logo}>Xóm Lầy</T>
-          <T style={styles.tagline}>Nối từ, bầu cua, cờ tỷ phú. Rủ bạn bè vào chơi ngay trên điện thoại.</T>
+          <T style={styles.tagline}>Nối từ Việt – Anh, bầu cua, cờ tỷ phú. Rủ bạn bè vào chơi ngay trên điện thoại.</T>
         </View>
 
         {!online && (

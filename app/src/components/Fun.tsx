@@ -12,7 +12,7 @@ import type { Game } from '../useGame';
 import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '../messages';
 import { ROACH_URI } from '../avatars';
 import { setCharm, setDoodle, setMood, setNick } from '../funState';
-import { useKeyboardInset, useOnNew } from '../hooks';
+import { ViewportContext, useKeyboardInset, useOnNew } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -44,13 +44,16 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
-/** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` */
-export function rectOf(testId: string, origin: DOMRect | null): Rect | null {
+/** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` (hỗ trợ cả màn hình xoay ngang 90° bởi Rotator) */
+export function rectOf(testId: string, origin: DOMRect | null, rotated = false): Rect | null {
   if (typeof document === 'undefined' || !origin) return null;
   const el = document.querySelector(`[data-testid="${testId}"]`);
   if (!el) return null;
   const r = el.getBoundingClientRect();
   if (r.width === 0) return null;
+  if (rotated) {
+    return { x: r.top - origin.top, y: origin.right - r.right, w: r.height, h: r.width };
+  }
   return { x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height };
 }
 
@@ -248,6 +251,12 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   const seq = useRef(0);
   const feed = useFeed();
   const shake = useShake();
+  const vp = useContext(ViewportContext);
+  const rotated = !!vp?.rotated;
+  const rotatedRef = useRef(rotated);
+  useEffect(() => {
+    rotatedRef.current = rotated;
+  }, [rotated]);
   const playersRef = useRef(players);
   useEffect(() => {
     playersRef.current = players;
@@ -267,7 +276,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   // tin nhắn mới: bong bóng dưới avatar người gửi
   useOnNew(chat, (m) => {
     if (m.from !== game.me) play('chat');
-    const at = rectOf(`avatar-${m.from}`, origin());
+    const at = rectOf(`avatar-${m.from}`, origin(), rotatedRef.current);
     if (at) say({ from: m.from, name: m.from === game.me ? 'Bạn' : m.name, text: m.kind === 'sticker' ? (stickerOf(m.stickerId)?.alt ?? 'Nhãn dán') : m.text, stickerId: m.stickerId, at, chat: true });
   });
 
@@ -275,12 +284,13 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
     return game.onFun((e: FunEvent) => {
       const origin = (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
-      const fromR = rectOf(`avatar-${e.from}`, origin);
+      const rot = rotatedRef.current;
+      const fromR = rectOf(`avatar-${e.from}`, origin, rot);
       const toMe = 'to' in e && e.to === game.me;
       const from = nameOf(e.from);
       if (e.kind === 'throw') {
         const emoji = emojiOf(e.item);
-        const toR = rectOf(`avatar-${e.to}`, origin);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
         const nice = e.item === 'hoa' || e.item === 'tim';
         const hit = () => {
           setMood(e.to, nice ? 'smug' : 'shock', 2200);
@@ -317,7 +327,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         else feed(`${from}: ${e.emoji}`, 'fun');
       } else if (e.kind === 'hit') {
         const move = HITS.find((h) => h.move === e.move) ?? HITS[0];
-        const toR = rectOf(`avatar-${e.to}`, origin);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
         const damage = e.damage ?? 0;
         const land = () => {
           setMood(e.to, 'dizzy', 3000);
@@ -350,7 +360,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         feed(quip.honk(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'cry') {
         setMood(e.to, 'cry', 6000);
-        const toR = rectOf(`avatar-${e.to}`, origin);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '😭', at: toR });
         play('sad');
         feed(quip.cry(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');

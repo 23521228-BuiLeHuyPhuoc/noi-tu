@@ -57,7 +57,7 @@ export const HITS: { move: HitMove; emoji: string; name: string }[] = [
 
 export const GAME_META: Record<GameType, { emoji: string; tagline: string; players: string }> = {
   wordchain: { emoji: '🔤', tagline: 'con mèo → mèo mướp → mướp đắng…', players: '1–6 người' },
-  ludo: { emoji: '🐴', tagline: 'Đổ xúc xắc, đá ngựa nhau về chuồng', players: '2–4 người' },
+  wordchain_en: { emoji: '🇬🇧', tagline: 'art → tits → sex… nối chữ cái cuối', players: '1–6 người' },
   baucua: { emoji: '🦀', tagline: 'Đặt cược, máy lắc bát, mở bát. Xu ảo thôi!', players: '1–6 người' },
   typhu: { emoji: '🏦', tagline: 'Mua đất Sài Gòn, Hà Nội, xây khách sạn, thu tiền thuê', players: '2–6 người' },
 };
@@ -69,10 +69,11 @@ export const RULES: Record<GameType, string[]> = {
     'Mỗi người có 1 quyền Cứu trợ để xem gợi ý.',
     'Từ đúng mà từ điển chưa có? Bấm "Xin duyệt", cả phòng đồng ý là được tính và lưu luôn.',
   ],
-  ludo: [
-    'Đổ 1 hoặc 6 mới được ra quân. Đổ 6 được đổ thêm.',
-    'Không được nhảy qua đầu ngựa khác. Dừng đúng ô đối thủ là đá về chuồng.',
-    'Về đích phải đổ vừa đủ. Ai đưa hết ngựa về trước thì thắng.',
+  wordchain_en: [
+    'Nối từ đơn tiếng Anh: chữ cái đầu của từ sau phải trùng chữ cái cuối của từ trước (vd: art → tits → sex).',
+    'Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bay màu.',
+    'Có chú thích nghĩa tiếng Việt cho từng từ. Mỗi người có 1 quyền Cứu trợ để xem gợi ý.',
+    'Từ đúng mà từ điển chưa có? Bấm "Xin duyệt", cả phòng đồng ý là được tính và lưu luôn.',
   ],
   baucua: [
     'Mỗi người có 1.000 xu ảo. Chạm vào con vật để đặt cược. Hết 20 giây máy tự lắc.',

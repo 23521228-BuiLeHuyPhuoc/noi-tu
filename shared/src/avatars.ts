@@ -22,63 +22,116 @@ export const AVATAR_PRESETS: readonly CharacterConfig[] = [
   { gender: 'khac', age: 'nhi', hair: 'maibang', color: 7, accessory: 'bangdo', skin: 2, face: 'nhon', build: 'gay', eyes: 'to', brows: 'lieu', look: { gaze: 'phai', mouth: 'he' } },
   { gender: 'nam', age: 'nhi', hair: 'afro', color: 6, accessory: 'bangcanhan', skin: 5, face: 'bau', build: 'mum', look: { volume: 'cao', mouth: 'cuoirang' } },
   { gender: 'khac', age: 'trung', hair: 'buicu', color: 1, accessory: 'ria', skin: 0, face: 'dai', build: 'vua', eyes: 'motmi', brows: 'ray', look: { asym: 'co', gaze: 'trai' } },
-  // 16..25: 10 nhân vật hài chất meme do Xóm Lầy tự sáng tác, không dựa trên người thật nào
+  // 16..25: 10 nhân vật thực tế & idol mạng đặc sắc (Cô Phương Hằng, Chị Phiến, Thầy Huấn, Khá Bảnh, Lộc Fuho, Bà Tân Vlog, Thông Soái Ca...)
   {
+    // 16: Cô Phương Hằng — áo trắng cổ bèo, tóc buộc thấp có tóc con, bông tai kim cương to, nhẫn hoa kim cương, đồng hồ bạc, hai tay đan trước ngực
     gender: 'nu', age: 'trung', hair: 'buocthap', color: 7, accessory: 'none', outfit: 'beo', detail: 'notruoi',
-    skin: 2, face: 'ovaldai', build: 'vua', eyes: 'to', brows: 'lieu',
-    look: { liner: 'co', lipcolor: 'do', lipthick: 'day', mouth: 'he', earring: 'da', ring: 'hoa', watch: 'bac', maphan: 'co', babyhair: 'co', molepos: 'moi', tilt: 'phai', pose: 'chumnguc' },
+    skin: 1, face: 'ovaldai', build: 'vua', eyes: 'to', brows: 'lieu',
+    look: {
+      liner: 'co', lipcolor: 'do', lipthick: 'day', mouth: 'he',
+      earring: 'da', ring: 'hoa', watch: 'bac',
+      maphan: 'co', nepcuoi: 'co', babyhair: 'co', molepos: 'moi',
+      nose: 'ro', volume: 'cao', tilt: 'phai', pose: 'chumnguc',
+    },
   },
   {
-    gender: 'nam', age: 'tre', hair: 'chaingoc', color: 5, accessory: 'muihe', outfit: 'aohoa', detail: 'ranghe',
-    skin: 3, face: 'ovalvuong', build: 'vua', eyes: 'to',
-    look: { browshape: 'gap', browthick: 'day', mouth: 'cuoitu', asym: 'co', gaze: 'trai', volume: 'cao', nepcuoi: 'co', tilt: 'trai' },
+    // 17: Chị Phiến — tóc chải ngược phồng cao + lọn xoăn gáy, áo thun xanh rừng, găng tay nilon trong suốt, bông tai hoa, nốt ruồi má, nụ cười đặc trưng
+    gender: 'nu', age: 'tre', hair: 'chaingoc', color: 2, accessory: 'none', outfit: 'thun', detail: 'notruoi',
+    skin: 3, face: 'ovalvuong', build: 'vua', eyes: 'to', brows: 'ray',
+    look: {
+      jaw: 'ro', cheek: 'go', browshape: 'gap', browthick: 'vua', liner: 'co',
+      mouth: 'cuoirang', lipcolor: 'cam', lipthick: 'duoi',
+      asym: 'co', gaze: 'trai', volume: 'cao', babyhair: 'co', haircolor: 'nauden',
+      outfitcolor: 'xanhrung', glove: 'co', earring: 'hoa', molepos: 'ma',
+      nose: 'ro', tilt: 'trai', pose: 'chongcam',
+    },
   },
   {
-    gender: 'nu', age: 'trung', hair: 'bui', color: 0, accessory: 'nonla', outfit: 'dayvang', detail: 'notruoi',
-    skin: 6, face: 'ovalngan', build: 'mum', eyes: 'motmi', brows: 'ray',
-    look: { jaw: 'ro', cheek: 'go', browshape: 'gap', browthick: 'day', mouth: 'he', nostril: 'rong', earring: 'hoa', glove: 'co', molepos: 'ma' },
+    // 18: Thầy Huấn Hoa Hồng — tóc vuốt lệch undercut sát 2 bên, sơ mi trắng mở cổ, kính đen, đồng hồ bạc, nhẫn kim cương, hình xăm, tay chống cằm giảng đạo lý
+    gender: 'nam', age: 'trung', hair: 'vuotlech', color: 3, accessory: 'kinhden', outfit: 'somi', detail: 'malum',
+    skin: 2, face: 'vuong', build: 'khoe', eyes: 'macdinh', brows: 'ray',
+    look: {
+      jaw: 'ro', sides: 'sat', volume: 'cao', part: 'lech',
+      ria: 'manh', raucam: 'manh', mouth: 'cuoirang', nose: 'ro',
+      watch: 'bac', ring: 'hoa', tattoo: 'co', tattoosize: 'vaibap', tattooside: 'phai',
+      pose: 'chongcam',
+    },
   },
   {
-    gender: 'nam', age: 'nhi', hair: 'nam', color: 3, accessory: 'mahong', outfit: 'thun', detail: 'tannhang',
-    skin: 4, face: 'bau', build: 'mum', eyes: 'hip',
-    look: { cheek: 'phinh', chin: 'bo', neck: 'day', mouth: 'cuoitu', nosetip: 'day', outfitcolor: 'xanhrung' },
+    // 19: Khá Bảnh Múa Quạt — tóc bờm ngựa mohican dựng cao, áo hoa sặc sỡ, băng cá nhân, hình xăm bắp tay, khoanh tay cực ngầu
+    gender: 'nam', age: 'tre', hair: 'mohican', color: 5, accessory: 'bangcanhan', outfit: 'aohoa', detail: 'longmay',
+    skin: 4, face: 'nhon', build: 'vua', eyes: 'to', brows: 'ray',
+    look: {
+      jaw: 'ro', browshape: 'gap', browthick: 'day', mouth: 'cuoirang',
+      volume: 'cao', sides: 'sat', tattoo: 'co', tattoosize: 'vaibap', tattooside: 'trai',
+      watch: 'toi', pose: 'baochan',
+    },
   },
   {
-    gender: 'nam', age: 'trung', hair: 'dungchom', color: 2, accessory: 'none', outfit: 'balden', detail: 'longmay',
+    // 20: Lộc Fuho — phụ hồ chân chất, tóc đinh dựng chỏm, áo ba lỗ đen khoét sâu, da rám nắng khỏe khoắn, râu ria, đồng hồ thể thao đen
+    gender: 'nam', age: 'trung', hair: 'dungchom', color: 1, accessory: 'none', outfit: 'balden', detail: 'longmay',
     skin: 7, face: 'vuong', build: 'khoe', brows: 'ray',
-    look: { jaw: 'ro', chin: 'rong', neck: 'day', ria: 'vua', raucam: 'vua', rauham: 'vua', mouth: 'cuoirang', tattoo: 'co', tattoosize: 'vaibap', tattooside: 'trai', watch: 'toi' },
+    look: {
+      jaw: 'ro', chin: 'rong', neck: 'day',
+      ria: 'vua', raucam: 'vua', rauham: 'vua',
+      mouth: 'cuoirang', nose: 'ro', nostril: 'rong',
+      tattoo: 'co', tattoosize: 'vaibap', tattooside: 'trai', watch: 'toi', pose: 'baochan',
+    },
   },
   {
-    gender: 'nam', age: 'tre', hair: 'vuotlech', color: 1, accessory: 'bangcanhan', outfit: 'dongphuc', detail: 'tannhang',
-    skin: 1, face: 'dai', build: 'gay', eyes: 'hip',
-    look: { eyeshape: 'nho', open: 'tru', gaze: 'phai', part: 'lech', volume: 'cao', haircolor: 'nau', mouth: 'khep', tilt: 'trai' },
+    // 21: Bà Tân Vlog — nón lá truyền thống, áo bà ba chấm bi, tóc búi, nụ cười hiền hậu siu to khổng lồ
+    gender: 'nu', age: 'lao', hair: 'bui', color: 6, accessory: 'nonla', outfit: 'dobo', detail: 'notruoi',
+    skin: 8, face: 'ovalngan', build: 'gay', eyes: 'hip', brows: 'macdinh',
+    look: {
+      nepcuoi: 'co', cheek: 'go', mouth: 'cuoirang',
+      nose: 'ro', nostril: 'rong', earring: 'hoa', molepos: 'cam', pose: 'chumnguc',
+    },
   },
   {
-    gender: 'nam', age: 'tre', hair: 'undercut', color: 4, accessory: 'kinhden', outfit: 'somi', detail: 'malum',
-    skin: 0, face: 'nhon', build: 'vua',
-    look: { jaw: 'ro', sides: 'sat', volume: 'cao', ria: 'manh', raucam: 'manh', mouth: 'cuoirang', watch: 'bac', tattoo: 'co', tattooside: 'phai', pose: 'chongcam' },
+    // 22: Thông Soái Ca — tóc highlight vàng rực, kính râm đen, dây chuyền vàng to bản, răng khểnh thương hiệu "những thằng khác ngại tán em..."
+    gender: 'nam', age: 'tre', hair: 'highlight', color: 4, accessory: 'kinhden', outfit: 'dayvang', detail: 'ranghe',
+    skin: 6, face: 'dai', build: 'gay', eyes: 'hip', brows: 'ray',
+    look: {
+      jaw: 'ro', chin: 'nho', browshape: 'gap', mouth: 'cuoirang',
+      haircolor: 'highlight', volume: 'cao', ria: 'manh',
+      watch: 'bac', ring: 'hoa', tilt: 'trai', pose: 'chongcam',
+    },
   },
   {
-    gender: 'nam', age: 'lao', hair: 'dinh', color: 6, accessory: 'nonbh', outfit: 'aomua', detail: 'longmay',
-    skin: 8, face: 'oval', build: 'gay', eyes: 'motmi', brows: 'ray',
-    look: { nepcuoi: 'co', ria: 'vua', raucam: 'manh', nose: 'ro', nostril: 'rong', mouth: 'khep' },
+    // 23: Chị Đại Chợ Lớn — tóc xoăn bồng bềnh, dây chuyền vàng + nhẫn kim cương + khuyên tai hoa vàng, môi đỏ mọng
+    gender: 'nu', age: 'trung', hair: 'xoan', color: 0, accessory: 'mahong', outfit: 'dayvang', detail: 'notruoi',
+    skin: 3, face: 'tron', build: 'mum', eyes: 'motmi', brows: 'lieu',
+    look: {
+      cheek: 'day', browshape: 'cong', liner: 'co',
+      lipcolor: 'do', lipthick: 'day', mouth: 'he',
+      earring: 'hoa', ring: 'hoa', watch: 'bac', maphan: 'co', molepos: 'moi', pose: 'chongcam',
+    },
   },
   {
-    gender: 'nu', age: 'tre', hair: 'maibang', color: 2, accessory: 'taitho', outfit: 'dobo', detail: 'malum',
-    skin: 2, face: 'tron', build: 'mum', eyes: 'hip', brows: 'lieu',
-    look: { open: 'nheo', cheek: 'phinh', babyhair: 'co', mouth: 'he', maphan: 'co' },
+    // 24: Thánh Mukbang — má phính hồng hào, tóc nấm, đeo găng tay nilon chuẩn bị chén sạch bàn tiệc
+    gender: 'nam', age: 'tre', hair: 'nam', color: 5, accessory: 'mahong', outfit: 'dongphuc', detail: 'tannhang',
+    skin: 1, face: 'bau', build: 'mum', eyes: 'to',
+    look: {
+      cheek: 'phinh', chin: 'bo', neck: 'day',
+      mouth: 'cuoirang', lipcolor: 'cam', lipthick: 'day', nosetip: 'tron',
+      glove: 'co', pose: 'chumnguc',
+    },
   },
   {
+    // 25: Idol Cầu Vồng — tóc dài highlight + mảng tóc cầu vồng, vest bóng sang chảnh, khuyên tai kim cương lấp lánh
     gender: 'lgbt', age: 'tre', hair: 'dailung', color: 6, accessory: 'pridetoc', outfit: 'vestbong', detail: 'notruoi',
-    skin: 5, face: 'xoan', build: 'vua',
-    look: { haircolor: 'highlight', liner: 'co', lipcolor: 'cam', mouth: 'cuoitu', earring: 'da', molepos: 'cam', tilt: 'phai' },
+    skin: 2, face: 'xoan', build: 'vua', eyes: 'to', brows: 'lieu',
+    look: {
+      haircolor: 'highlight', liner: 'co', lipcolor: 'do', lipthick: 'day', mouth: 'cuoitu',
+      earring: 'da', ring: 'hoa', maphan: 'co', babyhair: 'co', molepos: 'ma', tilt: 'phai', pose: 'chongcam',
+    },
   },
 ];
 
 /** Tên gọi của từng chân dung mẫu (cho chú thích) */
 export const AVATAR_PRESET_NAMES: readonly string[] = [
-  'Anh Kính Đen', 'Nàng Băng Đô', 'Cu Mũi Hề', 'Bé Tai Thỏ', 'Chú Ria', 'Chị Khẩu Trang', 'Ông Râu Kẽm', 'Bà Nón Lá',
-  'Bạn Nón Bảo Hiểm', 'Cô Má Hồng', 'Cậu Băng Cá Nhân', 'Chị Kính Đen', 'Sếp Đầu Trọc', 'Nàng Băng Đô 2', 'Cu Sẹo', 'Chú Ria Đẹp Trai',
-  'Bà Trùm Livestream', 'Danh Hài Mặt Lầy', 'Chị Đại Chợ', 'Thánh Ăn', 'Ông Chú Nhậu', 'Học Sinh Trốn Học', 'Dân Chơi Phố Cổ', 'Bác Xe Ôm',
-  'Chúa Ngủ Nướng', 'Idol Cầu Vồng',
+  'Anh Kính Đen', 'Nàng Băng Đô', 'Cu Mũi Hề', 'Bé Tai Thỏ', 'Chú Ria', 'Chị Cài Áo', 'Ông Râu Kẽm', 'Bà Nón Lá',
+  'Phượt Thủ Nón Sơn', 'Cô Má Hồng', 'Giang Hồ Băng Keo', 'Chị Kính Râm', 'Sếp Đầu Trọc', 'Bé Mái Bằng', 'Cu Tóc Xù', 'Chú Ria Lệch',
+  'Cô Phương Hằng', 'Chị Phiến', 'Thầy Huấn', 'Khá Bảnh', 'Lộc Fuho', 'Bà Tân Vlog', 'Thông Soái Ca', 'Chị Đại Chợ Lớn',
+  'Thánh Mukbang', 'Idol Cầu Vồng',
 ];

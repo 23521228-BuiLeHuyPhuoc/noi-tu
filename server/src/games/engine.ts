@@ -33,6 +33,8 @@ export interface GameEngine {
   action(playerId: string, action: GameAction): ActionResult;
   /** người chơi rời phòng giữa ván */
   removePlayer(playerId: string): void;
+  /** trạng thái kết nối của người chơi thay đổi giữa ván */
+  onPlayerConnection?(playerId: string, connected: boolean): void;
   view(): GameView;
   dispose(): void;
 }

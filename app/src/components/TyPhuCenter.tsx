@@ -98,7 +98,7 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
         </View>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={styles.rowC}>
+        <View style={[styles.rowC, { paddingRight: 26 }]}>
           <T numberOfLines={1} style={styles.wName}>{p.nameOf(id)}</T>
           {id in g.jail && <Image source={{ uri: FX_ICON.police }} style={styles.tiny} />}
           {cur && <Image source={{ uri: FX_ICON.dice }} style={styles.tiny} />}
@@ -166,44 +166,35 @@ function MyLands({ rect, p }: { rect: Rect; p: CenterProps }) {
 
 function CardView({ p, layout }: { p: CenterProps; layout: CenterLayout }) {
   const c = p.card!;
-  const t = p.reducedMotion ? 10_000 : p.now - c.at;
-  const flip = clamp(t / 550, 0, 1);
-  const dock = p.reducedMotion ? 1 : clamp((t - 1800 / (p.speed ?? 1)) / 400, 0, 1);
-  const e = dock * dock * (3 - 2 * dock);
+  const dur = Math.round(2200 / (p.speed ?? 1));
+  const t = p.reducedMotion ? 600 : p.now - c.at;
+  if (!p.reducedMotion && (t < 0 || t >= dur)) return null;
+  const flip = clamp(t / 450, 0, 1);
+  const out = p.reducedMotion ? 0 : clamp((t - (dur - 350)) / 350, 0, 1);
   const big = layout.cardBig;
   const bw = Math.min(big.w, 190);
   const bh = Math.min(big.h, 124);
-  const bigR: Rect = { x: big.x + (big.w - bw) / 2, y: big.y + (big.h - bh) / 2, w: bw, h: bh };
-  const d = layout.cardDock;
-  const r: Rect = {
-    x: bigR.x + (d.x - bigR.x) * e, y: bigR.y + (d.y - bigR.y) * e,
-    w: bigR.w + (d.w - bigR.w) * e, h: bigR.h + (d.h - bigR.h) * e,
-  };
+  const r: Rect = { x: big.x + (big.w - bw) / 2, y: big.y + (big.h - bh) / 2, w: bw, h: bh };
   const angle = (1 - flip) * 180;
   const faceUp = angle < 90;
   const chance = c.title === 'CƠ HỘI';
   const bg = chance ? '#FFE066' : '#FFB3D6';
-  const docked = e > 0.6;
   return (
     <View
       testID="typhu-card"
       pointerEvents="none"
       style={[
         abs(r), styles.card,
-        { backgroundColor: faceUp ? bg : C.son, opacity: t < 0 ? 0 : 1, zIndex: 20 },
-        { transform: [{ perspective: 600 }, { rotateY: `${angle}deg` }] } as object,
+        { backgroundColor: faceUp ? bg : C.son, opacity: 1 - out, zIndex: 20 },
+        { transform: [{ perspective: 600 }, { rotateY: `${angle}deg` }, { scale: 1 - out * 0.15 }] } as object,
       ]}
     >
       {faceUp ? (
-        docked ? (
-          <T numberOfLines={2} style={styles.cardDock}>{c.text}</T>
-        ) : (
-          <View style={{ alignItems: 'center', gap: 4, transform: [{ scaleX: 1 }] }}>
-            <T style={styles.cardTitle}>{c.title}</T>
-            <Image source={{ uri: iconUri(chance ? '2753' : '1f381') }} style={{ width: 26, height: 26 }} />
-            <T style={styles.cardText}>{c.text}</T>
-          </View>
-        )
+        <View style={{ alignItems: 'center', gap: 4, transform: [{ scaleX: 1 }] }}>
+          <T style={styles.cardTitle}>{c.title}</T>
+          <Image source={{ uri: iconUri(chance ? '2753' : '1f381') }} style={{ width: 26, height: 26 }} />
+          <T style={styles.cardText}>{c.text}</T>
+        </View>
       ) : (
         <Image source={{ uri: FX_ICON.star }} style={{ width: 34, height: 34, transform: [{ scaleX: -1 }] }} />
       )}
@@ -296,16 +287,16 @@ export function TyPhuCenter(p: CenterProps) {
         <View style={styles.btnRow}>
           {showRoll ? (
             <>
-              {p.inJail && <Button testID="pay-jail" small variant="paper" title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
+              {p.inJail && <Button testID="pay-jail" small variant="paper" disabled={(g.cash[p.me] ?? 0) < TYPHU_JAIL_FINE} title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
               <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
           ) : showBuy || showEnd ? (
             <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : 'Chọn nâng cấp nhà ở bảng thông tin'}</T>
           ) : (
-            <T style={[styles.hint, { flex: 1 }]}>{p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
+            <T style={[styles.hint, { flex: 1 }]}>{p.dice.animating ? 'Đang đổ xúc xắc...' : p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}
         </View>
-        {p.error && <T style={styles.error}>{p.error}</T>}
+        {p.error && <T numberOfLines={1} style={styles.error}>{p.error}</T>}
       </View>
 
       {g.order.map((id, i) => (
@@ -327,7 +318,7 @@ export function TyPhuCenter(p: CenterProps) {
         </View>
       )}
 
-      {p.card && g.card?.id === p.card.id && <CardView p={p} layout={L} />}
+      {p.card && (p.reducedMotion ? g.card?.id === p.card.id : p.now < p.card.at + Math.round(2200 / (p.speed ?? 1))) && <CardView p={p} layout={L} />}
     </View>
   );
 }
@@ -368,7 +359,7 @@ const styles = StyleSheet.create({
   reactTxt: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
   reactTail: { position: 'absolute', left: 16, bottom: -6, width: 10, height: 10, borderRightWidth: 2, borderBottomWidth: 2, transform: [{ rotate: '45deg' }] },
   hint: { fontSize: 11, fontWeight: '700', color: C.muted, textAlign: 'center' },
-  error: { fontSize: 11, fontWeight: '800', color: C.ink, backgroundColor: C.gold, borderRadius: 6, padding: 3, textAlign: 'center' },
+  error: { position: 'absolute', left: 6, right: 6, bottom: 42, zIndex: 10, fontSize: 11, fontWeight: '800', color: C.ink, backgroundColor: C.gold, borderRadius: 6, padding: 3, textAlign: 'center', borderWidth: 1.5, borderColor: C.ink },
   wealth: {
     flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 2, borderRadius: 11, paddingLeft: 3, paddingRight: 4,
   },
@@ -381,7 +372,7 @@ const styles = StyleSheet.create({
   wCash: { fontSize: 13, fontWeight: '900', color: '#B45309', lineHeight: 16 },
   tiny: { width: 12, height: 12 },
   landChipWide: { right: 3, top: 3 },
-  landChipNarrow: { left: 2, bottom: 1 },
+  landChipNarrow: { right: 2, top: 2 },
   landChip: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 7, paddingHorizontal: 3, height: 15, borderWidth: 1.5, borderColor: C.ink },
   landTxt: { color: '#fff', fontWeight: '900', fontSize: 11, lineHeight: 13 },
   chipsBox: { backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 11, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden' },
