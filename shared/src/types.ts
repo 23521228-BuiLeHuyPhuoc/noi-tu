@@ -332,7 +332,7 @@ export interface BauCuaView {
 
 // ================= Cờ tỷ phú =================
 
-export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'start' | 'build' | 'tax' | 'info';
+export type TyPhuLogKind = 'buy' | 'rent' | 'jail' | 'card' | 'bankrupt' | 'start' | 'build' | 'tax' | 'info' | 'pot';
 
 export interface TyPhuView {
   type: 'typhu';
@@ -348,11 +348,14 @@ export interface TyPhuView {
   owners: Record<number, string>;
   houses: Record<number, number>;
   currentPlayerId: string | null;
-  step: 'roll' | 'buy' | 'manage' | 'wait';
+  /** upgrade: vừa dừng ở đất của mình, được chọn nâng cấp nhà ngay tại ô đó */
+  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait';
   dice: [number, number] | null;
   rollId: number;
-  /** ô đang chờ quyết định mua */
+  /** ô đang chờ quyết định mua (step buy) hoặc nâng cấp (step upgrade) */
   pendingBuy: number | null;
+  /** hũ tiền ở ô Nghỉ chân: thuế và tiền phạt dồn vào, ai dừng ở đó thì ăn cả hũ */
+  pot?: number;
   turnEndsAt: number | null;
   turnSeconds: number;
   /** các dòng diễn biến gần nhất, mới nhất ở cuối */
@@ -361,6 +364,10 @@ export interface TyPhuView {
   card: { id: number; text: string } | null;
   /** các khung hình mô phỏng cú lăn xúc xắc đang diễn ra (null khi đã xong) */
   roll: DiceRollView | null;
+  /** tốc độ chơi (1, 2, 3): rút ngắn thời gian đi quân, chờ và thông báo */
+  speed?: number;
+  /** người đang tới lượt vừa đổ đôi nên được tung tiếp */
+  extraRoll?: boolean;
 }
 
 // ================= Hành động trong game =================
@@ -377,9 +384,10 @@ export type GameAction =
   | { type: 'loan' }
   | { type: 'buy' }
   | { type: 'skip' }
-  | { type: 'build'; cell: number }
+  | { type: 'build'; cell: number; levels?: number }
   | { type: 'endTurn' }
   | { type: 'payJail' }
+  | { type: 'speed'; value: number }
   | { type: 'end' };
 
 export type ActionError =

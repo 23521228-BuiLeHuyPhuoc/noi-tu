@@ -85,8 +85,8 @@ export interface TyPhuMovement {
   delay: number;
   kind: 'roll' | 'card' | 'jail';
 }
-/** mỗi ô quân cờ đi mất ~400ms; xúc xắc lăn 1,6-2,1s tuỳ mô phỏng vật lý */
-export const TYPHU_MOVE_STEP_MS = 400;
+/** mỗi ô quân cờ đi mất ~300ms (chia cho tốc độ x2, x3); xúc xắc lăn 1,6-2,1s tuỳ mô phỏng vật lý */
+export const TYPHU_MOVE_STEP_MS = 300;
 export const TYPHU_ROLL_MIN_MS = 1600;
 export const TYPHU_ROLL_MAX_MS = 2100;
 export function isTyPhuProperty(cell: TyPhuCell): cell is Extract<TyPhuCell, { price: number }> {
@@ -105,6 +105,7 @@ export const TYPHU_PASS_START = 200;
 export const TYPHU_JAIL_FINE = 50;
 export const TYPHU_MAX_HOUSES = 4; // 4 = khách sạn
 export const TYPHU_TURN_SECONDS = 20;
+export const TYPHU_SPEEDS = [1, 2, 3] as const;
 /** hệ số tiền thuê theo số nhà (1..4) */
 export const TYPHU_HOUSE_MULT = [5, 15, 30, 45];
 

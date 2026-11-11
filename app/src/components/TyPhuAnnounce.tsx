@@ -21,7 +21,7 @@ export type Announce = {
   level?: number;
 };
 
-export const ANNOUNCE_MS: Record<Announce['kind'], number> = { buy: 2100, reward: 2100, loss: 2200, build: 1900, bankrupt: 2600 };
+export const ANNOUNCE_MS: Record<Announce['kind'], number> = { buy: 1300, reward: 1400, loss: 1500, build: 1200, bankrupt: 2200 };
 const ease = (t: number) => 1 - (1 - t) * (1 - t) * (1 - t);
 const rnd = (id: number, i: number) => ((i * 7919 + id * 104729 + 13) % 1000) / 1000;
 const fmt = (n: number) => n.toLocaleString('vi-VN');

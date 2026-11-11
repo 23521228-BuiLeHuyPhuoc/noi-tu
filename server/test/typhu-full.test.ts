@@ -70,17 +70,46 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     expect(rentOf(sg, TYPHU_MAX_HOUSES, true)).toBe(c.rent * 45);
   });
 
-  it('chỉ xây khi đủ bộ màu, tối đa khách sạn, trừ đúng tiền', () => {
-    const { g, v, own } = make(2);
-    const cells = groupCells('nau');
-    own([cells[0]], 'p0');
-    expect(g.action('p0', { type: 'build', cell: cells[0] }).ok).toBe(false);
-    own(cells, 'p0');
-    for (let k = 0; k < TYPHU_MAX_HOUSES; k++) expect(g.action('p0', { type: 'build', cell: cells[0] }).ok).toBe(true);
-    expect(g.action('p0', { type: 'build', cell: cells[0] }).ok).toBe(false);
-    expect(v().houses[cells[0]]).toBe(TYPHU_MAX_HOUSES);
-    expect(v().cash.p0).toBe(1500 - TYPHU_MAX_HOUSES * TYPHU_GROUPS.nau.house);
-    expect(g.action('p1', { type: 'build', cell: cells[1] }).ok).toBe(false);
+  it('dừng ở đất của mình thì nâng cấp ngay, một lúc nhiều cấp, tối đa khách sạn', () => {
+    const { g, v, own, settle, push } = make(2);
+    own([3], 'p0');
+    expect(g.action('p0', { type: 'build', cell: 3 }).ok).toBe(false); // chưa tới ô thì chưa xây được
+    push(1, 2);
+    g.action('p0', { type: 'roll' }); settle();
+    expect(v().step).toBe('upgrade');
+    expect(g.action('p0', { type: 'build', cell: 1 }).ok).toBe(false); // chỉ ô đang đứng
+    expect(g.action('p0', { type: 'build', cell: 3, levels: 5 }).ok).toBe(false); // quá khách sạn
+    expect(g.action('p0', { type: 'build', cell: 3, levels: 2 }).ok).toBe(true);
+    expect(v().houses[3]).toBe(2);
+    expect(v().cash.p0).toBe(1500 - 2 * TYPHU_GROUPS.nau.house);
+    expect(v().step).not.toBe('upgrade');
+  });
+
+  it('khách sạn rồi thì không hỏi nâng cấp nữa; bỏ qua nâng cấp thì sang lượt', () => {
+    const { g, v, own, settle, push } = make(2);
+    own([3], 'p0', TYPHU_MAX_HOUSES);
+    push(1, 2);
+    g.action('p0', { type: 'roll' }); settle();
+    expect(v().step).not.toBe('upgrade');
+    const b = make(2, 5);
+    b.own([3], 'p0');
+    b.push(1, 2);
+    b.g.action('p0', { type: 'roll' }); b.settle();
+    expect(b.g.action('p0', { type: 'skip' }).ok).toBe(true);
+    expect(b.v().houses[3] ?? 0).toBe(0);
+  });
+
+  it('thuế và tiền phạt vào hũ, dừng Nghỉ chân thì ăn cả hũ', () => {
+    const { g, v, pl, settle, push } = make(2);
+    push(1, 3); // ô 4: thuế thu nhập 200
+    g.action('p0', { type: 'roll' }); settle();
+    expect(v().pot).toBe(200);
+    vi.advanceTimersByTime(3000);
+    pl(1).pos = 17;
+    push(1, 2); // tới ô 20 Nghỉ chân
+    g.action('p1', { type: 'roll' }); settle();
+    expect(v().cash.p1).toBe(1700);
+    expect(v().pot).toBe(0);
   });
 
   it('thiếu tiền thì tự bán nhà rồi bán đất trước khi phá sản', () => {
@@ -121,12 +150,48 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
     push(1, 2);
     g.action('p0', { type: 'roll' }); settle();
     expect(v().cash.p0).toBe(1500);
+    g.action('p0', { type: 'skip' });
     pl(1).jail = 0;
     own([6], 'p1');
     pl(0).pos = 3;
     vi.advanceTimersByTime(5000);
     const cur = v().currentPlayerId;
     expect(cur).toBe('p1');
+  });
+
+  it('phá sản vì nợ người chơi khác thì chủ nợ nhận toàn bộ đất', () => {
+    const { g, v, pl, own, settle, push } = make(2);
+    const sg = TYPHU_BOARD.findIndex((c) => c.name === 'Sài Gòn');
+    const hn = TYPHU_BOARD.findIndex((c) => c.name === 'Hà Nội');
+    own([hn, sg], 'p1', 3);
+    own([1], 'p0');
+    pl(0).cash = 50;
+    pl(0).pos = sg - 4;
+    push(1, 3);
+    g.action('p0', { type: 'roll' }); settle();
+    expect(pl(0).bankrupt).toBe(true);
+    expect(v().owners[1]).toBe('p1');
+  });
+
+  it('chỉnh tốc độ x2, x3 rút ngắn thời gian đi quân', () => {
+    const { g, v, push } = make(2);
+    expect(g.action('p1', { type: 'speed', value: 3 }).ok).toBe(true);
+    expect(v().speed).toBe(3);
+    expect(g.action('p1', { type: 'speed', value: 5 }).ok).toBe(false);
+    push(2, 3);
+    g.action('p0', { type: 'roll' });
+    const m = v().movement!;
+    expect(m.endsAt - (m as unknown as { startedAt: number }).startedAt).toBe(5 * 100);
+  });
+
+  it('đổ đôi được tung tiếp và view báo extraRoll', () => {
+    const { g, v, settle, push } = make(2);
+    push(2, 2);
+    g.action('p0', { type: 'roll' }); settle();
+    if (v().step === 'buy') g.action('p0', { type: 'skip' });
+    expect(v().currentPlayerId).toBe('p0');
+    expect(v().step).toBe('roll');
+    expect(v().extraRoll).toBe(true);
   });
 
   it('chơi ngẫu nhiên 30 ván 2-6 người không lỗi, giữ đúng các bất biến', () => {
@@ -144,10 +209,9 @@ describe('Cờ tỷ phú: luật đầy đủ', () => {
           else g.action(cur, { type: 'roll' });
         } else if (s.step === 'buy') {
           g.action(cur, { type: pickR() < 0.75 ? 'buy' : 'skip' });
-        } else if (s.step === 'manage') {
-          const mine = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' && s.owners[i] === cur ? [i] : []));
-          if (mine.length && pickR() < 0.7) g.action(cur, { type: 'build', cell: mine[Math.floor(pickR() * mine.length)] });
-          else g.action(cur, { type: 'endTurn' });
+        } else if (s.step === 'upgrade') {
+          if (pickR() < 0.7) g.action(cur, { type: 'build', cell: s.pendingBuy!, levels: 1 + Math.floor(pickR() * 2) });
+          if (v().step === 'upgrade') g.action(cur, { type: 'skip' });
         } else {
           vi.advanceTimersByTime(2000);
         }

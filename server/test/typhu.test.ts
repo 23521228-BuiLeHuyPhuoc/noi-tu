@@ -75,16 +75,20 @@ describe('Cờ tỷ phú V2', () => {
   settle(); expect(v().pendingBuy).toBe(3); expect(g.action('p0',{type:'buy'}).ok).toBe(true);
   expect(v().cash.p0).toBe(1440); expect(v().owners[3]).toBe('p0');
  });
- it('times out buying and advances the turn', () => {
+ it('does not count down while choosing to buy; only skips after a long idle', () => {
   const {g,v,settle}=make(['An','Bình'],[1,2]); g.action('p0',{type:'roll'});settle();
-  vi.advanceTimersByTime(TURN+WAIT);expect(v().currentPlayerId).toBe('p1');expect(v().owners[3]).toBeUndefined();
+  vi.advanceTimersByTime(TURN+WAIT);expect(v().step).toBe('buy');
+  vi.advanceTimersByTime(60_000+WAIT);expect(v().currentPlayerId).toBe('p1');expect(v().owners[3]).toBeUndefined();
  });
  it('charges land rent and allows full-group construction', () => {
   const {g,v,own,settle}=make(['An','Bình'],[1,2]); own([1,3],'p1');
   g.action('p0',{type:'roll'});settle();expect(v().cash.p0).toBe(1488);
   expect(rentOf(3,2,true)).toBe(90);
-  const b=make(['An','Bình']);b.own([1,3],'p0');expect(b.g.action('p0',{type:'build',cell:1}).ok).toBe(true);
-  expect(b.v().houses[1]).toBe(1);expect(b.v().cash.p0).toBe(1450);
+  // nâng cấp kiểu Cờ tỷ phú Việt: dừng ở đất của mình thì được xây ngay tại ô đó, không cần đủ bộ
+  const b=make(['An','Bình'],[1,2]);b.own([3],'p0');expect(b.g.action('p0',{type:'build',cell:3}).ok).toBe(false);
+  b.g.action('p0',{type:'roll'});b.settle();expect(b.v().step).toBe('upgrade');expect(b.v().pendingBuy).toBe(3);
+  expect(b.g.action('p0',{type:'build',cell:3}).ok).toBe(true);
+  expect(b.v().houses[3]).toBe(1);expect(b.v().cash.p0).toBe(1450);
  });
  it('buys stations and utilities and scales their rent by owned count', () => {
   expect([1,2,3,4].map(stationRent)).toEqual([25,50,100,200]);expect(utilityRent(2,7)).toBe(70);
@@ -193,7 +197,7 @@ describe('Xúc xắc 3D vật lý và nhịp chơi', () => {
     if (v.movement) {
       expect(v.movement.delay).toBe(v.roll!.ms);
       expect(v.movement.endsAt - v.movement.startedAt).toBe(v.roll!.ms + v.movement.path.length * TYPHU_MOVE_STEP_MS);
-      expect(TYPHU_MOVE_STEP_MS).toBeGreaterThanOrEqual(350);
+      expect(TYPHU_MOVE_STEP_MS).toBeGreaterThanOrEqual(250);
       expect(TYPHU_MOVE_STEP_MS).toBeLessThanOrEqual(450);
       // đồng hồ lượt chỉ chạy sau khi hoạt ảnh xong
       vi.advanceTimersByTime(v.movement.endsAt - Date.now() + 1);

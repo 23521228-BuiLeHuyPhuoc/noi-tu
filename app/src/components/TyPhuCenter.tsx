@@ -17,7 +17,7 @@ const abs = (r: Rect) => ({ position: 'absolute' as const, left: r.x, top: r.y, 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 const LOG_ICON: Record<TyPhuLogKind, string> = {
-  buy: iconUri('1f3e0'), rent: iconUri('1f4b0'), jail: iconUri('1f694'), card: iconUri('2728'),
+  buy: iconUri('1f3e0'), rent: iconUri('1f4b0'), jail: iconUri('1f694'), card: iconUri('2728'), pot: iconUri('1f36f'),
   bankrupt: iconUri('1f480'), start: iconUri('1f3c1'), build: iconUri('1f3d8'), tax: iconUri('1f4b8'), info: iconUri('2b50'),
 };
 
@@ -53,6 +53,8 @@ export interface CenterProps {
   onEnd: () => void;
   onAct: (a: 'roll' | 'buy' | 'skip' | 'endTurn' | 'payJail') => void;
   /** câu cảm thán của từng người khi tiền thay đổi */
+  speed?: number;
+  onSpeed?: () => void;
   reacts?: Record<string, { text: string; kind: 'gain' | 'loss'; from: number; until: number }>;
   onCell: (i: number) => void;
   onPlayer: (id: string) => void;
@@ -61,7 +63,7 @@ export interface CenterProps {
 function MiniBtn({ icon, label, onPress, testID, badge }: { icon: string; label: string; onPress: () => void; testID?: string; badge?: number }) {
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6} style={styles.mini}>
-      <T style={{ fontSize: 15 }}>{icon}</T>
+      <T style={{ fontSize: icon.startsWith('x') ? 13 : 15, fontWeight: '900', color: C.ink }}>{icon}</T>
       {!!badge && badge > 0 && <View style={styles.miniBadge}><T style={styles.miniBadgeTxt}>{badge > 9 ? '9+' : badge}</T></View>}
     </Pressable>
   );
@@ -165,7 +167,7 @@ function CardView({ p, layout }: { p: CenterProps; layout: CenterLayout }) {
   const c = p.card!;
   const t = p.reducedMotion ? 10_000 : p.now - c.at;
   const flip = clamp(t / 550, 0, 1);
-  const dock = p.reducedMotion ? 1 : clamp((t - 3000) / 450, 0, 1);
+  const dock = p.reducedMotion ? 1 : clamp((t - 1800 / (p.speed ?? 1)) / 400, 0, 1);
   const e = dock * dock * (3 - 2 * dock);
   const big = layout.cardBig;
   const bw = Math.min(big.w, 190);
@@ -214,7 +216,7 @@ export function TyPhuCenter(p: CenterProps) {
   const idle = !p.moving;
   const showRoll = idle && p.myTurn && g.step === 'roll';
   const showBuy = idle && p.myTurn && g.step === 'buy' && p.buyable;
-  const showEnd = idle && p.myTurn && g.step === 'manage';
+  const showEnd = idle && p.myTurn && (g.step === 'manage' || g.step === 'upgrade');
   const timeTotal = Math.max(1, g.turnSeconds);
   const hot = !p.paused && p.left <= 5;
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
@@ -228,6 +230,7 @@ export function TyPhuCenter(p: CenterProps) {
       {L.tools.h > 0 && tools && (
         <View style={[abs(L.tools), styles.tools]}>
           <MiniBtn testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
+          {p.onSpeed && <MiniBtn testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
           <MiniBtn label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
           {p.isHost && <MiniBtn testID="end-open" label="Tổng kết" icon="🏁" onPress={p.onEnd} />}
           <MiniBtn testID="leave-open" label="Rời phòng" icon="🚪" onPress={tools.leave} />
@@ -269,14 +272,6 @@ export function TyPhuCenter(p: CenterProps) {
         {L.wide && (
           <View style={[styles.statusRow, { height: statusH - 4 }]}>
             <T testID="typhu-status" numberOfLines={1} style={[styles.status, { flex: 1 }, p.myTurn && { color: '#C2410C' }]}>{p.status}</T>
-            {g.step !== 'roll' && (
-              <>
-                <View style={[styles.track, { width: 80, minWidth: 80, flexGrow: 0, flexShrink: 0 }]}>
-                  <View style={{ height: '100%', width: `${p.paused ? 100 : clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
-                </View>
-                <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
-              </>
-            )}
           </View>
         )}
         <View
@@ -303,7 +298,7 @@ export function TyPhuCenter(p: CenterProps) {
               <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
           ) : showBuy || showEnd ? (
-            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : 'Chọn xây nhà ở bảng thông tin'}</T>
+            <T style={[styles.hint, { flex: 1 }]}>{showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : 'Chọn nâng cấp nhà ở bảng thông tin'}</T>
           ) : (
             <T style={[styles.hint, { flex: 1 }]}>{p.moving ? 'Đang đi...' : cur && cur !== p.me ? `Chờ ${p.nameOf(cur)}...` : 'Chờ chút...'}</T>
           )}

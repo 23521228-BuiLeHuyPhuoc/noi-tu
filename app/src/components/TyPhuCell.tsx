@@ -24,6 +24,8 @@ export interface TyPhuCellProps {
   isTrail: boolean;
   isStepTarget: boolean;
   onPress: (i: number) => void;
+  /** hũ tiền (chỉ ô Nghỉ chân) */
+  pot?: number;
 }
 
 const BOARD_BG = '#CDE6D0';
@@ -82,7 +84,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const ring = hl ?? (owned ? p.ownerHex! : null);
   const overlay = ring ? <View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderWidth: hl ? 3 : 2.5 }]} /> : null;
   const face = owned && p.houses === 0 ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
-  const priceTxt = price === null ? (c.kind === 'start' ? '+200' : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
+  const priceTxt = price === null ? (c.kind === 'start' ? '+200' : c.kind === 'rest' ? (p.pot ? `+${p.pot}` : 'HŨ 0') : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
   const minus = c.kind === 'tax';
 
   if (p.side === 'corner') {
