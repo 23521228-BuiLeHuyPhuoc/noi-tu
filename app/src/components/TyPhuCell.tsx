@@ -81,7 +81,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const hl = p.here ? C.son : p.isStepTarget || p.isTrail ? C.gold : null;
   const ring = hl ?? (owned ? p.ownerHex! : null);
   const overlay = ring ? <View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderWidth: hl ? 3 : 2.5 }]} /> : null;
-  const face = owned ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
+  const face = owned && p.houses === 0 ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
   const priceTxt = price === null ? (c.kind === 'start' ? '+200' : '') : c.kind === 'tax' ? `-${price}` : `${price} xu`;
   const minus = c.kind === 'tax';
 

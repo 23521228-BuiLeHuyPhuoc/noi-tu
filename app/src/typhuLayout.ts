@@ -48,9 +48,10 @@ export function makeCenterLayout(w: number, h: number, n: number, _hasCard: bool
   const none: Rect = { x: 0, y: 0, w: 0, h: 0 };
   const inner = w - 2 * pad;
   const tools: Rect = { x: pad, y: pad, w: inner, h: 26 };
-  const cols = n <= 1 ? 1 : 2;
+  // 2 người: 2 cột; 3 người: 1 hàng 3 cột; 4 người: 2×2; 5-6 người: 3 cột × 2 hàng (khay xúc xắc không bị bóp)
+  const cols = n <= 2 ? Math.max(1, n) : n === 4 ? 2 : 3;
   const rows = Math.ceil(n / cols);
-  const cardH = Math.max(30, Math.min(42, (h * 0.36 - 4 * (rows - 1)) / rows));
+  const cardH = Math.max(32, Math.min(42, (h * 0.34 - 4 * (rows - 1)) / rows));
   const cardW = (inner - gap * (cols - 1)) / cols;
   const wealthH = rows * cardH + (rows - 1) * 4;
   const action: Rect = { x: pad, y: tools.y + tools.h + gap, w: inner, h: h - pad - wealthH - gap - (tools.y + tools.h + gap) };

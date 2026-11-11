@@ -111,15 +111,15 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
           )}
         </View>
       </View>
-      <View style={[styles.landChip, { backgroundColor: color }]}>
+      <View style={[styles.landChip, rect.w < 170 ? styles.landChipNarrow : styles.landChipWide, { backgroundColor: color }]}>
         <T style={styles.landTxt}>{lands}</T>
         <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
       </View>
     </Pressable>
     {showRc && (
-      <View pointerEvents="none" style={[styles.react, { left: rect.x + 4, top: rect.y - 30, maxWidth: rect.w + 30, borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]}>
+      <View pointerEvents="none" style={[styles.react, rect.x + rect.w / 2 > p.size.w * 0.6 ? { right: Math.max(0, p.size.w - rect.x - rect.w) + 4 } : { left: rect.x + 4 }, { top: rect.y - 30, maxWidth: Math.min(260, p.size.w - 8), borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]}>
         <T numberOfLines={1} style={[styles.reactTxt, { color: rc.kind === 'loss' ? '#C92A2A' : '#2B8A3E' }]}>{rc.text}</T>
-        <View style={[styles.reactTail, { borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]} />
+        <View style={[styles.reactTail, rect.x + rect.w / 2 > p.size.w * 0.6 && { left: undefined, right: 16 }, { borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]} />
       </View>
     )}
     </>
@@ -391,7 +391,9 @@ const styles = StyleSheet.create({
   wName: { fontSize: 11, fontWeight: '800', color: C.ink, flexShrink: 1 },
   wCash: { fontSize: 13, fontWeight: '900', color: '#B45309', lineHeight: 16 },
   tiny: { width: 12, height: 12 },
-  landChip: { position: 'absolute', right: 3, top: 3, flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 7, paddingHorizontal: 3, height: 15, borderWidth: 1.5, borderColor: C.ink },
+  landChipWide: { right: 3, top: 3 },
+  landChipNarrow: { left: 2, bottom: 1 },
+  landChip: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 1, borderRadius: 7, paddingHorizontal: 3, height: 15, borderWidth: 1.5, borderColor: C.ink },
   landTxt: { color: '#fff', fontWeight: '900', fontSize: 11, lineHeight: 13 },
   chipsBox: { backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 11, paddingHorizontal: 6, paddingVertical: 3, overflow: 'hidden' },
   chipsTitle: { fontSize: 10, fontWeight: '900', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
