@@ -42,7 +42,7 @@ export const TYPHU_CARDS: Card[] = [
   { text: 'Đi đám cưới, mừng mỗi người 20 xu', each: -20 },
   { text: 'Được thưởng Tết 100 xu', money: 100 },
   { text: 'Bị bồ đá, tiêu 80 xu đi spa chữa lành', money: -80 },
-  { text: 'Về thẳng Xuất phát', goto: 0 },
+  { text: 'Về thẳng Xuất phát, nhận thưởng 200 xu', goto: 0, money: 200 },
   { text: 'Đua xe bị tóm! Vào tù', jail: true },
   { text: 'Quên ví, lùi lại 3 ô', move: -3 },
   { text: 'Bay ra Hà Nội ăn phở', goto: TYPHU_BOARD.findIndex((c) => c.name === 'Hà Nội') },
@@ -53,7 +53,7 @@ export const TYPHU_CARDS: Card[] = [
 export const TYPHU_COMMUNITY_CARDS: Card[] = [
  { text: 'Được hoàn thuế 100 xu', money: 100 }, { text: 'Viện phí 50 xu', money: -50 },
  { text: 'Sinh nhật bạn! Mỗi người mừng bạn 30 xu', each: 30 }, { text: 'Nhận học bổng 150 xu', money: 150 },
- { text: 'Về thẳng Xuất phát', goto: 0 }, { text: 'Vào tù theo lệnh tòa', jail: true },
+ { text: 'Về thẳng Xuất phát, nhận thưởng 200 xu', goto: 0, money: 200 }, { text: 'Vào tù theo lệnh tòa', jail: true },
 ];
 interface TPlayer extends EnginePlayer {
   cash: number;
@@ -302,7 +302,8 @@ export class TyPhuGame implements GameEngine {
     this.timer.set(duration, () => {
       this.movement = null;
       this.throwView = null;
-      if (steps > 0 && from + steps >= TYPHU_SIZE) this.passStart(me);
+      // chỉ thưởng khi đi VƯỢT QUA Xuất phát; dừng đúng ô Xuất phát thì không được thưởng
+      if (steps > 0 && from + steps > TYPHU_SIZE) this.passStart(me);
       this.land(allowCard);
     });
     this.ctx.changed();

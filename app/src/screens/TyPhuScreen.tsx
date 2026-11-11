@@ -81,6 +81,9 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const geo = useMemo(() => makeGeo(tilt.S), [tilt.S]);
   const hasCard = !!g.card;
   const speed = Math.max(1, Math.min(3, g.speed ?? 1));
+  // bấm x1/x2/x3 liên tiếp nhanh: tính mức kế tiếp từ lần bấm trước, không chờ server trả về
+  const speedRef = useRef(speed);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
   const layout = useMemo(
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
@@ -471,7 +474,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 onAct={(a) => void act({ type: a })}
                 speed={speed}
                 onRules={() => setRulesOpen(true)}
-                onSpeed={() => void act({ type: 'speed', value: speed >= 3 ? 1 : speed + 1 })}
+                onSpeed={() => { const next = speedRef.current >= 3 ? 1 : speedRef.current + 1; speedRef.current = next; void act({ type: 'speed', value: next }); }}
                 onCell={setDetail}
                 onPlayer={(id) => { if (id !== me) setThrowAt(id); }}
               />
@@ -647,7 +650,7 @@ const REACT_GAIN = [
 const RULES = [
   'Mỗi người có 1.500 xu. Đổ 2 xúc xắc rồi đi theo chiều kim đồng hồ.',
   'Đổ đôi được tung thêm lượt; đổ đôi 3 lần liên tiếp thì vào tù.',
-  'Đi qua hoặc dừng ở Xuất phát được +200 xu.',
+  'Đi vượt qua Xuất phát được +200 xu; dừng đúng ô Xuất phát thì không được thưởng.',
   'Dừng ở đất chưa ai mua: được mua. Dừng ở đất người khác: trả tiền thuê (đủ bộ màu mà đất trống thì thuê x2).',
   'Dừng ở đất của mình: nâng lên đúng 1 cấp (nhà cấp 1 → 2 → 3 → khách sạn). Lần sau dừng lại mới nâng tiếp.',
   'Tiền thuê đất trống bằng 3/4 giá đất; mỗi cấp nhà tăng mạnh (cấp 1 x2, cấp 2 x4, cấp 3 x6, khách sạn x9).',
@@ -690,7 +693,11 @@ function DecisionCard(p: {
             {rows.map(([k, v]) => (
               <View key={k} style={dc.rentRow}><T style={dc.rentK}>{k}</T><T style={dc.rentV}>{typeof v === 'number' ? `${money(v)} xu` : v}</T></View>
             ))}
-            {c.kind === 'land' && <T style={dc.note}>Mỗi nhà: -{money(TYPHU_GROUPS[c.group].house)} xu</T>}
+            {c.kind === 'land' && <T style={dc.note}>Mỗi lần nâng nhà: -{money(TYPHU_GROUPS[c.group].house)} xu</T>}
+            <View testID="decision-cash" style={dc.cashBox}>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(g.cash[p.me] ?? 0)} xu</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Mua xong còn</T><T style={[dc.cashV, !afford && { color: C.danger }]}>{money((g.cash[p.me] ?? 0) - c.price)} xu</T></View>
+            </View>
             <View style={dc.btns}>
               <Button testID="skip-btn" small variant="paper" title="Bỏ qua" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
               <Button testID="buy-btn" small variant="jade" disabled={!afford} title={`Mua -${money(c.price)}`} style={{ flex: 1.3 }} onPress={() => p.onAct({ type: 'buy' })} />
@@ -720,6 +727,10 @@ function DecisionCard(p: {
           </View>
           <View style={dc.body}>
             <View style={dc.rentRow}><T style={dc.rentK}>Tiền thuê hiện tại</T><T style={dc.rentV}>{money(rentOf(i, h, full))} xu</T></View>
+            <View testID="decision-cash" style={dc.cashBox}>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)} xu</T></View>
+              <View style={dc.rentRow}><T style={dc.cashK}>Nâng xong còn</T><T style={[dc.cashV, !afford && { color: C.danger }]}>{money(cash - cost)} xu</T></View>
+            </View>
             <View style={dc.buildRow}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <T numberOfLines={1} style={dc.rentV}>Lên {label(h + 1)}</T>
@@ -749,6 +760,9 @@ const dc = StyleSheet.create({
   rentV: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '800' },
   note: { fontSize: 11, lineHeight: 15, color: C.muted, textAlign: 'center' },
   btns: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  cashBox: { backgroundColor: '#FFF3BF', borderRadius: 8, borderWidth: 1.5, borderColor: '#111', paddingHorizontal: 8, paddingVertical: 4, marginTop: 4, gap: 1 },
+  cashK: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '700' },
+  cashV: { fontSize: 13, lineHeight: 17, color: '#B45309', fontWeight: '900' },
   buildRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 1 },
   dot: { width: 12, height: 12, borderRadius: 3, borderWidth: 1, borderColor: '#111' },
 });

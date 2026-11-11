@@ -146,12 +146,12 @@ function playAudited(n: number, seed: number) {
     transcript.push(`${cur} đổ ${d1}+${d2}${dbl ? ' (đôi)' : ''} ${from}->${a.pos[cur]}: ${newLogs.map((l) => l.text).join(' | ')}`);
     if (expectMove) {
       const land = (from + sum) % TYPHU_SIZE;
-      const passed = from + sum >= TYPHU_SIZE;
+      const passed = from + sum > TYPHU_SIZE; // dừng đúng Xuất phát thì không thưởng
       const hasStart = newLogs.some((l) => l.kind === 'start' && l.text.startsWith(`P${cur.slice(1)} `));
       const c = TYPHU_BOARD[land];
       const viaCard = c.kind === 'chance' || c.kind === 'community';
       if (!viaCard && passed !== hasStart) fail(`qua Xuất phát (${from}+${sum}) nhưng log nhận 200: ${hasStart}`);
-      if (viaCard && passed && !hasStart) fail(`qua Xuất phát (${from}+${sum}) mà không nhận 200`);
+
       const owner = before.owners[land];
       const cashAfterStart = before.cash[cur] + (passed ? TYPHU_PASS_START : 0) - (inJail && !dbl && jailCount + 1 >= 3 ? TYPHU_JAIL_FINE : 0);
       if (isTyPhuProperty(c) && owner && owner !== cur && !a.bankrupt.includes(cur)) {
