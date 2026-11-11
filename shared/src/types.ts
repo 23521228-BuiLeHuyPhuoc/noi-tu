@@ -342,6 +342,7 @@ export type GameAction =
   | { type: 'buy' }
   | { type: 'skip' }
   | { type: 'build'; cell: number; levels?: number }
+  | { type: 'sell'; cell: number }
   | { type: 'endTurn' }
   | { type: 'payJail' }
   | { type: 'speed'; value: number }

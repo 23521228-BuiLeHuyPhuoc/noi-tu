@@ -10,7 +10,7 @@ import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_MAX_HOUSES, TYPHU_PASS_START, TYPHU_SIZE,
-  groupCells, isTyPhuProperty, rentOf, stationRent, utilityRent,
+  groupCells, isTyPhuProperty, liquidValueOf, rentOf, stationRent, utilityRent,
 } from '../../shared/src/typhu';
 import { smallDict } from './helpers';
 
@@ -163,11 +163,12 @@ function playAudited(n: number, seed: number) {
         else if (!log.text.includes(` ${rent.toLocaleString('vi-VN')} xu`)) fail(`tiền thuê ${c.name} phải ${rent}: "${log.text}"`);
         if (a.cash[owner] < before.cash[owner] + Math.min(rent, 1)) fail('chủ đất không nhận tiền thuê');
       } else if (isTyPhuProperty(c) && !owner) {
-        if (cashAfterStart >= c.price && a.step !== 'buy') fail(`dừng ở ${c.name} chưa chủ, đủ tiền mà không được hỏi mua (bước ${a.step})`);
-        if (cashAfterStart >= c.price && a.pendingBuy !== land) fail('hỏi mua sai ô');
+        const canBuy = a.cash[cur] + liquidValueOf(cur, a.owners, a.houses) >= c.price;
+        if (canBuy !== (a.step === 'buy')) fail(`dừng ở ${c.name} chưa chủ, khả năng mua=${canBuy} nhưng bước là ${a.step}`);
+        if (canBuy && a.pendingBuy !== land) fail('hỏi mua sai ô');
       } else if (c.kind === 'land' && owner === cur) {
-        const h = before.houses[land] ?? 0;
-        const can = h < TYPHU_MAX_HOUSES && cashAfterStart >= TYPHU_GROUPS[c.group].house;
+        const h = a.houses[land] ?? 0;
+        const can = h < TYPHU_MAX_HOUSES && a.cash[cur] + liquidValueOf(cur, a.owners, a.houses, land) >= TYPHU_GROUPS[c.group].house;
         if (can !== (a.step === 'upgrade')) fail(`dừng ở đất của mình ${c.name} (cấp ${h}) mà bước là ${a.step}`);
       } else if (c.kind === 'tax' && !a.bankrupt.includes(cur)) {
         if ((a.pot ?? 0) !== (before.pot ?? 0) + c.amount) fail(`thuế ${c.amount} không vào hũ`);

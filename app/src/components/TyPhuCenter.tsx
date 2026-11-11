@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import {
-  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL_FINE, type TyPhuGroup,
+  TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL_FINE, liquidValueOf, type TyPhuGroup,
 } from '../../../shared/src/typhu';
 import type { TyPhuLogKind, TyPhuView } from '../../../shared/src/types';
 import { C } from '../theme';
@@ -216,6 +216,7 @@ export function TyPhuCenter(p: CenterProps) {
   const statusH = L.wide ? 30 : 0;
   const trayH = L.action.h - 44 - statusH;
   const canThrow = showRoll && !p.dice.animating;
+  const canPayJail = (g.cash[p.me] ?? 0) + liquidValueOf(p.me, g.owners, g.houses) >= TYPHU_JAIL_FINE;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* hàng nút nhỏ thay cho thanh trên cùng */}
@@ -287,7 +288,7 @@ export function TyPhuCenter(p: CenterProps) {
         <View style={styles.btnRow}>
           {showRoll ? (
             <>
-              {p.inJail && <Button testID="pay-jail" small variant="paper" disabled={(g.cash[p.me] ?? 0) < TYPHU_JAIL_FINE} title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
+              {p.inJail && <Button testID="pay-jail" small variant="paper" disabled={!canPayJail} title={`Ra tù -${TYPHU_JAIL_FINE}`} style={styles.fillBtn} onPress={() => p.onAct('payJail')} />}
               <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
             </>
           ) : showBuy || showEnd ? (

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TyPhuGame, TYPHU_CARDS } from '../src/games/typhu';
 import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
-import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, rentOf, typhuCellPos, stationRent, utilityRent } from '../../shared/src/typhu';
+import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, rentOf, typhuCellPos, stationRent, utilityRent, suggestSales } from '../../shared/src/typhu';
 import { simulateThrow } from '../src/games/dice3d';
 import { DICE_DEFAULT_IMPULSE, DICE_FACES, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
 import { smallDict } from './helpers';
@@ -145,6 +145,60 @@ describe('Cờ tỷ phú V2', () => {
   vi.advanceTimersByTime(2600);
   d.settle();
   expect(d.v().pos.p0).toBe(3);
+ });
+ it('allows selling houses or properties to pay jail fine, buy land, or upgrade houses when cash is short', () => {
+  // 1. Trong tù không đủ 50 xu tiền mặt nhưng có nhà/đất: tự chọn bán hoặc bấm payJail tự bán tài sản rẻ nhất
+  const a = make(['An', 'Bình']);
+  a.pl(0).jail = 0;
+  a.pl(0).cash = 20;
+  a.own([1, 11], 'p0'); // ô 1 (Cà Mau, giá 60 -> bán được 30), ô 11 (Quy Nhơn, giá 140 -> bán được 70)
+  const suggestedJail = suggestSales('p0', 50, 20, a.v().owners, a.v().houses);
+  expect(suggestedJail[0]).toMatchObject({ cell: 1, kind: 'property', refund: 30, suggested: true });
+  expect(a.g.action('p0', { type: 'payJail' }).ok).toBe(true);
+  expect(a.v().jail.p0).toBeUndefined();
+  expect(a.v().owners[1]).toBeUndefined();
+  expect(a.v().owners[11]).toBe('p0');
+  expect(a.v().cash.p0).toBe(0); // 20 + 30 - 50 = 0
+
+  // 2. Trong tù: chủ động chọn bán ô 11 (Quy Nhơn +70 xu) thay vì ô đề xuất, rồi nộp phạt ra tù
+  const b = make(['An', 'Bình']);
+  b.pl(0).jail = 0;
+  b.pl(0).cash = 10;
+  b.own([1, 11], 'p0');
+  expect(b.g.action('p0', { type: 'sell', cell: 11 }).ok).toBe(true);
+  expect(b.v().cash.p0).toBe(80);
+  expect(b.v().owners[11]).toBeUndefined();
+  expect(b.g.action('p0', { type: 'payJail' }).ok).toBe(true);
+  expect(b.v().cash.p0).toBe(30);
+  expect(b.v().owners[1]).toBe('p0');
+
+  // 3. Dừng ở đất trống không đủ tiền mặt nhưng có tài sản bán đủ: vẫn hiện bước 'buy' và cho bán để mua
+  const c = make(['An', 'Bình'], [1, 2]); // tới ô 3 (Bạc Liêu, giá 60)
+  c.pl(0).cash = 40;
+  c.own([1], 'p0'); // Cà Mau bán được 30 -> 40 + 30 = 70 >= 60
+  c.g.action('p0', { type: 'roll' });
+  c.settle();
+  expect(c.v().step).toBe('buy');
+  expect(c.v().pendingBuy).toBe(3);
+  expect(c.g.action('p0', { type: 'buy' }).ok).toBe(true);
+  expect(c.v().owners[1]).toBeUndefined();
+  expect(c.v().owners[3]).toBe('p0');
+  expect(c.v().cash.p0).toBe(10); // 40 + 30 - 60 = 10
+
+  // 4. Dừng ở đất của mình không đủ tiền mặt nâng nhà nhưng có tài sản khác bán đủ: hiện 'upgrade' và cho bán để nâng
+  const d = make(['An', 'Bình'], [1, 2]); // tới ô 3 (Bạc Liêu, nâng nhà tốn 50)
+  d.pl(0).cash = 25;
+  d.own([1, 3], 'p0');
+  (d.g as unknown as { houses: Record<number, number> }).houses[1] = 1; // nhà ở Cà Mau bán được 25 -> 25 + 25 = 50
+  d.g.action('p0', { type: 'roll' });
+  d.settle();
+  expect(d.v().step).toBe('upgrade');
+  expect(d.v().pendingBuy).toBe(3);
+  expect(d.g.action('p0', { type: 'sell', cell: 3 }).ok).toBe(false); // không được bán chính ô đang xét nâng cấp
+  expect(d.g.action('p0', { type: 'build', cell: 3 }).ok).toBe(true);
+  expect(d.v().houses[1]).toBeUndefined();
+  expect(d.v().houses[3]).toBe(1);
+  expect(d.v().cash.p0).toBe(0);
  });
 });
 

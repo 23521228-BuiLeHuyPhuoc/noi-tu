@@ -122,6 +122,92 @@ export function rentOf(cell: number, houses: number, fullGroup: boolean): number
   return fullGroup ? c.rent * 2 : c.rent;
 }
 
+export interface TyPhuSaleItem {
+  cell: number;
+  kind: 'house' | 'property';
+  name: string;
+  refund: number;
+  houses: number;
+  suggested: boolean;
+}
+
+/** Tổng số tiền thu được nếu người chơi bán hết nhà và đất cho ngân hàng (nửa giá), có thể trừ ra 1 ô đang xét nâng cấp. */
+export function liquidValueOf(
+  playerId: string,
+  owners: Record<number, string>,
+  houses: Record<number, number>,
+  excludeCell?: number,
+): number {
+  let v = 0;
+  for (const [k, owner] of Object.entries(owners)) {
+    const i = Number(k);
+    if (owner !== playerId || i === excludeCell) continue;
+    const c = TYPHU_BOARD[i];
+    if (!c || !isTyPhuProperty(c)) continue;
+    v += c.price / 2;
+    if (c.kind === 'land') v += ((houses[i] ?? 0) * TYPHU_GROUPS[c.group].house) / 2;
+  }
+  return v;
+}
+
+/** Danh sách tài sản có thể bán của người chơi (kèm đánh dấu những ô hệ thống đề xuất bán trước để đủ `needTotal` xu). */
+export function suggestSales(
+  playerId: string,
+  needTotal: number,
+  cash: number,
+  owners: Record<number, string>,
+  houses: Record<number, number>,
+  excludeCell?: number,
+): TyPhuSaleItem[] {
+  const mine = TYPHU_BOARD.flatMap((c, i) => (isTyPhuProperty(c) && owners[i] === playerId && i !== excludeCell ? [i] : []));
+  const byValue = (i: number) => (TYPHU_BOARD[i] as { price: number }).price;
+  const sorted = [...mine].sort((a, b) => byValue(a) - byValue(b));
+
+  let simCash = cash;
+  const simHouses: Record<number, number> = { ...houses };
+  const suggestedCells = new Set<number>();
+
+  for (const i of sorted) {
+    while (simCash < needTotal && (simHouses[i] ?? 0) > 0) {
+      const c = TYPHU_BOARD[i] as Extract<TyPhuCell, { kind: 'land' }>;
+      simHouses[i]--;
+      simCash += TYPHU_GROUPS[c.group].house / 2;
+      suggestedCells.add(i);
+    }
+  }
+  for (const i of sorted) {
+    if (simCash >= needTotal) break;
+    if ((simHouses[i] ?? 0) > 0) continue;
+    simCash += byValue(i) / 2;
+    suggestedCells.add(i);
+  }
+
+  const items: TyPhuSaleItem[] = sorted.map((i) => {
+    const c = TYPHU_BOARD[i] as Extract<TyPhuCell, { price: number }>;
+    const h = houses[i] ?? 0;
+    if (h > 0 && c.kind === 'land') {
+      return {
+        cell: i,
+        kind: 'house',
+        name: c.name,
+        refund: TYPHU_GROUPS[c.group].house / 2,
+        houses: h,
+        suggested: suggestedCells.has(i),
+      };
+    }
+    return {
+      cell: i,
+      kind: 'property',
+      name: c.name,
+      refund: c.price / 2,
+      houses: 0,
+      suggested: suggestedCells.has(i),
+    };
+  });
+
+  return items.sort((a, b) => (a.suggested === b.suggested ? 0 : a.suggested ? -1 : 1));
+}
+
 /** Toạ độ (hàng, cột) trên lưới 9×9. */
 export function typhuCellPos(i: number): [number, number] {
   if (i <= 10) return [10, 10 - i];
