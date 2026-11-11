@@ -39,7 +39,9 @@ function restQuat(value: number, yaw: number): Q {
 }
 
 /** ma trận CSS (đã đổi hệ trục sim y-lên → CSS z hướng về người xem) cho vị trí/hướng một viên */
-function matrixOf(S: number, x: number, y: number, z: number, q: Q): string {
+function matrixOf(S: number, x: number, yRaw: number, z: number, q: Q): string {
+  // giới hạn độ cao hiển thị để viên xúc xắc không bay khuất khỏi khay
+  const y = Math.min(yRaw, 1.8);
   const [qx, qy, qz, qw] = q;
   const r = [
     [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)],
@@ -115,7 +117,7 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
   canThrow: boolean;
   onThrow: (impulse?: ThrowImpulse) => void;
 }) {
-  const S = Math.max(26, Math.min(width / (2 * TRAY_HX + 0.9), height / 2.5));
+  const S = Math.max(24, Math.min(width / (2 * TRAY_HX + 1.2), height / 2.9));
   const rotated = useContext(ViewportContext)?.rotated ?? false;
   /** vector vuốt theo màn hình -> khung đã xoay 90° của giao diện */
   const toLocal = (dx: number, dy: number): [number, number] => (rotated ? [dy, -dx] : [dx, dy]);
@@ -215,7 +217,7 @@ export function TyPhuDice3D({ width, height, roll, clockOffset, values, canThrow
         touchAction: 'none', userSelect: 'none', cursor: canThrow ? 'grab' : 'default',
       }}
     >
-      <div style={{ position: 'absolute', left: '50%', top: '56%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: 'rotateX(46deg)' }}>
+      <div style={{ position: 'absolute', left: '50%', top: '60%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: 'rotateX(46deg)' }}>
         <div
           style={{
             position: 'absolute', left: -TRAY_HX * S - 6, top: -TRAY_HZ * S - 6, width: 2 * TRAY_HX * S + 12, height: 2 * TRAY_HZ * S + 12, boxSizing: 'border-box',

@@ -19,6 +19,8 @@ import { simulateThrow } from './dice3d';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const WAIT_MS = 1600;
+/** người chơi còn kết nối mà không tung sau chừng này thì hệ thống tung giúp */
+const ROLL_IDLE_MS = 60_000;
 const AWAY_MS = 2500;
 const MAX_LOG = 30;
 
@@ -350,6 +352,7 @@ export class TyPhuGame implements GameEngine {
         if (o === me || o.bankrupt) continue;
         if (card.each > 0) this.charge(o, card.each, me, 'mừng sinh nhật');
         else this.charge(me, -card.each, o, 'mừng cưới');
+        if (me.bankrupt) break;
       }
     }
     if (card.perHouse) {
@@ -378,6 +381,8 @@ export class TyPhuGame implements GameEngine {
   private afterLanding(): void {
     const me = this.players[this.current];
     if (me.bankrupt) return this.afterBankrupt();
+    // người khác có thể vừa phá sản (vd. thẻ mừng sinh nhật) → kiểm tra kết thúc ván
+    if (this.checkEnd()) return;
     if (this.rolledDouble && me.jail === null) return this.beginRoll();
     if (this.buildable(me).length > 0) {
       this.step = 'manage';
@@ -479,7 +484,8 @@ export class TyPhuGame implements GameEngine {
     this.throwView = null;
     this.step = 'roll';
     this.pendingBuy = null;
-    this.armTimer(() => this.roll());
+    // không đếm ngược lúc tung: chỉ tự tung khi người chơi treo máy quá lâu
+    this.armTimer(() => this.roll(), ROLL_IDLE_MS);
     this.ctx.changed();
   }
 
@@ -492,9 +498,9 @@ export class TyPhuGame implements GameEngine {
     this.ctx.changed();
   }
 
-  private armTimer(fn: () => void): void {
+  private armTimer(fn: () => void, onlineMs = this.turnMs): void {
     const me = this.players[this.current];
-    const ms = me && !this.ctx.isConnected(me.id) ? AWAY_MS : this.turnMs;
+    const ms = me && !this.ctx.isConnected(me.id) ? AWAY_MS : onlineMs;
     this.turnEndsAt = Date.now() + ms;
     this.timer.set(ms, fn);
   }

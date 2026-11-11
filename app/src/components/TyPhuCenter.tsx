@@ -269,16 +269,20 @@ export function TyPhuCenter(p: CenterProps) {
         {L.wide && (
           <View style={[styles.statusRow, { height: statusH - 4 }]}>
             <T testID="typhu-status" numberOfLines={1} style={[styles.status, { flex: 1 }, p.myTurn && { color: '#C2410C' }]}>{p.status}</T>
-            <View style={[styles.track, { width: 80, minWidth: 80, flexGrow: 0, flexShrink: 0 }]}>
-              <View style={{ height: '100%', width: `${p.paused ? 100 : clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
-            </View>
-            <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
+            {g.step !== 'roll' && (
+              <>
+                <View style={[styles.track, { width: 80, minWidth: 80, flexGrow: 0, flexShrink: 0 }]}>
+                  <View style={{ height: '100%', width: `${p.paused ? 100 : clamp(p.left / timeTotal, 0, 1) * 100}%`, backgroundColor: hot ? C.danger : C.jade }} />
+                </View>
+                <T style={[styles.timerNum, hot && { color: C.danger }]}>{p.paused ? '…' : `${p.left}s`}</T>
+              </>
+            )}
           </View>
         )}
         <View
           testID={`dice-phase-${p.dice.phase}`}
           accessibilityLabel={`Xúc xắc: ${p.dice.phase}`}
-          style={{ width: L.action.w - 4, height: trayH, borderRadius: 12, overflow: 'hidden', alignSelf: 'center' }}
+          style={{ width: L.action.w - 4, height: trayH, borderRadius: 12, alignSelf: 'center', zIndex: 5 }}
         >
           <TyPhuDice3D
             width={L.action.w - 4}
@@ -290,12 +294,6 @@ export function TyPhuCenter(p: CenterProps) {
             onThrow={p.onThrow}
           />
           {canThrow && <T style={styles.trayHint}>Vuốt để tung, hoặc chạm</T>}
-          {g.step === 'roll' && idle && !p.dice.animating && (
-            <View testID="roll-countdown" style={[styles.countdown, hot && { backgroundColor: C.danger }]} pointerEvents="none">
-              <T style={styles.countdownNum}>{p.left}</T>
-              <T style={styles.countdownLbl}>{p.myTurn ? 'giây để tung' : `${p.nameOf(cur ?? '')} tung`}</T>
-            </View>
-          )}
           {g.dice && !p.dice.animating && !p.moving && <View style={styles.sumPill}><T style={styles.sumTxt}>{g.dice[0] + g.dice[1]}</T></View>}
         </View>
         <View style={styles.btnRow}>
@@ -372,12 +370,6 @@ const styles = StyleSheet.create({
   react: { position: 'absolute', zIndex: 30, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 14, borderWidth: 2, boxShadow: '0px 3px 8px rgba(0,0,0,0.25)' },
   reactTxt: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
   reactTail: { position: 'absolute', left: 16, bottom: -6, width: 10, height: 10, borderRightWidth: 2, borderBottomWidth: 2, transform: [{ rotate: '45deg' }] },
-  countdown: {
-    position: 'absolute', top: 8, left: 8, minWidth: 54, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12,
-    backgroundColor: 'rgba(17,17,17,0.78)', alignItems: 'center', borderWidth: 2, borderColor: '#fff',
-  },
-  countdownNum: { color: '#fff', fontSize: 24, lineHeight: 28, fontWeight: '900' },
-  countdownLbl: { color: '#fff', fontSize: 9, lineHeight: 11, fontWeight: '800' },
   hint: { fontSize: 11, fontWeight: '700', color: C.muted, textAlign: 'center' },
   error: { fontSize: 11, fontWeight: '800', color: C.ink, backgroundColor: C.gold, borderRadius: 6, padding: 3, textAlign: 'center' },
   wealth: {
