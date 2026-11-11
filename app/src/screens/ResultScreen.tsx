@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { GAME_META } from '../messages';
@@ -19,6 +19,8 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const iWon = r.winnerId === game.me;
   const [error, setError] = useState<string | null>(null);
   const playerById = new Map(room.players.map((p) => [p.id, p]));
+  const { width, height } = useWindowDimensions();
+  const wide = width > height;
 
   useEffect(() => {
     play(iWon || !r.winnerId ? 'win' : 'lose');
@@ -32,8 +34,9 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
         isHost ? (
           <>
             {error && <T style={styles.error}>{error}</T>}
-            <Button testID="restart-btn" icon="🔁" title={`Chơi lại ${GAME_INFO[room.gameType].name}`} onPress={async () => setError(await game.restart())} />
-            <View style={styles.row}>
+            <View style={wide ? styles.rowWide : undefined}>
+            <Button testID="restart-btn" icon="🔁" small={wide} style={wide ? { flexGrow: 1.4, flexBasis: '28%' } : undefined} title={`Chơi lại ${GAME_INFO[room.gameType].name}`} onPress={async () => setError(await game.restart())} />
+            <View style={[styles.row, wide && { flexGrow: 3, flexBasis: '60%', flexWrap: 'nowrap' }]}>
               {GAMES.filter((g) => g !== room.gameType).map((g) => (
                 <Button
                   key={g}
@@ -45,6 +48,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                   onPress={async () => setError(await game.configure({ gameType: g }))}
                 />
               ))}
+            </View>
             </View>
           </>
         ) : (
@@ -91,6 +95,7 @@ const styles = StyleSheet.create({
   name: { fontWeight: '800', fontSize: 17 },
   detail: { color: C.muted, fontSize: 14 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  rowWide: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
   error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
 });
