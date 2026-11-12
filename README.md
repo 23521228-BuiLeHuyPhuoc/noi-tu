@@ -4,7 +4,7 @@ Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối t�
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
-- Nhập tên (chơi khách) hoặc **tạo tài khoản** để giữ tên, mặt đại diện và thành tích các ván đã chơi.
+- Nhập tên (chơi khách) hoặc bấm **Đăng ký** / **Đăng nhập** ở đầu trang để giữ tên, mặt đại diện và thành tích các ván đã chơi. Đăng ký cần email và nhập mật khẩu 2 lần; đăng nhập bằng tên đăng nhập hoặc email; **Quên mật khẩu?** gửi mã 6 số qua email. Đổi email, đổi mật khẩu trong bảng ✏️.
 - **Đổi tên, mặt đại diện, tải ảnh của mình ở bất cứ đâu**: trang chủ (chạm vào ảnh cạnh ô tên), phòng chờ hay giữa ván (nút ✏️ trên thanh trên, hoặc chạm vào avatar của chính mình). Khách cũng tải ảnh được. Tên hiện đầy đủ dưới avatar, dài thì xuống dòng.
 - Chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
 - Chủ phòng đổi game được ngay trong phòng chờ hoặc sau mỗi ván.
@@ -94,6 +94,20 @@ Server đọc chuỗi kết nối MongoDB từ biến môi trường `DATABASE` 
 - MongoDB Atlas: mục **Network Access** phải cho phép IP của Render (đơn giản nhất là `0.0.0.0/0`), và nên dùng mật khẩu mạnh.
 - Kiểm tra: `/health` trả về `"db":"mongo"`. Nếu thấy `"db":"memory"` nghĩa là chưa đặt biến hoặc không kết nối được (xem log), tài khoản chỉ lưu tạm và mất khi server khởi động lại.
 - Chạy thử trên máy: `DATABASE='mongodb://...' npm run dev` trong thư mục `server`.
+
+## Gửi mã quên mật khẩu (Gmail)
+
+Trong **noi-tu-server → Environment** trên Render đặt:
+
+| Biến | Ý nghĩa |
+|---|---|
+| `SMTP_USER` | Địa chỉ Gmail gửi mã |
+| `SMTP_PASS` | **Mật khẩu ứng dụng** Gmail 16 ký tự (Google Account → Bảo mật → Xác minh 2 bước → Mật khẩu ứng dụng), không phải mật khẩu Gmail |
+| `SMTP_FROM_NAME` | Tên người gửi, mặc định `Xóm Lầy` (tùy chọn) |
+
+**Không** ghi các giá trị này vào code hay repo. Thiếu biến thì nút Quên mật khẩu báo "Server chưa bật gửi mail", phần còn lại vẫn chạy (`/health` → `"mail": false`).
+Mã hết hạn sau 10 phút, sai tối đa 5 lần, mỗi tài khoản tối đa 5 thư/giờ (cách nhau 60 giây). Đặt lại mật khẩu thì mọi máy khác bị đăng xuất.
+`MAIL_DEBUG=1` chỉ dùng khi chạy thử trên máy (ghi thư ra log thay vì gửi), **không** đặt trên Render.
 
 ## Ảnh đại diện (Cloudinary)
 
