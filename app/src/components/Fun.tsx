@@ -12,7 +12,7 @@ import type { Game } from '../useGame';
 import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '../messages';
 import { ROACH_URI } from '../avatars';
 import { setCharm, setDoodle, setMood, setNick, setWobble } from '../funState';
-import { ViewportContext, useKeyboardInset, useOnNew } from '../hooks';
+import { ViewportContext, useKeyboardInset, useOnNew, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -833,6 +833,8 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   const [sending, setSending] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  // màn ngang thấp (Cờ tỷ phú, điện thoại xoay ngang): danh sách tin ngắn lại để ô nhập luôn thấy
+  const shortScreen = useStableWindow().height < 520;
   const kb = useKeyboardInset() > 0; // đang gõ: ẩn bớt hàng emoji/câu khịa để danh sách và ô nhập vừa phần trên bàn phím
   const me = game.me;
   const send = async () => {
@@ -845,8 +847,27 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
       setSending(false);
     }
   };
+  // ô nhập: màn thấp đặt lên đầu bảng cho luôn thấy, không phải cuộn
+  const inputRow = (
+        <View style={styles.chatInputRow}>
+          <TextInput
+            testID="chat-input"
+            style={styles.chatInput}
+            value={text}
+            onChangeText={setText}
+            placeholder="Nhắn gì đó…"
+            placeholderTextColor={C.muted}
+            maxLength={CHAT_MAX}
+            returnKeyType="send"
+            onSubmitEditing={send}
+            blurOnSubmit={false}
+          />
+          <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
+        </View>
+  );
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
+      {shortScreen && inputRow}
       {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
         {EMOJIS.map((e, i) => (
           <Button
@@ -887,7 +908,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
       <ScrollView
         ref={listRef}
         testID="chat-list"
-        style={[styles.chatList, kb && { maxHeight: 130 }]}
+        style={[styles.chatList, (kb || shortScreen) && { maxHeight: kb ? 130 : 96 }]}
         contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
       >
@@ -907,21 +928,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           );
         })}
       </ScrollView>
-      <View style={styles.chatInputRow}>
-        <TextInput
-          testID="chat-input"
-          style={styles.chatInput}
-          value={text}
-          onChangeText={setText}
-          placeholder="Nhắn gì đó…"
-          placeholderTextColor={C.muted}
-          maxLength={CHAT_MAX}
-          returnKeyType="send"
-          onSubmitEditing={send}
-          blurOnSubmit={false}
-        />
-        <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
-      </View>
+      {!shortScreen && inputRow}
     </Sheet>
   );
 }

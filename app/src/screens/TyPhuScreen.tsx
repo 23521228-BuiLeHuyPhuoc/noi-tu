@@ -12,7 +12,7 @@ import { characterSvgUri, playerColorOf } from '../avatars';
 import { TYPHU_PHOTOS } from '../typhuArt';
 import { ICON_BY_CELL } from '../typhuCellIcons';
 import type { DiceRollView } from '../../../shared/src/dice';
-import { makeCenterLayout, makeGeo, type Rect } from '../typhuLayout';
+import { TYPHU_VIEW_LABEL, TYPHU_VIEW_MODES, makeCenterLayout, makeGeo, readViewMode, saveViewMode, type Rect, type TyPhuViewMode } from '../typhuLayout';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
 import { play } from '../sound';
@@ -81,10 +81,19 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
   const availW = stageSize && stageSize.w > 200 ? stageSize.w - 4 : Math.max(320, width - 12);
   const availH = stageSize && stageSize.h > 200 ? stageSize.h - 8 : Math.max(220, height - 60);
+  // chế độ xem (lưu trên máy): 3D nghiêng / 2D phẳng vuông / 2D tràn kín màn hình
+  const [viewMode, setViewMode] = useState<TyPhuViewMode>(readViewMode);
+  const cycleView = () => {
+    const next = TYPHU_VIEW_MODES[(TYPHU_VIEW_MODES.indexOf(viewMode) + 1) % TYPHU_VIEW_MODES.length];
+    setViewMode(next);
+    saveViewMode(next);
+    feed(`Chế độ xem: ${TYPHU_VIEW_LABEL[next]}`, 'info');
+  };
   const tilt = useMemo(() => fitTilted(availW, availH), [availW, availH]);
-  const boardW = tilt.S;
-  const boardH = tilt.S;
-  const geo = useMemo(() => makeGeo(tilt.S), [tilt.S]);
+  const flatS = Math.floor(Math.min(availW, availH));
+  const boardW = viewMode === 'tilt' ? tilt.S : viewMode === 'flat' ? flatS : Math.floor(availW);
+  const boardH = viewMode === 'tilt' ? tilt.S : viewMode === 'flat' ? flatS : Math.floor(availH);
+  const geo = useMemo(() => makeGeo(boardW, boardH), [boardW, boardH]);
   const hasCard = !!g.card;
   const speed = Math.max(1, Math.min(3, g.speed ?? 1));
   // bấm x1/x2/x3 liên tiếp nhanh: tính mức kế tiếp từ lần bấm trước, không chờ server trả về
@@ -94,7 +103,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
     [geo, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(18, Math.min(26, geo.wm * 0.66));
+  const pawnBase = Math.max(18, Math.min(viewMode === 'tilt' ? 26 : 34, Math.min(geo.wm, geo.hm * 1.6) * 0.66));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -108,6 +117,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const prevCashRef = useRef<Record<string, number>>({ ...g.cash });
   const [reacts, setReacts] = useState<Record<string, Reaction>>({});
   const [rulesOpen, setRulesOpen] = useState(false);
+  // chọn người để chọc (bàn cờ không có hàng avatar như các game khác)
+  const [pokeOpen, setPokeOpen] = useState(false);
   const prevOwnersRef = useRef<Record<number, string>>({ ...g.owners });
   const prevHousesRef = useRef<Record<number, number>>({ ...g.houses });
   const lastLogRef = useRef(g.log.at(-1)?.id ?? 0);
@@ -511,7 +522,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         <View
           style={[
             styles.board,
-            { width: boardW, height: boardH, transform: [{ perspective: TILT_PERSP }, { translateY: tilt.dy }, { rotateX: `${TILT_DEG}deg` }] },
+            { width: boardW, height: boardH },
+            viewMode === 'tilt' && { transform: [{ perspective: TILT_PERSP }, { translateY: tilt.dy }, { rotateX: `${TILT_DEG}deg` }] },
           ]}
         >
           {/* 40 ô (memo: chỉ vẽ lại khi ô đó đổi) */}
@@ -574,6 +586,9 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 onAct={(a) => { void act({ type: a }); }}
                 speed={speed}
                 onRules={() => setRulesOpen(true)}
+                viewLabel={TYPHU_VIEW_LABEL[viewMode]}
+                onView={cycleView}
+                onPoke={g.order.filter((id) => id !== me && room.players.some((x) => x.id === id)).length > 0 ? () => setPokeOpen(true) : undefined}
                 onSpeed={canChangeSpeed ? () => { const next = speedRef.current >= 3 ? 1 : speedRef.current + 1; speedRef.current = next; void act({ type: 'speed', value: next }); } : undefined}
                 onCell={setDetail}
                 onPlayer={(id) => { if (isParticipant && id !== me) setThrowAt(id); }}
@@ -761,6 +776,26 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
       {throwAt && playerById.get(throwAt) && (
         <ThrowSheet game={game} target={playerById.get(throwAt)!} onClose={() => setThrowAt(null)} />
+      )}
+
+      {pokeOpen && (
+        <Sheet title="Chọc ai?" onClose={() => setPokeOpen(false)}>
+          <View style={styles.pokeRow}>
+            {g.order.filter((id) => id !== me && playerById.get(id)).map((id) => (
+              <Pressable
+                key={id}
+                testID={`poke-pick-${id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Chọc ${nameOf(id)}`}
+                onPress={() => { setPokeOpen(false); setThrowAt(id); }}
+                style={styles.pokePick}
+              >
+                <Image source={{ uri: portraitUriOf(id) }} style={[styles.pokeFace, { borderColor: colorOf(id) }]} />
+                <T style={styles.pokeName}>{nameOf(id)}</T>
+              </Pressable>
+            ))}
+          </View>
+        </Sheet>
       )}
 
       {rulesOpen && (
@@ -1163,6 +1198,10 @@ function fitTilted(availW: number, availH: number): { S: number; dy: number } {
 }
 
 const styles = StyleSheet.create({
+  pokeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  pokePick: { alignItems: 'center', gap: 4, width: 96 },
+  pokeFace: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, backgroundColor: '#fff' },
+  pokeName: { fontWeight: '800', textAlign: 'center' },
   stageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   board: { backgroundColor: '#CDE6D0', borderWidth: 2, borderColor: '#111', position: 'relative', boxShadow: '0px 18px 24px rgba(0,0,0,0.35)' },
   center: {

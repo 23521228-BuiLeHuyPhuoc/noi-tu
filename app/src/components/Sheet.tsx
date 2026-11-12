@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
@@ -9,10 +9,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   // bàn phím mở: chỉ bảng này nhích lên và co lại cho vừa phần còn trống (phần game phía sau không đổi)
   const kb = useKeyboardInset();
   const { height } = useStableWindow();
+  // luôn bám màn hình (kể cả khi game tự xoay ngang): chiều cao tối đa tính bằng số theo màn, không theo khung cha
+  // (khung bàn Cờ tỷ phú cao hơn màn ngang làm bảng tràn khỏi đáy, mất ô nhập chat / nút chọc)
+  const maxHeight = kb > 0 ? Math.max(220, height - kb - 12) : Math.max(220, Math.round(height * 0.94));
+  const short = height < 520;
   return (
     <View style={styles.root}>
       <Pressable accessibilityLabel="Đóng" style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.panel, sticker(0), kb > 0 && { marginBottom: kb, maxHeight: Math.max(220, height - kb - 12) }]}>
+      <View style={[styles.panel, sticker(0), { maxHeight }, short && styles.panelShort, kb > 0 && { marginBottom: kb }]}>
         <View style={styles.grip} />
         <T style={styles.title}>{title}</T>
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -24,13 +28,17 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
 }
 
 const styles = StyleSheet.create({
-  root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, justifyContent: 'flex-end' },
+  // web: fixed để bám khung nhìn (trong khung đã xoay của Rotator thì bám khung xoay đó)
+  root: { position: (Platform.OS === 'web' ? 'fixed' : 'absolute') as 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, justifyContent: 'flex-end' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(42,10,16,0.55)' },
   panel: {
     backgroundColor: C.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomWidth: 0,
-    padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center', maxHeight: '92%',
+    padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 520, alignSelf: 'center', overflow: 'hidden',
   },
-  body: { flexGrow: 0, flexShrink: 1 },
+  // màn ngang thấp: bảng rộng hơn, đệm ít hơn cho đủ chỗ
+  panelShort: { maxWidth: 680, padding: 12, paddingBottom: 14, gap: 8 },
+  // minHeight 0: vùng cuộn mới co được dưới chiều cao nội dung (không thì bảng tràn khỏi màn hình)
+  body: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   bodyContent: { gap: 14 },
   grip: { width: 44, height: 5, borderRadius: 3, backgroundColor: C.mist, alignSelf: 'center' },
   title: { fontSize: 20, fontWeight: '900' },
