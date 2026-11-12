@@ -24,6 +24,8 @@ export interface TyPhuCellProps {
   isTrail: boolean;
   isStepTarget: boolean;
   onPress: (i: number) => void;
+  /** phóng chữ tên (hàng ô phía xa của bàn 3D bị bóp nhỏ khi chiếu) */
+  boost?: number;
   /** hũ tiền (chỉ ô Xuất phát) */
 }
 
@@ -110,16 +112,13 @@ export function pawnAnchor(i: number, r: { x: number; y: number; w: number; h: n
   const land = TYPHU_BOARD[i].kind === 'land';
   if (side === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.24 };
   if (side === 'top' || side === 'bottom') {
-    const bandH = land ? Math.max(11, r.h * 0.22) : 0;
-    const dy = side === 'top' ? bandH / 2 : -bandH / 2;
-    return { x: r.x + r.w / 2, y: r.y + r.h / 2 + dy + size * 0.2 };
+    // quân cờ nằm góc dưới bên trái ô (dưới tên, cạnh giá) để không che tên đất; ô thấp thì thu về sát đáy
+    const yFrac = side === 'top' ? 0.72 : 0.62;
+    return { x: r.x + size / 2 + 3, y: r.y + r.h * yFrac + size * 0.2 };
   }
-  if (r.w >= r.h * 2) {
-    const bandW = land ? clamp(r.w * 0.16, 14, 30) : 0;
-    const x = side === 'left' ? r.x + bandW + 3 + size / 2 : r.x + 3 + size / 2;
-    return { x, y: r.y + r.h / 2 + size * 0.2 };
-  }
-  return { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.24 };
+  const bandW = land ? clamp(r.w * 0.16, 14, 30) : 0;
+  const x = side === 'left' ? r.x + bandW + 3 + size / 2 : r.x + 3 + size / 2;
+  return { x, y: r.y + r.h / 2 + size * 0.2 };
 }
 
 const WRAP = (Platform.OS === 'web' ? { wordBreak: 'break-word' } : {}) as TextStyle;
@@ -150,9 +149,9 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   if (p.side === 'corner') {
     const pr = priceTxt !== '';
     const fit = fitCellName(name, p.w - 8, p.h * 0.3, clamp(p.h * 0.17, 8, 20), 7);
-    const prFs = clamp(Math.min(p.h * 0.17, p.w / 6), 8, 19);
+    const prFs = clamp(Math.min(p.h * 0.17, p.w / 6), 7, 19);
     const nameH = fit.lh * fit.lines;
-    const icon = clamp(Math.min(p.w * 0.6, p.h - nameH - (pr ? prFs * 1.2 : 0) - 8), 12, 200);
+    const icon = clamp(Math.min(p.w * 0.6, p.h - nameH - (pr ? prFs * 1.2 : 0) - 8), 7, 200);
     return (
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.corner}>
@@ -178,7 +177,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const starSize = clamp(W / 4.2, 7, 14);
     const starH = isStation && p.houses > 0 ? Math.round(starSize * 1.15) : 0;
     const inner = H - bandH - priceLH - starH - 4;
-    const fit = fitCellName(name, W - 4, inner * (isLand ? 0.7 : 0.4), clamp(H * 0.17, 6.5, 19));
+    const fit = fitCellName(name, W - 4, inner * (isLand ? 0.7 : 0.4), clamp(H * 0.17 * (p.boost ?? 1), 6.5, 19 * (p.boost ?? 1)));
     const iconSize = clamp(Math.min(W * (face ? 0.56 : 0.8), inner - fit.lh * fit.lines - 2), 8, 120);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>

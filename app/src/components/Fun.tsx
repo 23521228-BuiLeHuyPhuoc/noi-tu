@@ -916,10 +916,36 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
         </View>
   );
+  const chatList = (
+    <ScrollView
+      ref={listRef}
+      testID="chat-list"
+      style={[styles.chatList, (kb || shortScreen) && { maxHeight: kb ? 130 : 130 }]}
+      contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
+      onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+    >
+      {game.chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
+      {game.chat.map((m) => {
+        const mine = m.from === me;
+        const pl = players.find((p) => p.id === m.from);
+        const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
+        return (
+          <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
+            <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} />
+            <View style={[styles.msg, mine ? styles.msgMine : null]}>
+              {!mine && <T style={styles.msgName}>{m.name}</T>}
+              {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>}
+            </View>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
   if (shopOpen) return <ShopSheet game={game} initialTab="sticker" onClose={() => setShopOpen(false)} />;
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
       {shortScreen && inputRow}
+      {shortScreen && chatList}
       {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
         {EMOJIS.map((e, i) => (
           <Button
@@ -981,29 +1007,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           </Pressable>
         ))}
       </ScrollView>}
-      <ScrollView
-        ref={listRef}
-        testID="chat-list"
-        style={[styles.chatList, (kb || shortScreen) && { maxHeight: kb ? 130 : 96 }]}
-        contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-      >
-        {game.chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
-        {game.chat.map((m) => {
-          const mine = m.from === me;
-          const pl = players.find((p) => p.id === m.from);
-          const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
-          return (
-            <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
-              <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} />
-              <View style={[styles.msg, mine ? styles.msgMine : null]}>
-                {!mine && <T style={styles.msgName}>{m.name}</T>}
-                {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>}
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+      {!shortScreen && chatList}
       {!shortScreen && inputRow}
     </Sheet>
   );

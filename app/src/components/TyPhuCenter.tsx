@@ -191,6 +191,7 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
       const bg = rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE';
       return (
         <View
+          testID="react-bubble"
           pointerEvents="none"
           style={[
             styles.react,

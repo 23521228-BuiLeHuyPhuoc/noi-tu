@@ -107,7 +107,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     () => makeCenterLayout(cw / k, chh / k, Math.max(1, g.order.length), hasCard),
     [cw, chh, k, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(16, Math.min(viewMode === 'tilt' ? 26 : 34, Math.min(geo.wm * 0.62, geo.hm * 0.72)));
+  const pawnBase = Math.max(16, Math.min(viewMode === 'tilt' ? 26 : 34, Math.min(geo.wm * 0.62, geo.hm * 0.58)));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -484,7 +484,12 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const moveStates = Object.fromEntries(alive.map((id) => [id, tokenMoveState(id)]));
   const isParticipant = g.order.includes(me);
   const canChangeSpeed = isParticipant && !g.bankrupt.includes(me);
-  const offsetsFor = (n: number, size: number, cellW: number, sideWide = false): [number, number][] => {
+  const offsetsFor = (n: number, size: number, cellW: number, sideWide = false, rowLeft = false): [number, number][] => {
+    // ô trên/dưới: quân chung ô xếp thành hàng ngang từ góc trái, chồng nhẹ lên nhau
+    if (rowLeft && n <= 4) {
+      const step = Math.min(size * 0.55, Math.max(4, (cellW - size - 6) / Math.max(1, n - 1)));
+      return Array.from({ length: n }, (_, i): [number, number] => [i * step, 0]);
+    }
     // ô hai bên bàn (rộng, thấp): quân cờ nằm sát mép ngoài, xếp dọc để không đè lên tên đất
     if (sideWide && n <= 4) {
       const vy = Math.min(size * 0.42, 22);
@@ -559,6 +564,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 isTrail={activeMovementState?.trail.has(i) ?? false}
                 isStepTarget={activeMovementState?.stepCell === i}
                 onPress={setDetail}
+                boost={viewMode === 'tilt' && geo.side[i] === 'bottom' ? 1.3 : 1}
               />
             );
           })}
@@ -614,7 +620,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
             const stacked = !st.active && here.length > 1;
             const size = pawnBase * (stacked ? (here.length > 4 ? 0.76 : 0.84) : 1);
             const cellRect = geo.rect[st.visualCell >= 0 ? st.visualCell : g.pos[id]];
-            const off = stacked ? offsetsFor(Math.min(6, here.length), size, cellRect.w, cellRect.w >= cellRect.h * 2 && (geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'left' || geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'right'))[Math.min(5, here.indexOf(id))] : [0, 0];
+            const off = stacked ? offsetsFor(Math.min(6, here.length), size, cellRect.w, (geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'left' || geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'right'), geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'top' || geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'bottom')[Math.min(5, here.indexOf(id))] : [0, 0];
             return (
               <Pawn
                 key={id}
@@ -658,6 +664,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         ) : myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade' || g.step === 'ticket' || (g.step === 'roll' && inJail)) && (
           /* bảng thông tin nổi khi tới ô mua được, được nâng cấp, đang ở tù, rút được vé ra tù (không nghiêng theo bàn) */
           <DecisionCard
+            onPoke={g.order.filter((id) => id !== me && room.players.some((x) => x.id === id)).length > 0 ? () => setPokeOpen(true) : undefined}
             g={g}
             me={me}
             canBuild={canBuild}
@@ -982,11 +989,16 @@ function SellPicker(p: {
 
 /** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, nâng cấp, ở tù, mua vé ra tù. */
 /** Bảng quyết định che mất nút 💬 ở giữa bàn (màn ngang thấp): thêm nút nhỏ ở góc để vẫn nhắn tin được khi đang cân nhắc */
-function DecisionCard(p: Parameters<typeof DecisionBody>[0]) {
+function DecisionCard(p: Parameters<typeof DecisionBody>[0] & { onPoke?: () => void }) {
   const tools = useShellTools();
   return (
     <>
       <DecisionBody {...p} />
+      {p.onPoke && (
+        <Pressable testID="poke-open-dialog" accessibilityRole="button" accessibilityLabel="Chọc đối thủ" onPress={p.onPoke} hitSlop={6} style={[dc.chatPeek, { top: 50 }]}>
+          <T style={{ fontSize: 16 }}>😈</T>
+        </Pressable>
+      )}
       {tools && (
         <Pressable
           testID="chat-open-dialog"

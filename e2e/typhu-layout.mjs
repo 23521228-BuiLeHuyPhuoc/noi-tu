@@ -50,7 +50,11 @@ for (const [W, H] of VPS) for (const n of COUNTS) {
     await sleep(350);
   }
   // chờ tới lượt mình (nút Đổ xúc xắc hiện) để chụp khay xúc xắc + nút
-  for (let i = 0; i < 60 && !(await t('roll-btn').count()); i++) await sleep(500);
+  for (let i = 0; i < 60 && !(await t('roll-btn').count()); i++) {
+    // đang có bảng quyết định thì bỏ qua cho khỏi che bàn lúc chụp
+    for (const id of ['skip-btn', 'stay-jail']) if (await t(id).count()) await t(id).first().click({ timeout: 800 }).catch(() => {});
+    await sleep(500);
+  }
   await sleep(800);
   // đóng bảng: bấm vào phần nền tối còn lộ ra (mép phải màn hình nếu đang xoay, mép trên nếu không)
   const dismiss = async () => { await page.mouse.click(W > H ? W / 2 : W - 3, W > H ? 3 : H / 2); };
@@ -66,7 +70,7 @@ for (const [W, H] of VPS) for (const n of COUNTS) {
           const r = c.getBoundingClientRect();
           c.querySelectorAll('*').forEach((e) => {
             const b = e.getBoundingClientRect();
-            if (b.width && (b.right > r.right + 1.5 || b.bottom > r.bottom + 1.5 || b.left < r.left - 1.5 || b.top < r.top - 1.5)) out.push(c.getAttribute('data-testid'));
+            if (b.width && (b.right > r.right + 1.5 || b.bottom > r.bottom + 1.5 || b.left < r.left - 1.5 || b.top < r.top - 1.5)) out.push(c.getAttribute('data-testid') + '[' + e.tagName + ':' + (e.textContent || '').slice(0, 12) + ':' + Math.round(b.right - r.right) + ',' + Math.round(b.bottom - r.bottom) + ',' + Math.round(r.left - b.left) + ',' + Math.round(r.top - b.top) + ']');
             if (e.scrollHeight > e.clientHeight + 2 && e.children.length === 0 && getComputedStyle(e).overflow !== 'visible') out.push(`${c.getAttribute('data-testid')}:clip`);
           });
         });

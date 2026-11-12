@@ -112,8 +112,9 @@ if (PHASES.includes('play')) {
         await sleep(500);
         await p.shot(`play-${p.name}-${s.replace(/[^a-z+-]/g, '')}`);
       }
-      for (const k of ['buy', 'reward', 'loss', 'build', 'bankrupt']) {
-        if (!seen.has(`${p.name}:announce-${k}`) && (await p.t(`announce-${k}`).count())) {
+      for (const k of ['buy', 'reward', 'loss', 'build', 'bankrupt', 'react-bubble']) {
+        const tid = k === 'react-bubble' ? k : `announce-${k}`;
+        if (!seen.has(`${p.name}:announce-${k}`) && (await p.t(tid).count())) {
           seen.set(`${p.name}:announce-${k}`, 1);
           await sleep(250);
           await p.shot(`play-${p.name}-announce-${k}`);
