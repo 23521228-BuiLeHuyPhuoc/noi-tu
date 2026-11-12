@@ -810,6 +810,12 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         <Button testID="troll-blackout" icon="🔌" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
         <Button testID="troll-spin" icon="🌀" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
         <Button testID="troll-quake" icon="🌋" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
+        <Button testID="troll-fart" icon="💨" title="Thả bom thối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'fart', to: target.id })} />
+        <Button testID="troll-slipper" icon="🩴" title="Dép bay liên hoàn" variant="gold" style={styles.troll} onPress={() => send({ kind: 'slipper', to: target.id })} />
+        <Button testID="troll-chicken" icon="🐔" title="Gà mổ" variant="gold" style={styles.troll} onPress={() => send({ kind: 'chicken', to: target.id })} />
+        <Button testID="troll-bigface" icon="🤪" title="Mặt to" variant="gold" style={styles.troll} onPress={() => send({ kind: 'bigface', to: target.id })} />
+        <Button testID="troll-banana" icon="🍌" title="Vỏ chuối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'banana', to: target.id })} />
+        <Button testID="troll-mirror" icon="🪞" title="Lật ngược màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'mirror', to: target.id })} />
         <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
       </View>
       )}

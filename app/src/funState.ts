@@ -7,7 +7,7 @@ import type { DoodleKind, Mood, NicknameId } from '../../shared/src/types';
 
 type Entry<T> = { value: T; until: number };
 
-export type WobbleKind = 'spin' | 'shake' | 'blackout';
+export type WobbleKind = 'spin' | 'shake' | 'blackout' | 'big' | 'slip';
 /** màu phủ lên avatar: cháy đen (sét), băng, đỏ mặt (hôn gió) */
 export type TintKind = 'burnt' | 'ice' | 'blush';
 

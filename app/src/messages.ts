@@ -215,5 +215,11 @@ export const quip = {
   charm: (a: string) => `✨ ${a} xin vía, đang tỏa hào quang`,
   blackout: (a: string, b: string) => `🔌 ${a} dập cầu dao, sụp nguồn sáng máy ${b}!`,
   spin: (a: string, b: string) => `🌀 ${a} xoay mòng mòng màn hình của ${b}!`,
+  fart: (a: string, b: string) => `💨 ${a} thả bom thối vào ${b}, PHỤT!`,
+  slipper: (a: string, b: string) => `🩴 ${a} phóng dép liên hoàn vào ${b}!`,
+  chicken: (a: string, b: string) => `🐔 ${a} thả gà đi mổ trên máy ${b}`,
+  bigface: (a: string, b: string) => `🤪 ${a} thổi mặt ${b} to gấp đôi!`,
+  banana: (a: string, b: string) => `🍌 ${a} đặt vỏ chuối cho ${b}, coi chừng BỊCH!`,
+  mirror: (a: string, b: string) => `🪞 ${a} lật ngược màn hình của ${b}!`,
   quake: (a: string, b: string) => `🌋 ${a} tạo động đất rung lắc máy ${b}!`,
 };

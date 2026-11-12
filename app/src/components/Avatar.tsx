@@ -38,12 +38,37 @@ export function Avatar({
   const borderCol = ring ?? (player.character ? pt.hex : C.ink);
   const rot = useState(() => new Animated.Value(0))[0];
   const shiftX = useState(() => new Animated.Value(0))[0];
+  const grow = useState(() => new Animated.Value(1))[0];
 
   useEffect(() => {
     if (!face.wobble) {
       rot.setValue(0);
       shiftX.setValue(0);
+      grow.setValue(1);
       return;
+    }
+    if (face.wobble === 'big') {
+      // Mặt phồng to gấp đôi rồi lắc lư ngớ ngẩn
+      Animated.spring(grow, { toValue: 2, friction: 3, tension: 120, useNativeDriver: true }).start();
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(rot, { toValue: -0.06, duration: 220, useNativeDriver: true }),
+          Animated.timing(rot, { toValue: 0.06, duration: 220, useNativeDriver: true }),
+        ]),
+      );
+      anim.start();
+      return () => anim.stop();
+    }
+    if (face.wobble === 'slip') {
+      // Trượt vỏ chuối: ngửa ra sau, xoay một vòng rồi nằm sõng soài
+      const anim = Animated.sequence([
+        Animated.timing(rot, { toValue: -0.12, duration: 110, useNativeDriver: true }),
+        Animated.timing(rot, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.timing(rot, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.timing(rot, { toValue: 0.25, duration: 140, useNativeDriver: true }),
+      ]);
+      anim.start();
+      return () => anim.stop();
     }
     if (face.wobble === 'spin') {
       // Xoay qua xoay lại lắc lư rồi lộn vòng 360 độ
@@ -79,7 +104,7 @@ export function Avatar({
     );
     anim.start();
     return () => anim.stop();
-  }, [face.wobble, rot, shiftX]);
+  }, [face.wobble, rot, shiftX, grow]);
 
   const rotateInterpolate = rot.interpolate({
     inputRange: [-1, 1],
@@ -106,6 +131,7 @@ export function Avatar({
             borderColor: borderCol, borderWidth: ring || player.character ? 3.5 : 2.5,
             transform: [
               ...(active ? [{ scale: 1.08 }] : []),
+              { scale: grow },
               { translateX: shiftX },
               { rotate: rotateInterpolate },
             ],

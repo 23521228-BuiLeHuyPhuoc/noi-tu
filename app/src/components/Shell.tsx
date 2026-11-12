@@ -10,6 +10,7 @@ import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { useStableWindow } from '../hooks';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
+import { TrollFxLayer } from './TrollFx';
 import { SkillLayer } from './SkillFx';
 import { Sheet } from './Sheet';
 import { ProfileSheet } from './Account';
@@ -205,6 +206,7 @@ export function Shell({
       {overlay}
       <FunLayer game={game} players={room.players} chat={game.chat} />
       <TrollLayer game={game} players={room.players} />
+      <TrollFxLayer game={game} players={room.players} />
       <SkillLayer game={game} players={room.players} />
       {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
       {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
