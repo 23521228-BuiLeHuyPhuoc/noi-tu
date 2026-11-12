@@ -11,6 +11,7 @@ import { ACCOUNT_PREFIX } from './room';
 import { MemoryStore, MongoStore, type Store } from './store';
 import { MongoWalletStore, type WalletStore } from './walletStore';
 import { WalletEvents } from './wallet';
+import { FunQuota } from './shop';
 
 /** ví Ruby theo nơi lưu tài khoản: MongoDB thì dùng chung kết nối, bộ nhớ thì dùng chung bảng người dùng */
 function walletFor(store: Store): WalletStore {
@@ -41,6 +42,10 @@ export interface GameServerOptions extends Omit<RoomManagerOptions, 'onRoomChang
   mailer?: Mailer | null;
   /** ví Ruby; mặc định theo `store` (bộ nhớ hoặc MongoDB) */
   wallet?: WalletStore;
+  /** đồng hồ (ms) cho điểm danh và lượt chọc miễn phí; mặc định Date.now (test thay được) */
+  now?: () => number;
+  /** số lượt chọc miễn phí mỗi ngày (mặc định 30; test hạ thấp cho nhanh) */
+  freePokes?: number;
 }
 
 export function createGameServer(dict: Dictionary, opts: GameServerOptions = {}): GameServer {
@@ -107,7 +112,8 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });
-  attachSocketHandlers(io, manager, auth, photos, { wallet, store, events: new WalletEvents() });
+  const now = opts.now ?? Date.now;
+  attachSocketHandlers(io, manager, auth, photos, { wallet, store, events: new WalletEvents(), now, quota: new FunQuota(now, opts.freePokes) });
 
   return {
     http,

@@ -1,3 +1,4 @@
+import { GIFT_IDS, SKILL_IDS, type GiftId, type SkillId } from '../../shared/src/shop';
 import {
   DISRUPT_LIMIT, DISRUPT_PAUSE_MS, DISRUPT_WINDOW_MS, DOODLES, EMOJIS, HARD_DISRUPT_KINDS, MAX_HP, NICKNAMES,
   type DoodleKind, type Emoji, type FunEvent, type FunSend, type HitMove, type NicknameId, type ThrowItem, type TauntId,
@@ -40,6 +41,12 @@ export function cleanFun(raw: unknown): FunSend | null {
     return { kind: f.kind, to: f.to };
   }
   if (f.kind === 'charm') return { kind: 'charm' };
+  if ((SKILL_IDS as readonly string[]).includes(f.kind as string) && typeof f.to === 'string') {
+    return { kind: f.kind as SkillId, to: f.to };
+  }
+  if (f.kind === 'gift' && typeof f.to === 'string' && (GIFT_IDS as readonly string[]).includes(f.gift as string)) {
+    return { kind: 'gift', to: f.to, gift: f.gift as GiftId };
+  }
   return null;
 }
 

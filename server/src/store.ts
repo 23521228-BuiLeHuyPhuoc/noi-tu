@@ -7,6 +7,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { MongoClient, ObjectId, type Collection, type Db } from 'mongodb';
 import { MemoryWalletStore } from './walletStore';
 import { isAdmin } from './admin';
+import type { CosmeticSlot, Equipped } from '../../shared/src/shop';
 import { GAME_INFO, type GameStat, type GameType, type LeaderRow, type PublicUser } from '../../shared/src/types';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
@@ -31,6 +32,14 @@ export interface UserRecord {
   topupCode?: string;
   /** đã nhận khuyến mãi nạp lần đầu */
   firstTopupAt?: Date;
+  /** món đã mua (trang trí, bộ sticker) */
+  owned?: string[];
+  /** món đang trang bị theo ô */
+  equipped?: Equipped;
+  /** điểm danh: ngày nhận gần nhất (YYYY-MM-DD giờ VN) và số ngày liên tiếp */
+  checkin?: { lastDay: string; streak: number };
+  /** điểm quà đã nhận */
+  giftPoints?: number;
 }
 
 export interface ResetRecord {
@@ -61,6 +70,13 @@ export interface Store {
   createSession(userId: string): Promise<string>;
   userBySession(token: string): Promise<UserRecord | null>;
   deleteSession(token: string): Promise<void>;
+  /** thêm món vào kho; false nếu đã có (nguyên tử) */
+  addOwned(userId: string, itemId: string): Promise<boolean>;
+  /** trang bị / gỡ một ô (itemId null = gỡ) */
+  setEquipped(userId: string, slot: CosmeticSlot, itemId: string | null): Promise<void>;
+  /** nhận điểm danh hôm nay; false nếu ngày đó đã nhận (nguyên tử, có điều kiện lastDay khác today) */
+  claimCheckin(userId: string, today: string, streak: number): Promise<boolean>;
+  addGiftPoints(userId: string, points: number): Promise<void>;
   /** cộng ván đã chơi / đã thắng cho các tài khoản */
   recordGame(userIds: string[], game: GameType, winnerId: string | null): Promise<void>;
   /** bảng xếp hạng số lần thắng của một game (null = cộng mọi game), chỉ người đã chơi ít nhất 1 ván */
@@ -75,6 +91,7 @@ export function toPublic(u: UserRecord): PublicUser {
   return {
     id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar,
     ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {}, ruby: u.ruby ?? 0,
+    owned: [...(u.owned ?? [])], equipped: { ...(u.equipped ?? {}) }, giftPoints: u.giftPoints ?? 0,
     // mọi đường trả hồ sơ (đăng nhập, sửa hồ sơ, tải ảnh) đều mang cờ quản trị
     ...(isAdmin(u.username) ? { admin: true as const } : {}),
   };
@@ -162,7 +179,7 @@ export class MemoryStore implements Store {
   }
   async userById(id: string) {
     const u = this.users.get(id);
-    return u ? { ...u, stats: { ...u.stats } } : null;
+    return u ? { ...u, stats: { ...u.stats }, ...(u.owned ? { owned: [...u.owned] } : {}), ...(u.equipped ? { equipped: { ...u.equipped } } : {}), ...(u.checkin ? { checkin: { ...u.checkin } } : {}) } : null;
   }
   async updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }) {
     const u = this.users.get(id);
@@ -186,6 +203,31 @@ export class MemoryStore implements Store {
   }
   async deleteSession(token: string) {
     this.sessions.delete(hashToken(token));
+  }
+  async addOwned(userId: string, itemId: string) {
+    const u = this.users.get(userId);
+    if (!u) return false;
+    const owned = (u.owned ??= []);
+    if (owned.includes(itemId)) return false;
+    owned.push(itemId);
+    return true;
+  }
+  async setEquipped(userId: string, slot: CosmeticSlot, itemId: string | null) {
+    const u = this.users.get(userId);
+    if (!u) return;
+    const eq = (u.equipped ??= {});
+    if (itemId === null) delete eq[slot];
+    else eq[slot] = itemId;
+  }
+  async claimCheckin(userId: string, today: string, streak: number) {
+    const u = this.users.get(userId);
+    if (!u || u.checkin?.lastDay === today) return false;
+    u.checkin = { lastDay: today, streak };
+    return true;
+  }
+  async addGiftPoints(userId: string, points: number) {
+    const u = this.users.get(userId);
+    if (u) u.giftPoints = (u.giftPoints ?? 0) + points;
   }
   async recordGame(userIds: string[], game: GameType, winnerId: string | null) {
     for (const id of userIds) {
@@ -239,6 +281,10 @@ interface UserDoc {
   ruby?: number;
   topupCode?: string;
   firstTopupAt?: Date;
+  owned?: string[];
+  equipped?: Equipped;
+  checkin?: { lastDay: string; streak: number };
+  giftPoints?: number;
 }
 
 const fromDoc = (d: UserDoc): UserRecord => ({
@@ -255,6 +301,10 @@ const fromDoc = (d: UserDoc): UserRecord => ({
   ruby: d.ruby ?? 0,
   topupCode: d.topupCode,
   firstTopupAt: d.firstTopupAt,
+  owned: d.owned ?? [],
+  equipped: d.equipped ?? {},
+  checkin: d.checkin,
+  giftPoints: d.giftPoints ?? 0,
 });
 
 export class MongoStore implements Store {
@@ -402,6 +452,22 @@ export class MongoStore implements Store {
   }
   async deleteSession(token: string) {
     await this.sessions.deleteOne({ token: hashToken(token) });
+  }
+  async addOwned(userId: string, itemId: string) {
+    if (!ObjectId.isValid(userId)) return false;
+    // $ne trên mảng: chỉ thêm khi chưa có (hai lần mua song song chỉ một lần thắng)
+    return (await this.users.updateOne({ _id: new ObjectId(userId), owned: { $ne: itemId } }, { $addToSet: { owned: itemId } })).modifiedCount === 1;
+  }
+  async setEquipped(userId: string, slot: CosmeticSlot, itemId: string | null) {
+    if (!ObjectId.isValid(userId)) return;
+    await this.users.updateOne({ _id: new ObjectId(userId) }, itemId === null ? { $unset: { [`equipped.${slot}`]: '' } } : { $set: { [`equipped.${slot}`]: itemId } });
+  }
+  async claimCheckin(userId: string, today: string, streak: number) {
+    if (!ObjectId.isValid(userId)) return false;
+    return (await this.users.updateOne({ _id: new ObjectId(userId), 'checkin.lastDay': { $ne: today } }, { $set: { checkin: { lastDay: today, streak } } })).modifiedCount === 1;
+  }
+  async addGiftPoints(userId: string, points: number) {
+    if (ObjectId.isValid(userId)) await this.users.updateOne({ _id: new ObjectId(userId) }, { $inc: { giftPoints: points } });
   }
   async recordGame(userIds: string[], game: GameType, winnerId: string | null) {
     const ids = userIds.filter((id) => ObjectId.isValid(id));
