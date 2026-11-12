@@ -20,7 +20,7 @@ export const FREE_POKES_PER_DAY = 30;
 export const POKE_OVERFLOW_RUBY = 1;
 
 /** kỹ năng chọc trả phí (kind của FunSend) */
-export const SKILL_IDS = ['lightning', 'freeze', 'cake', 'water', 'dog', 'rocket', 'kiss'] as const;
+export const SKILL_IDS = ['lightning', 'freeze', 'cake', 'water', 'dog', 'rocket', 'kiss', 'duck', 'ufo', 'disco', 'money'] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 
 /** các ô trang trí; mỗi ô trang bị một món */
@@ -44,6 +44,10 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: 'dog', kind: 'skill', name: 'Thả chó', emoji: '🐕', price: 12, desc: 'Chú chó chạy ngang màn hình kèm tiếng sủa' },
   { id: 'rocket', kind: 'skill', name: 'Tên lửa', emoji: '🚀', price: 20, desc: 'Tên lửa bay tới avatar rồi nổ' },
   { id: 'kiss', kind: 'skill', name: 'Hôn gió', emoji: '😘', price: 5, desc: 'Tim bay, avatar đỏ mặt' },
+  { id: 'duck', kind: 'skill', name: 'Đàn vịt đòi nợ', emoji: '🦆', price: 8, desc: 'Đàn vịt chạy tới đòi nợ, chạm để đuổi' },
+  { id: 'ufo', kind: 'skill', name: 'UFO bắt cóc', emoji: '🛸', price: 15, desc: 'Đĩa bay rọi tia bắt cóc, chạm để thoát' },
+  { id: 'disco', kind: 'skill', name: 'Sàn nhảy bất ổn', emoji: '🪩', price: 10, desc: 'Bóng disco và vũ điệu bất ổn, chạm để tắt' },
+  { id: 'money', kind: 'skill', name: 'Đại gia tiền giấy', emoji: '💸', price: 8, desc: 'Mưa tiền giấy cho vui, không cộng Ruby hay điểm quà' },
   // khung avatar
   { id: 'frame_gold', kind: 'frame', name: 'Viền vàng', emoji: '💛', price: 100 },
   { id: 'frame_fire', kind: 'frame', name: 'Viền lửa', emoji: '🔥', price: 200 },
