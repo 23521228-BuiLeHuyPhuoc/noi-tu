@@ -5,6 +5,14 @@ import { doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avata
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
+import { FrameWrap, NameText } from './Cosmetics';
+
+/** màu phủ lên avatar theo chiêu: sét (cháy đen), băng, hôn gió (đỏ mặt) */
+const TINTS = {
+  burnt: { bg: 'rgba(14,10,8,0.74)', emoji: '💨' },
+  ice: { bg: 'rgba(120,205,255,0.55)', emoji: '🧊' },
+  blush: { bg: 'rgba(255,70,110,0.38)', emoji: '😘' },
+} as const;
 
 export function Avatar({
   player, size = 52, active, dim, host, sub, me, onPress, ring, rank, editable,
@@ -78,6 +86,7 @@ export function Avatar({
     outputRange: ['-360deg', '360deg'],
   });
 
+  const cos = player.cosmetics;
   return (
     <Pressable
       onPress={onPress}
@@ -86,6 +95,7 @@ export function Avatar({
       accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : onPress ? `Chọc ${player.name}` : player.name}
       style={[styles.wrap, { minWidth: size + 22, maxWidth: size + 64 }, dim && { opacity: 0.4 }]}
     >
+      <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} active={active}>
       <Animated.View
         testID={`avatar-${player.id}`}
         style={[
@@ -107,6 +117,11 @@ export function Avatar({
         {face.doodle && (
           <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
         )}
+        {face.tint && (
+          <View pointerEvents="none" testID={`tint-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: TINTS[face.tint].bg }]}>
+            <Text style={{ fontSize: Math.max(14, size * 0.4) }}>{TINTS[face.tint].emoji}</Text>
+          </View>
+        )}
         {face.wobble === 'blackout' && (
           <View pointerEvents="none" style={[styles.blackoutMask, { borderRadius: size / 2 }]}>
             <Text style={{ fontSize: 16 }}>🔌</Text>
@@ -123,10 +138,11 @@ export function Avatar({
           </View>
         )}
       </Animated.View>
+      </FrameWrap>
       {/* tên đầy đủ, xuống dòng khi dài (không cắt bớt) */}
-      <Text testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: 7 }]}>
+      <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: 7 }]}>
         {player.name}{me ? ' (bạn)' : ''}
-      </Text>
+      </NameText>
       {face.nick && (
         <Text testID={`nick-${player.id}`} numberOfLines={2} style={styles.nick}>{nickText(face.nick).replace(/\s*\p{Extended_Pictographic}\uFE0F?$/u, '')}</Text>
       )}
@@ -171,9 +187,10 @@ const styles = StyleSheet.create({
 });
 
 /** Chân dung tròn dùng chung (kết quả, trò chuyện, tài khoản): cùng cách vẽ như trong ván. */
-export function Portrait({ p, size = 40, border = 2.5 }: { p: PortraitSource; size?: number; border?: number }) {
+export function Portrait({ p, size = 40, border = 2.5, frame }: { p: PortraitSource; size?: number; border?: number; frame?: string }) {
   const pt = portraitOf(p);
   return (
+    <FrameWrap size={size} frame={frame}>
     <View
       style={{
         width: size, height: size, borderRadius: size / 2, backgroundColor: pt.light, overflow: 'hidden',
@@ -182,5 +199,6 @@ export function Portrait({ p, size = 40, border = 2.5 }: { p: PortraitSource; si
     >
       <Image source={{ uri: pt.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
     </View>
+    </FrameWrap>
   );
 }
