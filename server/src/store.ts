@@ -15,6 +15,7 @@ const byRank = (a: LeaderEntry, b: LeaderEntry) => b.won - a.won || a.played - b
 export interface UserRecord {
   id: string;
   username: string;
+  email?: string;
   displayName: string;
   avatar: number;
   avatarUrl?: string;
@@ -24,9 +25,25 @@ export interface UserRecord {
   stats: Partial<Record<GameType, GameStat>>;
 }
 
+export interface ResetRecord {
+  userId: string;
+  codeHash: string;
+  expiresAt: Date;
+  attempts: number;
+  sentAt: Date[];
+}
+
 export interface Store {
   readonly kind: 'mongo' | 'memory';
-  createUser(u: Omit<UserRecord, 'id' | 'stats'>): Promise<UserRecord | null>;
+  createUser(u: Omit<UserRecord, 'id' | 'stats'>): Promise<UserRecord | 'username_taken' | 'email_taken'>;
+  userByEmail(email: string): Promise<UserRecord | null>;
+  setEmail(userId: string, email: string): Promise<'ok' | 'taken'>;
+  setPassword(userId: string, passHash: string, salt: string): Promise<void>;
+  deleteSessionsExcept(userId: string, keepToken?: string): Promise<void>;
+  saveReset(r: ResetRecord): Promise<void>;
+  getReset(userId: string): Promise<ResetRecord | null>;
+  bumpResetAttempts(userId: string): Promise<number>;
+  deleteReset(userId: string): Promise<boolean>;
   userByName(username: string): Promise<UserRecord | null>;
   userById(id: string): Promise<UserRecord | null>;
   updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }): Promise<UserRecord | null>;
@@ -44,7 +61,7 @@ export interface Store {
 }
 
 export function toPublic(u: UserRecord): PublicUser {
-  return { id: u.id, username: u.username, displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {} };
+  return { id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {} };
 }
 
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
@@ -57,10 +74,17 @@ export class MemoryStore implements Store {
   private users = new Map<string, UserRecord>();
   private sessions = new Map<string, string>();
   private words = new Set<string>();
+  private resets = new Map<string, ResetRecord>();
   private seq = 0;
 
   async createUser(u: Omit<UserRecord, 'id' | 'stats'>) {
-    if (await this.userByName(u.username)) return null;
+    // Keep uniqueness checks and insertion synchronous, like Mongo's unique indexes.
+    for (const existing of this.users.values()) {
+      if (existing.username === u.username) return 'username_taken' as const;
+    }
+    if (u.email) for (const existing of this.users.values()) {
+      if (existing.email === u.email) return 'email_taken' as const;
+    }
     const rec: UserRecord = { ...u, id: (++this.seq).toString(16).padStart(24, '0'), stats: {} };
     this.users.set(rec.id, rec);
     return { ...rec };
@@ -68,6 +92,38 @@ export class MemoryStore implements Store {
   async userByName(username: string) {
     for (const u of this.users.values()) if (u.username === username) return { ...u };
     return null;
+  }
+  async userByEmail(email: string) {
+    for (const u of this.users.values()) if (u.email === email) return { ...u };
+    return null;
+  }
+  async setEmail(userId: string, email: string): Promise<'ok' | 'taken'> {
+    for (const u of this.users.values()) if (u.id !== userId && u.email === email) return 'taken';
+    const user = this.users.get(userId);
+    if (user) user.email = email;
+    return 'ok';
+  }
+  async setPassword(userId: string, passHash: string, salt: string) {
+    const user = this.users.get(userId);
+    if (user) Object.assign(user, { passHash, salt });
+  }
+  async deleteSessionsExcept(userId: string, keepToken?: string) {
+    const keepHash = keepToken === undefined ? undefined : hashToken(keepToken);
+    for (const [token, id] of this.sessions) if (id === userId && token !== keepHash) this.sessions.delete(token);
+  }
+  async saveReset(r: ResetRecord) {
+    this.resets.set(r.userId, structuredClone(r));
+  }
+  async getReset(userId: string) {
+    const r = this.resets.get(userId);
+    return r ? structuredClone(r) : null;
+  }
+  async bumpResetAttempts(userId: string) {
+    const r = this.resets.get(userId);
+    return r ? ++r.attempts : 0;
+  }
+  async deleteReset(userId: string) {
+    return this.resets.delete(userId);
   }
   async userById(id: string) {
     const u = this.users.get(id);
@@ -136,6 +192,7 @@ export class MemoryStore implements Store {
 interface UserDoc {
   _id: ObjectId;
   username: string;
+  email?: string;
   displayName: string;
   avatar: number;
   avatarUrl?: string;
@@ -149,6 +206,7 @@ interface UserDoc {
 const fromDoc = (d: UserDoc): UserRecord => ({
   id: d._id.toHexString(),
   username: d.username,
+  email: d.email,
   displayName: d.displayName,
   avatar: d.avatar,
   avatarUrl: d.avatarUrl,
@@ -165,15 +223,19 @@ export class MongoStore implements Store {
     private readonly users: Collection<UserDoc>,
     private readonly sessions: Collection<{ token: string; userId: ObjectId; createdAt: Date }>,
     private readonly words: Collection<{ word: string; by: string; createdAt: Date }>,
+    private readonly resets: Collection<ResetRecord>,
   ) {}
 
   static async connect(uri: string, dbName = 'xomlay'): Promise<MongoStore> {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10_000, appName: 'xom-lay' });
     await client.connect();
     const db: Db = client.db(dbName);
-    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'));
+    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'));
     await Promise.all([
       store.users.createIndex({ username: 1 }, { unique: true }),
+      store.users.createIndex({ email: 1 }, { unique: true, sparse: true }),
+      store.resets.createIndex({ userId: 1 }, { unique: true }),
+      store.resets.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       store.sessions.createIndex({ token: 1 }, { unique: true }),
       // phiên đăng nhập tự hết hạn sau 180 ngày
       store.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }),
@@ -185,16 +247,54 @@ export class MongoStore implements Store {
   async createUser(u: Omit<UserRecord, 'id' | 'stats'>) {
     try {
       const doc: UserDoc = { _id: new ObjectId(), ...u, stats: {}, createdAt: new Date() };
+      if (doc.email === undefined) delete doc.email;
       await this.users.insertOne(doc);
       return fromDoc(doc);
     } catch (e) {
-      if ((e as { code?: number }).code === 11000) return null; // trùng tên đăng nhập
+      const duplicate = e as { code?: number; keyPattern?: Record<string, number> };
+      if (duplicate.code === 11000) return duplicate.keyPattern?.email ? 'email_taken' as const : 'username_taken' as const;
       throw e;
     }
   }
   async userByName(username: string) {
     const d = await this.users.findOne({ username });
     return d ? fromDoc(d) : null;
+  }
+  async userByEmail(email: string) {
+    const d = await this.users.findOne({ email });
+    return d ? fromDoc(d) : null;
+  }
+  async setEmail(userId: string, email: string): Promise<'ok' | 'taken'> {
+    if (!ObjectId.isValid(userId)) return 'ok';
+    try {
+      await this.users.updateOne({ _id: new ObjectId(userId) }, { $set: { email } });
+      return 'ok';
+    } catch (e) {
+      if ((e as { code?: number }).code === 11000) return 'taken';
+      throw e;
+    }
+  }
+  async setPassword(userId: string, passHash: string, salt: string) {
+    if (!ObjectId.isValid(userId)) return;
+    await this.users.updateOne({ _id: new ObjectId(userId) }, { $set: { passHash, salt } });
+  }
+  async deleteSessionsExcept(userId: string, keepToken?: string) {
+    if (!ObjectId.isValid(userId)) return;
+    await this.sessions.deleteMany({ userId: new ObjectId(userId), ...(keepToken === undefined ? {} : { token: { $ne: hashToken(keepToken) } }) });
+  }
+  async saveReset(r: ResetRecord) {
+    await this.resets.replaceOne({ userId: r.userId }, r, { upsert: true });
+  }
+  async getReset(userId: string): Promise<ResetRecord | null> {
+    const r = await this.resets.findOne({ userId }, { projection: { _id: 0 } });
+    return r;
+  }
+  async bumpResetAttempts(userId: string) {
+    const r = await this.resets.findOneAndUpdate({ userId }, { $inc: { attempts: 1 } }, { returnDocument: 'after' });
+    return r?.attempts ?? 0;
+  }
+  async deleteReset(userId: string) {
+    return (await this.resets.deleteOne({ userId })).deletedCount === 1;
   }
   async userById(id: string) {
     if (!ObjectId.isValid(id)) return null;

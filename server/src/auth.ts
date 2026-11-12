@@ -48,7 +48,7 @@ export class Auth {
     if (!displayName) return { ack: fail('invalid_name') };
     const avatar = okAvatar(p.avatar) ? p.avatar : Math.floor(Math.random() * 16);
     const user = await this.store.createUser({ username, displayName, avatar, ...(await hashPassword(p.password)) });
-    if (!user) return { ack: fail('username_taken') };
+    if (typeof user === 'string') return { ack: fail('username_taken') };
     return this.session(user);
   }
 

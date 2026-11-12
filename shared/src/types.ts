@@ -533,6 +533,7 @@ export interface GameStat {
 export interface PublicUser {
   id: string;
   username: string;
+  email?: string;
   displayName: string;
   avatar: number;
   avatarUrl?: string;

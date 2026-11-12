@@ -54,7 +54,11 @@ describe('Phòng công khai / riêng tư và mời ra', () => {
 describe('Bảng xếp hạng', () => {
   it('xếp theo số lần thắng; bằng nhau thì ai chơi ít ván hơn đứng trên; chỉ tính người đã chơi', async () => {
     const st = new MemoryStore();
-    const mk = async (n: string) => (await st.createUser({ username: n, displayName: n.toUpperCase(), avatar: 0, passHash: 'x', salt: 'y' }))!;
+    const mk = async (n: string) => {
+      const user = await st.createUser({ username: n, displayName: n.toUpperCase(), avatar: 0, passHash: 'x', salt: 'y' });
+      if (typeof user === 'string') throw new Error(user);
+      return user;
+    };
     const a = await mk('an');
     const b = await mk('binh');
     const c = await mk('chi');
@@ -143,6 +147,7 @@ describe('Sảnh phòng, mời ra và bảng xếp hạng qua server', () => {
 
   it('bảng xếp hạng qua /api/leaderboard', async () => {
     const u = (await store.createUser({ username: 'an', displayName: 'An', avatar: 3, passHash: 'x', salt: 'y' }))!;
+    if (typeof u === 'string') throw new Error(u);
     await store.recordGame([u.id], GAME, u.id);
     const get = async (q: string) => fetch(`${url}/api/leaderboard${q}`);
     const one = (await (await get(`?game=${GAME}`)).json()) as { rows: LeaderRow[] };
