@@ -5,7 +5,7 @@
  * - Hết xu thì được "vay nóng" 500 xu (bị ghi nợ). Chủ phòng bấm "Tổng kết" để kết thúc.
  */
 import {
-  BAUCUA_BET_SECONDS, BAUCUA_DEFAULT_ROUNDS, BAUCUA_LOAN, BAUCUA_RESULT_SECONDS, BAUCUA_START, BAUCUA_SYMBOLS,
+  BAUCUA_BET_SECONDS, BAUCUA_DEFAULT_ROUNDS, BAUCUA_LOAN, BAUCUA_RESULT_SECONDS, BAUCUA_START, BAUCUA_SYMBOLS, BAUCUA_CHIPS,
   type ActionResult, type BauCuaSymbol, type BauCuaView, type GameAction,
 } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
@@ -109,6 +109,21 @@ export class BauCuaGame implements GameEngine {
       recent: this.recent,
       names: this.names,
     };
+  }
+
+  /**
+   * Máy chơi Bầu cua: trò may rủi nên "thông minh" chỉ là quản lý vốn: mỗi ván đặt một cửa ngẫu nhiên
+   * khoảng 10–15% số xu đang có (theo mệnh giá chip), cháy túi thì vay. Xúc xắc vẫn công bằng.
+   */
+  botAction(playerId: string): GameAction | null {
+    if (this.over || this.step !== 'betting' || !this.ids.includes(playerId)) return null;
+    const avail = this.available(playerId);
+    if (avail < 10) return { type: 'loan' };
+    if (Object.values(this.bets[playerId] ?? {}).some((v) => (v ?? 0) > 0)) return null;
+    const target = Math.max(10, avail * 0.12);
+    const chip = [...BAUCUA_CHIPS].reverse().find((c) => c <= target && c <= avail) ?? 10;
+    const symbol = BAUCUA_SYMBOLS[Math.floor(this.ctx.rng() * BAUCUA_SYMBOLS.length) % BAUCUA_SYMBOLS.length];
+    return { type: 'bet', symbol, amount: chip };
   }
 
   /** người chơi đổi tên giữa ván */

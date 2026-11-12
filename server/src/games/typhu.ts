@@ -223,6 +223,59 @@ export class TyPhuGame implements GameEngine {
     }
   }
 
+  /**
+   * Máy chơi Cờ tỷ phú (mức mạnh nhất, theo luật kinh nghiệm):
+   * - luôn giữ một khoản dự phòng để không phá sản vì tiền thuê; mua đất khi còn dư dự phòng,
+   *   đất giúp gom đủ bộ màu / ga thì mua kể cả khi dự phòng mỏng;
+   * - nâng nhà ở đất của mình khi còn dư dự phòng; ở tù: dùng vé, đủ giàu thì trả tiền ra ngay, không thì ngồi chờ đổ đôi;
+   * - nợ: bán nhà trước (ô rẻ trước), hết nhà mới bán đất.
+   */
+  botAction(playerId: string): GameAction | null {
+    if (this.over || this.movement) return null;
+    const me = this.players[this.current];
+    if (!me || me.id !== playerId || me.bankrupt) return null;
+    const reserve = 150 + 40 * this.players.filter((p) => !p.bankrupt && p.id !== me.id).length;
+    switch (this.step) {
+      case 'roll':
+        if (me.jail === null) return { type: 'roll' };
+        if ((this.tickets[me.id] ?? 0) > 0) return { type: 'useTicket' };
+        if (me.cash >= TYPHU_JAIL_FINE + reserve * 2 || me.jail >= TYPHU_JAIL_MAX) {
+          return me.cash >= TYPHU_JAIL_FINE ? { type: 'payJail' } : null;
+        }
+        return { type: 'stayJail' };
+      case 'ticket':
+        return me.cash >= TYPHU_JAIL_TICKET + reserve * 3 ? { type: 'buy' } : { type: 'skip' };
+      case 'buy': {
+        const cell = this.pendingBuy;
+        const c = cell === null ? undefined : TYPHU_BOARD[cell];
+        if (!c || !isTyPhuProperty(c) || me.cash < c.price) return { type: 'skip' };
+        const mates = c.kind === 'land' ? groupCells(c.group) : TYPHU_BOARD.flatMap((x, i) => (x.kind === c.kind ? [i] : []));
+        const owned = mates.filter((i) => i !== cell && this.owners[i] === me.id).length;
+        const othersOwn = mates.some((i) => i !== cell && this.owners[i] && this.owners[i] !== me.id);
+        const completes = c.kind === 'land' && !othersOwn && owned === mates.length - 1;
+        const left = me.cash - c.price;
+        return left >= reserve || ((completes || owned > 0) && left >= reserve / 3) ? { type: 'buy' } : { type: 'skip' };
+      }
+      case 'upgrade': {
+        const cell = this.pendingBuy;
+        if (cell === null) return { type: 'skip' };
+        return me.cash - upgradeCostOf(cell) >= reserve ? { type: 'build', cell } : { type: 'skip' };
+      }
+      case 'manage':
+        return { type: 'endTurn' };
+      case 'debt': {
+        const mine = Object.keys(this.owners).map(Number).filter((i) => this.owners[i] === me.id);
+        if (mine.length === 0) return null;
+        const price = (i: number) => { const c = TYPHU_BOARD[i]; return isTyPhuProperty(c) ? c.price : 0; };
+        const withHouses = mine.filter((i) => (this.houses[i] ?? 0) > 0).sort((a, b) => price(a) - price(b));
+        const cell = withHouses[0] ?? [...mine].sort((a, b) => price(a) - price(b))[0];
+        return { type: 'sell', cell };
+      }
+      default:
+        return null;
+    }
+  }
+
   removePlayer(playerId: string): void {
     const idx = this.players.findIndex((p) => p.id === playerId);
     const p = this.players[idx];

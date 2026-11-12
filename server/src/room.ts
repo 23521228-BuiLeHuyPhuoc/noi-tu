@@ -38,6 +38,8 @@ interface Player {
   account: boolean;
   /** người chơi đã tự chỉnh nhân vật trong phòng: không tự đổi theo avatar tài khoản nữa */
   characterCustom?: boolean;
+  /** người chơi máy (chủ phòng thêm vào) */
+  bot?: boolean;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -51,6 +53,13 @@ const AVATAR_COUNT = AVATAR_PRESETS.length;
 /** nhân vật mặc định của khách luân phiên 3 kiểu đầu (không tự gán 'LGBT+' cho ai) */
 const DEFAULT_GENDERS = CHARACTER_GENDERS.slice(0, 3);
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
+
+/** tên người chơi máy */
+const BOT_NAMES = ['Máy Tèo', 'Máy Tí', 'Máy Mít', 'Máy Bông', 'Máy Su', 'Máy Bi'];
+/** máy "suy nghĩ" bao lâu trước mỗi nước (ms) */
+const BOT_THINK_MS: Record<GameType, [number, number]> = {
+  wordchain: [1500, 3200], wordchain_en: [1500, 3200], baucua: [700, 2200], typhu: [900, 1700],
+};
 
 export function cleanName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -84,6 +93,8 @@ export class Room {
   readonly disruptLimiter = new WindowLimiter();
   private readonly graceMs: number;
   private readonly rng: Rng;
+  /** ngẫu nhiên riêng cho thời gian máy suy nghĩ (không làm lệch dãy ngẫu nhiên của ván) */
+  private readonly botRng: Rng = Math.random;
   private readonly onChange: (room: Room) => void;
 
   constructor(readonly code: string, private readonly dict: Dictionary, private readonly opts: RoomOptions = {}) {
@@ -93,8 +104,64 @@ export class Room {
     this.hp = new HpBoard(this.rng);
   }
 
+  /** số người thật đang kết nối (máy không tính: phòng chỉ còn máy thì được dọn) */
   get connectedCount(): number {
-    return this.players.filter((p) => p.connected).length;
+    return this.players.filter((p) => p.connected && !p.bot).length;
+  }
+
+  isBot(playerId: string): boolean {
+    return this.find(playerId)?.bot === true;
+  }
+
+  // ---------- máy chơi ----------
+
+  /** Chủ phòng thêm một người chơi máy (chỉ ở phòng chờ). */
+  addBot(byId: string): Result<{ playerId: string }> {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
+    if (this.phase === 'finished') this.backToLobby();
+    const used = new Set(this.players.map((p) => p.name.toLowerCase()));
+    const base = BOT_NAMES.find((n) => !used.has(n.toLowerCase())) ?? 'Máy';
+    const id = `bot-${randomUUID().slice(0, 12)}`;
+    this.players.push({
+      id, name: this.uniqueName(base), connected: true, avatar: this.freeAvatar(), character: this.spreadCharacter(), account: false, bot: true,
+    });
+    this.changed();
+    return { ok: true, playerId: id };
+  }
+
+  /** Chủ phòng bỏ một người chơi máy (chỉ ở phòng chờ / sau ván). */
+  removeBot(byId: string, botId: unknown): Result {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    const p = typeof botId === 'string' ? this.find(botId) : undefined;
+    if (!p?.bot) return { ok: false, error: 'bad_request' };
+    this.removePlayer(p.id);
+    return { ok: true };
+  }
+
+  /** hẹn giờ cho máy tới lượt ra tay (mỗi lúc một máy; mỗi lần trạng thái đổi thì xét lại) */
+  private botTimer?: ReturnType<typeof setTimeout>;
+  private scheduleBots(): void {
+    if (this.botTimer || this.phase !== 'playing' || !this.engine?.botAction) return;
+    const engine = this.engine;
+    const bot = this.players.find((p) => p.bot && this.participants.includes(p.id) && engine.botAction!(p.id));
+    if (!bot) return;
+    const [lo, hi] = BOT_THINK_MS[this.gameType];
+    const delay = Math.round(lo + this.botRng() * (hi - lo));
+    this.botTimer = setTimeout(() => {
+      this.botTimer = undefined;
+      if (this.phase !== 'playing' || this.engine !== engine) return;
+      // xét lại lúc ra tay: trạng thái có thể đã đổi trong lúc "suy nghĩ"
+      const a = engine.botAction!(bot.id);
+      if (a) this.action(bot.id, a);
+      this.scheduleBots();
+    }, delay);
+  }
+  private clearBotTimer(): void {
+    if (this.botTimer) clearTimeout(this.botTimer);
+    this.botTimer = undefined;
   }
 
   has(playerId: string): boolean {
@@ -371,7 +438,8 @@ export class Room {
     this.players = this.players.filter((x) => x.id !== p.id);
     this.hp.remove(p.id);
     this.disruptLimiter.remove(p.id);
-    if (this.hostId === p.id) this.hostId = this.players[0]?.id ?? '';
+    // chủ phòng rời đi: trao cho người thật kế tiếp (máy không làm chủ phòng được)
+    if (this.hostId === p.id) this.hostId = (this.players.find((x) => !x.bot) ?? this.players[0])?.id ?? '';
     if (this.phase === 'playing') this.engine?.removePlayer(p.id);
     this.changed();
   }
@@ -451,6 +519,7 @@ export class Room {
         character: p.character,
         ...(this.isSpectator(p.id) ? { spectator: true } : {}),
         ...(p.account ? { account: true } : {}),
+        ...(p.bot ? { bot: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,
       gameType: this.gameType,
@@ -472,6 +541,7 @@ export class Room {
   }
 
   dispose(): void {
+    this.clearBotTimer();
     this.engine?.dispose();
     for (const p of this.players) this.clearRemoveTimer(p);
   }
@@ -486,6 +556,7 @@ export class Room {
       turnMs: this.opts.turnMs,
       hostId: () => this.hostId,
       isConnected: (id: string) => this.find(id)?.connected ?? false,
+      isBot: (id: string) => this.isBot(id),
       changed: () => {
         if (this.phase === 'playing') this.changed();
       },
@@ -515,6 +586,7 @@ export class Room {
   }
 
   private backToLobby(): void {
+    this.clearBotTimer();
     this.engine?.dispose();
     this.engine = null;
     this.result = null;
@@ -584,5 +656,6 @@ export class Room {
 
   private changed(): void {
     this.onChange(this);
+    this.scheduleBots();
   }
 }

@@ -18,6 +18,8 @@ export interface EngineContext {
   hostId: () => string;
   /** người chơi còn kết nối không (để tự đi thay người đang mất mạng) */
   isConnected: (playerId: string) => boolean;
+  /** người chơi là máy (không bỏ phiếu duyệt từ, không cần chờ kết nối) */
+  isBot?: (playerId: string) => boolean;
   /** báo trạng thái đã đổi để server phát cho mọi người */
   changed: () => void;
   /** kết thúc ván */
@@ -39,6 +41,11 @@ export interface GameEngine {
   disrupt?(playerId: string, ms: number): number;
   /** người chơi đổi tên giữa ván */
   renamePlayer?(playerId: string, name: string): void;
+  /**
+   * Máy chơi: nước đi tốt nhất lúc này cho người chơi máy `playerId`, hoặc null nếu chưa tới lượt / không cần làm gì.
+   * Room tự hẹn giờ (giả vờ suy nghĩ) rồi gọi action() như người thật.
+   */
+  botAction?(playerId: string): GameAction | null;
   view(): GameView;
   dispose(): void;
 }

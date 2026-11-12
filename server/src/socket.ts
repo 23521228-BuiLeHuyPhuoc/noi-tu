@@ -151,6 +151,20 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       ack(room.configure(session.playerId, p.gameType, p.settings));
     });
 
+    // chủ phòng thêm / bỏ máy chơi cùng (phòng chờ)
+    socket.on('room:addBot', (ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.addBot(session.playerId));
+    });
+    socket.on('room:removeBot', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.removeBot(session.playerId, p?.id));
+    });
+
     socket.on('player:customize', (p, ack) => {
       if (typeof ack !== 'function') return;
       const room = currentRoom();

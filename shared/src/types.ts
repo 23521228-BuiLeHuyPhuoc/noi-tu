@@ -174,6 +174,8 @@ export interface PublicPlayer {
   spectator?: boolean;
   /** đã đăng nhập tài khoản (có lưu thành tích) */
   account?: boolean;
+  /** người chơi máy */
+  bot?: boolean;
 }
 
 export interface RankEntry {
@@ -621,6 +623,9 @@ export interface ClientToServerEvents {
   'room:join': (p: { code: string; name: string; playerId?: string; avatar?: number; avatarUrl?: string }, ack: (r: Ack<JoinResult>) => void) => void;
   'room:config': (p: { gameType?: GameType; settings?: Partial<RoomSettings> }, ack: (r: Ack) => void) => void;
   'player:customize': (p: Partial<CharacterConfig>, ack: (r: Ack) => void) => void;
+  /** chủ phòng thêm / bỏ người chơi máy (ở phòng chờ) */
+  'room:addBot': (ack: (r: Ack<{ playerId: string }>) => void) => void;
+  'room:removeBot': (p: { id: string }, ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   'game:restart': (ack: (r: Ack) => void) => void;

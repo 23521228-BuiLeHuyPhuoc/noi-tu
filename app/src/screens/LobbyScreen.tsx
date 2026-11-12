@@ -129,6 +129,29 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       <RoomManageCard game={game} room={room} />
 
+      {/* máy chơi cùng: máy chơi hết sức (Nối từ: dồn vào ngõ cụt) */}
+      {(isHost || room.players.some((p) => p.bot)) && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🤖 Chơi với máy</T>
+          {room.players.filter((p) => p.bot).map((p) => (
+            <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <T style={{ flex: 1, fontWeight: '800' }}>{p.name}</T>
+              {isHost && <Button testID={`bot-remove-${p.id}`} small variant="paper" title="Bỏ" onPress={async () => { const e = await game.removeBot(p.id); if (e) feed(e, 'bad'); }} />}
+            </View>
+          ))}
+          {isHost && (
+            <Button
+              testID="bot-add"
+              small
+              variant="gold"
+              title={n >= room.maxPlayers ? 'Phòng đã đủ người' : 'Thêm máy chơi cùng'}
+              disabled={n >= room.maxPlayers}
+              onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); }}
+            />
+          )}
+        </Card>
+      )}
+
       <T style={styles.section}>{isHost ? 'Chọn game' : 'Game của phòng'}</T>
       {isHost ? (
         <View style={styles.games}>

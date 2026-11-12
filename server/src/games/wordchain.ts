@@ -144,7 +144,7 @@ export class WordChainGame implements GameEngine {
   private appeal(playerId: string, word: string): ActionResult {
     if (this.appealedTurn) return { ok: false, reason: 'cannot_appeal' };
     const voters = this.players
-      .filter((p) => p.id !== playerId && !p.eliminated && this.ctx.isConnected(p.id))
+      .filter((p) => p.id !== playerId && !p.eliminated && this.ctx.isConnected(p.id) && !this.ctx.isBot?.(p.id))
       .map((p) => p.id);
     if (voters.length === 0) return { ok: false, reason: 'no_voters' };
     const by = this.find(playerId)!;
@@ -247,6 +247,38 @@ export class WordChainGame implements GameEngine {
     this.timer.set(left + add, () => this.timeout());
     this.ctx.changed();
     return add;
+  }
+
+  /**
+   * Máy chơi (mức mạnh nhất): biết hết từ điển, chọn từ để lại ÍT đường nối tiếp nhất cho người sau
+   * (tốt nhất là ngõ cụt), hòa thì chọn ngẫu nhiên. Không còn từ nào thì đứng im tới hết giờ.
+   */
+  botAction(playerId: string): GameAction | null {
+    if (this.over || this.vote || playerId !== this.currentId) return null;
+    const p = this.find(playerId);
+    if (!p || p.eliminated) return null;
+    const options = this.dict.nextOptions(this.lastUnit(this.currentWord), this.used);
+    if (options.length === 0) return null;
+    const firstUnit = (w: string) => (this.lang === 'en' ? firstLetter(w) : firstSyllable(w));
+    const left = new Map<string, number>();
+    let best: string[] = [];
+    let bestScore = Infinity;
+    for (const w of options) {
+      const u = this.lastUnit(w);
+      let n = left.get(u);
+      if (n === undefined) {
+        n = this.dict.countNext(u, this.used);
+        left.set(u, n);
+      }
+      // sau khi dùng w thì chính w không còn trong danh sách nối tiếp của u
+      const score = n - (firstUnit(w) === u ? 1 : 0);
+      if (score < bestScore) {
+        bestScore = score;
+        best = [w];
+      } else if (score === bestScore) best.push(w);
+    }
+    const word = best[Math.floor(this.ctx.rng() * best.length)];
+    return { type: 'submit', word };
   }
 
   /** người chơi đổi tên giữa ván */
