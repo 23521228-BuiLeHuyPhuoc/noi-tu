@@ -138,7 +138,20 @@ await cur.page.locator(tid('word-input')).fill('');
   check((await cur.page.locator(tid('hint-btn')).count()) === 0 || !(await cur.page.locator(tid('turn-label')).textContent()).includes('Tới lượt bạn'), 'hết lượt cứu trợ / đã chuyển lượt');
 }
 
+/** người đang tới lượt nối một từ để mở lượt mới (còn ~30 giây) trước các bước chậm, tránh ván hết giờ giữa chừng */
+async function freshTurn() {
+  const p = await turnOwner();
+  if (!p) return;
+  const last = await lockedLetter(p);
+  const w = byFirst.get(last).find((x) => !used.has(x));
+  used.add(w);
+  await p.page.locator(tid('word-input')).fill(w.slice(1));
+  await p.page.locator(tid('submit-btn')).click();
+  await waitFor(async () => (await currentWord(an)) === w);
+}
+
 // ---------- đổi tên giữa ván: tên dài hiện đầy đủ ----------
+await freshTurn();
 const longName = 'Nguyễn Thị Phương Thảo';
 await binh.page.locator(tid('profile-open')).click();
 await binh.page.locator(tid('profile-name')).fill(longName);
@@ -148,6 +161,7 @@ check(!!seen, 'đổi tên giữa ván: người khác thấy tên mới đầy 
 await an.page.screenshot({ path: `${SHOTS}/en-rename.png` });
 
 // ---------- tải ảnh giữa ván (khách) ----------
+await freshTurn();
 {
   // PNG 2x2 đỏ
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
@@ -164,6 +178,7 @@ await an.page.screenshot({ path: `${SHOTS}/en-rename.png` });
 }
 
 // ---------- chọc: tối đa 3 lần rung màn hình / 15 giây, bù giờ khi đang tới lượt ----------
+await freshTurn();
 {
   cur = await turnOwner();
   const victim = cur;
