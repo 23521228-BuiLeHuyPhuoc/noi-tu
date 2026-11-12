@@ -6,6 +6,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { MongoClient, ObjectId, type Collection, type Db } from 'mongodb';
 import { MemoryWalletStore } from './walletStore';
+import { isAdmin } from './admin';
 import { GAME_INFO, type GameStat, type GameType, type LeaderRow, type PublicUser } from '../../shared/src/types';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
@@ -71,7 +72,12 @@ export interface Store {
 }
 
 export function toPublic(u: UserRecord): PublicUser {
-  return { id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {}, ruby: u.ruby ?? 0 };
+  return {
+    id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar,
+    ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {}, ruby: u.ruby ?? 0,
+    // mọi đường trả hồ sơ (đăng nhập, sửa hồ sơ, tải ảnh) đều mang cờ quản trị
+    ...(isAdmin(u.username) ? { admin: true as const } : {}),
+  };
 }
 
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');

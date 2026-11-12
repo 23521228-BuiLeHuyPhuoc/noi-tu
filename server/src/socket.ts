@@ -5,6 +5,7 @@ import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
 import { cleanFun, isDisruptive, isHardDisrupt, isScreenTroll, isTroll, pauseMsOf, RateLimiter, trollExtras, WindowLimiter } from './fun';
 import type { Auth } from './auth';
 import { PhotoService } from './avatar';
+import { attachWalletHandlers, type WalletContext } from './wallet';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import type { UserRecord } from './store';
 
@@ -18,7 +19,7 @@ export function broadcastRoom(io: IO, room: Room): void {
 let funSeq = 0;
 
 /** Gắn các xử lý sự kiện. Server là trọng tài duy nhất: mọi kiểm tra đều ở đây và trong Room/engine. */
-export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, photos: PhotoService = new PhotoService()): void {
+export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, photos: PhotoService = new PhotoService(), walletCtx?: WalletContext): void {
   // socket đang đại diện cho mỗi người chơi ("CODE:playerId" -> socket.id)
   const activeSocket = new Map<string, string>();
   const key = (code: string, playerId: string) => `${code}:${playerId}`;
@@ -334,6 +335,8 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
         room.updateProfile(session.playerId, updated.displayName, updated.avatar, updated.avatarUrl);
     };
     auth.profiles.on('updated', profileChanged);
-    socket.on('disconnect', () => { auth.profiles.off('updated', profileChanged); detach(false); });
+    // ví Ruby + quản trị
+    const detachWallet = walletCtx ? attachWalletHandlers(socket, walletCtx, () => user) : () => {};
+    socket.on('disconnect', () => { auth.profiles.off('updated', profileChanged); detachWallet(); detach(false); });
   });
 }

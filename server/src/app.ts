@@ -10,6 +10,7 @@ import { Auth } from './auth';
 import { ACCOUNT_PREFIX } from './room';
 import { MemoryStore, MongoStore, type Store } from './store';
 import { MongoWalletStore, type WalletStore } from './walletStore';
+import { WalletEvents } from './wallet';
 
 /** ví Ruby theo nơi lưu tài khoản: MongoDB thì dùng chung kết nối, bộ nhớ thì dùng chung bảng người dùng */
 function walletFor(store: Store): WalletStore {
@@ -106,7 +107,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });
-  attachSocketHandlers(io, manager, auth, photos);
+  attachSocketHandlers(io, manager, auth, photos, { wallet, store, events: new WalletEvents() });
 
   return {
     http,

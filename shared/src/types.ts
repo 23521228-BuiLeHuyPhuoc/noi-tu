@@ -558,6 +558,12 @@ export interface TopupRequest {
   ruby?: number;
 }
 
+export type WalletError = 'need_account' | 'bad_request' | 'too_many' | 'forbidden' | 'not_found' | 'already_handled' | 'insufficient' | 'rate_limited';
+/** ack của lệnh ví / quản trị */
+export type WalletAck<T = {}> = (r: ({ ok: true } & T) | { ok: false; error: WalletError }) => void;
+export interface WalletInfo { ruby: number; topupCode: string; firstTopupDone: boolean; pending: TopupRequest[] }
+export interface WalletUpdate { ruby: number; delta: number; reason: string }
+
 /** một dòng sổ Ruby */
 export interface RubyLedgerRow {
   delta: number;
@@ -638,6 +644,17 @@ export interface ClientToServerEvents {
   'auth:resume': (p: { token: string }, ack: (r: AuthAck) => void) => void;
   'auth:update': (p: { displayName?: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:logout': (ack: (r: { ok: boolean }) => void) => void;
+  // ví Ruby (chỉ tài khoản)
+  'wallet:get': (ack: WalletAck<WalletInfo>) => void;
+  'wallet:request': (p: { amount: number }, ack: WalletAck<{ request: TopupRequest }>) => void;
+  'wallet:history': (ack: WalletAck<{ rows: RubyLedgerRow[] }>) => void;
+  // quản trị (ADMIN_USERNAMES)
+  'admin:requests': (p: { status: TopupRequest['status'] }, ack: WalletAck<{ requests: TopupRequest[] }>) => void;
+  'admin:approve': (p: { id: string; amount?: number }, ack: WalletAck<{ request: TopupRequest; ruby: number; balance: number }>) => void;
+  'admin:reject': (p: { id: string }, ack: WalletAck<{ request: TopupRequest }>) => void;
+  'admin:creditCode': (p: { code: string; amount: number }, ack: WalletAck<{ request: TopupRequest; ruby: number; balance: number }>) => void;
+  'admin:adjust': (p: { username: string; delta: number; reason: string }, ack: WalletAck<{ balance: number }>) => void;
+  'admin:revenue': (ack: WalletAck<{ today: number; month: number; total: number }>) => void;
 }
 
 export interface ServerToClientEvents {
@@ -647,4 +664,8 @@ export interface ServerToClientEvents {
   'chat:history': (ms: ChatMsg[]) => void;
   /** bạn vừa bị chủ phòng mời ra khỏi phòng */
   'room:kicked': (p: { code: string }) => void;
+  /** số dư Ruby vừa đổi (quản trị duyệt nạp, cộng/trừ tay) */
+  'wallet:update': (p: WalletUpdate) => void;
+  /** yêu cầu nạp bị từ chối */
+  'wallet:rejected': (p: { amount: number }) => void;
 }
