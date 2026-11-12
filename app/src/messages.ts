@@ -1,3 +1,4 @@
+import type { ShopError } from '../../shared/src/shop';
 import type { ActionError, AuthError, WalletError, BauCuaSymbol, DoodleKind, ErrorCode, GameType, HitMove, NicknameId, TauntId, ThrowItem } from '../../shared/src/types';
 
 export const errorText: Record<ErrorCode, string> = {
@@ -22,6 +23,17 @@ export const walletText: Record<WalletError, string> = {
   not_found: 'Không tìm thấy (mã nạp, yêu cầu hoặc tài khoản).',
   already_handled: 'Yêu cầu này đã được xử lý rồi.',
   insufficient: 'Không đủ Ruby để trừ.',
+  rate_limited: 'Thao tác nhanh quá, đợi chút rồi thử lại.',
+};
+
+export const shopText: Record<ShopError, string> = {
+  need_account: 'Cần đăng nhập tài khoản để dùng cửa hàng.',
+  bad_request: 'Món này không mua được.',
+  not_found: 'Không tìm thấy món này.',
+  insufficient: 'Không đủ Ruby, nạp thêm nhé.',
+  already_owned: 'Bạn đã có món này rồi.',
+  not_owned: 'Bạn chưa mua món này.',
+  already_claimed: 'Hôm nay bạn đã điểm danh rồi, mai quay lại nhé.',
   rate_limited: 'Thao tác nhanh quá, đợi chút rồi thử lại.',
 };
 

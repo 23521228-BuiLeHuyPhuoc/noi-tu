@@ -12,6 +12,7 @@ import { Button, Card, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { authText } from '../messages';
 import { WalletSheet } from './Wallet';
+import { ShopSheet } from './Shop';
 import { AdminSheet } from './Admin';
 
 function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
@@ -35,8 +36,8 @@ function AvatarPicker({ value, onChange, disabled = false }: { value: number; on
   );
 }
 
-function UserAvatar({ avatar, avatarUrl, size = 60 }: { avatar: number; avatarUrl?: string; size?: number }) {
-  return <Portrait p={{ avatar, avatarUrl }} size={size} />;
+function UserAvatar({ avatar, avatarUrl, size = 60, frame }: { avatar: number; avatarUrl?: string; size?: number; frame?: string }) {
+  return <Portrait p={{ avatar, avatarUrl }} size={size} frame={frame} />;
 }
 
 /** Server cũ không có trường avatarUploads (hoặc không gọi được): vẫn hiện nút tải ảnh. */
@@ -355,7 +356,7 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [sub, setSub] = useState<'wallet' | 'admin' | null>(null);
+  const [sub, setSub] = useState<'wallet' | 'admin' | 'shop' | null>(null);
   const canUpload = useAvatarUploads();
   const feed = useFeed();
 
@@ -428,11 +429,12 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
 
   if (sub === 'wallet') return <WalletSheet game={game} onClose={() => setSub(null)} />;
   if (sub === 'admin') return <AdminSheet game={game} onClose={() => setSub(null)} />;
+  if (sub === 'shop') return <ShopSheet game={game} onClose={() => setSub(null)} />;
 
   return (
     <Sheet title="Sửa tên & ảnh" onClose={onClose}>
       <View testID="profile-sheet" style={styles.photoRow}>
-        <Portrait p={portrait} size={76} />
+        <Portrait p={portrait} size={76} frame={user?.equipped?.frame} />
         <View style={{ flex: 1, gap: 6 }}>
           {canUpload && (
             <Button
@@ -485,6 +487,7 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
         <View testID="profile-wallet" style={styles.rubyRow}>
           <T style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           {user.admin && <Button testID="admin-open" small variant="ink" title="🛠 Quản trị" onPress={() => setSub('admin')} />}
+          <Button testID="shop-open-profile" small variant="paper" title="🛍️ Cửa hàng" onPress={() => setSub('shop')} />
           <Button testID="wallet-open-profile" small variant="gold" title="Nạp / lịch sử" onPress={() => setSub('wallet')} />
         </View>
       )}
@@ -517,17 +520,18 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
 
 const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
-export function ProfileCard({ user, onEdit, onWallet, onAdmin }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void }) {
+export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void; onShop?: () => void }) {
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);
   const won = Object.values(user.stats).reduce((s, x) => s + (x?.won ?? 0), 0);
   return (
     <Card style={{ gap: 10 }}>
       <View testID="profile-card" style={styles.profileRow}>
-        <UserAvatar avatar={user.avatar} avatarUrl={user.avatarUrl} />
+        <UserAvatar avatar={user.avatar} avatarUrl={user.avatarUrl} frame={user.equipped?.frame} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <T style={styles.pname}>{user.displayName}</T>
           <T style={styles.puser}>@{user.username}</T>
           <T style={styles.pstat}>{played} ván · {won} lần thắng</T>
+          {(user.giftPoints ?? 0) > 0 && <T testID="gift-points" style={styles.pgift}>💝 {(user.giftPoints ?? 0).toLocaleString('vi-VN')} điểm quà</T>}
         </View>
         <Button testID="profile-edit" small variant="paper" title="Sửa" onPress={onEdit} />
       </View>
@@ -535,6 +539,7 @@ export function ProfileCard({ user, onEdit, onWallet, onAdmin }: { user: PublicU
         <View style={styles.rubyRow}>
           <T testID="home-ruby" style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           {user.admin && onAdmin && <Button testID="admin-open-home" small variant="ink" title="🛠 Quản trị" onPress={onAdmin} />}
+          {onShop && <Button testID="shop-open" small variant="paper" title="🛍️ Cửa hàng" onPress={onShop} />}
           <Button testID="wallet-open" small variant="gold" title="Nạp Ruby" onPress={onWallet} />
         </View>
       )}
@@ -583,6 +588,7 @@ const styles = StyleSheet.create({
   pname: { fontSize: 20, fontWeight: '900' },
   puser: { fontSize: 13, color: C.muted, fontWeight: '600' },
   pstat: { fontSize: 13, color: C.jade, fontWeight: '800' },
+  pgift: { fontSize: 13, color: C.son, fontWeight: '800' },
   statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   statChip: { fontSize: 12, fontWeight: '700', backgroundColor: C.mist, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
 });

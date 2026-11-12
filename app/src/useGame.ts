@@ -5,9 +5,10 @@ import type {
   LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TopupRequest,
   WalletError, WalletInfo,
 } from '../../shared/src/types';
+import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
-import { authText, errorText, walletText } from './messages';
+import { authText, errorText, shopText, walletText } from './messages';
 import { clearInviteParam, squareJpeg } from './web';
 
 type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -108,6 +109,13 @@ export interface Game {
   adminCreditCode(code: string, amount: number, nonce: string): Promise<WalletResult<{ ruby: number; balance: number; request: TopupRequest }>>;
   adminAdjust(username: string, delta: number, reason: string): Promise<WalletResult<{ balance: number }>>;
   adminRevenue(): Promise<WalletResult<{ today: number; month: number; total: number }>>;
+  /** cửa hàng: kho đồ, mua, trang bị; điểm danh; lượt chọc miễn phí */
+  loadShop(): Promise<WalletResult<ShopInfo>>;
+  buyItem(itemId: string): Promise<string | null>;
+  equipItem(slot: CosmeticSlot, itemId: string | null): Promise<string | null>;
+  checkinStatus(): Promise<WalletResult<CheckinStatus>>;
+  checkinClaim(): Promise<WalletResult<{ reward: number; balance: number; streak: number; day: number }>>;
+  funQuota(): Promise<{ free: number; left: number } | null>;
   sendChat(text: string): Promise<boolean>;
   sendSticker(stickerId: StickerId): Promise<boolean>;
 }
@@ -454,6 +462,26 @@ export function useGame(): Game {
   }, [user?.id]);
   const wallet = walletState && walletState.uid === user?.id ? walletState.info : null;
 
+  // ---------- cửa hàng + điểm danh ----------
+  const shopCall = useCallback(
+    async <T,>(fn: (s: GameSocket) => Promise<({ ok: true } & T) | { ok: false; error: ShopError }>): Promise<WalletResult<T>> => {
+      const res = await call(fn);
+      if (!res) return { ok: false, error: 'Chưa kết nối được tới server, thử lại nhé.' };
+      if (!res.ok) return { ok: false, error: shopText[res.error] };
+      const { ok: _ok, ...data } = res;
+      return { ok: true, data: data as unknown as T };
+    },
+    [call],
+  );
+  // các hàm dùng làm điều kiện của useEffect ở màn hình: giữ nguyên danh tính giữa các lần vẽ
+  const loadShop = useCallback(async () => {
+    const r = await shopCall<ShopInfo>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:get'));
+    if (r.ok) setUser((u) => (u ? { ...u, ruby: r.data.ruby, owned: r.data.owned, equipped: r.data.equipped, giftPoints: r.data.giftPoints } : u));
+    return r;
+  }, [shopCall]);
+  const checkinStatus = useCallback(() => shopCall<CheckinStatus>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('checkin:status')), [shopCall]);
+  const funQuota = useCallback(() => call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:quota')), [call]);
+
   return {
     status,
     room,
@@ -554,6 +582,26 @@ export function useGame(): Game {
     adminAdjust: (username, delta, reason) =>
       walletCall<{ balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:adjust', { username, delta, reason })),
     adminRevenue: () => walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),
+    loadShop,
+    buyItem: async (itemId) => {
+      const r = await shopCall<{ balance: number; owned: string[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:buy', { itemId }));
+      if (!r.ok) return r.error;
+      setUser((u) => (u ? { ...u, ruby: r.data.balance, owned: r.data.owned } : u));
+      return null;
+    },
+    equipItem: async (slot, itemId) => {
+      const r = await shopCall<{ equipped: ShopInfo['equipped'] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:equip', { slot, itemId }));
+      if (!r.ok) return r.error;
+      setUser((u) => (u ? { ...u, equipped: r.data.equipped } : u));
+      return null;
+    },
+    checkinStatus,
+    checkinClaim: async () => {
+      const r = await shopCall<{ reward: number; balance: number; streak: number; day: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('checkin:claim'));
+      if (r.ok) setUser((u) => (u ? { ...u, ruby: r.data.balance } : u));
+      return r;
+    },
+    funQuota,
     sendChat: async (text) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { text }));
       return !!res?.ok;

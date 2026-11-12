@@ -17,7 +17,9 @@ import { Confetti } from './Fun';
 export const fmtVnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 export const fmtRuby = (n: number) => n.toLocaleString('vi-VN');
 
-const REASON_TEXT: Record<string, string> = { topup: 'Nạp Ruby', admin_adjust: 'Quản trị điều chỉnh' };
+const REASON_TEXT: Record<string, string> = {
+  topup: 'Nạp Ruby', admin_adjust: 'Quản trị điều chỉnh', shop: 'Mua ở cửa hàng', skill: 'Dùng kỹ năng chọc', gift: 'Tặng quà', checkin: 'Điểm danh',
+};
 
 function CopyRow({ testID, label, value, copy }: { testID?: string; label: string; value: string; copy?: string }) {
   const feed = useFeed();

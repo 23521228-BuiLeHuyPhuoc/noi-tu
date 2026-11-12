@@ -10,6 +10,7 @@ import { Button, Card, T } from '../ui';
 import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
 import { WalletSheet } from '../components/Wallet';
 import { AdminSheet } from '../components/Admin';
+import { CheckinSheet, ShopSheet } from '../components/Shop';
 import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 
 const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
@@ -24,6 +25,10 @@ export function HomeScreen({ game }: { game: Game }) {
   const [profile, setProfile] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [checkinOpen, setCheckinOpen] = useState(false);
+  // chấm đỏ trên nút Điểm danh khi hôm nay chưa nhận
+  const [checkinFor, setCheckinFor] = useState<string | null>(null);
   const [board, setBoard] = useState(false);
   const user = game.user;
 
@@ -32,6 +37,17 @@ export function HomeScreen({ game }: { game: Game }) {
   }, []);
 
   const online = game.status === 'online';
+  const canCheckin = !!user && online && checkinFor === user.id;
+  const { checkinStatus } = game;
+  const uid = user?.id;
+  useEffect(() => {
+    if (!uid || !online) return;
+    let live = true;
+    void checkinStatus().then((r) => live && setCheckinFor(r.ok && r.data.canClaim ? uid : null));
+    return () => {
+      live = false;
+    };
+  }, [uid, online, checkinStatus]);
   // đã đăng nhập thì dùng tên của tài khoản
   const trimmed = user ? user.displayName : name.trim();
 
@@ -95,7 +111,7 @@ export function HomeScreen({ game }: { game: Game }) {
         {game.notice && <T style={styles.notice}>{game.notice}</T>}
 
         {user ? (
-          <ProfileCard user={user} onEdit={() => setProfile(true)} onWallet={() => setWalletOpen(true)} onAdmin={() => setAdminOpen(true)} />
+          <ProfileCard user={user} onEdit={() => setProfile(true)} onWallet={() => setWalletOpen(true)} onAdmin={() => setAdminOpen(true)} onShop={() => setShopOpen(true)} />
         ) : (
           <Card style={{ gap: 8 }}>
             <T style={styles.h2}>Bạn tên gì?</T>
@@ -120,6 +136,13 @@ export function HomeScreen({ game }: { game: Game }) {
             <T style={styles.authHint}>Chơi khách được luôn, hoặc đăng ký để giữ tên, Ruby và thành tích.</T>
             <Button testID="wallet-open-guest" small variant="ghost" icon="💎" title="Nạp Ruby (cần tài khoản)" disabled={!online} onPress={() => setAuth('register')} />
           </Card>
+        )}
+
+        {user && (
+          <View>
+            <Button testID="checkin-open" icon="🎁" title="Điểm danh nhận Ruby" variant="gold" disabled={!online} onPress={() => setCheckinOpen(true)} />
+            {canCheckin && <View testID="checkin-dot" style={styles.dot} />}
+          </View>
         )}
 
         {error && (
@@ -163,6 +186,14 @@ export function HomeScreen({ game }: { game: Game }) {
       </ScrollView>
       {board && <LeaderboardSheet game={game} onClose={() => setBoard(false)} />}
       {walletOpen && user && <WalletSheet game={game} onClose={() => setWalletOpen(false)} />}
+      {shopOpen && user && <ShopSheet game={game} onClose={() => setShopOpen(false)} />}
+      {checkinOpen && user && (
+        <CheckinSheet
+          game={game}
+          onClose={() => setCheckinOpen(false)}
+          onChanged={() => setCheckinFor(null)}
+        />
+      )}
       {adminOpen && user?.admin && <AdminSheet game={game} onClose={() => setAdminOpen(false)} />}
       {auth && <AuthSheet game={game} initial={auth} defaultName={name.trim()} onClose={() => setAuth(null)} />}
       {profile && (
@@ -217,6 +248,7 @@ const styles = StyleSheet.create({
   gamePlayers: { fontSize: 13, fontWeight: '700', color: C.jade },
   go: { fontSize: 36, fontWeight: '900', color: C.son },
   joinCard: { gap: 10 },
+  dot: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#E5252A', borderWidth: 2, borderColor: '#fff' },
   authTop: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   authBtn: { minWidth: 104, marginBottom: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },

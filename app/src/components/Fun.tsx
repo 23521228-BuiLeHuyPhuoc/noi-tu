@@ -19,7 +19,9 @@ import { C, FONT, sticker } from '../theme';
 import { Portrait } from './Avatar';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
-import { STICKERS, stickerOf } from '../stickers';
+import { CHU_LAY_STICKERS, STICKERS, stickerOf } from '../stickers';
+import { GIFT_IDS, FREE_POKES_PER_DAY, STICKER_PACK_ID, shopItem, SKILL_IDS } from '../../../shared/src/shop';
+import { ShopSheet } from './Shop';
 import { KickInline } from './RoomTools';
 
 // ---------- Lắc & Xoay màn hình ----------
@@ -735,10 +737,20 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
 
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
   const [pane, setPane] = useState<'doodle' | 'nick' | null>(null);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [quota, setQuota] = useState<{ free: number; left: number } | null>(null);
   const feed = useFeed();
+  const { funQuota } = game;
+  useEffect(() => {
+    void funQuota().then(setQuota);
+  }, [funQuota]);
   const send = (f: Parameters<Game['sendFun']>[0]) => {
     onClose();
     void game.sendFun(f).then((r) => {
+      if (!r.ok && r.reason === 'quota') {
+        feed(game.user ? `Hết ${FREE_POKES_PER_DAY} lượt chọc miễn phí hôm nay — nạp Ruby để chọc tiếp` : `Hết ${FREE_POKES_PER_DAY} lượt chọc miễn phí hôm nay — đăng ký tài khoản và nạp Ruby để chọc tiếp`, 'info');
+      } else if (!r.ok && r.reason === 'need_ruby') feed('Không đủ Ruby cho chiêu này, vào Cửa hàng để nạp thêm 💎', 'info');
+      else if (!r.ok && r.reason === 'need_account') feed('Cần đăng nhập tài khoản để dùng kỹ năng và tặng quà', 'info');
       // mỗi người chỉ bị rung/sụp nguồn/gián/mực tối đa 3 lần mỗi 15 giây
       if (!r.ok && r.reason === 'limited') {
         feed(`⏳ ${target.name} bị chọc đủ rồi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa nhé (tối đa 3 lần/15 giây)`, 'info');
@@ -746,8 +758,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
     });
   };
   const hit = (move: HitMove) => send({ kind: 'hit', to: target.id, move });
+  if (shopOpen) return <ShopSheet game={game} onClose={() => setShopOpen(false)} />;
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
+      {quota && <T testID="poke-quota" style={styles.quota}>🎟️ Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)</T>}
       <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
       <View style={styles.hits}>
         {HITS.map((h) => (
@@ -800,6 +814,22 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       </View>
       )}
 
+      <T style={styles.sectionLabel}>⚡ Kỹ năng trả Ruby</T>
+      <View style={styles.trolls}>
+        {SKILL_IDS.map((id) => {
+          const it = shopItem(id)!;
+          return <Button key={id} testID={`skill-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} variant="ink" style={styles.troll} onPress={() => send({ kind: id, to: target.id })} />;
+        })}
+      </View>
+      <T style={styles.sectionLabel}>🎁 Tặng quà (người nhận được điểm quà)</T>
+      <View style={styles.trolls}>
+        {GIFT_IDS.map((id) => {
+          const it = shopItem(id)!;
+          return <Button key={id} testID={`gift-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} variant="jade" style={styles.troll} onPress={() => send({ kind: 'gift', to: target.id, gift: id })} />;
+        })}
+      </View>
+      <Button testID="shop-open-throw" small variant="paper" icon="🛍️" title="Cửa hàng" style={{ alignSelf: 'flex-start' }} onPress={() => setShopOpen(true)} />
+
       <T style={styles.sectionLabel}>Ném đồ</T>
       <View style={styles.grid}>
         {THROWS.map((t) => (
@@ -832,6 +862,9 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const feed = useFeed();
+  const ownsPack = !!game.user?.owned?.includes(STICKER_PACK_ID);
   const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
   // màn ngang thấp (Cờ tỷ phú, điện thoại xoay ngang): danh sách tin ngắn lại để ô nhập luôn thấy
   const shortScreen = useStableWindow().height < 520;
@@ -865,6 +898,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
         </View>
   );
+  if (shopOpen) return <ShopSheet game={game} initialTab="sticker" onClose={() => setShopOpen(false)} />;
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
       {shortScreen && inputRow}
@@ -896,7 +930,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           />
         ))}
       </ScrollView>}
-      {!kb && <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán Quỳnh Aka' : 'Nhãn dán Quỳnh Aka · 9'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />}
+      {!kb && <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán' : 'Nhãn dán · 21 (12 bộ Chữ Lầy mua bằng Ruby)'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />}
       {showStickers && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
         {STICKERS.map((item) => <Pressable key={item.id} testID={`sticker-${item.id}`} accessibilityRole="button" accessibilityLabel={`Gửi nhãn dán ${item.alt}`} disabled={sending} style={[styles.stickerOption, sending && { opacity: 0.5 }]} onPress={async () => {
           if (sending) return;
@@ -904,6 +938,30 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           try { if (await game.sendSticker(item.id)) setShowStickers(false); }
           finally { setSending(false); }
         }}><Image source={item.source} accessibilityLabel={item.alt} style={styles.stickerThumb} resizeMode="contain" /></Pressable>)}
+        {CHU_LAY_STICKERS.map((item) => (
+          <Pressable
+            key={item.id}
+            testID={`sticker-${item.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={ownsPack ? `Gửi nhãn dán ${item.alt}` : `${item.alt} (khóa, mua bộ Chữ Lầy trong Cửa hàng)`}
+            disabled={sending}
+            style={[styles.stickerOption, sending && { opacity: 0.5 }]}
+            onPress={async () => {
+              if (!ownsPack) {
+                feed(game.user ? 'Bộ Chữ Lầy đang khóa 🔒 — mua 100 💎 trong Cửa hàng để dùng' : 'Bộ Chữ Lầy cần tài khoản và 100 💎 để mở khóa 🔒', 'info');
+                if (game.user) setShopOpen(true);
+                return;
+              }
+              if (sending) return;
+              setSending(true);
+              try { if (await game.sendSticker(item.id)) setShowStickers(false); }
+              finally { setSending(false); }
+            }}
+          >
+            <Image source={item.source} accessibilityLabel={item.alt} style={[styles.stickerThumb, !ownsPack && { opacity: 0.45 }]} resizeMode="contain" />
+            {!ownsPack && <Text style={styles.stickerLock}>🔒</Text>}
+          </Pressable>
+        ))}
       </ScrollView>}
       <ScrollView
         ref={listRef}
@@ -979,6 +1037,8 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
+  quota: { fontSize: 13, fontWeight: '800', color: C.jade, marginTop: -4 },
+  stickerLock: { position: 'absolute', right: 2, top: 2, fontSize: 16 },
   limitNote: { fontSize: 11, color: C.muted, lineHeight: 15, marginTop: -4 },
   stickerRow: { gap: 8, paddingVertical: 4 },
   stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 12 },
