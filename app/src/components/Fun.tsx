@@ -818,14 +818,14 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       <View style={styles.trolls}>
         {SKILL_IDS.map((id) => {
           const it = shopItem(id)!;
-          return <Button key={id} testID={`skill-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} variant="ink" style={styles.troll} onPress={() => send({ kind: id, to: target.id })} />;
+          return <Button key={id} testID={`skill-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} small variant="ink" style={styles.troll} onPress={() => send({ kind: id, to: target.id })} />;
         })}
       </View>
       <T style={styles.sectionLabel}>🎁 Tặng quà (người nhận được điểm quà)</T>
       <View style={styles.trolls}>
         {GIFT_IDS.map((id) => {
           const it = shopItem(id)!;
-          return <Button key={id} testID={`gift-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} variant="jade" style={styles.troll} onPress={() => send({ kind: 'gift', to: target.id, gift: id })} />;
+          return <Button key={id} testID={`gift-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} small variant="jade" style={styles.troll} onPress={() => send({ kind: 'gift', to: target.id, gift: id })} />;
         })}
       </View>
       <Button testID="shop-open-throw" small variant="paper" icon="🛍️" title="Cửa hàng" style={{ alignSelf: 'flex-start' }} onPress={() => setShopOpen(true)} />
