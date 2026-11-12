@@ -323,7 +323,7 @@ function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
           <Button testID="pw-save" small variant="paper" title="Đổi mật khẩu" disabled={busy || !oldPw || pw.length < 6 || pw !== pw2} onPress={savePw} />
         </View>
       ) : (
-        <Button testID="pw-open" small variant="ghost" icon="🔑" title="Đổi mật khẩu" onPress={() => setOpen(true)} />
+        <Button testID="pw-open" small variant="paper" icon="🔑" title="Đổi mật khẩu" onPress={() => setOpen(true)} />
       )}
       {msg && <T style={msg.ok ? styles.okNote : styles.error}>{msg.text}</T>}
     </View>

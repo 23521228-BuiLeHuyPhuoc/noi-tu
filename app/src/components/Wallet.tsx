@@ -127,7 +127,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
               ))}
             </View>
           ) : (
-            <Button testID="ruby-history" small variant="ghost" icon="🧾" title="Lịch sử Ruby" onPress={showHistory} />
+            <Button testID="ruby-history" small variant="paper" icon="🧾" title="Lịch sử Ruby" onPress={showHistory} />
           )}
         </>
       ) : (
@@ -158,7 +158,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
           )}
           {error && <T style={styles.error}>{error}</T>}
           <Button testID="topup-sent" icon="✅" title={busy ? 'Đang gửi…' : 'Tôi đã chuyển khoản'} disabled={busy} onPress={sent} />
-          <Button small variant="ghost" title="‹ Chọn gói khác" onPress={() => setAmount(null)} />
+          <Button small variant="paper" title="‹ Chọn gói khác" onPress={() => setAmount(null)} />
         </>
       )}
       {amount === null && error && w && <T style={styles.error}>{error}</T>}
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   packPrice: { fontSize: 15, fontWeight: '800' },
   bonus: { fontSize: 12, fontWeight: '900', color: C.jade },
   x2: {
-    position: 'absolute', top: -10, right: -6, backgroundColor: C.gold, borderRadius: 8, borderWidth: 2, borderColor: C.ink,
+    position: 'absolute', top: -10, right: 6, backgroundColor: C.gold, borderRadius: 8, borderWidth: 2, borderColor: C.ink,
     paddingHorizontal: 6, fontSize: 11, fontWeight: '900', overflow: 'hidden',
   },
   pendingBox: { backgroundColor: '#FFF3BF', borderRadius: 12, padding: 10, gap: 2 },

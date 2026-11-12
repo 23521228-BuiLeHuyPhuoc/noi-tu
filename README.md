@@ -95,6 +95,25 @@ Server đọc chuỗi kết nối MongoDB từ biến môi trường `DATABASE` 
 - Kiểm tra: `/health` trả về `"db":"mongo"`. Nếu thấy `"db":"memory"` nghĩa là chưa đặt biến hoặc không kết nối được (xem log), tài khoản chỉ lưu tạm và mất khi server khởi động lại.
 - Chạy thử trên máy: `DATABASE='mongodb://...' npm run dev` trong thư mục `server`.
 
+## Ruby (nạp bằng QR, quản trị duyệt tay)
+
+Ruby là tiền trong game, chỉ dùng mua đồ vui; **không** cược trong Bầu cua / Cờ tỷ phú, **không** đổi ra xu hay tiền. Cần tài khoản.
+
+| Gói | 10.000đ | 20.000đ | 50.000đ | 100.000đ | 200.000đ | 500.000đ |
+|---|---|---|---|---|---|---|
+| Ruby | 100 | 200 | 550 (+10%) | 1.150 (+15%) | 2.400 (+20%) | 6.250 (+25%) |
+
+Lần được cộng **đầu tiên** của mỗi tài khoản nhân đôi. Số tiền không khớp gói: 1.000đ = 10 Ruby.
+
+**Người chơi:** Trang chủ → **Nạp Ruby** (hoặc bảng ✏️ → Nạp / lịch sử) → chọn gói → quét mã QR (BIDV 6353025859, BUI LE HUY PHUOC, nội dung là mã nạp riêng `XL……` của tài khoản) → bấm **Tôi đã chuyển khoản** → chờ duyệt.
+
+**Quản trị** (tài khoản có tên trong `ADMIN_USERNAMES`, mở nút **🛠 Quản trị** ở trang chủ hoặc bảng ✏️):
+- *Chờ duyệt*: mở app BIDV SmartBanking, thấy tiền về đúng mã thì bấm **Đã nhận tiền** (sửa ô "Thực nhận" nếu số tiền khác gói), không thấy thì **Không thấy**. Mỗi yêu cầu chỉ duyệt được một lần.
+- *Theo mã*: ai chuyển mà quên bấm "Tôi đã chuyển" thì nhập mã `XL……` + số tiền thấy trên app BIDV.
+- *Doanh thu*: hôm nay / tháng này / tổng (giờ Việt Nam). *Cộng/trừ*: theo tên đăng nhập, bắt buộc ghi lý do, không làm âm số dư.
+
+Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=phuoc_2005` (nhiều người thì phân cách bằng dấu phẩy). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại. Ảnh QR lấy từ dịch vụ miễn phí img.vietqr.io; ảnh lỗi thì bảng nạp vẫn còn thông tin chữ để chuyển tay.
+
 ## Gửi mã quên mật khẩu (Gmail)
 
 Trong **noi-tu-server → Environment** trên Render đặt:
@@ -140,7 +159,7 @@ cd server && npm test        # chuẩn hóa, từ điển Việt & Anh, luật 4
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô), `en-rules.mjs` (Nối từ Anh: gõ Telex, cứu trợ nối hộ, thời gian giảm dần, đổi tên + ảnh giữa ván, giới hạn chọc, bù giờ). Xem đầu file `play.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô), `accounts.mjs` (đăng ký/quên mật khẩu), `wallet.mjs` (nạp Ruby + quản trị duyệt), `en-rules.mjs` (Nối từ Anh: gõ Telex, cứu trợ nối hộ, thời gian giảm dần, đổi tên + ảnh giữa ván, giới hạn chọc, bù giờ). Xem đầu file `play.mjs` để biết cách chạy.
 
 ## Nguồn icon và ảnh (Cờ tỷ phú)
 - Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy).

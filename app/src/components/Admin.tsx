@@ -134,7 +134,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
               }}
             />
           ))}
-          <Button small variant="ghost" icon="🔄" title="Tải lại" onPress={loadPending} />
+          <Button small variant="paper" icon="🔄" title="Tải lại" onPress={loadPending} />
         </View>
       )}
 
