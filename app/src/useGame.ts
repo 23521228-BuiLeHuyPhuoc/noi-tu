@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
-  LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, ServerToClientEvents, StickerId,
+  LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TopupRequest,
+  WalletError, WalletInfo,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
-import { authText, errorText } from './messages';
+import { authText, errorText, walletText } from './messages';
 import { clearInviteParam, squareJpeg } from './web';
 
 type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -29,6 +30,11 @@ export interface GuestProfile {
   avatar?: number;
   avatarUrl?: string;
 }
+
+/** sự kiện ví hiện thành thông báo ở mọi màn: +Ruby khi được duyệt, hoặc yêu cầu bị từ chối */
+export type WalletNotice = { kind: 'update'; ruby: number; delta: number; reason: string } | { kind: 'rejected'; amount: number };
+/** kết quả lệnh ví: dữ liệu, hoặc câu báo lỗi tiếng Việt */
+export type WalletResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export interface Game {
   status: ConnStatus;
@@ -85,6 +91,18 @@ export interface Game {
   logout(): Promise<void>;
   /** tin nhắn trong phòng */
   chat: ChatMsg[];
+  /** ví Ruby của tài khoản đang đăng nhập (null khi chưa tải hoặc là khách) */
+  wallet: WalletInfo | null;
+  loadWallet(): Promise<string | null>;
+  requestTopup(amount: number): Promise<string | null>;
+  rubyHistory(): Promise<WalletResult<RubyLedgerRow[]>>;
+  onWallet(cb: (n: WalletNotice) => void): () => void;
+  adminRequests(status: TopupRequest['status']): Promise<WalletResult<TopupRequest[]>>;
+  adminApprove(id: string, amount?: number): Promise<WalletResult<{ ruby: number; balance: number }>>;
+  adminReject(id: string): Promise<WalletResult<TopupRequest>>;
+  adminCreditCode(code: string, amount: number): Promise<WalletResult<{ ruby: number; balance: number }>>;
+  adminAdjust(username: string, delta: number, reason: string): Promise<WalletResult<{ balance: number }>>;
+  adminRevenue(): Promise<WalletResult<{ today: number; month: number; total: number }>>;
   sendChat(text: string): Promise<boolean>;
   sendSticker(stickerId: StickerId): Promise<boolean>;
 }
@@ -104,6 +122,11 @@ export function useGame(): Game {
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
+  const walletListeners = useRef(new Set<(n: WalletNotice) => void>());
+  // ví gắn với tài khoản đang đăng nhập: đổi tài khoản thì ví cũ tự bỏ
+  const [walletState, setWalletState] = useState<{ uid: string; info: WalletInfo } | null>(null);
+  const reloadWallet = useRef<() => void>(() => {});
+  const userIdRef = useRef<string | null>(null);
 
   const remember = useCallback(async (code: string, playerId: string, name: string) => {
     roomCodeRef.current = code;
@@ -193,6 +216,17 @@ export function useGame(): Game {
       void forget();
     });
     socket.on('chat:msg', (m) => setChat((xs) => [...xs.slice(-79), m]));
+    // ví: số dư mới do quản trị duyệt / cộng-trừ; yêu cầu bị từ chối
+    socket.on('wallet:update', (p) => {
+      setUser((u) => (u ? { ...u, ruby: p.ruby } : u));
+      setWalletState((w) => (w ? { ...w, info: { ...w.info, ruby: p.ruby } } : w));
+      reloadWallet.current();
+      for (const cb of walletListeners.current) cb({ kind: 'update', ...p });
+    });
+    socket.on('wallet:rejected', (p) => {
+      reloadWallet.current();
+      for (const cb of walletListeners.current) cb({ kind: 'rejected', amount: p.amount });
+    });
 
     storage.getPlayerId().then((id) => id && setMe(id));
     return () => {
@@ -380,6 +414,34 @@ export function useGame(): Game {
     return res?.ok ? null : 'Không bỏ được ảnh, thử lại nhé.';
   }, [user, photoPersist, removeAvatar, call, updateGuest]);
 
+  // ---------- ví Ruby ----------
+  const walletCall = useCallback(
+    async <T,>(fn: (s: GameSocket) => Promise<({ ok: true } & T) | { ok: false; error: WalletError }>): Promise<WalletResult<T>> => {
+      const res = await call(fn);
+      if (!res) return { ok: false, error: 'Chưa kết nối được tới server, thử lại nhé.' };
+      if (!res.ok) return { ok: false, error: walletText[res.error] };
+      const { ok: _ok, ...data } = res;
+      return { ok: true, data: data as unknown as T };
+    },
+    [call],
+  );
+
+  const loadWallet = useCallback(async (): Promise<string | null> => {
+    const r = await walletCall<WalletInfo>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:get'));
+    if (!r.ok) return r.error;
+    const uid = userIdRef.current;
+    if (uid) setWalletState({ uid, info: r.data });
+    setUser((u) => (u ? { ...u, ruby: r.data.ruby } : u));
+    return null;
+  }, [walletCall]);
+  useEffect(() => {
+    reloadWallet.current = () => void loadWallet();
+  }, [loadWallet]);
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+  const wallet = walletState && walletState.uid === user?.id ? walletState.info : null;
+
   return {
     status,
     room,
@@ -444,6 +506,39 @@ export function useGame(): Game {
       await forget();
     },
     chat,
+    wallet,
+    loadWallet,
+    requestTopup: async (amount) => {
+      const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:request', { amount }));
+      if (!r.ok) return r.error;
+      await loadWallet();
+      return null;
+    },
+    rubyHistory: async () => {
+      const r = await walletCall<{ rows: RubyLedgerRow[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:history'));
+      return r.ok ? { ok: true, data: r.data.rows } : r;
+    },
+    onWallet: (cb) => {
+      walletListeners.current.add(cb);
+      return () => {
+        walletListeners.current.delete(cb);
+      };
+    },
+    adminRequests: async (status) => {
+      const r = await walletCall<{ requests: TopupRequest[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:requests', { status }));
+      return r.ok ? { ok: true, data: r.data.requests } : r;
+    },
+    adminApprove: (id, amount) =>
+      walletCall<{ ruby: number; balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:approve', amount === undefined ? { id } : { id, amount })),
+    adminReject: async (id) => {
+      const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:reject', { id }));
+      return r.ok ? { ok: true, data: r.data.request } : r;
+    },
+    adminCreditCode: (code, amount) =>
+      walletCall<{ ruby: number; balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:creditCode', { code, amount })),
+    adminAdjust: (username, delta, reason) =>
+      walletCall<{ balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:adjust', { username, delta, reason })),
+    adminRevenue: () => walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),
     sendChat: async (text) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { text }));
       return !!res?.ok;

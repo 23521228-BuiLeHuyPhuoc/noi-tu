@@ -10,6 +10,8 @@ import { SERVER_URL } from '../config';
 import { C, FONT } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
+import { WalletSheet } from './Wallet';
+import { AdminSheet } from './Admin';
 
 function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
   return (
@@ -342,6 +344,7 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sub, setSub] = useState<'wallet' | 'admin' | null>(null);
   const canUpload = useAvatarUploads();
   const feed = useFeed();
 
@@ -412,6 +415,9 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
     else setNote('Đã bỏ ảnh, dùng lại mặt đại diện.');
   };
 
+  if (sub === 'wallet') return <WalletSheet game={game} onClose={() => setSub(null)} />;
+  if (sub === 'admin') return <AdminSheet game={game} onClose={() => setSub(null)} />;
+
   return (
     <Sheet title="Sửa tên & ảnh" onClose={onClose}>
       <View testID="profile-sheet" style={styles.photoRow}>
@@ -464,6 +470,13 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
       {note && <T testID="profile-note" style={styles.okNote}>{note}</T>}
       {error && <T testID="profile-error" style={styles.error}>{error}</T>}
       <Button testID="profile-save" title={busy ? 'Đang lưu…' : 'Lưu tên'} disabled={busy || uploading || !displayName.trim()} onPress={saveName} />
+      {user && (
+        <View testID="profile-wallet" style={styles.rubyRow}>
+          <T style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+          {user.admin && <Button testID="admin-open" small variant="ink" title="🛠 Quản trị" onPress={() => setSub('admin')} />}
+          <Button testID="wallet-open-profile" small variant="gold" title="Nạp / lịch sử" onPress={() => setSub('wallet')} />
+        </View>
+      )}
       {user && <AccountSecurity game={game} user={user} />}
       {user && (
         <Button
@@ -493,7 +506,7 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
 
 const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
-export function ProfileCard({ user, onEdit }: { user: PublicUser; onEdit: () => void }) {
+export function ProfileCard({ user, onEdit, onWallet, onAdmin }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void }) {
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);
   const won = Object.values(user.stats).reduce((s, x) => s + (x?.won ?? 0), 0);
   return (
@@ -507,6 +520,13 @@ export function ProfileCard({ user, onEdit }: { user: PublicUser; onEdit: () => 
         </View>
         <Button testID="profile-edit" small variant="paper" title="Sửa" onPress={onEdit} />
       </View>
+      {onWallet && (
+        <View style={styles.rubyRow}>
+          <T testID="home-ruby" style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+          {user.admin && onAdmin && <Button testID="admin-open-home" small variant="ink" title="🛠 Quản trị" onPress={onAdmin} />}
+          <Button testID="wallet-open" small variant="gold" title="Nạp Ruby" onPress={onWallet} />
+        </View>
+      )}
       {played > 0 && (
         <View style={styles.statRow}>
           {ORDER.filter((g) => user.stats[g]?.played).map((g) => (
@@ -544,6 +564,8 @@ const styles = StyleSheet.create({
   link: { color: C.son, fontWeight: '800', fontSize: 14, textDecorationLine: 'underline' },
   warnNote: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   emailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rubyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  rubyText: { flex: 1, fontSize: 17, fontWeight: '900', color: C.son },
   okNote: { color: C.ink, backgroundColor: '#D8F8E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   guestAvatar: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   editBadge: { position: 'absolute', right: -4, bottom: -4, fontSize: 16 },

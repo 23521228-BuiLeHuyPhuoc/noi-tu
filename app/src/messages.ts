@@ -1,4 +1,4 @@
-import type { ActionError, AuthError, BauCuaSymbol, DoodleKind, ErrorCode, GameType, HitMove, NicknameId, TauntId, ThrowItem } from '../../shared/src/types';
+import type { ActionError, AuthError, WalletError, BauCuaSymbol, DoodleKind, ErrorCode, GameType, HitMove, NicknameId, TauntId, ThrowItem } from '../../shared/src/types';
 
 export const errorText: Record<ErrorCode, string> = {
   invalid_name: 'Tên phải từ 1 đến 24 ký tự.',
@@ -12,6 +12,17 @@ export const errorText: Record<ErrorCode, string> = {
   color_taken: 'Màu này đã có người trong phòng chọn rồi.',
   kicked: 'Bạn đã bị chủ phòng mời ra khỏi phòng này.',
   bad_request: 'Có lỗi xảy ra, thử lại nhé.',
+};
+
+export const walletText: Record<WalletError, string> = {
+  need_account: 'Cần đăng nhập tài khoản để dùng Ruby.',
+  bad_request: 'Thông tin chưa hợp lệ.',
+  too_many: 'Bạn đang có 3 yêu cầu chờ duyệt, đợi quản trị duyệt xong nhé.',
+  forbidden: 'Chỉ quản trị mới làm được việc này.',
+  not_found: 'Không tìm thấy (mã nạp, yêu cầu hoặc tài khoản).',
+  already_handled: 'Yêu cầu này đã được xử lý rồi.',
+  insufficient: 'Không đủ Ruby để trừ.',
+  rate_limited: 'Thao tác nhanh quá, đợi chút rồi thử lại.',
 };
 
 export const authText: Record<AuthError, string> = {

@@ -8,6 +8,8 @@ import { GAME_META } from '../messages';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
+import { WalletSheet } from '../components/Wallet';
+import { AdminSheet } from '../components/Admin';
 import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 
 const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
@@ -20,6 +22,8 @@ export function HomeScreen({ game }: { game: Game }) {
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<'login' | 'register' | null>(null);
   const [profile, setProfile] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [board, setBoard] = useState(false);
   const user = game.user;
 
@@ -91,7 +95,7 @@ export function HomeScreen({ game }: { game: Game }) {
         {game.notice && <T style={styles.notice}>{game.notice}</T>}
 
         {user ? (
-          <ProfileCard user={user} onEdit={() => setProfile(true)} />
+          <ProfileCard user={user} onEdit={() => setProfile(true)} onWallet={() => setWalletOpen(true)} onAdmin={() => setAdminOpen(true)} />
         ) : (
           <Card style={{ gap: 8 }}>
             <T style={styles.h2}>Bạn tên gì?</T>
@@ -114,6 +118,7 @@ export function HomeScreen({ game }: { game: Game }) {
             </View>
             <T style={styles.authHint}>Chạm vào ảnh để chọn mặt đại diện hoặc tải ảnh của bạn (đổi lại được cả trong ván).</T>
             <T style={styles.authHint}>Chơi khách được luôn, hoặc đăng ký để giữ tên, Ruby và thành tích.</T>
+            <Button testID="wallet-open-guest" small variant="ghost" icon="💎" title="Nạp Ruby (cần tài khoản)" disabled={!online} onPress={() => setAuth('register')} />
           </Card>
         )}
 
@@ -157,6 +162,8 @@ export function HomeScreen({ game }: { game: Game }) {
         <Button testID="leaderboard-open" icon="🏆" title="Bảng xếp hạng" variant="paper" onPress={() => setBoard(true)} />
       </ScrollView>
       {board && <LeaderboardSheet game={game} onClose={() => setBoard(false)} />}
+      {walletOpen && user && <WalletSheet game={game} onClose={() => setWalletOpen(false)} />}
+      {adminOpen && user?.admin && <AdminSheet game={game} onClose={() => setAdminOpen(false)} />}
       {auth && <AuthSheet game={game} initial={auth} defaultName={name.trim()} onClose={() => setAuth(null)} />}
       {profile && (
         <ProfileSheet

@@ -9,6 +9,7 @@ import { BauCuaScreen } from './src/screens/BauCuaScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { TyPhuScreen } from './src/screens/TyPhuScreen';
 import { ShakeProvider } from './src/components/Fun';
+import { WalletNoticeLayer } from './src/components/Wallet';
 import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
 
@@ -40,6 +41,7 @@ export default function App() {
               </View>
             )}
             {body}
+            <WalletNoticeLayer game={game} />
           </ShakeProvider>
         </FeedProvider>
       </Screen>
