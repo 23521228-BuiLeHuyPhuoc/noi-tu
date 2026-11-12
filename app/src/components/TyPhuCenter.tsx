@@ -90,10 +90,10 @@ export interface CenterProps {
   onPlayer: (id: string) => void;
 }
 
-function MiniBtn({ icon, label, onPress, testID, badge }: { icon: string; label: string; onPress: () => void; testID?: string; badge?: number }) {
+function MiniBtn({ icon, label, onPress, testID, badge, size = 30 }: { icon: string; label: string; onPress: () => void; testID?: string; badge?: number; size?: number }) {
   return (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6} style={styles.mini}>
-      <T style={{ fontSize: icon.startsWith('x') ? 13 : 15, fontWeight: '900', color: C.ink }}>{icon}</T>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6} style={[styles.mini, size !== 30 && { width: size, height: size, borderRadius: size / 2 }]}>
+      <T style={{ fontSize: Math.round((icon.startsWith('x') ? 13 : 15) * size / 30), fontWeight: '900', color: C.ink }}>{icon}</T>
       {!!badge && badge > 0 && <View style={styles.miniBadge}><T style={styles.miniBadgeTxt}>{badge > 9 ? '9+' : badge}</T></View>}
     </Pressable>
   );
@@ -183,12 +183,27 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
         </View>
       </View>
     </Pressable>
-    {showRc && (
-      <View pointerEvents="none" style={[styles.react, rect.x + rect.w / 2 > p.size.w * 0.6 ? { right: Math.max(0, p.size.w - rect.x - rect.w) + 4 } : { left: rect.x + 4 }, { top: rect.y - 30, maxWidth: Math.min(260, p.size.w - 8), borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]}>
-        <T numberOfLines={1} style={[styles.reactTxt, { color: rc.kind === 'loss' ? '#C92A2A' : '#2B8A3E' }]}>{rc.text}</T>
-        <View style={[styles.reactTail, rect.x + rect.w / 2 > p.size.w * 0.6 && { left: undefined, right: 16 }, { borderColor: rc.kind === 'loss' ? C.danger : C.jade, backgroundColor: rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE' }]} />
-      </View>
-    )}
+    {showRc && (() => {
+      // thẻ hàng trên: bong bóng nằm phía trên thẻ; thẻ hàng dưới: nằm đè lên chính thẻ đó (không che tiền người khác)
+      const topRow = rect.y <= Math.min(...p.layout.wealth.map((r) => r.y)) + 1;
+      const right = rect.x + rect.w / 2 > p.size.w * 0.6;
+      const tone = rc.kind === 'loss' ? C.danger : C.jade;
+      const bg = rc.kind === 'loss' ? '#FFF0F0' : '#EBFBEE';
+      return (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.react,
+            right ? { right: Math.max(0, p.size.w - rect.x - rect.w) + 4 } : { left: rect.x + 4 },
+            topRow ? { top: rect.y - 30, maxWidth: Math.min(260, p.size.w - 8) } : { top: rect.y + (rect.h - 24) / 2, maxWidth: Math.max(60, rect.w - 8) },
+            { borderColor: tone, backgroundColor: bg },
+          ]}
+        >
+          <T numberOfLines={1} style={[styles.reactTxt, { color: rc.kind === 'loss' ? '#C92A2A' : '#2B8A3E' }]}>{rc.text}</T>
+          {topRow && <View style={[styles.reactTail, right && { left: undefined, right: 16 }, { borderColor: tone, backgroundColor: bg }]} />}
+        </View>
+      );
+    })()}
     </>
   );
 }
@@ -284,19 +299,23 @@ export function TyPhuCenter(p: CenterProps) {
   // khung hành động: viền+đệm 8, khe 4 giữa các phần, hàng nút 38, hàng trạng thái (statusH - 4)
   const trayH = Math.max(40, L.action.h - (8 + (L.wide ? 8 : 4) + 38 + (L.wide ? statusH - 4 : 0)) - 1);
   const canThrow = showRoll && !p.dice.animating;
+  // hàng nút nhỏ có tối đa 9 nút: bàn hẹp thì thu nhỏ nút cho vừa hàng, không tràn ra ô viền
+  const toolCount = 3 + (p.onPoke ? 1 : 0) + (p.onView ? 1 : 0) + (p.onRules ? 1 : 0) + (p.onSpeed ? 1 : 0) + (p.isHost ? 1 : 0);
+  const toolGap = 6;
+  const toolSize = clamp(Math.floor((L.tools.w - toolGap * (toolCount - 1)) / toolCount), 22, 30);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* hàng nút nhỏ thay cho thanh trên cùng */}
       {L.tools.h > 0 && tools && (
-        <View style={[abs(L.tools), styles.tools]}>
-          <MiniBtn testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
-          {p.onPoke && <MiniBtn testID="poke-open" label="Chọc đối thủ" icon="😈" onPress={p.onPoke} />}
-          {p.onView && <MiniBtn testID="view-mode" label={`Chế độ xem: ${p.viewLabel ?? ''}, chạm để đổi`} icon={p.viewLabel?.startsWith('3D') ? '3D' : p.viewLabel?.includes('tràn') ? '⛶' : '2D'} onPress={p.onView} />}
-          {p.onRules && <MiniBtn testID="rules-open" label="Luật chơi" icon="📖" onPress={p.onRules} />}
-          {p.onSpeed && <MiniBtn testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
-          <MiniBtn label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
-          {p.isHost && <MiniBtn testID="end-open" label="Tổng kết" icon="🏁" onPress={p.onEnd} />}
-          <MiniBtn testID="leave-open" label="Rời phòng" icon="🚪" onPress={tools.leave} />
+        <View style={[abs(L.tools), styles.tools, { gap: toolGap }]}>
+          <MiniBtn size={toolSize} testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
+          {p.onPoke && <MiniBtn size={toolSize} testID="poke-open" label="Chọc đối thủ" icon="😈" onPress={p.onPoke} />}
+          {p.onView && <MiniBtn size={toolSize} testID="view-mode" label={`Chế độ xem: ${p.viewLabel ?? ''}, chạm để đổi`} icon={p.viewLabel?.startsWith('3D') ? '3D' : p.viewLabel?.includes('tràn') ? '⛶' : '2D'} onPress={p.onView} />}
+          {p.onRules && <MiniBtn size={toolSize} testID="rules-open" label="Luật chơi" icon="📖" onPress={p.onRules} />}
+          {p.onSpeed && <MiniBtn size={toolSize} testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
+          <MiniBtn size={toolSize} label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
+          {p.isHost && <MiniBtn size={toolSize} testID="end-open" label="Tổng kết" icon="🏁" onPress={p.onEnd} />}
+          <MiniBtn size={toolSize} testID="leave-open" label="Rời phòng" icon="🚪" onPress={tools.leave} />
         </View>
       )}
 
@@ -419,7 +438,7 @@ const styles = StyleSheet.create({
     gap: 4, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 14, borderWidth: 2, borderColor: '#E8D5B0', padding: 2,
   },
   btnRow: { flexDirection: 'row', gap: 6, alignItems: 'center', height: 38, paddingHorizontal: 4 },
-  trayHint: { position: 'absolute', left: 0, right: 0, bottom: 2, textAlign: 'center', fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.9)' },
+  trayHint: { position: 'absolute', alignSelf: 'center', bottom: 2, textAlign: 'center', fontSize: 11, fontWeight: '800', color: '#fff', backgroundColor: 'rgba(20,48,38,0.62)', borderRadius: 9, overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 1 },
   sumPill: {
     position: 'absolute', right: 6, top: 4, minWidth: 28, height: 24, borderRadius: 12, backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,

@@ -88,7 +88,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     setViewMode(next);
     saveViewMode(next);
   };
-  const tilt = useMemo(() => fitTilted(availW, availH), [availW, availH]);
+  const tiltDeg = tiltDegFor(availW, availH);
+  const tilt = useMemo(() => fitTilted(availW, availH, tiltDeg), [availW, availH, tiltDeg]);
   const flatS = Math.floor(Math.min(availW, availH));
   const boardW = viewMode === 'tilt' ? tilt.S : viewMode === 'flat' ? flatS : Math.floor(availW);
   const boardH = viewMode === 'tilt' ? tilt.S : viewMode === 'flat' ? flatS : Math.floor(availH);
@@ -483,7 +484,15 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const moveStates = Object.fromEntries(alive.map((id) => [id, tokenMoveState(id)]));
   const isParticipant = g.order.includes(me);
   const canChangeSpeed = isParticipant && !g.bankrupt.includes(me);
-  const offsetsFor = (n: number, size: number, cellW: number): [number, number][] => {
+  const offsetsFor = (n: number, size: number, cellW: number, sideWide = false): [number, number][] => {
+    // ô hai bên bàn (rộng, thấp): quân cờ nằm sát mép ngoài, xếp dọc để không đè lên tên đất
+    if (sideWide && n <= 4) {
+      const vy = Math.min(size * 0.42, 22);
+      if (n === 1) return [[0, 0]];
+      if (n === 2) return [[0, -vy], [0, vy]];
+      if (n === 3) return [[0, -vy], [0, vy], [size * 0.6, 0]];
+      return [[0, -vy], [0, vy], [size * 0.6, -vy], [size * 0.6, vy]];
+    }
     const dx = Math.min(size * 0.5, cellW * 0.32);
     const dy = size * 0.3;
     if (n === 1) return [[0, 0]];
@@ -525,7 +534,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
           style={[
             styles.board,
             { width: boardW, height: boardH },
-            viewMode === 'tilt' && { transform: [{ perspective: TILT_PERSP }, { translateY: tilt.dy }, { rotateX: `${TILT_DEG}deg` }] },
+            viewMode === 'tilt' && { transform: [{ perspective: TILT_PERSP }, { translateY: tilt.dy }, { rotateX: `${tiltDeg}deg` }] },
           ]}
         >
           {/* 40 ô (memo: chỉ vẽ lại khi ô đó đổi) */}
@@ -605,7 +614,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
             const stacked = !st.active && here.length > 1;
             const size = pawnBase * (stacked ? (here.length > 4 ? 0.76 : 0.84) : 1);
             const cellRect = geo.rect[st.visualCell >= 0 ? st.visualCell : g.pos[id]];
-            const off = stacked ? offsetsFor(Math.min(6, here.length), size, cellRect.w)[Math.min(5, here.indexOf(id))] : [0, 0];
+            const off = stacked ? offsetsFor(Math.min(6, here.length), size, cellRect.w, cellRect.w >= cellRect.h * 2 && (geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'left' || geo.side[st.visualCell >= 0 ? st.visualCell : g.pos[id]] === 'right'))[Math.min(5, here.indexOf(id))] : [0, 0];
             return (
               <Pawn
                 key={id}
@@ -1178,10 +1187,12 @@ const dc = StyleSheet.create({
 
 /** góc nghiêng bàn cờ 3D (nhìn từ phía người chơi) */
 const TILT_DEG = 36;
+/** màn hình nhỏ: nghiêng ít hơn để hàng ô phía xa không bị bóp tới mức chữ không đọc được */
+const tiltDegFor = (availW: number, availH: number) => (Math.min(availW, availH) < 440 ? 24 : TILT_DEG);
 const TILT_PERSP = 1100;
 /** Tìm cạnh bàn vuông lớn nhất mà sau khi nghiêng 3D vẫn lọt khung, kèm độ dời để hình chiếu nằm giữa. */
-function fitTilted(availW: number, availH: number): { S: number; dy: number } {
-  const th = (TILT_DEG * Math.PI) / 180;
+function fitTilted(availW: number, availH: number, deg: number): { S: number; dy: number } {
+  const th = (deg * Math.PI) / 180;
   const proj = (S: number) => {
     const a = S / 2;
     const st = TILT_PERSP / (TILT_PERSP + a * Math.sin(th));
