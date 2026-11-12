@@ -1,3 +1,4 @@
+import { isHardPoke, pokeItem } from '../../shared/src/pokes';
 import { GIFT_IDS, SKILL_IDS, type GiftId, type SkillId } from '../../shared/src/shop';
 import {
   DISRUPT_LIMIT, DISRUPT_PAUSE_MS, DISRUPT_WINDOW_MS, DOODLES, EMOJIS, HARD_DISRUPT_KINDS, MAX_HP, NICKNAMES,
@@ -23,7 +24,10 @@ export function cleanFun(raw: unknown): FunSend | null {
     return { kind: 'throw', to: f.to, item: f.item as ThrowItem };
   }
   if (f.kind === 'taunt' && TAUNTS.includes(f.taunt as TauntId)) return { kind: 'taunt', taunt: f.taunt as TauntId };
-  if (f.kind === 'poke' && typeof f.to === 'string') return { kind: 'poke', to: f.to };
+  if (f.kind === 'poke' && typeof f.to === 'string') {
+    if (f.poke === undefined) return { kind: 'poke', to: f.to };
+    return pokeItem(f.poke) ? { kind: 'poke', to: f.to, poke: f.poke as string } : null;
+  }
   if (f.kind === 'emoji' && EMOJIS.includes(f.emoji as Emoji)) return { kind: 'emoji', emoji: f.emoji as Emoji };
   if (f.kind === 'hit' && typeof f.to === 'string' && (f.move as string) in HIT_DAMAGE) {
     return { kind: 'hit', to: f.to, move: f.move as HitMove };
@@ -58,6 +62,8 @@ export const SCREEN_KINDS: FunSend['kind'][] = ['roach', 'ink'];
 export const SCREEN_COOLDOWN_MS = 8000;
 
 export const isTroll = (k: FunSend['kind']) => TROLL_KINDS.includes(k);
+/** món kho chọc ghẹo phủ cả màn hình cũng tính vào giới hạn "chọc mất dạy" */
+export const isTrollFx = (f: FunSend) => isTroll(f.kind) || (f.kind === 'poke' && isHardFx(f));
 export const isScreenTroll = (k: FunSend['kind']) => SCREEN_KINDS.includes(k);
 
 /** Số liệu ngẫu nhiên do server bốc để mọi máy thấy cùng một cảnh */
@@ -68,6 +74,8 @@ export function trollExtras(f: FunSend, rng: () => number = Math.random): Pick<F
   if (f.kind === 'honk') return { variant: Math.floor(rng() * 3) };
   if (f.kind === 'fart') return { variant: Math.floor(rng() * 3) };
   if (f.kind === 'chicken') return { variant: Math.floor(rng() * 2) };
+  // món trong kho chọc ghẹo: một hạt giống để mọi máy vẽ cùng một cảnh (vị trí, số lượng, góc...)
+  if (f.kind === 'poke' && f.poke) return { variant: Math.floor(rng() * 1_000_000) };
   return {};
 }
 
@@ -131,8 +139,21 @@ export class RateLimiter {
 /** chiêu chỉ để làm phiền màn hình (rung, xoay, sụp nguồn, gián, mực, hối): quá giới hạn thì chặn hẳn */
 export const isHardDisrupt = (k: FunSend['kind']) => (HARD_DISRUPT_KINDS as readonly string[]).includes(k);
 
+/** như isHardDisrupt nhưng nhìn cả món trong kho chọc ghẹo: chỉ mưa, dính màn hình, khổng lồ, đàn mới phủ cả màn hình */
+export function isHardFx(f: FunSend): boolean {
+  if (f.kind === 'poke' && f.poke) {
+    const p = pokeItem(f.poke);
+    return !!p && isHardPoke(p);
+  }
+  return isHardDisrupt(f.kind);
+}
+
 /** chiêu làm rung/lắc/che màn hình người bị chọc (đánh và ném đồ bẩn cũng rung màn hình họ) */
 export function isDisruptive(f: FunSend): boolean {
+  if (f.kind === 'poke' && f.poke) {
+    const p = pokeItem(f.poke);
+    return !!p && (isHardPoke(p) || (!p.nice && p.template !== 'orbit'));
+  }
   if (isHardDisrupt(f.kind)) return true;
   if (f.kind === 'hit') return true;
   return f.kind === 'throw' && f.item !== 'hoa' && f.item !== 'tim';
@@ -140,6 +161,7 @@ export function isDisruptive(f: FunSend): boolean {
 
 /** số ms người bị chọc mất vì hiệu ứng (để bù vào lượt Nối từ) */
 export function pauseMsOf(f: FunSend, extra: { ko?: boolean; [k: string]: unknown } = {}): number {
+  if (f.kind === 'poke' && f.poke) return isHardFx(f) ? 3000 : 1000;
   const base = DISRUPT_PAUSE_MS[f.kind] ?? 0;
   return f.kind === 'hit' && extra.ko ? Math.max(base, DISRUPT_PAUSE_MS.quake ?? base) : base;
 }

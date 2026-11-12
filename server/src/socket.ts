@@ -2,7 +2,8 @@ import type { Server, Socket } from 'socket.io';
 import type { AuthAck, ClientToServerEvents, FunAck, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
-import { cleanFun, isDisruptive, isHardDisrupt, isScreenTroll, isTroll, pauseMsOf, RateLimiter, trollExtras, WindowLimiter } from './fun';
+import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, RateLimiter, trollExtras, WindowLimiter } from './fun';
+import { pokeItem } from '../../shared/src/pokes';
 import type { Auth } from './auth';
 import { PhotoService } from './avatar';
 import { attachWalletHandlers } from './wallet';
@@ -248,7 +249,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const f = cleanFun(raw);
       if (!f) return reply({ ok: false });
       // phí: kỹ năng và quà trả Ruby mỗi lần; các chiêu còn lại (trừ emoji) có 30 lượt miễn phí mỗi ngày rồi 1 Ruby / lần
-      const price = f.kind === 'gift' ? shopItem(f.gift)?.price : skillPrice(f.kind);
+      const price = f.kind === 'gift' ? shopItem(f.gift)?.price : f.kind === 'poke' && f.poke ? pokeItem(f.poke)?.price : skillPrice(f.kind);
       const metered = price === undefined && f.kind !== 'emoji';
       const key = quotaKey();
       const free = metered && key !== null && !!walletCtx && walletCtx.quota.left(key) > 0;
@@ -271,7 +272,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       // Quá giới hạn: chiêu chỉ để phá (rung, xoay, sụp nguồn, gián, mực, hối...) bị chặn; đánh/ném vẫn bay tới avatar nhưng không rung màn hình.
       const target = 'to' in f ? f.to : null;
       const disruptive = target !== null && isDisruptive(f);
-      const hard = isHardDisrupt(f.kind);
+      const hard = isHardFx(f);
       let soft = false;
       if (disruptive) {
         const wait = room.disruptLimiter.wait(target);
@@ -280,7 +281,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
           if (retryMs > 0) return reply({ ok: false, reason: 'limited', retryMs });
         } else soft = wait > 0;
       }
-      if (isTroll(f.kind)) {
+      if (isTrollFx(f)) {
         if (!trollLimiter.take()) return reply({ ok: false, reason: 'busy' });
         if (isScreenTroll(f.kind) && target && !room.screenCooldown.take(target)) return reply({ ok: false, reason: 'busy' });
       }
@@ -291,7 +292,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const from = session.playerId;
       if (free && key !== null && walletCtx) walletCtx.quota.consume(key);
       if (cost > 0 && user && walletCtx) {
-        const ref = f.kind === 'gift' ? f.gift : price !== undefined ? f.kind : 'poke_' + f.kind;
+        const ref = f.kind === 'gift' ? f.gift : f.kind === 'poke' && f.poke ? `poke:${f.poke}` : price !== undefined ? f.kind : 'poke_' + f.kind;
         const balance = await chargeRuby(walletCtx, user.id, cost, f.kind === 'gift' ? 'gift' : 'skill', ref);
         if (balance === null) return reply({ ok: false, reason: noRuby });
       }

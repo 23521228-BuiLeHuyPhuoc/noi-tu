@@ -475,7 +475,8 @@ export const NICK_MS = 60_000;
 export type FunSend =
   | { kind: 'throw'; to: string; item: ThrowItem }
   | { kind: 'taunt'; taunt: TauntId }
-  | { kind: 'poke'; to: string }
+  /** `poke` rỗng: nút "Hối" cũ; có `poke`: một món trong kho chọc ghẹo (shared/src/pokes.ts) */
+  | { kind: 'poke'; to: string; poke?: string }
   | { kind: 'emoji'; emoji: Emoji }
   | { kind: 'hit'; to: string; move: HitMove }
   // "chọc mất dạy": chỉ để vui, không bao giờ ảnh hưởng kết quả ván
