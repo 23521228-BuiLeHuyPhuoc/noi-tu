@@ -156,12 +156,31 @@ if (PHASES.includes('chat')) {
   const box1 = await A.t('roll-btn').boundingBox().catch(() => null);
   check(box1 && box0 && Math.abs(box1.y - box0.y) < 3 && Math.abs(box1.x - box0.x) < 3, 'nút Đổ không xê dịch sau khi chat');
   check(!(await A.t('chat-input').count()), 'chat đã đóng');
-  // mở chat khi đang có bảng thoại
-  await A.t('roll-btn').click();
-  for (let i = 0; i < 30; i++) { if (await A.t('buy-btn').count() || await A.t('build-btn').count() || await A.t('roll-btn').count()) break; await sleep(400); }
-  await sleep(600);
-  await A.shot('chat-5-dialog');
-  if (await A.t('chat-open').count()) { await A.t('chat-open').click(); await sleep(500); await A.shot('chat-6-dialog-chat'); await dismiss(A); await A.shot('chat-7-dialog-closed'); }
+  // mở chat khi đang có bảng thoại mua đất / nâng cấp / ở tù: bảng không bị chat che, chat đóng xong bảng còn nguyên
+  for (let round = 0; round < 12; round++) {
+    await waitMyTurn(A, 40000);
+    await A.t('roll-btn').click().catch(() => {});
+    let dlg = null;
+    for (let i = 0; i < 60 && !dlg; i++) {
+      for (const id of ['buy-btn', 'build-btn', 'stay-jail', 'roll-btn']) if (id !== 'roll-btn' && (await A.t(id).count())) dlg = id;
+      if (!dlg) { await step(B); await sleep(300); }
+    }
+    if (!dlg) continue;
+    await sleep(700);
+    await A.shot(`chat-5-dialog-${dlg}`);
+    const chatBtn = (await A.t('chat-open-dialog').count()) ? 'chat-open-dialog' : 'chat-open';
+    if (await A.t(chatBtn).count()) {
+      await A.t(chatBtn).click({ timeout: 3000 }).catch(() => { failures++; console.log('FAIL không bấm được chat-open khi có bảng', dlg); });
+      await sleep(500); await A.shot(`chat-6-dialog-chat-${dlg}`);
+      await A.t('chat-input').fill('đang cân nhắc mua đất đây, chờ tí nha').catch(() => {});
+      await A.t('chat-send').click().catch(() => {}); await sleep(500);
+      await dismiss(A);
+      await A.shot(`chat-7-dialog-closed-${dlg}`);
+      check((await A.t(dlg).count()) > 0, `bảng ${dlg} còn nguyên sau khi chat`);
+    }
+    await step(A);
+    if (['buy-btn', 'build-btn', 'stay-jail'].includes(dlg) && round > 2) break;
+  }
 }
 
 if (PHASES.includes('poke')) {

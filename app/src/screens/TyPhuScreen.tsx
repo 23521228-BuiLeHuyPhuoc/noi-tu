@@ -19,7 +19,7 @@ import { play } from '../sound';
 import { vibrate } from '../web';
 import { C } from '../theme';
 import { Button, T, useFeed } from '../ui';
-import { Shell } from '../components/Shell';
+import { Shell, useShellTools } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { TyPhuCell, pawnAnchor } from '../components/TyPhuCell';
 import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
@@ -981,7 +981,30 @@ function SellPicker(p: {
 }
 
 /** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, nâng cấp, ở tù, mua vé ra tù. */
-function DecisionCard(p: {
+/** Bảng quyết định che mất nút 💬 ở giữa bàn (màn ngang thấp): thêm nút nhỏ ở góc để vẫn nhắn tin được khi đang cân nhắc */
+function DecisionCard(p: Parameters<typeof DecisionBody>[0]) {
+  const tools = useShellTools();
+  return (
+    <>
+      <DecisionBody {...p} />
+      {tools && (
+        <Pressable
+          testID="chat-open-dialog"
+          accessibilityRole="button"
+          accessibilityLabel="Trò chuyện"
+          onPress={tools.openChat}
+          hitSlop={6}
+          style={dc.chatPeek}
+        >
+          <T style={{ fontSize: 16 }}>💬</T>
+          {tools.unread > 0 && <View style={dc.chatPeekBadge}><T style={{ fontSize: 9, fontWeight: '900' }}>{tools.unread > 9 ? '9+' : tools.unread}</T></View>}
+        </Pressable>
+      )}
+    </>
+  );
+}
+
+function DecisionBody(p: {
   g: TyPhuView;
   me: string;
   canBuild: (i: number) => boolean;
@@ -1154,6 +1177,8 @@ function DecisionCard(p: {
 }
 
 const dc = StyleSheet.create({
+  chatPeek: { position: 'absolute', left: 8, top: 8, zIndex: 45, width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 2, borderColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  chatPeekBadge: { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, borderWidth: 1.5, borderColor: '#111', alignItems: 'center', justifyContent: 'center' },
   wrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40, backgroundColor: 'rgba(0,0,0,0.25)' },
   card: { width: 260, backgroundColor: '#FFFDF6', borderRadius: 12, borderWidth: 2.5, borderColor: '#111', overflow: 'hidden', boxShadow: '0px 10px 24px rgba(0,0,0,0.4)' },
   cardWide: { width: 300 },
