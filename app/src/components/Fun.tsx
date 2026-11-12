@@ -23,6 +23,8 @@ import { CHU_LAY_STICKERS, STICKERS, stickerOf } from '../stickers';
 import { GIFT_IDS, FREE_POKES_PER_DAY, STICKER_PACK_ID, shopItem, SKILL_IDS } from '../../../shared/src/shop';
 import { ShopSheet } from './Shop';
 import { KickInline } from './RoomTools';
+import { PokeGallery } from './PokeGallery';
+import { POKES, type PokeItem } from '../../../shared/src/pokes';
 
 // ---------- Lắc & Xoay màn hình ----------
 
@@ -379,7 +381,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         play('pop');
         if (fromR) say({ from: e.from, name: from === 'bạn' ? 'Bạn' : from, text, at: fromR, chat: false });
         else feed(`${from}: ${text}`, 'fun');
-      } else if (e.kind === 'poke') {
+      } else if (e.kind === 'poke' && !e.poke) {
         setMood(e.to, 'angry', 2500);
         setWobble(e.to, 'shake', 1800);
         if (toMe) {
@@ -739,6 +741,7 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
   const [pane, setPane] = useState<'doodle' | 'nick' | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
+  const [kho, setKho] = useState(false);
   const [quota, setQuota] = useState<{ free: number; left: number } | null>(null);
   const feed = useFeed();
   const { funQuota } = game;
@@ -763,6 +766,14 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
       {quota && <T testID="poke-quota" style={styles.quota}>🎟️ Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)</T>}
+      <Button
+        testID="poke-kho-open"
+        variant={kho ? 'ink' : 'gold'}
+        icon="🎁"
+        title={kho ? 'Đóng kho chọc ghẹo' : `Kho chọc ghẹo · ${POKES.length} món`}
+        onPress={() => setKho((v) => !v)}
+      />
+      {kho && <PokeGallery onPick={(p: PokeItem) => send({ kind: 'poke', to: target.id, poke: p.id })} />}
       <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
       <View style={styles.hits}>
         {HITS.map((h) => (
