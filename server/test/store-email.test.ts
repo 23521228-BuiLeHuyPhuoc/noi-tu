@@ -34,11 +34,11 @@ describe('account storage', () => {
 
   it('replaces resets, counts attempts, and atomically consumes a reset once', async () => {
     const store = new MemoryStore();
-    const record = { userId: 'an', codeHash: 'hash', expiresAt: new Date(Date.now() + 600000), attempts: 0, sentAt: [new Date()] };
+    const record = { userId: 'an', generation: 'generation', codeHash: 'hash', expiresAt: new Date(Date.now() + 600000), attempts: 0, sentAt: [new Date()] };
     await store.saveReset(record);
     expect(await store.getReset('an')).toEqual(record);
-    expect(await store.bumpResetAttempts('an')).toBe(1);
-    expect(await store.bumpResetAttempts('an')).toBe(2);
+    expect(await store.bumpResetAttempts('an', record.generation, new Date())).toBe(1);
+    expect(await store.bumpResetAttempts('an', record.generation, new Date())).toBe(2);
     expect((await store.getReset('an'))?.attempts).toBe(2);
     await store.saveReset({ ...record, codeHash: 'replacement' });
     expect((await store.getReset('an'))?.codeHash).toBe('replacement');

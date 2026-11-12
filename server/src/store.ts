@@ -26,6 +26,7 @@ export interface UserRecord {
 }
 
 export interface ResetRecord {
+  generation: string;
   userId: string;
   codeHash: string;
   expiresAt: Date;
@@ -43,8 +44,9 @@ export interface Store {
   reserveResetSend(userId: string, now: Date): Promise<Date[] | null>;
   saveReset(r: ResetRecord): Promise<void>;
   getReset(userId: string): Promise<ResetRecord | null>;
-  bumpResetAttempts(userId: string): Promise<number>;
-  deleteReset(userId: string): Promise<boolean>;
+  bumpResetAttempts(userId: string, generation: string, now: Date): Promise<number>;
+  consumeReset(userId: string, generation: string, now: Date): Promise<boolean>;
+  deleteReset(userId: string, generation?: string): Promise<boolean>;
   userByName(username: string): Promise<UserRecord | null>;
   userById(id: string): Promise<UserRecord | null>;
   updateUser(id: string, patch: { displayName?: string; avatar?: number; avatarUrl?: string | null; avatarPublicId?: string | null }): Promise<UserRecord | null>;
@@ -127,11 +129,17 @@ export class MemoryStore implements Store {
     const r = this.resets.get(userId);
     return r ? structuredClone(r) : null;
   }
-  async bumpResetAttempts(userId: string) {
+  async bumpResetAttempts(userId: string, generation: string, now: Date) {
     const r = this.resets.get(userId);
-    return r ? ++r.attempts : 0;
+    return r && r.generation === generation && +r.expiresAt > +now && r.attempts < 5 ? ++r.attempts : 0;
   }
-  async deleteReset(userId: string) {
+  async consumeReset(userId: string, generation: string, now: Date) {
+    const r = this.resets.get(userId);
+    if (!r || r.generation !== generation || +r.expiresAt <= +now || r.attempts >= 5) return false;
+    return this.resets.delete(userId);
+  }
+  async deleteReset(userId: string, generation?: string) {
+    if (generation !== undefined && this.resets.get(userId)?.generation !== generation) return false;
     return this.resets.delete(userId);
   }
   async userById(id: string) {
@@ -294,23 +302,22 @@ export class MongoStore implements Store {
     await this.sessions.deleteMany({ userId: new ObjectId(userId), ...(keepToken === undefined ? {} : { token: { $ne: hashToken(keepToken) } }) });
   }
   async reserveResetSend(userId: string, now: Date): Promise<Date[] | null> {
-    // Lịch sử riêng không có TTL giữ giới hạn sau khi mã đã dùng hoặc hết hạn.
-    const recent = { $filter: { input: { $ifNull: ['$sentAt', []] }, as: 'date', cond: { $gt: ['$$date', new Date(+now - 3600000)] } } };
+    // Khởi tạo riêng: Mongo không cho dùng $expr trong điều kiện upsert.
     try {
-      const result = await this.resetSends.findOneAndUpdate(
-        { userId, $expr: { $and: [
-          { $lt: [{ $size: recent }, 5] },
-          { $eq: [{ $size: { $filter: { input: recent, as: 'date', cond: { $gt: ['$$date', new Date(+now - 60000)] } } } }, 0] },
-        ] } },
-        [{ $set: { userId, sentAt: { $concatArrays: [recent, [now]] } } }],
-        { upsert: true, returnDocument: 'after' },
-      );
-      return result?.sentAt ?? null;
+      await this.resetSends.updateOne({ userId }, { $setOnInsert: { userId, sentAt: [] } }, { upsert: true });
     } catch (e) {
-      // Bản ghi bị giới hạn (kể cả yêu cầu đồng thời thắng trước) chặn upsert.
-      if ((e as { code?: number }).code === 11000) return null;
-      throw e;
+      if ((e as { code?: number }).code !== 11000) throw e;
     }
+    const recent = { $filter: { input: { $ifNull: ['$sentAt', []] }, as: 'date', cond: { $gt: ['$$date', new Date(+now - 3600000)] } } };
+    const result = await this.resetSends.findOneAndUpdate(
+      { userId, $expr: { $and: [
+        { $lt: [{ $size: recent }, 5] },
+        { $eq: [{ $size: { $filter: { input: recent, as: 'date', cond: { $gt: ['$$date', new Date(+now - 60000)] } } } }, 0] },
+      ] } },
+      [{ $set: { sentAt: { $concatArrays: [recent, [now]] } } }],
+      { returnDocument: 'after' },
+    );
+    return result?.sentAt ?? null;
   }
   async saveReset(r: ResetRecord) {
     await this.resets.replaceOne({ userId: r.userId }, r, { upsert: true });
@@ -319,12 +326,18 @@ export class MongoStore implements Store {
     const r = await this.resets.findOne({ userId }, { projection: { _id: 0 } });
     return r;
   }
-  async bumpResetAttempts(userId: string) {
-    const r = await this.resets.findOneAndUpdate({ userId }, { $inc: { attempts: 1 } }, { returnDocument: 'after' });
+  async bumpResetAttempts(userId: string, generation: string, now: Date) {
+    const r = await this.resets.findOneAndUpdate(
+      { userId, generation, expiresAt: { $gt: now }, attempts: { $lt: 5 } },
+      { $inc: { attempts: 1 } }, { returnDocument: 'after' },
+    );
     return r?.attempts ?? 0;
   }
-  async deleteReset(userId: string) {
-    return (await this.resets.deleteOne({ userId })).deletedCount === 1;
+  async consumeReset(userId: string, generation: string, now: Date) {
+    return (await this.resets.deleteOne({ userId, generation, expiresAt: { $gt: now }, attempts: { $lt: 5 } })).deletedCount === 1;
+  }
+  async deleteReset(userId: string, generation?: string) {
+    return (await this.resets.deleteOne({ userId, ...(generation === undefined ? {} : { generation }) })).deletedCount === 1;
   }
   async userById(id: string) {
     if (!ObjectId.isValid(id)) return null;

@@ -112,7 +112,7 @@ export class Auth {
       const sentAt = await this.store.reserveResetSend(user.id, now);
       if (sentAt) {
         const code = randomInt(1000000).toString().padStart(6, '0');
-        await this.store.saveReset({ userId: user.id, codeHash: codeHash(user.id, code).toString('hex'), expiresAt: new Date(+now + 600000), attempts: 0, sentAt });
+        await this.store.saveReset({ userId: user.id, generation: randomBytes(16).toString('hex'), codeHash: codeHash(user.id, code).toString('hex'), expiresAt: new Date(+now + 600000), attempts: 0, sentAt });
         const mail = resetMail(user.displayName, code);
         void Promise.resolve().then(() => this.mailer!.send(user.email!, mail.subject, mail.text, mail.html)).catch(console.error);
       }
@@ -126,14 +126,15 @@ export class Auth {
     const user = await this.find(p.who);
     if (!user) return { ack: fail('code_expired') };
     const reset = await this.store.getReset(user.id);
-    if (!reset) return { ack: fail('code_expired') };
-    if (+reset.expiresAt <= Date.now()) { await this.store.deleteReset(user.id); return { ack: fail('code_expired') }; }
+    if (!reset || !reset.generation) return { ack: fail('code_expired') };
+    if (+reset.expiresAt <= Date.now()) { await this.store.deleteReset(user.id, reset.generation); return { ack: fail('code_expired') }; }
     if (typeof p.code !== 'string' || !/^\d{6}$/.test(p.code) || !timingSafeEqual(codeHash(user.id, p.code), Buffer.from(reset.codeHash, 'hex'))) {
-      const attempts = await this.store.bumpResetAttempts(user.id);
-      if (attempts >= 5 || attempts === 0) { await this.store.deleteReset(user.id); return { ack: fail('code_expired') }; }
+      const attempts = await this.store.bumpResetAttempts(user.id, reset.generation, new Date());
+      if (attempts >= 5 || attempts === 0) { await this.store.deleteReset(user.id, reset.generation); return { ack: fail('code_expired') }; }
       return { ack: fail('bad_code') };
     }
-    if (!(await this.store.deleteReset(user.id))) return { ack: fail('code_expired') };
+    // Chỉ dùng đúng thế hệ đã đọc, còn hạn và chưa đủ năm lần sai.
+    if (!(await this.store.consumeReset(user.id, reset.generation, new Date()))) return { ack: fail('code_expired') };
     const hash = await hashPassword(p.password);
     await this.store.setPassword(user.id, hash.passHash, hash.salt);
     await this.store.deleteSessionsExcept(user.id);
