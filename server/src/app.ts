@@ -8,7 +8,19 @@ import { RoomManager, type RoomManagerOptions } from './roomManager';
 import { attachSocketHandlers, broadcastRoom } from './socket';
 import { Auth } from './auth';
 import { ACCOUNT_PREFIX } from './room';
-import { MemoryStore, type Store } from './store';
+import { MemoryStore, MongoStore, type Store } from './store';
+import { MongoWalletStore, type WalletStore } from './walletStore';
+
+/** ví Ruby theo nơi lưu tài khoản: MongoDB thì dùng chung kết nối, bộ nhớ thì dùng chung bảng người dùng */
+function walletFor(store: Store): WalletStore {
+  if (store instanceof MongoStore) {
+    const w = new MongoWalletStore(store.database);
+    w.init().catch((e) => console.error('wallet indexes', e));
+    return w;
+  }
+  if (store instanceof MemoryStore) return store.wallet();
+  throw new Error('Store không hỗ trợ ví Ruby');
+}
 import { debugMailer, gmailMailer, type Mailer } from './mailer';
 
 export interface GameServer {
@@ -16,6 +28,8 @@ export interface GameServer {
   io: Server<ClientToServerEvents, ServerToClientEvents>;
   manager: RoomManager;
   store: Store;
+  /** ví Ruby (dùng chung nơi lưu với tài khoản) */
+  wallet: WalletStore;
   close: () => Promise<void>;
 }
 
@@ -24,10 +38,13 @@ export interface GameServerOptions extends Omit<RoomManagerOptions, 'onRoomChang
   store?: Store;
   avatarUploader?: AvatarUploader;
   mailer?: Mailer | null;
+  /** ví Ruby; mặc định theo `store` (bộ nhớ hoặc MongoDB) */
+  wallet?: WalletStore;
 }
 
 export function createGameServer(dict: Dictionary, opts: GameServerOptions = {}): GameServer {
   const store = opts.store ?? new MemoryStore();
+  const wallet: WalletStore = opts.wallet ?? walletFor(store);
   const mailer = opts.mailer === null ? undefined : opts.mailer ?? gmailMailer() ?? debugMailer();
   const logErr = (what: string) => (e: unknown) => console.error(what, e);
 
@@ -96,6 +113,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     io,
     manager,
     store,
+    wallet,
     close: () =>
       new Promise((resolve) => {
         manager.dispose();

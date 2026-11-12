@@ -538,6 +538,33 @@ export interface PublicUser {
   avatar: number;
   avatarUrl?: string;
   stats: Partial<Record<GameType, GameStat>>;
+  /** số dư Ruby (chỉ trả cho chính chủ) */
+  ruby: number;
+  /** tài khoản quản trị (ADMIN_USERNAMES) */
+  admin?: true;
+}
+
+/** yêu cầu nạp Ruby chờ quản trị duyệt (thời gian: ms) */
+export interface TopupRequest {
+  id: string;
+  userId: string;
+  username: string;
+  code: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+  handledAt?: number;
+  handledBy?: string;
+  ruby?: number;
+}
+
+/** một dòng sổ Ruby */
+export interface RubyLedgerRow {
+  delta: number;
+  balance: number;
+  reason: string;
+  ref?: string;
+  at: number;
 }
 
 export type AuthError =

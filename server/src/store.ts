@@ -5,6 +5,7 @@
  */
 import { randomBytes, createHash } from 'node:crypto';
 import { MongoClient, ObjectId, type Collection, type Db } from 'mongodb';
+import { MemoryWalletStore } from './walletStore';
 import { GAME_INFO, type GameStat, type GameType, type LeaderRow, type PublicUser } from '../../shared/src/types';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
@@ -23,6 +24,12 @@ export interface UserRecord {
   passHash: string;
   salt: string;
   stats: Partial<Record<GameType, GameStat>>;
+  /** số dư Ruby (thiếu = 0) — chỉ ví (walletStore.ts) được đổi */
+  ruby?: number;
+  /** mã nạp cố định XL…… nằm trong nội dung chuyển khoản */
+  topupCode?: string;
+  /** đã nhận khuyến mãi nạp lần đầu */
+  firstTopupAt?: Date;
 }
 
 export interface ResetRecord {
@@ -64,7 +71,7 @@ export interface Store {
 }
 
 export function toPublic(u: UserRecord): PublicUser {
-  return { id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {} };
+  return { id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar, ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {}, ruby: u.ruby ?? 0 };
 }
 
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
@@ -79,6 +86,11 @@ export class MemoryStore implements Store {
   private words = new Set<string>();
   private resets = new Map<string, ResetRecord>();
   private resetSends = new Map<string, Date[]>();
+  private walletStore?: MemoryWalletStore;
+  /** ví Ruby dùng chung bảng người dùng trong bộ nhớ */
+  wallet(): MemoryWalletStore {
+    return (this.walletStore ??= new MemoryWalletStore(this.users));
+  }
   private seq = 0;
 
   async createUser(u: Omit<UserRecord, 'id' | 'stats'>) {
@@ -218,6 +230,9 @@ interface UserDoc {
   salt: string;
   stats?: Partial<Record<GameType, GameStat>>;
   createdAt: Date;
+  ruby?: number;
+  topupCode?: string;
+  firstTopupAt?: Date;
 }
 
 const fromDoc = (d: UserDoc): UserRecord => ({
@@ -231,6 +246,9 @@ const fromDoc = (d: UserDoc): UserRecord => ({
   passHash: d.passHash,
   salt: d.salt,
   stats: d.stats ?? {},
+  ruby: d.ruby ?? 0,
+  topupCode: d.topupCode,
+  firstTopupAt: d.firstTopupAt,
 });
 
 export class MongoStore implements Store {
@@ -242,13 +260,19 @@ export class MongoStore implements Store {
     private readonly words: Collection<{ word: string; by: string; createdAt: Date }>,
     private readonly resets: Collection<ResetRecord>,
     private readonly resetSends: Collection<{ userId: string; sentAt: Date[] }>,
+    private readonly db: Db,
   ) {}
+
+  /** cơ sở dữ liệu đang dùng (để ví Ruby dùng chung kết nối) */
+  get database(): Db {
+    return this.db;
+  }
 
   static async connect(uri: string, dbName = 'xomlay'): Promise<MongoStore> {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10_000, appName: 'xom-lay' });
     await client.connect();
     const db: Db = client.db(dbName);
-    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'), db.collection('password_reset_sends'));
+    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'), db.collection('password_reset_sends'), db);
     await Promise.all([
       store.users.createIndex({ username: 1 }, { unique: true }),
       store.users.createIndex({ email: 1 }, { unique: true, sparse: true }),
