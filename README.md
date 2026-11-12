@@ -165,6 +165,9 @@ Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để
 - Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy).
 - Ảnh địa danh trong bảng chi tiết ô lấy từ Wikimedia Commons / Wikipedia (xem `app/src/typhuArt.ts`). Trong game có dòng "Nguồn icon/ảnh" ở cuối bảng chi tiết mỗi ô.
 
+## Nguồn hình (Kho chọc ghẹo)
+- Hình 3D của hơn 200 món chọc ghẹo là **Fluent Emoji** của Microsoft, giấy phép **MIT**, bản quyền (c) Microsoft Corporation: https://github.com/microsoft/fluentui-emoji. App tải từng hình lúc chạy qua jsDelivr (`https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/...`), không chép vào repo; mất mạng thì hiện emoji gốc. Danh sách món, giá và mẫu hiệu ứng nằm ở `shared/src/pokes.ts`; chạy `node e2e/poke-gallery.mjs` để chụp ảnh từng mẫu.
+
 ## Cấu hình server (biến môi trường)
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
