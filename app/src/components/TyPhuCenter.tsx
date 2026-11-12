@@ -120,7 +120,8 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   // thẻ hẹp (bàn nghiêng trên màn nhỏ, 5-6 người): bỏ icon đồng xu, thu chữ tiền, ẩn số đất cho khỏi tràn
   const tight = textW < 92;
   const veryTight = textW < 70;
-  const cashStyle = tight ? { fontSize: 11.5, lineHeight: 14 } : null;
+  const nameless = textW < 46; // thẻ siêu hẹp: chỉ còn avatar + tiền (tên vẫn có trong nhãn truy cập)
+  const cashStyle = veryTight ? { fontSize: 10.5, lineHeight: 13 } : tight ? { fontSize: 11.5, lineHeight: 14 } : null;
   return (
     <>
     <Pressable
@@ -155,12 +156,12 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
           )}
         </View>
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={styles.rowC}>
+      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+        {!nameless && <View style={styles.rowC}>
           <T testID={`wealth-name-${id}`} numberOfLines={fit.lines} style={[styles.wName, { fontSize: fit.fs, lineHeight: fit.lh }, WRAP]}>{name}</T>
           {id in g.jail && <Image source={{ uri: FX_ICON.police }} style={styles.tiny} />}
           {cur && <Image source={{ uri: FX_ICON.dice }} style={styles.tiny} />}
-        </View>
+        </View>}
         <View style={styles.rowC}>
           {out ? (
             <T style={[styles.wCash, { color: '#6B2B2B' }]}>Phá sản</T>
@@ -280,7 +281,8 @@ export function TyPhuCenter(p: CenterProps) {
   const logs = L.logRows > 0 ? g.log.slice(-L.logRows) : [];
   const tools = useShellTools();
   const statusH = L.wide ? 30 : 0;
-  const trayH = L.action.h - 44 - statusH;
+  // khung hành động: viền+đệm 8, khe 4 giữa các phần, hàng nút 38, hàng trạng thái (statusH - 4)
+  const trayH = Math.max(40, L.action.h - (8 + (L.wide ? 8 : 4) + 38 + (L.wide ? statusH - 4 : 0)) - 1);
   const canThrow = showRoll && !p.dice.animating;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">

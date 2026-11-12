@@ -75,7 +75,7 @@ function Stars({ n, size }: { n: number; size: number }) {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 /** bề rộng trung bình 1 chữ HOA in đậm so với cỡ chữ */
-const CH = 0.74;
+const CH = 0.8;
 
 /**
  * Cỡ chữ để hiện ĐỦ tên trong khung rộng w, cao h (tối đa 2 dòng, ngắt theo từ, không cắt "…").
@@ -178,7 +178,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
     const starSize = clamp(W / 4.2, 7, 14);
     const starH = isStation && p.houses > 0 ? Math.round(starSize * 1.15) : 0;
     const inner = H - bandH - priceLH - starH - 4;
-    const fit = fitCellName(name, W - 4, inner * (isLand ? 0.55 : 0.4), clamp(H * 0.17, 6.5, 19));
+    const fit = fitCellName(name, W - 4, inner * (isLand ? 0.7 : 0.4), clamp(H * 0.17, 6.5, 19));
     const iconSize = clamp(Math.min(W * (face ? 0.56 : 0.8), inner - fit.lh * fit.lines - 2), 8, 120);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>

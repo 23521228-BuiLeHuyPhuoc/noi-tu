@@ -49,7 +49,11 @@ for (const [W, H] of VPS) for (const n of COUNTS) {
     }
     await sleep(350);
   }
-  await sleep(2500);
+  // chờ tới lượt mình (nút Đổ xúc xắc hiện) để chụp khay xúc xắc + nút
+  for (let i = 0; i < 60 && !(await t('roll-btn').count()); i++) await sleep(500);
+  await sleep(800);
+  // đóng bảng: bấm vào phần nền tối còn lộ ra (mép phải màn hình nếu đang xoay, mép trên nếu không)
+  const dismiss = async () => { await page.mouse.click(W > H ? W / 2 : W - 3, W > H ? 3 : H / 2); };
   const shot = async (name) => page.screenshot({ path: `${OUT}/${tag}-${name}.png` });
   for (let m = 0; m < 3; m++) {
     await sleep(400);
@@ -79,17 +83,17 @@ for (const [W, H] of VPS) for (const n of COUNTS) {
     await shot('chat');
     if (await t('chat-send').isVisible().catch(() => false)) await tap(t('chat-send')); else { problems++; console.log(`[${tag}] chat-send không thấy`); }
     await sleep(500); await shot('chat-sent');
-    await page.keyboard.press('Escape'); await page.mouse.click(4, 4); await sleep(400);
+    await dismiss(); await sleep(400);
     // chọc
     if (await t('poke-open').count()) {
       await tap(t('poke-open')); await sleep(400); await shot('poke');
       await tap(page.locator('[data-testid^="poke-pick-"]').first()); await sleep(500); await shot('throw');
-      await page.mouse.click(4, 4); await sleep(400);
+      await dismiss(); await sleep(400);
     }
     await tap(t('rules-open')); await sleep(400); await shot('rules');
-    await page.mouse.click(4, 4); await sleep(400);
+    await dismiss(); await sleep(400);
     await tap(t('cell-1')); await sleep(500); await shot('detail');
-    await page.mouse.click(4, 4); await sleep(400);
+    await dismiss(); await sleep(400);
     await tap(t('cell-39')); await sleep(500); await shot('detail39');
   }
   await ctx.close();
