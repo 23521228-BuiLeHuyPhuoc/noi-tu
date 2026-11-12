@@ -10,6 +10,7 @@ import { SERVER_URL } from '../config';
 import { C, FONT } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
+import { authText } from '../messages';
 import { WalletSheet } from './Wallet';
 import { AdminSheet } from './Admin';
 
@@ -268,10 +269,14 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
   );
 }
 
+/** câu báo sai mật khẩu (đổi email cần mật khẩu hiện tại) */
+const authTextWrong = authText.wrong_credentials;
+
 /** Email và đổi mật khẩu trong hồ sơ (chỉ tài khoản) */
 function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
   const [email, setEmail] = useState(user.email ?? '');
   const [editing, setEditing] = useState(!user.email);
+  const [emailPw, setEmailPw] = useState('');
   const [oldPw, setOldPw] = useState('');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
@@ -281,10 +286,13 @@ function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
 
   const saveEmail = async () => {
     setBusy(true);
-    const err = await game.setEmail(email);
+    const err = await game.setEmail(email, user.email ? emailPw : undefined);
     setBusy(false);
-    setMsg(err ? { ok: false, text: err } : { ok: true, text: 'Đã lưu email.' });
-    if (!err) setEditing(false);
+    setMsg(err ? { ok: false, text: err === authTextWrong ? 'Mật khẩu chưa đúng.' : err } : { ok: true, text: 'Đã lưu email.' });
+    if (!err) {
+      setEditing(false);
+      setEmailPw('');
+    }
   };
   const savePw = async () => {
     if (pw !== pw2) return setMsg({ ok: false, text: 'Hai mật khẩu chưa khớp.' });
@@ -306,7 +314,10 @@ function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
       {editing ? (
         <View style={{ gap: 6 }}>
           <Field testID="profile-email" label="Email" value={email} onChangeText={(t) => setEmail(t.replace(/\s/g, ''))} keyboardType="email-address" maxLength={100} />
-          <Button testID="profile-email-save" small variant="paper" title="Lưu email" disabled={busy || !email.includes('@')} onPress={saveEmail} />
+          {user.email && (
+            <Field testID="profile-email-password" label="Mật khẩu hiện tại (để đổi email)" value={emailPw} onChangeText={setEmailPw} secureTextEntry maxLength={72} />
+          )}
+          <Button testID="profile-email-save" small variant="paper" title="Lưu email" disabled={busy || !email.includes('@') || (!!user.email && emailPw.length < 6)} onPress={saveEmail} />
         </View>
       ) : (
         <View style={styles.emailRow}>

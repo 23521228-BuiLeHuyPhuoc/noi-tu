@@ -1,4 +1,4 @@
-// Chạy: (cd server && npm run build && ADMIN_USERNAMES=boss MAIL_DEBUG=1 PORT=4320 node dist/server.js)
+// Chạy: (cd server && npm run build && ADMIN_USERNAMES=boss ALLOW_MEMORY_ADMIN=1 MAIL_DEBUG=1 PORT=4320 node dist/server.js)
 //       (cd app && EXPO_PUBLIC_SERVER_URL=http://localhost:4320 npx expo export -p web --output-dir /tmp/web-w)
 //       (cd /tmp/web-w && python3 -m http.server 8396)
 //       cd e2e && WEB=http://localhost:8396 CHROME=/usr/bin/google-chrome node wallet.mjs /tmp/shots

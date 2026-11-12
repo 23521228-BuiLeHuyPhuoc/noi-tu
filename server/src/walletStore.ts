@@ -23,7 +23,7 @@ export interface WalletStore {
   resolveRequest(id: string, status: 'approved' | 'rejected', by: string, ruby?: number, amount?: number): Promise<TopupRequest | null>;
   setRequestRuby(id: string, ruby: number): Promise<void>;
   /** quản trị cộng theo mã (người chơi quên bấm "đã chuyển"): ghi một yêu cầu đã duyệt để có lịch sử và doanh thu */
-  addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, at?: Date): Promise<TopupRequest>;
+  addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, opts?: { at?: Date; nonce?: string }): Promise<TopupRequest | 'duplicate'>;
   /** đặt mốc đã nhận khuyến mãi lần đầu; true nếu lần này là lần đầu */
   markFirstTopup(userId: string): Promise<boolean>;
   /** cộng/trừ Ruby nguyên tử; trả số dư mới, null nếu không có tài khoản hoặc không đủ Ruby */
@@ -50,6 +50,7 @@ export function vnStarts(now: Date): { day: number; month: number } {
 
 export class MemoryWalletStore implements WalletStore {
   private requests = new Map<string, TopupRequest>();
+  private nonces = new Set<string>();
   private ledger: (RubyLedgerRow & { userId: string })[] = [];
   private order = 0;
   constructor(private readonly users: Map<string, UserRecord>) {}
@@ -98,7 +99,13 @@ export class MemoryWalletStore implements WalletStore {
     const r = this.requests.get(id);
     if (r) r.ruby = ruby;
   }
-  async addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, at = new Date()) {
+  async addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, opts: { at?: Date; nonce?: string } = {}) {
+    // cùng một lần bấm (nonce) chỉ ghi một lần: bấm lại vì mạng chậm không cộng trùng
+    if (opts.nonce) {
+      if (this.nonces.has(opts.nonce)) return 'duplicate' as const;
+      this.nonces.add(opts.nonce);
+    }
+    const at = opts.at ?? new Date();
     const r: TopupRequest = {
       id: randomBytes(12).toString('hex'), userId, username, code, amount, status: 'approved',
       createdAt: +at, handledAt: +at, handledBy: by, ruby,
@@ -171,6 +178,8 @@ interface RequestDoc {
   handledAt?: Date;
   handledBy?: string;
   ruby?: number;
+  /** khóa chống ghi trùng khi quản trị bấm lại "Cộng theo mã" */
+  nonce?: string;
 }
 interface LedgerDoc {
   userId: string;
@@ -206,6 +215,7 @@ export class MongoWalletStore implements WalletStore {
       this.users.createIndex({ topupCode: 1 }, { unique: true, sparse: true }),
       this.requests.createIndex({ status: 1, createdAt: -1 }),
       this.requests.createIndex({ userId: 1, status: 1 }),
+      this.requests.createIndex({ nonce: 1 }, { unique: true, sparse: true }),
       this.ledger.createIndex({ userId: 1, at: -1 }),
     ]);
   }
@@ -258,9 +268,18 @@ export class MongoWalletStore implements WalletStore {
     const _id = oid(id);
     if (_id) await this.requests.updateOne({ _id }, { $set: { ruby } });
   }
-  async addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, at = new Date()) {
-    const doc: RequestDoc = { _id: new ObjectId(), userId, username, code, amount, status: 'approved', createdAt: at, handledAt: at, handledBy: by, ruby };
-    await this.requests.insertOne(doc);
+  async addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, opts: { at?: Date; nonce?: string } = {}) {
+    const at = opts.at ?? new Date();
+    const doc: RequestDoc = {
+      _id: new ObjectId(), userId, username, code, amount, status: 'approved', createdAt: at, handledAt: at, handledBy: by, ruby,
+      ...(opts.nonce ? { nonce: opts.nonce } : {}),
+    };
+    try {
+      await this.requests.insertOne(doc);
+    } catch (e) {
+      if ((e as { code?: number }).code === 11000) return 'duplicate' as const;
+      throw e;
+    }
     return fromReq(doc);
   }
   async markFirstTopup(userId: string) {

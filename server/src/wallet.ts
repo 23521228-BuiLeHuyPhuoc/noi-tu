@@ -52,6 +52,8 @@ export function attachWalletHandlers(socket: Sock, ctx: WalletContext, getUser: 
     const u = getUser();
     if (!u) return reply({ ok: false, error: 'need_account' });
     if (admin && !isAdmin(u.username)) return reply({ ok: false, error: 'forbidden' });
+    // server lỡ chạy bộ nhớ tạm (mất kết nối MongoDB): ai đăng ký trước tên quản trị sẽ thành quản trị -> chặn
+    if (admin && store.kind === 'memory' && process.env.ALLOW_MEMORY_ADMIN !== '1') return reply({ ok: false, error: 'forbidden' });
     if (!limiter.take()) return reply({ ok: false, error: 'rate_limited' });
     run(u, reply).catch((e) => {
       console.error('wallet error', e);
@@ -119,13 +121,13 @@ export function attachWalletHandlers(socket: Sock, ctx: WalletContext, getUser: 
     const userId = code ? await wallet.userIdByTopupCode(code) : null;
     const user = userId ? await store.userById(userId) : null;
     if (!code || !user) return reply({ ok: false, error: 'not_found' });
-    if (!okAmount(p.amount)) return reply({ ok: false, error: 'bad_request' });
-    const first = await wallet.markFirstTopup(user.id);
-    const ruby = rubyForAmount(p.amount, first);
-    const request = await wallet.addApproved(user.id, user.username, code, p.amount, admin.username, ruby);
-    const balance = (await wallet.creditRuby(user.id, ruby, 'topup', request.id, admin.username)) ?? (await wallet.balance(user.id));
-    events.update(user.id, { ruby: balance, delta: ruby, reason: 'topup' });
-    reply({ ok: true, request, ruby, balance });
+    if (!okAmount(p.amount) || typeof p.nonce !== 'string' || !/^[\w-]{6,64}$/.test(p.nonce)) return reply({ ok: false, error: 'bad_request' });
+    // ghi khoản đã nhận trước (nonce chống bấm lại cộng trùng), rồi mới giành khuyến mãi lần đầu và cộng Ruby
+    const request = await wallet.addApproved(user.id, user.username, code, p.amount, admin.username, 0, { nonce: p.nonce });
+    if (request === 'duplicate') return reply({ ok: false, error: 'already_handled' });
+    const { ruby, balance } = await creditTopup(user.id, p.amount, request.id, admin.username);
+    await wallet.setRequestRuby(request.id, ruby);
+    reply({ ok: true, request: { ...request, ruby }, ruby, balance });
   }));
 
   socket.on('admin:adjust', (p, ack) => handle(ack, true, async (admin, reply) => {

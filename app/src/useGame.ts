@@ -73,7 +73,8 @@ export interface Game {
   forgotPassword(who: string): Promise<string | null>;
   /** đặt mật khẩu mới bằng mã trong thư; thành công thì đăng nhập luôn */
   resetPassword(who: string, code: string, password: string): Promise<string | null>;
-  setEmail(email: string): Promise<string | null>;
+  /** đã có email thì phải kèm mật khẩu hiện tại */
+  setEmail(email: string, password?: string): Promise<string | null>;
   changePassword(oldPassword: string, password: string): Promise<string | null>;
   login(username: string, password: string): Promise<string | null>;
   updateProfile(p: { displayName?: string; avatar?: number }): Promise<string | null>;
@@ -100,7 +101,8 @@ export interface Game {
   adminRequests(status: TopupRequest['status']): Promise<WalletResult<TopupRequest[]>>;
   adminApprove(id: string, amount?: number): Promise<WalletResult<{ ruby: number; balance: number }>>;
   adminReject(id: string): Promise<WalletResult<TopupRequest>>;
-  adminCreditCode(code: string, amount: number): Promise<WalletResult<{ ruby: number; balance: number }>>;
+  /** nonce: giữ nguyên khi bấm lại cùng một lần cộng để server không cộng trùng */
+  adminCreditCode(code: string, amount: number, nonce: string): Promise<WalletResult<{ ruby: number; balance: number; request: TopupRequest }>>;
   adminAdjust(username: string, delta: number, reason: string): Promise<WalletResult<{ balance: number }>>;
   adminRevenue(): Promise<WalletResult<{ today: number; month: number; total: number }>>;
   sendChat(text: string): Promise<boolean>;
@@ -222,6 +224,13 @@ export function useGame(): Game {
       setWalletState((w) => (w ? { ...w, info: { ...w.info, ruby: p.ruby } } : w));
       reloadWallet.current();
       for (const cb of walletListeners.current) cb({ kind: 'update', ...p });
+    });
+    // mật khẩu vừa đổi / đặt lại ở máy khác: máy này bị đăng xuất
+    socket.on('auth:revoked', () => {
+      setUser(null);
+      void storage.setToken(null);
+      void forget();
+      setNotice('Mật khẩu tài khoản vừa được đổi ở máy khác, hãy đăng nhập lại.');
     });
     socket.on('wallet:rejected', (p) => {
       reloadWallet.current();
@@ -488,7 +497,8 @@ export function useGame(): Game {
     },
     resetPassword: (who, code, password) =>
       authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:reset', { who: who.trim(), code: code.trim(), password })),
-    setEmail: (email) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:setEmail', { email: email.trim() })),
+    setEmail: (email, password) =>
+      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:setEmail', password === undefined ? { email: email.trim() } : { email: email.trim(), password })),
     changePassword: (oldPassword, password) =>
       authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:changePassword', { oldPassword, password })),
     updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
@@ -534,8 +544,8 @@ export function useGame(): Game {
       const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:reject', { id }));
       return r.ok ? { ok: true, data: r.data.request } : r;
     },
-    adminCreditCode: (code, amount) =>
-      walletCall<{ ruby: number; balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:creditCode', { code, amount })),
+    adminCreditCode: (code, amount, nonce) =>
+      walletCall<{ ruby: number; balance: number; request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:creditCode', { code, amount, nonce })),
     adminAdjust: (username, delta, reason) =>
       walletCall<{ balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:adjust', { username, delta, reason })),
     adminRevenue: () => walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),

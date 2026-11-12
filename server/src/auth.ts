@@ -34,7 +34,8 @@ export function cleanUsername(raw: unknown): string | null {
 export function cleanEmail(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const email = raw.trim().toLowerCase();
-  return email.length >= 6 && email.length <= 100 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? email : null;
+  // đúng một địa chỉ: không dấu phẩy, chấm phẩy, ngoặc kép (nodemailer coi dấu phẩy là nhiều người nhận)
+  return email.length >= 6 && email.length <= 100 && /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(email) ? email : null;
 }
 const payload = (raw: unknown): Record<string, unknown> => raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
 const codeHash = (id: string, code: string) => createHash('sha256').update(id + ':' + code).digest();
@@ -142,10 +143,16 @@ export class Auth {
   }
 
   async setEmail(id: string, token: string, raw: unknown) {
-    if ((await this.store.userBySession(token))?.id !== id) return { ack: fail('session_expired') };
-    const email = cleanEmail(payload(raw).email);
+    const current = await this.store.userBySession(token);
+    if (current?.id !== id) return { ack: fail('session_expired') };
+    const p = payload(raw);
+    const email = cleanEmail(p.email);
     if (!email) return { ack: fail('invalid_email') };
+    // đã có email thì phải nhập mật khẩu: người cầm phiên lạ không đổi được email để chiếm tài khoản qua "quên mật khẩu"
+    if (current.email && (typeof p.password !== 'string' || !(await verifyPassword(p.password, current)))) return { ack: fail('wrong_credentials') };
     if (await this.store.setEmail(id, email) === 'taken') return { ack: fail('email_taken') };
+    // mã đặt lại gửi tới email cũ hết hiệu lực
+    await this.store.deleteReset(id);
     const user = (await this.store.userById(id))!;
     return { ack: { ok: true, token, user: toPublic(user) } as AuthAck, user };
   }

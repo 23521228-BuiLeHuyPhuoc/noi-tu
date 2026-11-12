@@ -15,6 +15,7 @@ const oldAdmins = process.env.ADMIN_USERNAMES;
 
 beforeEach(async () => {
   process.env.ADMIN_USERNAMES = ' Boss , other ';
+  process.env.ALLOW_MEMORY_ADMIN = '1';
   server = createGameServer(smallDict(), { store: new MemoryStore(), mailer: null, room: { turnMs: 5000, disconnectGraceMs: 300 }, emptyRoomTtlMs: 300 });
   await new Promise<void>((r) => server.http.listen(0, r));
   url = `http://localhost:${(server.http.address() as AddressInfo).port}`;
@@ -136,11 +137,11 @@ describe('Ví Ruby qua Socket.IO', () => {
     const w = await an.emitWithAck('wallet:get');
     if (!w.ok) throw new Error();
     const spaced = `ck ${w.topupCode.slice(0, 4).toLowerCase()} ${w.topupCode.slice(4)}`;
-    const r = await boss.emitWithAck('admin:creditCode', { code: spaced, amount: 100_000 });
+    const r = await boss.emitWithAck('admin:creditCode', { code: spaced, amount: 100_000, nonce: 'n-spaced' });
     expect(r).toMatchObject({ ok: true, ruby: 2300, balance: 2300 });
     await wait(50);
     expect(an.updates.at(-1)).toEqual({ ruby: 2300, delta: 2300, reason: 'topup' });
-    expect(await boss.emitWithAck('admin:creditCode', { code: 'XLZZZZZZ', amount: 10_000 })).toEqual({ ok: false, error: 'not_found' });
+    expect(await boss.emitWithAck('admin:creditCode', { code: 'XLZZZZZZ', amount: 10_000, nonce: 'n-unknown' })).toEqual({ ok: false, error: 'not_found' });
   });
 
   it('cộng/trừ tay: bắt buộc lý do, không làm âm số dư', async () => {
@@ -161,7 +162,7 @@ describe('Ví Ruby qua Socket.IO', () => {
     await boss.emitWithAck('admin:reject', { id: (await request(an, 20_000)).id });
     const w = await an.emitWithAck('wallet:get');
     if (!w.ok) throw new Error();
-    await boss.emitWithAck('admin:creditCode', { code: w.topupCode, amount: 10_000 });
+    await boss.emitWithAck('admin:creditCode', { code: w.topupCode, amount: 10_000, nonce: 'n-revenue' });
     expect(await boss.emitWithAck('admin:revenue')).toEqual({ ok: true, today: 60_000, month: 60_000, total: 60_000 });
   });
 });

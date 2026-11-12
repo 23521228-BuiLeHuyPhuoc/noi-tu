@@ -24,6 +24,8 @@ function Input(props: React.ComponentProps<typeof TextInput>) {
 }
 
 const digits = (t: string) => Number(t.replace(/\D/g, '')) || 0;
+/** mã ngẫu nhiên cho một lần cộng theo mã: bấm lại (mạng chậm) gửi đúng mã cũ nên server không cộng trùng */
+const newNonce = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 function PendingRow({ game, r, onDone }: { game: Game; r: TopupRequest; onDone: (msg: string) => void }) {
   const [amount, setAmount] = useState(String(r.amount));
@@ -63,6 +65,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
   const [revenue, setRevenue] = useState<{ today: number; month: number; total: number } | null>(null);
   const [code, setCode] = useState('');
   const [codeAmount, setCodeAmount] = useState('');
+  const [nonce, setNonce] = useState(newNonce);
   const [user, setUser] = useState('');
   const [delta, setDelta] = useState('');
   const [reason, setReason] = useState('');
@@ -82,12 +85,13 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
 
   const creditCode = async () => {
     setBusy(true);
-    const r = await game.adminCreditCode(code, digits(codeAmount));
+    const r = await game.adminCreditCode(code, digits(codeAmount), nonce);
     setBusy(false);
-    setMsg(r.ok ? `Đã cộng 💎 ${fmtRuby(r.data.ruby)} (số dư ${fmtRuby(r.data.balance)})` : r.error);
+    setMsg(r.ok ? `Đã cộng 💎 ${fmtRuby(r.data.ruby)} cho ${r.data.request.username} (số dư ${fmtRuby(r.data.balance)})` : r.error);
     if (r.ok) {
       setCode('');
       setCodeAmount('');
+      setNonce(newNonce());
     }
   };
   const adjust = async () => {
@@ -141,8 +145,8 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
       {tab === 'code' && (
         <View style={{ gap: 8 }}>
           <T style={styles.muted}>Người chơi chuyển khoản mà quên bấm “Tôi đã chuyển”: nhập mã XL… trong nội dung và số tiền thấy trên app BIDV.</T>
-          <Input testID="admin-code" value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="Mã nạp, vd XL8F3K2Q" />
-          <Input testID="admin-code-amount" value={codeAmount} onChangeText={setCodeAmount} keyboardType="number-pad" placeholder="Số tiền (đồng)" />
+          <Input testID="admin-code" value={code} onChangeText={(t) => { setCode(t.toUpperCase()); setNonce(newNonce()); }} placeholder="Mã nạp, vd XL8F3K2Q" />
+          <Input testID="admin-code-amount" value={codeAmount} onChangeText={(t) => { setCodeAmount(t); setNonce(newNonce()); }} keyboardType="number-pad" placeholder="Số tiền (đồng)" />
           <Button testID="admin-code-credit" small title="Cộng Ruby" disabled={busy || code.length < 8 || digits(codeAmount) < 1000} onPress={creditCode} />
         </View>
       )}

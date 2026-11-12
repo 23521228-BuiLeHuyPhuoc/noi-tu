@@ -61,9 +61,10 @@ describe('WalletStore (bộ nhớ)', () => {
     const { wallet, an } = await setup();
     const code = await wallet.ensureTopupCode(an);
     const now = new Date('2026-11-12T10:00:00+07:00');
-    await wallet.addApproved(an, 'an', code, 50_000, 'boss', 550, new Date('2026-11-12T00:30:00+07:00'));
-    await wallet.addApproved(an, 'an', code, 20_000, 'boss', 200, new Date('2026-11-01T08:00:00+07:00'));
-    await wallet.addApproved(an, 'an', code, 10_000, 'boss', 100, new Date('2026-10-31T23:00:00+07:00'));
+    await wallet.addApproved(an, 'an', code, 50_000, 'boss', 550, { at: new Date('2026-11-12T00:30:00+07:00') });
+    await wallet.addApproved(an, 'an', code, 20_000, 'boss', 200, { at: new Date('2026-11-01T08:00:00+07:00') });
+    await wallet.addApproved(an, 'an', code, 10_000, 'boss', 100, { at: new Date('2026-10-31T23:00:00+07:00'), nonce: 'n-1' });
+    expect(await wallet.addApproved(an, 'an', code, 10_000, 'boss', 100, { nonce: 'n-1' })).toBe('duplicate');
     const rej = await wallet.createRequest(an, 'an', code, 500_000);
     if (rej === 'too_many') throw new Error();
     await wallet.resolveRequest(rej.id, 'rejected', 'boss');

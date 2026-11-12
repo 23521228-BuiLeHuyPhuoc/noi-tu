@@ -117,8 +117,10 @@ it("setEmail validates, enforces uniqueness and updates public user", async () =
     await register(s);
     await register(await client(), "other");
     expect(await call(s, "auth:setEmail", { email: "bad" })).toEqual({ ok: false, error: "invalid_email" });
-    expect(await call(s, "auth:setEmail", { email: "OTHER@gmail.com" })).toEqual({ ok: false, error: "email_taken" });
-    expect((await call(s, "auth:setEmail", { email: " NEW@gmail.com " })).user.email).toBe("new@gmail.com");
+    // đã có email: phải kèm mật khẩu hiện tại (sửa sau review)
+    expect(await call(s, "auth:setEmail", { email: "NEW@gmail.com" })).toEqual({ ok: false, error: "wrong_credentials" });
+    expect(await call(s, "auth:setEmail", { email: "OTHER@gmail.com", password: "secret1" })).toEqual({ ok: false, error: "email_taken" });
+    expect((await call(s, "auth:setEmail", { email: " NEW@gmail.com ", password: "secret1" })).user.email).toBe("new@gmail.com");
 });
 it("changePassword checks old password, keeps current session, expires others", async () => {
     const s = await client();

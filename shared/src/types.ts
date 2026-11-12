@@ -639,7 +639,8 @@ export interface ClientToServerEvents {
   'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;
   'auth:forgot': (p: { who: string }, ack: (r: { ok: true } | { ok: false; error: 'mail_disabled' | 'invalid_username' | 'rate_limited' }) => void) => void;
   'auth:reset': (p: { who: string; code: string; password: string }, ack: (r: AuthAck) => void) => void;
-  'auth:setEmail': (p: { email: string }, ack: (r: AuthAck) => void) => void;
+  /** đã có email thì phải kèm mật khẩu hiện tại */
+  'auth:setEmail': (p: { email: string; password?: string }, ack: (r: AuthAck) => void) => void;
   'auth:changePassword': (p: { oldPassword: string; password: string }, ack: (r: AuthAck) => void) => void;
   'auth:resume': (p: { token: string }, ack: (r: AuthAck) => void) => void;
   'auth:update': (p: { displayName?: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
@@ -652,7 +653,8 @@ export interface ClientToServerEvents {
   'admin:requests': (p: { status: TopupRequest['status'] }, ack: WalletAck<{ requests: TopupRequest[] }>) => void;
   'admin:approve': (p: { id: string; amount?: number }, ack: WalletAck<{ request: TopupRequest; ruby: number; balance: number }>) => void;
   'admin:reject': (p: { id: string }, ack: WalletAck<{ request: TopupRequest }>) => void;
-  'admin:creditCode': (p: { code: string; amount: number }, ack: WalletAck<{ request: TopupRequest; ruby: number; balance: number }>) => void;
+  /** nonce: mã ngẫu nhiên của một lần bấm, gửi lại y nguyên khi thử lại để server không cộng trùng */
+  'admin:creditCode': (p: { code: string; amount: number; nonce: string }, ack: WalletAck<{ request: TopupRequest; ruby: number; balance: number }>) => void;
   'admin:adjust': (p: { username: string; delta: number; reason: string }, ack: WalletAck<{ balance: number }>) => void;
   'admin:revenue': (ack: WalletAck<{ today: number; month: number; total: number }>) => void;
 }
@@ -668,4 +670,6 @@ export interface ServerToClientEvents {
   'wallet:update': (p: WalletUpdate) => void;
   /** yêu cầu nạp bị từ chối */
   'wallet:rejected': (p: { amount: number }) => void;
+  /** phiên đăng nhập trên máy này bị thu hồi (mật khẩu vừa được đặt lại / đổi ở máy khác) */
+  'auth:revoked': () => void;
 }

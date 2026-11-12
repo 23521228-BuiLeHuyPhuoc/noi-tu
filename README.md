@@ -112,7 +112,7 @@ Lần được cộng **đầu tiên** của mỗi tài khoản nhân đôi. S�
 - *Theo mã*: ai chuyển mà quên bấm "Tôi đã chuyển" thì nhập mã `XL……` + số tiền thấy trên app BIDV.
 - *Doanh thu*: hôm nay / tháng này / tổng (giờ Việt Nam). *Cộng/trừ*: theo tên đăng nhập, bắt buộc ghi lý do, không làm âm số dư.
 
-Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=phuoc_2005` (nhiều người thì phân cách bằng dấu phẩy). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại. Ảnh QR lấy từ dịch vụ miễn phí img.vietqr.io; ảnh lỗi thì bảng nạp vẫn còn thông tin chữ để chuyển tay.
+Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=<tên đăng nhập tài khoản quản trị>` (nhiều người thì phân cách bằng dấu phẩy; tạo tài khoản đó trước). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại; nếu server lỡ chạy bộ nhớ tạm (`/health` → `"db":"memory"`) thì mọi lệnh quản trị bị chặn để người lạ không đăng ký trước tên quản trị (chỉ khi chạy thử trên máy mới đặt `ALLOW_MEMORY_ADMIN=1`). Đổi email cần nhập mật khẩu hiện tại; đổi/đặt lại mật khẩu thì các máy khác bị đăng xuất ngay. Ảnh QR lấy từ dịch vụ miễn phí img.vietqr.io; ảnh lỗi thì bảng nạp vẫn còn thông tin chữ để chuyển tay.
 
 ## Gửi mã quên mật khẩu (Gmail)
 

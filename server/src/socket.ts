@@ -290,9 +290,14 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
 
     socket.on('auth:register', (p, ack) => handleAuth(ack, () => auth.register(p ?? {})));
     socket.on('auth:forgot', (p, ack) => handleAuth(ack, () => auth.forgot(p)));
-    socket.on('auth:reset', (p, ack) => handleAuth(ack, () => auth.reset(p)));
+    // đặt lại / đổi mật khẩu xong: thu hồi mọi socket khác đang đăng nhập tài khoản đó (giữ phiên vừa tạo / đang dùng)
+    socket.on('auth:reset', (p, ack) => handleAuth(ack, () => auth.reset(p), (r) => {
+      if (r.ack.ok && 'user' in r.ack) auth.profiles.emit('revoked', r.ack.user.id, r.ack.token);
+    }));
     socket.on('auth:setEmail', (p, ack) => handleAuth(ack, () => user && token ? auth.setEmail(user.id, token, p) : Promise.resolve({ ack: { ok: false, error: 'session_expired' } })));
-    socket.on('auth:changePassword', (p, ack) => handleAuth(ack, () => user && token ? auth.changePassword(user.id, token, p) : Promise.resolve({ ack: { ok: false, error: 'session_expired' } })));
+    socket.on('auth:changePassword', (p, ack) => handleAuth(ack, () => user && token ? auth.changePassword(user.id, token, p) : Promise.resolve({ ack: { ok: false, error: 'session_expired' } }), (r) => {
+      if (r.ack.ok && 'user' in r.ack) auth.profiles.emit('revoked', r.ack.user.id, r.ack.token);
+    }));
     socket.on('auth:login', (p, ack) => handleAuth(ack, () => auth.login(p ?? {})));
     socket.on('auth:resume', (p, ack) => handleAuth(ack, () => auth.resume(p?.token), undefined, false));
 
@@ -335,8 +340,17 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
         room.updateProfile(session.playerId, updated.displayName, updated.avatar, updated.avatarUrl);
     };
     auth.profiles.on('updated', profileChanged);
+    // phiên của socket này đã bị thu hồi (mật khẩu vừa đổi ở máy khác): đăng xuất ngay, mất quyền ví/quản trị
+    const sessionRevoked = (userId: string, keepToken?: string) => {
+      if (!user || user.id !== userId || token === keepToken) return;
+      user = null;
+      token = null;
+      detach(true);
+      socket.emit('auth:revoked');
+    };
+    auth.profiles.on('revoked', sessionRevoked);
     // ví Ruby + quản trị
     const detachWallet = walletCtx ? attachWalletHandlers(socket, walletCtx, () => user) : () => {};
-    socket.on('disconnect', () => { auth.profiles.off('updated', profileChanged); detachWallet(); detach(false); });
+    socket.on('disconnect', () => { auth.profiles.off('updated', profileChanged); auth.profiles.off('revoked', sessionRevoked); detachWallet(); detach(false); });
   });
 }
