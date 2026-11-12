@@ -10,7 +10,7 @@ import { newTopupCode } from '../../shared/src/ruby';
 import type { RubyLedgerRow, TopupRequest } from '../../shared/src/types';
 import type { UserRecord } from './store';
 
-export type RubyReason = 'topup' | 'admin_adjust';
+export type RubyReason = 'topup' | 'admin_adjust' | 'shop' | 'skill' | 'gift' | 'checkin';
 type Status = TopupRequest['status'];
 
 export interface WalletStore {

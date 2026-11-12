@@ -8,6 +8,7 @@ import {
   type RoomSettings, type RoomState, type RoomSummary,
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
+import type { PlayerCosmetics } from '../../shared/src/shop';
 import { parseLook } from '../../shared/src/types';
 import { HpBoard, TargetCooldown, WindowLimiter } from './fun';
 import type { Dictionary, Rng } from './dictionary';
@@ -36,6 +37,8 @@ interface Player {
   avatarUrl?: string;
   character: CharacterConfig;
   account: boolean;
+  /** trang trí đã trang bị (tài khoản) */
+  cosmetics?: PlayerCosmetics;
   /** người chơi đã tự chỉnh nhân vật trong phòng: không tự đổi theo avatar tài khoản nữa */
   characterCustom?: boolean;
   /** người chơi máy (chủ phòng thêm vào) */
@@ -176,13 +179,14 @@ export class Room {
   // ---------- người chơi ----------
 
   /** Vào phòng. Nếu ván đang diễn ra, người mới vẫn được vào ở chế độ xem (spectator). */
-  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean }): Result<{ playerId: string }> {
+  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean; cosmetics?: PlayerCosmetics }): Result<{ playerId: string }> {
     const account = profile?.account === true;
     // khách không được mạo danh id tài khoản
     if (existingId?.startsWith(ACCOUNT_PREFIX) && !account) existingId = undefined;
     if (existingId && this.kicked.has(existingId)) return { ok: false, error: 'kicked' };
     const existing = existingId ? this.find(existingId) : undefined;
     if (existing) {
+      if (account) this.setCosmetics(existing.id, profile?.cosmetics);
       this.setConnected(existing.id, true);
       return { ok: true, playerId: existing.id };
     }
@@ -194,7 +198,7 @@ export class Room {
     // tài khoản và khách đã tự chọn mặt đại diện: dựng nhân vật theo mặt đó
     const preset = this.presetFor(profile?.avatar);
     const character: CharacterConfig = preset ?? this.spreadCharacter();
-    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account });
+    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account, ...(profile?.cosmetics ? { cosmetics: profile.cosmetics } : {}) });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
@@ -347,6 +351,16 @@ export class Room {
     }
     this.changed();
     return true;
+  }
+
+  /** trang trí vừa đổi (trang bị / gỡ): cập nhật cho cả phòng */
+  setCosmetics(playerId: string, cosmetics: PlayerCosmetics | undefined): void {
+    const p = this.find(playerId);
+    if (!p) return;
+    if (JSON.stringify(p.cosmetics ?? null) === JSON.stringify(cosmetics ?? null)) return;
+    if (cosmetics) p.cosmetics = cosmetics;
+    else delete p.cosmetics;
+    this.changed();
   }
 
   /** người chơi dính chiêu làm rung/che màn hình: bù thời gian lượt nếu game hỗ trợ. Trả về số ms được bù. */
@@ -519,6 +533,7 @@ export class Room {
         character: p.character,
         ...(this.isSpectator(p.id) ? { spectator: true } : {}),
         ...(p.account ? { account: true } : {}),
+        ...(p.cosmetics ? { cosmetics: p.cosmetics } : {}),
         ...(p.bot ? { bot: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,

@@ -1,5 +1,6 @@
 import type { TyPhuMovement } from './typhu';
 import type { DiceRollView, ThrowImpulse } from './dice';
+import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
 
 export const MAX_PLAYERS = 6;
@@ -163,6 +164,8 @@ export interface CharacterConfig {
 
 export interface PublicPlayer {
   id: string;
+  /** trang trí đã trang bị (tài khoản): khung avatar, hiệu ứng tên, hào quang tới lượt */
+  cosmetics?: PlayerCosmetics;
   name: string;
   connected: boolean;
   /** chỉ số avatar (thú + màu), không trùng trong phòng */
@@ -485,7 +488,19 @@ export type FunSend =
   | { kind: 'blackout'; to: string }
   | { kind: 'spin'; to: string }
   | { kind: 'quake'; to: string }
-  | { kind: 'charm' };
+  | { kind: 'charm' }
+  // kỹ năng trả Ruby (xem shared/src/shop.ts)
+  | { kind: 'lightning'; to: string }
+  | { kind: 'freeze'; to: string }
+  | { kind: 'cake'; to: string }
+  | { kind: 'water'; to: string }
+  | { kind: 'dog'; to: string }
+  | { kind: 'rocket'; to: string }
+  | { kind: 'kiss'; to: string }
+  /** tặng quà: người tặng trả Ruby, người nhận được điểm quà */
+  | { kind: 'gift'; to: string; gift: GiftId }
+  /** chỉ server phát: người có hiệu ứng vào phòng vừa vào (from = người đó) */
+  | { kind: 'entrance'; fx: string };
 
 /**
  * sự kiện phát cho cả phòng; đánh nhau thì kèm sát thương và máu còn lại (máu ảo, không ảnh hưởng game).
@@ -504,18 +519,26 @@ export type FunEvent = FunSend & {
 export const DISRUPT_LIMIT = 3;
 export const DISRUPT_WINDOW_MS = 15_000;
 /** chiêu chỉ có tác dụng làm phiền màn hình: quá giới hạn thì bị chặn hẳn */
-export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke'] as const;
+export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog'] as const;
 /** thời gian (ms) được bù vào lượt Nối từ khi người đang tới lượt dính chiêu */
 export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
   blackout: 4500, spin: 3500, roach: 3000, ink: 2000, quake: 1500, poke: 1000, hit: 1000, throw: 1000,
+  lightning: 2000, freeze: 3000, cake: 2000, water: 2000, dog: 2500,
 };
 /** tổng thời gian bù tối đa trong một lượt */
 export const DISRUPT_MAX_BONUS_MS = 15_000;
-export type FunAck = { ok: boolean; /** bị giới hạn: thử lại sau chừng này ms */ retryMs?: number; reason?: 'limited' | 'busy' };
+export type FunAck = {
+  ok: boolean; /** bị giới hạn: thử lại sau chừng này ms */ retryMs?: number;
+  reason?: 'limited' | 'busy' | 'quota' | 'need_ruby' | 'need_account';
+  /** số lượt chọc miễn phí còn lại hôm nay (khi gửi được) */
+  left?: number;
+};
 
 export const STICKER_IDS = [
   'quynh-01', 'quynh-02', 'quynh-03', 'quynh-04', 'quynh-05',
   'quynh-06', 'quynh-07', 'quynh-08', 'quynh-09',
+  // bộ "Chữ Lầy" (mua bằng Ruby, xem shop.ts)
+  'chu-01', 'chu-02', 'chu-03', 'chu-04', 'chu-05', 'chu-06', 'chu-07', 'chu-08', 'chu-09', 'chu-10', 'chu-11', 'chu-12',
 ] as const;
 export type StickerId = (typeof STICKER_IDS)[number];
 export type ChatSend = { kind?: 'text'; text: string } | { kind: 'sticker'; stickerId: StickerId };
@@ -544,6 +567,11 @@ export interface PublicUser {
   ruby: number;
   /** tài khoản quản trị (ADMIN_USERNAMES) */
   admin?: true;
+  /** món đã mua (trang trí, bộ sticker) và món đang trang bị */
+  owned: string[];
+  equipped: Equipped;
+  /** điểm quà đã nhận */
+  giftPoints: number;
 }
 
 /** yêu cầu nạp Ruby chờ quản trị duyệt (thời gian: ms) */
@@ -635,6 +663,14 @@ export interface ClientToServerEvents {
   /** chủ phòng mời một người ra khỏi phòng */
   'room:kick': (p: { playerId: string }, ack: (r: Ack) => void) => void;
   'fun:send': (f: FunSend, ack: (r: FunAck) => void) => void;
+  /** lượt chọc miễn phí hôm nay */
+  'fun:quota': (ack: (r: { free: number; left: number }) => void) => void;
+  // cửa hàng + điểm danh (chỉ tài khoản)
+  'shop:get': (ack: ShopAck<ShopInfo>) => void;
+  'shop:buy': (p: { itemId: string }, ack: ShopAck<{ balance: number; owned: string[] }>) => void;
+  'shop:equip': (p: { slot: CosmeticSlot; itemId: string | null }, ack: ShopAck<{ equipped: Equipped }>) => void;
+  'checkin:status': (ack: ShopAck<CheckinStatus>) => void;
+  'checkin:claim': (ack: ShopAck<{ reward: number; balance: number; streak: number; day: number }>) => void;
   /** đổi tên / mặt đại diện có sẵn ngay trong phòng (khách; người có tài khoản dùng auth:update) — được cả lúc đang chơi */
   'player:profile': (p: { name?: string; avatar?: number }, ack: (r: Ack) => void) => void;
   /** ảnh đại diện của khách: ảnh JPG/PNG/WebP đã thu nhỏ (base64), hoặc remove để bỏ ảnh */
