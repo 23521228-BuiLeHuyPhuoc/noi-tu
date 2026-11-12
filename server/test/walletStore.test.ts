@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryStore, toPublic } from '../src/store';
+import { ObjectId, type Db } from 'mongodb';
+import { MongoWalletStore } from '../src/walletStore';
 
 async function setup() {
   const store = new MemoryStore();
@@ -11,7 +13,46 @@ async function setup() {
   return { store, wallet: store.wallet(), an: await mk('an'), binh: await mk('binh') };
 }
 
+it('Mongo giữ chỗ nguyên tử, tính cả yêu cầu cũ và tái dùng chỗ đã xử lý', async () => {
+  const userId = new ObjectId().toHexString();
+  const docs = [{ _id: new ObjectId(), userId, username: 'an', code: 'XLABCDEF', amount: 10_000,
+    status: 'pending', createdAt: new Date(), pendingSlot: undefined as number | undefined }];
+  // Giả lập unique partial index của Mongo, kể cả khi nhiều insert đang chờ cùng lúc.
+  const collection = {
+    createIndex: async () => 'pending_slots',
+    countDocuments: async () => docs.filter((d) => d.status === 'pending' && d.pendingSlot === undefined).length,
+    insertOne: async (doc: typeof docs[number]) => {
+      await Promise.resolve();
+      if (docs.some((d) => d.status === 'pending' && d.userId === doc.userId && d.pendingSlot === doc.pendingSlot)) {
+        throw Object.assign(new Error('duplicate pending slot'), { code: 11000 });
+      }
+      docs.push(doc);
+    },
+  };
+  const wallet = new MongoWalletStore({ collection: () => collection } as unknown as Db);
+  const add = () => wallet.createRequest(userId, 'an', 'XLABCDEF', 10_000);
+  const results = await Promise.all(Array.from({ length: 8 }, add));
+  expect(results.filter((r) => r !== 'too_many')).toHaveLength(2);
+  expect(docs.filter((d) => d.status === 'pending')).toHaveLength(3);
+  docs[0].status = 'rejected';
+  expect(await add()).not.toBe('too_many');
+  expect(await add()).toBe('too_many');
+});
+
 describe('WalletStore (bộ nhớ)', () => {
+  it('giữ tối đa ba yêu cầu ngay cả khi gửi đồng thời', async () => {
+    const { wallet, an } = await setup();
+    const code = await wallet.ensureTopupCode(an);
+    const results = await Promise.all(Array.from({ length: 8 }, () => wallet.createRequest(an, 'an', code, 10_000)));
+    expect(results.filter((r) => r !== 'too_many')).toHaveLength(3);
+    expect(await wallet.pendingOf(an)).toHaveLength(3);
+    const request = results.find((r) => r !== 'too_many');
+    if (!request) throw new Error('missing request');
+    await wallet.resolveRequest(request.id, 'rejected', 'boss');
+    expect(await wallet.createRequest(an, 'an', code, 10_000)).not.toBe('too_many');
+    expect(await wallet.pendingOf(an)).toHaveLength(3);
+  });
+
   it('mã nạp cố định mỗi tài khoản, gọi song song vẫn một mã, mỗi người một mã', async () => {
     const { wallet, an, binh } = await setup();
     const [a1, a2] = await Promise.all([wallet.ensureTopupCode(an), wallet.ensureTopupCode(an)]);

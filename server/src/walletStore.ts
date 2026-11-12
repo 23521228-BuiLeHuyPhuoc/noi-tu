@@ -70,7 +70,8 @@ export class MemoryWalletStore implements WalletStore {
     return null;
   }
   async createRequest(userId: string, username: string, code: string, amount: number) {
-    if ((await this.pendingOf(userId)).length >= MAX_PENDING) return 'too_many' as const;
+    // Đếm và thêm trong cùng lượt chạy, không nhường cho yêu cầu song song.
+    if ([...this.requests.values()].filter((r) => r.userId === userId && r.status === 'pending').length >= MAX_PENDING) return 'too_many' as const;
     const r: TopupRequest = { id: randomBytes(12).toString('hex'), userId, username, code, amount, status: 'pending', createdAt: Date.now() + this.order++ / 1000 };
     this.requests.set(r.id, r);
     return { ...r };
@@ -180,6 +181,7 @@ interface RequestDoc {
   ruby?: number;
   /** khóa chống ghi trùng khi quản trị bấm lại "Cộng theo mã" */
   nonce?: string;
+  pendingSlot?: number;
 }
 interface LedgerDoc {
   userId: string;
@@ -204,6 +206,7 @@ export class MongoWalletStore implements WalletStore {
   private readonly users: Collection<WalletUserDoc>;
   private readonly requests: Collection<RequestDoc>;
   private readonly ledger: Collection<LedgerDoc>;
+  private pendingSlotsReady?: Promise<string>;
   constructor(db: Db) {
     this.users = db.collection('users');
     this.requests = db.collection('topup_requests');
@@ -216,8 +219,15 @@ export class MongoWalletStore implements WalletStore {
       this.requests.createIndex({ status: 1, createdAt: -1 }),
       this.requests.createIndex({ userId: 1, status: 1 }),
       this.requests.createIndex({ nonce: 1 }, { unique: true, sparse: true }),
+      this.ensurePendingSlots(),
       this.ledger.createIndex({ userId: 1, at: -1 }),
     ]);
+  }
+
+  private ensurePendingSlots(): Promise<string> {
+    return this.pendingSlotsReady ??= this.requests.createIndex({ userId: 1, pendingSlot: 1 }, {
+      unique: true, partialFilterExpression: { status: 'pending', pendingSlot: { $exists: true } },
+    });
   }
 
   async ensureTopupCode(userId: string) {
@@ -241,10 +251,19 @@ export class MongoWalletStore implements WalletStore {
     return u ? u._id.toHexString() : null;
   }
   async createRequest(userId: string, username: string, code: string, amount: number) {
-    if ((await this.requests.countDocuments({ userId, status: 'pending' })) >= MAX_PENDING) return 'too_many' as const;
-    const doc: RequestDoc = { _id: new ObjectId(), userId, username, code, amount, status: 'pending', createdAt: new Date() };
-    await this.requests.insertOne(doc);
-    return fromReq(doc);
+    // Yêu cầu cũ chưa có slot vẫn chiếm chỗ; unique index giữ ba chỗ trên mọi server.
+    await this.ensurePendingSlots();
+    const legacy = await this.requests.countDocuments({ userId, status: 'pending', pendingSlot: { $exists: false } });
+    for (let pendingSlot = legacy; pendingSlot < MAX_PENDING; pendingSlot++) {
+      const doc: RequestDoc = { _id: new ObjectId(), userId, username, code, amount, status: 'pending', pendingSlot, createdAt: new Date() };
+      try {
+        await this.requests.insertOne(doc);
+        return fromReq(doc);
+      } catch (e) {
+        if ((e as { code?: number }).code !== 11000) throw e;
+      }
+    }
+    return 'too_many' as const;
   }
   async listRequests(status: Status, limit: number) {
     return (await this.requests.find({ status }).sort({ createdAt: -1 }).limit(limit).toArray()).map(fromReq);
