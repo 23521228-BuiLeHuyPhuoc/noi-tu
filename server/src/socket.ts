@@ -262,7 +262,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
 
     // ---------- tài khoản ----------
 
-    type AuthResult = { ack: AuthAck; user?: UserRecord };
+    type AuthResult = { ack: AuthAck | { ok: true }; user?: UserRecord };
     const handleAuth = (
       ack: unknown,
       run: () => Promise<AuthResult>,
@@ -270,13 +270,13 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       limited = true,
     ) => {
       if (typeof ack !== 'function') return;
-      const reply = ack as (r: AuthAck) => void;
+      const reply = ack as (r: AuthResult['ack']) => void;
       if (limited && !authLimiter.take()) return reply({ ok: false, error: 'rate_limited' });
       run()
         .then((r) => {
           if (r.ack.ok && r.user) {
             user = r.user;
-            token = r.ack.token;
+            token = 'token' in r.ack ? r.ack.token : token;
           }
           after?.(r);
           reply(r.ack);
@@ -288,6 +288,10 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
     };
 
     socket.on('auth:register', (p, ack) => handleAuth(ack, () => auth.register(p ?? {})));
+    socket.on('auth:forgot', (p, ack) => handleAuth(ack, () => auth.forgot(p)));
+    socket.on('auth:reset', (p, ack) => handleAuth(ack, () => auth.reset(p)));
+    socket.on('auth:setEmail', (p, ack) => handleAuth(ack, () => user && token ? auth.setEmail(user.id, token, p) : Promise.resolve({ ack: { ok: false, error: 'session_expired' } })));
+    socket.on('auth:changePassword', (p, ack) => handleAuth(ack, () => user && token ? auth.changePassword(user.id, token, p) : Promise.resolve({ ack: { ok: false, error: 'session_expired' } })));
     socket.on('auth:login', (p, ack) => handleAuth(ack, () => auth.login(p ?? {})));
     socket.on('auth:resume', (p, ack) => handleAuth(ack, () => auth.resume(p?.token), undefined, false));
 
@@ -303,7 +307,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
         () => auth.update(uid, tk, p ?? {}),
         (r) => {
           const room = currentRoom();
-          if (r.ack.ok && room && session?.playerId === ACCOUNT_PREFIX + uid) {
+          if (r.ack.ok && 'user' in r.ack && room && session?.playerId === ACCOUNT_PREFIX + uid) {
             // chính người chơi vừa chọn mặt mới: áp nhân vật theo mặt đó ngay (kể cả đang chơi)
             room.updateProfile(session.playerId, r.ack.user.displayName, r.ack.user.avatar, r.ack.user.avatarUrl, p?.avatar !== undefined);
           }

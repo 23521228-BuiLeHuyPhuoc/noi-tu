@@ -31,7 +31,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   const mailer = opts.mailer === null ? undefined : opts.mailer ?? gmailMailer() ?? debugMailer();
   const logErr = (what: string) => (e: unknown) => console.error(what, e);
 
-  const auth = new Auth(store);
+  const auth = new Auth(store, mailer);
   const app = express();
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

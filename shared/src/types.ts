@@ -541,6 +541,11 @@ export interface PublicUser {
 }
 
 export type AuthError =
+  | 'invalid_email'
+  | 'email_taken'
+  | 'bad_code'
+  | 'code_expired'
+  | 'mail_disabled'
   | 'invalid_username'
   | 'invalid_password'
   | 'invalid_name'
@@ -597,8 +602,12 @@ export interface ClientToServerEvents {
   /** ảnh đại diện của khách: ảnh JPG/PNG/WebP đã thu nhỏ (base64), hoặc remove để bỏ ảnh */
   'player:photo': (p: { data?: string; remove?: boolean }, ack: (r: Ack<{ avatarUrl?: string }> | { ok: false; error: 'avatar_unavailable' | 'invalid_image' | 'rate_limited' | 'not_in_room' }) => void) => void;
   'chat:send': (p: ChatSend, ack: (r: { ok: boolean }) => void) => void;
-  'auth:register': (p: { username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
+  'auth:register': (p: { email: string; username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;
+  'auth:forgot': (p: { who: string }, ack: (r: { ok: true } | { ok: false; error: 'mail_disabled' | 'invalid_username' | 'rate_limited' }) => void) => void;
+  'auth:reset': (p: { who: string; code: string; password: string }, ack: (r: AuthAck) => void) => void;
+  'auth:setEmail': (p: { email: string }, ack: (r: AuthAck) => void) => void;
+  'auth:changePassword': (p: { oldPassword: string; password: string }, ack: (r: AuthAck) => void) => void;
   'auth:resume': (p: { token: string }, ack: (r: AuthAck) => void) => void;
   'auth:update': (p: { displayName?: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:logout': (ack: (r: { ok: boolean }) => void) => void;

@@ -11,7 +11,7 @@ afterEach(async () => { await Promise.all(servers.splice(0).map(s => s.close()))
 async function setup(uploader?: { upload: (data: Buffer, userId: string) => Promise<{secure_url:string;public_id:string}>; destroy?: (publicId: string) => Promise<void> }) {
   const store = new MemoryStore();
   const auth = new Auth(store);
-  const registration = await auth.register({ username:'tester', password:'secret123', displayName:'Tester' });
+  const registration = await auth.register({ username:'tester', email:'tester@example.com', password:'secret123', displayName:'Tester' });
   if (!registration.ack.ok) throw new Error('register');
   const server = createGameServer(new Dictionary([]), { store, avatarUploader:uploader });
   servers.push(server);

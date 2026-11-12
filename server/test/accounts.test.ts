@@ -56,22 +56,33 @@ describe('Mật khẩu', () => {
 });
 
 describe('Tài khoản qua Socket.IO', () => {
+  it('register requires valid email, rejects taken email case-insensitively and logs in by email', async () => {
+    const a = await client();
+    const base = { username: 'email_user', password: 'secret123', displayName: 'Email' };
+    expect(await a.emitWithAck('auth:register', base as never)).toEqual({ ok: false, error: 'invalid_email' });
+    expect(await a.emitWithAck('auth:register', { ...base, email: 'bad' })).toEqual({ ok: false, error: 'invalid_email' });
+    const registered = okUser(await a.emitWithAck('auth:register', { ...base, email: ' TEST@example.com ' }));
+    const b = await client();
+    expect(await b.emitWithAck('auth:register', { ...base, username: 'email_other', email: 'Test@Example.com' })).toEqual({ ok: false, error: 'email_taken' });
+    expect(okUser(await b.emitWithAck('auth:login', { username: ' TEST@EXAMPLE.COM ', password: base.password })).user.id).toBe(registered.user.id);
+  });
+
   it('đăng ký, đăng nhập lại, dùng lại phiên, đổi hồ sơ, đăng xuất', async () => {
     const a = await client();
-    expect(await a.emitWithAck('auth:register', { username: 'ab', password: '123456', displayName: 'An' })).toEqual({
+    expect(await a.emitWithAck('auth:register', { username: 'ab', email: 'ab@example.com', password: '123456', displayName: 'An' })).toEqual({
       ok: false,
       error: 'invalid_username',
     });
-    expect(await a.emitWithAck('auth:register', { username: 'an_an', password: '123', displayName: 'An' })).toEqual({
+    expect(await a.emitWithAck('auth:register', { username: 'an_an', email: 'an_an@example.com', password: '123', displayName: 'An' })).toEqual({
       ok: false,
       error: 'invalid_password',
     });
-    const reg = okUser(await a.emitWithAck('auth:register', { username: 'An_An', password: 'matkhau', displayName: 'An Béo', avatar: 3 }));
+    const reg = okUser(await a.emitWithAck('auth:register', { username: 'An_An', email: 'an_an@example.com', password: 'matkhau', displayName: 'An Béo', avatar: 3 }));
     expect(reg.user).toMatchObject({ username: 'an_an', displayName: 'An Béo', avatar: 3, stats: {} });
     expect(reg.token).toMatch(/^[0-9a-f]{64}$/);
 
     const b = await client();
-    expect(await b.emitWithAck('auth:register', { username: 'an_an', password: 'khac123', displayName: 'X' })).toEqual({
+    expect(await b.emitWithAck('auth:register', { username: 'an_an', email: 'an_an@example.com', password: 'khac123', displayName: 'X' })).toEqual({
       ok: false,
       error: 'username_taken',
     });
@@ -93,7 +104,7 @@ describe('Tài khoản qua Socket.IO', () => {
 
   it('vào phòng bằng tài khoản: id cố định, tên + ảnh theo tài khoản; khách không mạo danh được', async () => {
     const a = await client();
-    const reg = okUser(await a.emitWithAck('auth:register', { username: 'binh', password: 'matkhau', displayName: 'Bình', avatar: 5 }));
+    const reg = okUser(await a.emitWithAck('auth:register', { username: 'binh', email: 'binh@example.com', password: 'matkhau', displayName: 'Bình', avatar: 5 }));
     const created = await a.emitWithAck('room:create', { name: 'tên gì cũng được' });
     if (!created.ok) throw new Error(created.error);
     expect(created.playerId).toBe('u-' + reg.user.id);
@@ -110,7 +121,7 @@ describe('Tài khoản qua Socket.IO', () => {
 
   it('kết thúc ván thì cộng thành tích cho người có tài khoản', async () => {
     const a = await client();
-    const reg = okUser(await a.emitWithAck('auth:register', { username: 'chi', password: 'matkhau', displayName: 'Chi' }));
+    const reg = okUser(await a.emitWithAck('auth:register', { username: 'chi', email: 'chi@example.com', password: 'matkhau', displayName: 'Chi' }));
     const b = await client();
     const created = await a.emitWithAck('room:create', { name: 'x' });
     if (!created.ok) throw new Error(created.error);

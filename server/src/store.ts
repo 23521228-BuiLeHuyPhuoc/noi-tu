@@ -40,6 +40,7 @@ export interface Store {
   setEmail(userId: string, email: string): Promise<'ok' | 'taken'>;
   setPassword(userId: string, passHash: string, salt: string): Promise<void>;
   deleteSessionsExcept(userId: string, keepToken?: string): Promise<void>;
+  reserveResetSend(userId: string, now: Date): Promise<Date[] | null>;
   saveReset(r: ResetRecord): Promise<void>;
   getReset(userId: string): Promise<ResetRecord | null>;
   bumpResetAttempts(userId: string): Promise<number>;
@@ -75,6 +76,7 @@ export class MemoryStore implements Store {
   private sessions = new Map<string, string>();
   private words = new Set<string>();
   private resets = new Map<string, ResetRecord>();
+  private resetSends = new Map<string, Date[]>();
   private seq = 0;
 
   async createUser(u: Omit<UserRecord, 'id' | 'stats'>) {
@@ -110,6 +112,13 @@ export class MemoryStore implements Store {
   async deleteSessionsExcept(userId: string, keepToken?: string) {
     const keepHash = keepToken === undefined ? undefined : hashToken(keepToken);
     for (const [token, id] of this.sessions) if (id === userId && token !== keepHash) this.sessions.delete(token);
+  }
+  async reserveResetSend(userId: string, now: Date) {
+    const history = (this.resetSends.get(userId) ?? []).filter(d => +d > +now - 3600000);
+    if (history.length >= 5 || history.some(d => +d > +now - 60000)) return null;
+    history.push(new Date(now));
+    this.resetSends.set(userId, history);
+    return history.map(d => new Date(d));
   }
   async saveReset(r: ResetRecord) {
     this.resets.set(r.userId, structuredClone(r));
@@ -224,16 +233,18 @@ export class MongoStore implements Store {
     private readonly sessions: Collection<{ token: string; userId: ObjectId; createdAt: Date }>,
     private readonly words: Collection<{ word: string; by: string; createdAt: Date }>,
     private readonly resets: Collection<ResetRecord>,
+    private readonly resetSends: Collection<{ userId: string; sentAt: Date[] }>,
   ) {}
 
   static async connect(uri: string, dbName = 'xomlay'): Promise<MongoStore> {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10_000, appName: 'xom-lay' });
     await client.connect();
     const db: Db = client.db(dbName);
-    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'));
+    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'), db.collection('password_reset_sends'));
     await Promise.all([
       store.users.createIndex({ username: 1 }, { unique: true }),
       store.users.createIndex({ email: 1 }, { unique: true, sparse: true }),
+      store.resetSends.createIndex({ userId: 1 }, { unique: true }),
       store.resets.createIndex({ userId: 1 }, { unique: true }),
       store.resets.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       store.sessions.createIndex({ token: 1 }, { unique: true }),
@@ -281,6 +292,25 @@ export class MongoStore implements Store {
   async deleteSessionsExcept(userId: string, keepToken?: string) {
     if (!ObjectId.isValid(userId)) return;
     await this.sessions.deleteMany({ userId: new ObjectId(userId), ...(keepToken === undefined ? {} : { token: { $ne: hashToken(keepToken) } }) });
+  }
+  async reserveResetSend(userId: string, now: Date): Promise<Date[] | null> {
+    // Lịch sử riêng không có TTL giữ giới hạn sau khi mã đã dùng hoặc hết hạn.
+    const recent = { $filter: { input: { $ifNull: ['$sentAt', []] }, as: 'date', cond: { $gt: ['$$date', new Date(+now - 3600000)] } } };
+    try {
+      const result = await this.resetSends.findOneAndUpdate(
+        { userId, $expr: { $and: [
+          { $lt: [{ $size: recent }, 5] },
+          { $eq: [{ $size: { $filter: { input: recent, as: 'date', cond: { $gt: ['$$date', new Date(+now - 60000)] } } } }, 0] },
+        ] } },
+        [{ $set: { userId, sentAt: { $concatArrays: [recent, [now]] } } }],
+        { upsert: true, returnDocument: 'after' },
+      );
+      return result?.sentAt ?? null;
+    } catch (e) {
+      // Bản ghi bị giới hạn (kể cả yêu cầu đồng thời thắng trước) chặn upsert.
+      if ((e as { code?: number }).code === 11000) return null;
+      throw e;
+    }
   }
   async saveReset(r: ResetRecord) {
     await this.resets.replaceOne({ userId: r.userId }, r, { upsert: true });
