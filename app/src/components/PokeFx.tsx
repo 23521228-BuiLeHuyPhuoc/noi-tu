@@ -329,7 +329,7 @@ function RainScene({ c }: { c: Ctx }) {
           </Animated.View>
         );
       })}
-      <Word text={word} p={seg(t, 0, 0.5)} x={c.w / 2} y={strong ? c.h * 0.2 : c.to.y + c.to.h + 26} size={strong ? 44 : 22} color={pal[1] === '#FFFFFF' ? C.gold : pal[1]} rot={-4} />
+      <Word text={word} p={seg(t, 0, 0.5)} x={c.w / 2} y={strong ? c.h * 0.46 : c.to.y + c.to.h + 26} size={strong ? 44 : 22} color={pal[1] === '#FFFFFF' ? C.gold : pal[1]} rot={-4} />
     </>
   );
 }
@@ -613,7 +613,7 @@ function SwarmScene({ c }: { c: Ctx }) {
           </Animated.View>
         );
       })}
-      <Word text={word} p={seg(t, 0, 0.45)} x={strong ? c.w / 2 : center(c.to).x} y={strong ? c.h * 0.2 : c.to.y + c.to.h + 22} size={strong ? 40 : 20} color={C.gold} rot={5} />
+      <Word text={word} p={seg(t, 0, 0.45)} x={strong ? c.w / 2 : center(c.to).x} y={strong ? c.h * 0.46 : c.to.y + c.to.h + 22} size={strong ? 40 : 20} color={C.gold} rot={5} />
     </>
   );
 }
