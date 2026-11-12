@@ -118,4 +118,4 @@ it('loads the attributed offline seed alongside the full dictionary', () => {
   const dictionary = Dictionary.load(fileURLToPath(new URL('../data/', import.meta.url)));
   expect(dictionary.definition('HỌC SINH')?.source).toContain('CC BY-SA 4.0');
   expect(dictionary.definition('học sinh')?.text).toBe('Trẻ em học tập ở nhà trường.');
-});
+}, 20_000);

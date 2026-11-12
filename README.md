@@ -74,13 +74,15 @@ Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SE
 ## Đang chạy
 - Web: <https://noi-tu-web.onrender.com>
 - Server: <https://noi-tu-server.onrender.com> (kiểm tra: `/health`)
-- Cả hai được tạo từ `render.yaml`. Sửa code xong, push lên GitHub rồi vào Render bấm **Manual Deploy** cho service tương ứng.
+- Cả hai được tạo từ `render.yaml`. Mỗi lần push lên nhánh `main`, GitHub Actions kiểm tra code; nếu toàn bộ CI thành công, Render tự động deploy lại cả server lẫn web.
 
 ## 2. Đưa server lên mạng (miễn phí, Render)
 
 1. Đẩy thư mục `noi-tu` lên một repo GitHub.
-2. Vào <https://render.com> → **New → Blueprint**, chọn repo đó. Render tự đọc file `render.yaml` và tạo service `noi-tu-server`. (Repo public có thể dán thẳng link vào mục *Public Git Repository*; khi đó sửa code xong phải vào Render bấm **Manual Deploy**.)
-3. Deploy xong sẽ có địa chỉ dạng `https://noi-tu-server.onrender.com`. Mở `/health` trên địa chỉ đó để kiểm tra, kết quả có dạng `{"ok":true,"words":79569,...}`.
+2. Vào <https://render.com> → **New → Blueprint**, kết nối GitHub và chọn repo đó. Render tự đọc file `render.yaml`, rồi tạo `noi-tu-server` và `noi-tu-web`.
+3. Deploy xong sẽ có `https://noi-tu-server.onrender.com` và `https://noi-tu-web.onrender.com`. Mở `/health` trên địa chỉ server để kiểm tra, kết quả có dạng `{"ok":true,"words":79569,...}`.
+
+Pipeline nằm ở `.github/workflows/ci-cd.yml`. `render.yaml` dùng `autoDeployTrigger: checksPass`, nên Render chỉ deploy commit mới sau khi type-check, test, lint và build đều thành công; không cần Deploy Hook hay Render API key trong GitHub.
 
 Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng. Người đầu tiên mở app sẽ phải chờ khoảng 1 phút, app có hiện thông báo trong lúc chờ. Trong lúc đang có người chơi, server không ngủ.
 
@@ -104,7 +106,7 @@ Trong **noi-tu-server → Environment** trên Render, nhập đủ `CLOUDINARY_C
 - `server/data/extra-words.txt`, `server/data/extra-words-en.txt`: thêm từ tiếng Việt (2 chữ) hoặc tiếng Anh (1 từ đơn)
 - `server/data/banned-words.txt`, `server/data/banned-words-en.txt`: loại từ sai hoặc từ không muốn cho dùng
 
-Sửa xong thì khởi động lại server (trên Render: push lên GitHub rồi bấm Manual Deploy cho `noi-tu-server`). **Không cần build lại app.**
+Sửa xong thì push lên nhánh `main`; khi CI thành công, Render tự deploy lại `noi-tu-server`. **Không cần build lại app.**
 
 Muốn tạo lại toàn bộ `words.txt` từ nguồn:
 ```bash
