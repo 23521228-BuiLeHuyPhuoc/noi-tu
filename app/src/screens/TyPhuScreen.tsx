@@ -87,7 +87,6 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     const next = TYPHU_VIEW_MODES[(TYPHU_VIEW_MODES.indexOf(viewMode) + 1) % TYPHU_VIEW_MODES.length];
     setViewMode(next);
     saveViewMode(next);
-    feed(`Chế độ xem: ${TYPHU_VIEW_LABEL[next]}`, 'info');
   };
   const tilt = useMemo(() => fitTilted(availW, availH), [availW, availH]);
   const flatS = Math.floor(Math.min(availW, availH));

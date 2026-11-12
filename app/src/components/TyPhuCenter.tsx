@@ -282,7 +282,7 @@ export function TyPhuCenter(p: CenterProps) {
         <View style={[abs(L.tools), styles.tools]}>
           <MiniBtn testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
           {p.onPoke && <MiniBtn testID="poke-open" label="Chọc đối thủ" icon="😈" onPress={p.onPoke} />}
-          {p.onView && <MiniBtn testID="view-mode" label={`Chế độ xem: ${p.viewLabel ?? ''}, chạm để đổi`} icon="🔲" onPress={p.onView} />}
+          {p.onView && <MiniBtn testID="view-mode" label={`Chế độ xem: ${p.viewLabel ?? ''}, chạm để đổi`} icon={p.viewLabel?.startsWith('3D') ? '3D' : p.viewLabel?.includes('tràn') ? '⛶' : '2D'} onPress={p.onView} />}
           {p.onRules && <MiniBtn testID="rules-open" label="Luật chơi" icon="📖" onPress={p.onRules} />}
           {p.onSpeed && <MiniBtn testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
           <MiniBtn label={tools.muted ? 'Bật âm thanh' : 'Tắt âm thanh'} icon={tools.muted ? '🔇' : '🔊'} onPress={tools.toggleMute} />
