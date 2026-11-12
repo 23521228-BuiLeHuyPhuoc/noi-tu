@@ -9,6 +9,7 @@ import { attachSocketHandlers, broadcastRoom } from './socket';
 import { Auth } from './auth';
 import { ACCOUNT_PREFIX } from './room';
 import { MemoryStore, type Store } from './store';
+import { debugMailer, gmailMailer, type Mailer } from './mailer';
 
 export interface GameServer {
   http: HttpServer;
@@ -22,10 +23,12 @@ export interface GameServerOptions extends Omit<RoomManagerOptions, 'onRoomChang
   /** nơi lưu tài khoản và từ mới; mặc định lưu trong bộ nhớ */
   store?: Store;
   avatarUploader?: AvatarUploader;
+  mailer?: Mailer | null;
 }
 
 export function createGameServer(dict: Dictionary, opts: GameServerOptions = {}): GameServer {
   const store = opts.store ?? new MemoryStore();
+  const mailer = opts.mailer === null ? undefined : opts.mailer ?? gmailMailer() ?? debugMailer();
   const logErr = (what: string) => (e: unknown) => console.error(what, e);
 
   const auth = new Auth(store);
@@ -44,7 +47,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   app.get('/health', (_req, res) => res.json({
     ok: true, words: dict.size, wordsEn: dict.en?.size ?? 0, rooms: manager.size, db: store.kind,
     // avatarUploads: ảnh tài khoản lưu lâu dài (Cloudinary); photoUploads: khách tải ảnh được (bộ nhớ tạm nếu thiếu Cloudinary)
-    avatarUploads: !!avatarUploader, photoUploads: true,
+    avatarUploads: !!avatarUploader, photoUploads: true, mail: !!mailer,
   }));
   // sảnh: các phòng công khai đang mở, để vào chơi cùng người khác
   app.get('/api/rooms', (_req, res) => res.json({ ok: true, rooms: manager.listPublic() }));
