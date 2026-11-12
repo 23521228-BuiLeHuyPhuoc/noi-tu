@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanFun, isScreenTroll, isTroll, RateLimiter, TargetCooldown, trollExtras } from '../src/fun';
+import { cleanFun, isHardDisrupt, isScreenTroll, isTroll, pauseMsOf, RateLimiter, TargetCooldown, trollExtras } from '../src/fun';
 import { CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_EYES, CHARACTER_FACES, CHARACTER_HAIRS, SKIN_TONES, CHARACTER_ACCESSORIES, CHARACTER_DETAILS, CHARACTER_GENDERS, CHARACTER_OUTFITS, DOODLES, LOOK_OPTIONS, NICKNAMES, parseLook } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { setup } from './helpers';
@@ -156,5 +156,34 @@ describe('đa dạng khuôn mặt: da, dáng mặt, dáng người, mắt, mày,
     expect(new Set(AVATAR_PRESETS.map((p) => p.face)).size).toBe(CHARACTER_FACES.length);
     expect(new Set(AVATAR_PRESETS.map((p) => p.build)).size).toBe(CHARACTER_BUILDS.length);
     expect(AVATAR_PRESETS.every((p) => CHARACTER_HAIRS.includes(p.hair))).toBe(true);
+  });
+});
+
+describe('6 chiêu chọc mới (miễn phí)', () => {
+  const NEW = ['fart', 'slipper', 'chicken', 'bigface', 'banana', 'mirror'] as const;
+
+  it('cleanFun nhận đủ 6 chiêu, bỏ trường thừa, từ chối thiếu người nhận hoặc kind lạ', () => {
+    for (const k of NEW) {
+      expect(cleanFun({ kind: k, to: 'x', junk: 1 })).toEqual({ kind: k, to: 'x' });
+      expect(cleanFun({ kind: k })).toBeNull();
+      expect(cleanFun({ kind: k, to: 5 })).toBeNull();
+      expect(isTroll(k)).toBe(true);
+    }
+    expect(cleanFun({ kind: 'fart2', to: 'x' })).toBeNull();
+  });
+
+  it('chỉ mirror là chiêu phá màn hình: chặn cứng và bù 2500ms', () => {
+    expect(isHardDisrupt('mirror')).toBe(true);
+    expect(pauseMsOf({ kind: 'mirror', to: 'x' })).toBe(2500);
+    for (const k of ['fart', 'slipper', 'chicken', 'bigface', 'banana'] as const) expect(isHardDisrupt(k)).toBe(false);
+  });
+
+  it('server bốc biến thể hợp lệ cho fart/chicken', () => {
+    for (let i = 0; i < 30; i++) {
+      const a = trollExtras({ kind: 'fart', to: 'x' }).variant!;
+      expect(a >= 0 && a <= 2).toBe(true);
+      const b = trollExtras({ kind: 'chicken', to: 'x' }).variant!;
+      expect(b === 0 || b === 1).toBe(true);
+    }
   });
 });

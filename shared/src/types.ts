@@ -485,6 +485,12 @@ export type FunSend =
   | { kind: 'nick'; to: string; nick: NicknameId }
   | { kind: 'honk'; to: string }
   | { kind: 'cry'; to: string }
+  | { kind: 'fart'; to: string }
+  | { kind: 'slipper'; to: string }
+  | { kind: 'chicken'; to: string }
+  | { kind: 'bigface'; to: string }
+  | { kind: 'banana'; to: string }
+  | { kind: 'mirror'; to: string }
   | { kind: 'blackout'; to: string }
   | { kind: 'spin'; to: string }
   | { kind: 'quake'; to: string }
@@ -523,12 +529,12 @@ export type FunEvent = FunSend & {
 export const DISRUPT_LIMIT = 3;
 export const DISRUPT_WINDOW_MS = 15_000;
 /** chiêu chỉ có tác dụng làm phiền màn hình: quá giới hạn thì bị chặn hẳn */
-export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog', 'duck', 'ufo', 'disco', 'money'] as const;
+export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog', 'duck', 'ufo', 'disco', 'money', 'mirror'] as const;
 /** thời gian (ms) được bù vào lượt Nối từ khi người đang tới lượt dính chiêu */
 export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
   blackout: 4500, spin: 3500, roach: 3000, ink: 2000, quake: 1500, poke: 1000, hit: 1000, throw: 1000,
   lightning: 2000, freeze: 3000, cake: 2000, water: 2000, dog: 2500,
-  duck: 3500, ufo: 3500, disco: 4000, money: 3000,
+  duck: 3500, ufo: 3500, disco: 4000, money: 3000, mirror: 2500,
 };
 /** tổng thời gian bù tối đa trong một lượt */
 export const DISRUPT_MAX_BONUS_MS = 15_000;

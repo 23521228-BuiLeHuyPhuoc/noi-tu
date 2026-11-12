@@ -35,7 +35,8 @@ export function cleanFun(raw: unknown): FunSend | null {
     return { kind: 'nick', to: f.to, nick: f.nick as NicknameId };
   }
   if (
-    (f.kind === 'roach' || f.kind === 'ink' || f.kind === 'honk' || f.kind === 'cry' || f.kind === 'blackout' || f.kind === 'spin' || f.kind === 'quake') &&
+    (f.kind === 'roach' || f.kind === 'ink' || f.kind === 'honk' || f.kind === 'cry' || f.kind === 'blackout' || f.kind === 'spin' || f.kind === 'quake' ||
+      f.kind === 'fart' || f.kind === 'slipper' || f.kind === 'chicken' || f.kind === 'bigface' || f.kind === 'banana' || f.kind === 'mirror') &&
     typeof f.to === 'string'
   ) {
     return { kind: f.kind, to: f.to };
@@ -51,7 +52,7 @@ export function cleanFun(raw: unknown): FunSend | null {
 }
 
 /** "chọc mất dạy": nhóm chiêu có giới hạn riêng (chặt hơn ném đồ) */
-export const TROLL_KINDS: FunSend['kind'][] = ['doodle', 'roach', 'ink', 'nick', 'honk', 'cry', 'charm', 'blackout', 'spin', 'quake'];
+export const TROLL_KINDS: FunSend['kind'][] = ['doodle', 'roach', 'ink', 'nick', 'honk', 'cry', 'charm', 'blackout', 'spin', 'quake', 'fart', 'slipper', 'chicken', 'bigface', 'banana', 'mirror'];
 /** chiêu phủ lên màn hình người bị chọc: mỗi người bị chọc chỉ nhận 1 lần mỗi SCREEN_COOLDOWN_MS (từ bất kỳ ai) */
 export const SCREEN_KINDS: FunSend['kind'][] = ['roach', 'ink'];
 export const SCREEN_COOLDOWN_MS = 8000;
@@ -65,6 +66,8 @@ export function trollExtras(f: FunSend, rng: () => number = Math.random): Pick<F
   if (f.kind === 'ink' || f.kind === 'cake') return { corner: Math.floor(rng() * 4) };
   if (f.kind === 'dog') return { variant: Math.floor(rng() * 2) };
   if (f.kind === 'honk') return { variant: Math.floor(rng() * 3) };
+  if (f.kind === 'fart') return { variant: Math.floor(rng() * 3) };
+  if (f.kind === 'chicken') return { variant: Math.floor(rng() * 2) };
   return {};
 }
 

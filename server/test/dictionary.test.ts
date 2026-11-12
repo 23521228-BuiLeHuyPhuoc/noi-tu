@@ -90,5 +90,5 @@ describe('Dictionary', () => {
     expect(d.en!.definition('art')?.text).toContain('nghệ thuật');
     expect(d.en!.definition('tits')?.text).toContain('đầu vú');
     expect(d.en!.definition('sex')?.text).toContain('giới tính');
-  });
+  }, 15_000); // Kho dữ liệu lớn cần thêm thời gian I/O khi Windows chạy nhiều worker.
 });
