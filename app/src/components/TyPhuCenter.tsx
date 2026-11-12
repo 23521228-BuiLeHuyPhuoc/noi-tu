@@ -115,7 +115,12 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
   const tix = g.tickets?.[id] ?? 0;
   const icons = (id in g.jail ? 15 : 0) + (cur ? 15 : 0);
   // chỗ cho tên: trừ avatar, khoảng cách, viền; chừa 1 dòng tiền ở dưới
-  const fit = fitName(name, Math.max(24, rect.w - (rect.h - 4) - 14 - icons), Math.max(10, rect.h - 6 - 15));
+  const textW = rect.w - (rect.h - 4) - 14 - icons;
+  const fit = fitName(name, Math.max(24, textW), Math.max(10, rect.h - 6 - 15));
+  // thẻ hẹp (bàn nghiêng trên màn nhỏ, 5-6 người): bỏ icon đồng xu, thu chữ tiền, ẩn số đất cho khỏi tràn
+  const tight = textW < 92;
+  const veryTight = textW < 70;
+  const cashStyle = tight ? { fontSize: 11.5, lineHeight: 14 } : null;
   return (
     <>
     <Pressable
@@ -161,17 +166,19 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
             <T style={[styles.wCash, { color: '#6B2B2B' }]}>Phá sản</T>
           ) : (
             <>
-              <Image source={{ uri: FX_ICON.coin }} style={styles.tiny} />
+              {!tight && <Image source={{ uri: FX_ICON.coin }} style={styles.tiny} />}
               {/* số tiền không được co lại (trước đây có lúc bị co về 0 px nên mất chữ) */}
-              <T testID={`wealth-cash-${id}`} numberOfLines={1} style={[styles.wCash, { flexShrink: 0 }]}>{fmt(g.cash[id] ?? 0)}$</T>
+              <T testID={`wealth-cash-${id}`} numberOfLines={1} style={[styles.wCash, cashStyle, { flexShrink: 0 }]}>{fmt(g.cash[id] ?? 0)}$</T>
               {tix > 0 && <T testID={`ticket-${id}`} style={styles.wCash}> 🎫{tix > 1 ? tix : ''}</T>}
             </>
           )}
           <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 2 }} />
-          <View style={[styles.landChip, { backgroundColor: color, flexShrink: 0 }]}>
-            <T style={styles.landTxt}>{lands}</T>
-            <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
-          </View>
+          {!veryTight && (
+            <View style={[styles.landChip, { backgroundColor: color, flexShrink: 0 }]}>
+              <T style={styles.landTxt}>{lands}</T>
+              <Image source={{ uri: FX_ICON.house }} style={{ width: 10, height: 10 }} />
+            </View>
+          )}
         </View>
       </View>
     </Pressable>

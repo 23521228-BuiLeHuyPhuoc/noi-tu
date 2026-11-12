@@ -21,7 +21,7 @@ import { C } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
-import { TyPhuCell } from '../components/TyPhuCell';
+import { TyPhuCell, pawnAnchor } from '../components/TyPhuCell';
 import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
 import { ANNOUNCE_MS, TyPhuAnnounce, type Announce } from '../components/TyPhuAnnounce';
 import { Pawn, TyPhuFxLayer, fxEnd, type Fx } from '../components/TyPhuFx';
@@ -98,11 +98,15 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   // bấm x1/x2/x3 liên tiếp nhanh: tính mức kế tiếp từ lần bấm trước, không chờ server trả về
   const speedRef = useRef(speed);
   useEffect(() => { speedRef.current = speed; }, [speed]);
+  // phần giữa bàn dựng ở cỡ "chuẩn" (~460x330) rồi phóng k lần: bàn to (màn lớn, 2D tràn màn) thì nút, tên, tiền cũng to theo
+  const cw = geo.center.w - 6;
+  const chh = geo.center.h - 6;
+  const k = Math.round(Math.max(1, Math.min(2.4, Math.min(cw / 460, chh / 330))) * 20) / 20;
   const layout = useMemo(
-    () => makeCenterLayout(geo.center.w - 6, geo.center.h - 6, Math.max(1, g.order.length), hasCard),
-    [geo, g.order.length, hasCard],
+    () => makeCenterLayout(cw / k, chh / k, Math.max(1, g.order.length), hasCard),
+    [cw, chh, k, g.order.length, hasCard],
   );
-  const pawnBase = Math.max(18, Math.min(viewMode === 'tilt' ? 26 : 34, Math.min(geo.wm, geo.hm * 1.6) * 0.66));
+  const pawnBase = Math.max(16, Math.min(viewMode === 'tilt' ? 26 : 34, Math.min(geo.wm * 0.62, geo.hm * 0.72)));
 
   const [now, setNow] = useState(() => Date.now());
   const [playback, setPlayback] = useState<DiceRollView | null>(g.roll);
@@ -161,9 +165,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   /** Vị trí quân cờ theo pixel trên bàn (giữa ô); đang đi thì nội suy giữa hai ô liên tiếp và nhảy vòm. */
   // quân cờ đứng ở phần trên/trái của ô (che icon, chừa tên và giá cho dễ đọc)
   const cellMid = (i: number) => {
-    const r = geo.rect[i];
-    // đặt mặt quân cờ (vòng tròn avatar) nằm giữa ô để nhìn rõ quân đang ở ô nào; mũi ghim nhô xuống dưới
-    return { x: r.x + r.w / 2, y: r.y + r.h / 2 + pawnBase * 0.24 };
+    // mặt quân cờ (vòng tròn avatar) nằm ở chỗ ít chữ nhất của ô; mũi ghim nhô xuống dưới
+    return pawnAnchor(i, geo.rect[i], geo.side[i], pawnBase);
   };
   const tokenMoveState = (id: string): { x: number; y: number; hop: number; active: boolean; stepCell: number | null; trail: Set<number>; visualCell: number } => {
     const still = (cell = g.pos[id]) => ({ ...cellMid(cell), hop: 0, active: false, stepCell: null, trail: new Set<number>(), visualCell: cell });
@@ -193,7 +196,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   // ---- hiệu ứng theo sự kiện: so sánh ảnh chụp trạng thái mới với lần trước ----
   const wealthRectOf = (id: string): Rect => {
     const r = layout.wealth[Math.max(0, g.order.indexOf(id))] ?? layout.wealth[0];
-    return { x: geo.center.x + 3 + r.x, y: geo.center.y + 3 + r.y, w: r.w, h: r.h };
+    return { x: geo.center.x + 3 + r.x * k, y: geo.center.y + 3 + r.y * k, w: r.w * k, h: r.h * k };
   };
   const msUntilArrive = () => Math.max(0, movement ? movement.endsAt - (clockNow() + game.clockOffset) : 0, g.roll ? g.roll.startedAt + g.roll.ms - (clockNow() + game.clockOffset) : 0);
   const msUntilReach = (cell: number) => {
@@ -553,10 +556,10 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
           {/* TRUNG TÂM: người đang chơi, xúc xắc, nút, tài sản, đất của tôi, diễn biến */}
           <View style={[styles.center, { left: geo.center.x + 1.5, top: geo.center.y + 1.5, width: geo.center.w - 3, height: geo.center.h - 3 }]}>
-            <View style={{ position: 'absolute', left: 3, top: 3, width: geo.center.w - 9, height: geo.center.h - 9 }}>
+            <View style={{ position: 'absolute', left: 3, top: 3, width: (geo.center.w - 9) / k, height: (geo.center.h - 9) / k, transform: [{ scale: k }], transformOrigin: '0px 0px' }}>
               <TyPhuCenter
                 layout={layout}
-                size={{ w: geo.center.w - 6, h: geo.center.h - 6 }}
+                size={{ w: cw / k, h: chh / k }}
                 g={g}
                 me={me}
                 now={now}

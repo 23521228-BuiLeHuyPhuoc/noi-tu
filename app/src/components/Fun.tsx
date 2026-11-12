@@ -18,7 +18,7 @@ import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { Portrait } from './Avatar';
 import { Button, T, useFeed } from '../ui';
-import { Sheet } from './Sheet';
+import { Sheet, useSheetOpen } from './Sheet';
 import { CHU_LAY_STICKERS, STICKERS, stickerOf } from '../stickers';
 import { GIFT_IDS, FREE_POKES_PER_DAY, STICKER_PACK_ID, shopItem, SKILL_IDS } from '../../../shared/src/shop';
 import { ShopSheet } from './Shop';
@@ -470,6 +470,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
     });
   }, [game, add, feed, shake, say]);
 
+  const sheetOpen = useSheetOpen();
   const placed = layoutBubbles(bubbles, layerW);
   return (
     <View ref={layer} pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(e) => setLayerW(e.nativeEvent.layout.width)}>
@@ -484,7 +485,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           <Impact key={f.id} at={f.at} damage={f.damage} hp={f.hp} ko={f.ko} onDone={() => remove(f.id)} />
         ),
       )}
-      {bubbles.map((b, i) => (
+      {!sheetOpen && bubbles.map((b, i) => (
         <Bubble key={b.key} item={b} pos={placed[i]} onDone={() => unsay(b.key)} />
       ))}
     </View>

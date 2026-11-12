@@ -1,8 +1,16 @@
-import type { ReactNode } from 'react';
+import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
+
+// đếm số bảng đang mở: bong bóng chat/phản ứng nằm ở lớp khác (không đè lên được bảng) nên tự ẩn khi có bảng mở
+let openCount = 0;
+const listeners = new Set<() => void>();
+const bump = (d: number) => { openCount += d; listeners.forEach((l) => l()); };
+export function useSheetOpen(): boolean {
+  return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => openCount > 0, () => false);
+}
 
 /** Bảng trượt từ dưới lên (dễ bấm bằng ngón cái) */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -13,6 +21,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   // (khung bàn Cờ tỷ phú cao hơn màn ngang làm bảng tràn khỏi đáy, mất ô nhập chat / nút chọc)
   const maxHeight = kb > 0 ? Math.max(220, height - kb - 12) : Math.max(220, Math.round(height * 0.94));
   const short = height < 520;
+  useEffect(() => { bump(1); return () => bump(-1); }, []);
   return (
     <View style={styles.root}>
       <Pressable accessibilityLabel="Đóng" style={styles.backdrop} onPress={onClose} />

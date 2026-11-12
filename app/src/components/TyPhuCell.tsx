@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
 import { TYPHU_BOARD, TYPHU_GROUPS, TYPHU_MAX_HOUSES, TYPHU_PASS_START, isTyPhuProperty } from '../../../shared/src/typhu';
 import { C } from '../theme';
 import { T } from '../ui';
@@ -73,6 +73,57 @@ function Stars({ n, size }: { n: number; size: number }) {
   return <T numberOfLines={1} style={[styles.stars, { fontSize: size, lineHeight: Math.round(size * 1.15) }]}>{'★'.repeat(n)}</T>;
 }
 
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** bề rộng trung bình 1 chữ HOA in đậm so với cỡ chữ */
+const CH = 0.74;
+
+/**
+ * Cỡ chữ để hiện ĐỦ tên trong khung rộng w, cao h (tối đa 2 dòng, ngắt theo từ, không cắt "…").
+ * Chọn phương án (1 hay 2 dòng) cho chữ to nhất; cỡ chữ tỉ lệ theo ô nên ô to (2D tràn màn) chữ cũng to theo.
+ */
+export function fitCellName(name: string, w: number, h: number, maxFs: number, minFs = 6): { fs: number; lh: number; lines: number } {
+  const words = name.split(/\s+/).filter(Boolean);
+  const total = Math.max(1, [...name].length);
+  let longest = 1;
+  for (const wd of words) longest = Math.max(longest, [...wd].length);
+  // ngắt 2 dòng đẹp nhất: dòng dài nhất ngắn nhất có thể
+  let two = total;
+  for (let k = 1; k < words.length; k++) {
+    const l1 = [...words.slice(0, k).join(' ')].length;
+    const l2 = [...words.slice(k).join(' ')].length;
+    two = Math.min(two, Math.max(l1, l2));
+  }
+  two = Math.max(two, longest);
+  const one = { lines: 1, fs: Math.min(maxFs, w / (total * CH), h / 1.2) };
+  const dbl = { lines: 2, fs: Math.min(maxFs, w / (two * CH), h / 2.4) };
+  const best = words.length > 1 && dbl.fs > one.fs * 1.12 ? dbl : one;
+  // quá dài so với khung: vẫn không nhỏ hơn minFs (web tự xuống dòng nhờ wordBreak)
+  const fs = Math.max(minFs, Math.floor(best.fs * 2) / 2);
+  return { fs, lh: Math.round(fs * 1.2), lines: best.lines };
+}
+
+/**
+ * Chỗ đặt tâm quân cờ trong ô: tránh đè lên tên/giá.
+ * Ô cạnh trái/phải đủ rộng thì quân đứng ở chỗ icon (đầu ô, sau dải màu); ô hàng trên/dưới đứng giữa phần không phải dải màu.
+ */
+export function pawnAnchor(i: number, r: { x: number; y: number; w: number; h: number }, side: BandSide, size: number): { x: number; y: number } {
+  const land = TYPHU_BOARD[i].kind === 'land';
+  if (side === 'corner') return { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.24 };
+  if (side === 'top' || side === 'bottom') {
+    const bandH = land ? Math.max(11, r.h * 0.22) : 0;
+    const dy = side === 'top' ? bandH / 2 : -bandH / 2;
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2 + dy + size * 0.2 };
+  }
+  if (r.w >= r.h * 2) {
+    const bandW = land ? clamp(r.w * 0.16, 14, 30) : 0;
+    const x = side === 'left' ? r.x + bandW + 3 + size / 2 : r.x + 3 + size / 2;
+    return { x, y: r.y + r.h / 2 + size * 0.2 };
+  }
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 + size * 0.24 };
+}
+
+const WRAP = (Platform.OS === 'web' ? { wordBreak: 'break-word' } : {}) as TextStyle;
+
 /** Một ô kiểu bàn cờ in, chữ luôn xuôi theo hướng người cầm máy: dải màu bộ đất ở mép trong, TÊN in hoa, giá ở mép ngoài. */
 export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const c = TYPHU_BOARD[p.index];
@@ -89,20 +140,25 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const ring = hl ?? (owned ? p.ownerHex! : null);
   const overlay = ring ? <View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderWidth: hl ? 3 : 2.5 }]} /> : null;
   const isStation = c.kind === 'station';
+  const faceSize = clamp(Math.min(p.w, p.h) * 0.3, 13, 28);
+  const faceStyle = { width: faceSize, height: faceSize, borderRadius: faceSize / 2 };
   // ga có sao vẫn hiện mặt chủ (sao vẽ riêng); đất có nhà thì nhà thay cho mặt chủ
-  const face = owned && (p.houses === 0 || isStation) ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, { borderColor: p.ownerHex! }]} /> : null;
+  const face = owned && (p.houses === 0 || isStation) ? <Image source={{ uri: p.ownerPortrait! }} style={[styles.ownerFace, faceStyle, { borderColor: p.ownerHex! }]} /> : null;
   const priceTxt = price === null ? (c.kind === 'start' ? `+${TYPHU_PASS_START}$` : '') : c.kind === 'tax' ? `-${price}$` : `${price}$`;
   const minus = c.kind === 'tax';
 
   if (p.side === 'corner') {
-    const fs = Math.max(7, Math.min(11, p.w / 7.4));
-    const icon = p.w * (priceTxt !== '' ? 0.38 : 0.44);
+    const pr = priceTxt !== '';
+    const fit = fitCellName(name, p.w - 8, p.h * 0.3, clamp(p.h * 0.17, 8, 20), 7);
+    const prFs = clamp(Math.min(p.h * 0.17, p.w / 6), 8, 19);
+    const nameH = fit.lh * fit.lines;
+    const icon = clamp(Math.min(p.w * 0.6, p.h - nameH - (pr ? prFs * 1.2 : 0) - 8), 12, 200);
     return (
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.corner}>
-          <T numberOfLines={2} style={[styles.cornerName, { fontSize: fs, lineHeight: Math.round(fs * 1.2) }]}>{name}</T>
+          <T style={[styles.cornerName, { fontSize: fit.fs, lineHeight: fit.lh }, WRAP]}>{name}</T>
           <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
-          {priceTxt !== '' && <T style={[styles.price, styles.plus, { fontSize: fs, lineHeight: Math.round(fs * 1.25) }]}>{priceTxt}</T>}
+          {pr && <T numberOfLines={1} style={[styles.price, styles.plus, { fontSize: prFs, lineHeight: Math.round(prFs * 1.2) }]}>{priceTxt}</T>}
         </View>
         {overlay}
       </Pressable>
@@ -115,10 +171,15 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   if (horiz) {
     // ô hàng dưới (dải màu ở trên) và hàng trên (dải màu ở dưới), chữ đều xuôi
     const W = p.w;
-    const nameSize = Math.max(6.5, Math.min(10, W / 5.2));
-    const priceSize = Math.max(7, Math.min(10.5, W / 4.6));
-    const bandH = Math.max(13, p.h * 0.24);
-    const iconSize = Math.min(W * (face ? 0.56 : 0.8), p.h * 0.38);
+    const H = p.h;
+    const bandH = band ? Math.max(11, H * 0.22) : 0;
+    const priceSize = clamp(Math.min(H * 0.16, W / 4.6), 7, 18);
+    const priceLH = priceTxt !== '' ? Math.round(priceSize * 1.22) : 0;
+    const starSize = clamp(W / 4.2, 7, 14);
+    const starH = isStation && p.houses > 0 ? Math.round(starSize * 1.15) : 0;
+    const inner = H - bandH - priceLH - starH - 4;
+    const fit = fitCellName(name, W - 4, inner * (isLand ? 0.55 : 0.4), clamp(H * 0.17, 6.5, 19));
+    const iconSize = clamp(Math.min(W * (face ? 0.56 : 0.8), inner - fit.lh * fit.lines - 2), 8, 120);
     const bandEl = band ? (
       <View style={[styles.bandH, { height: bandH, backgroundColor: band }, p.side === 'top' ? styles.bandBorderB : styles.bandBorderT]}>
         <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(bandH - 2, (W - 6) / 3.3)} vertical={false} />
@@ -128,13 +189,13 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.col}>
           {p.side === 'top' && bandEl}
-          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.32), marginTop: 1 }]}>{name}</T>
+          <T style={[styles.name, { fontSize: fit.fs, lineHeight: fit.lh, marginTop: 1, paddingHorizontal: 2 }, WRAP]}>{name}</T>
           <View style={styles.mid}>
             {!isLand && <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />}
             {face}
           </View>
-          {isStation && <Stars n={p.houses} size={Math.max(7, Math.min(11, W / 4.2))} />}
-          {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.32), marginBottom: 1 }]}>{priceTxt}</T>}
+          {isStation && <Stars n={p.houses} size={starSize} />}
+          {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: priceLH, marginBottom: 1 }]}>{priceTxt}</T>}
           {p.side === 'bottom' && bandEl}
         </View>
         {overlay}
@@ -144,13 +205,19 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
 
   // ô cạnh trái/phải: nằm ngang, dải màu dọc ở mép trong
   const H = p.h;
-  const nameSize = Math.max(6.5, Math.min(9.5, H / 5));
-  const priceSize = Math.max(7, Math.min(10, H / 4.6));
-  const iconSize = Math.min(H * 0.6, p.w * 0.3);
-  const sidePrice = priceTxt;
+  const W = p.w;
+  const bandW = band ? clamp(W * 0.16, 14, 30) : 0;
+  const iconSize = clamp(Math.min(H * 0.64, W * 0.3), 8, 90);
+  const faceW = isLand && face ? faceSize + 3 : 0;
+  const textW = W - bandW - (isLand ? faceW : iconSize + 4) - 6;
+  const priceSize = clamp(Math.min(H * 0.27, textW / 4.2), 7, 18);
+  const priceLH = priceTxt !== '' ? Math.round(priceSize * 1.22) : 0;
+  const starSize = clamp(Math.min(H * 0.24, textW / 4), 7, 14);
+  const starH = isStation && p.houses > 0 ? Math.round(starSize * 1.15) : 0;
+  const fit = fitCellName(name, textW, (H - priceLH - starH - 4) * 0.95, clamp(H * 0.26, 6.5, 19));
   const bandEl = band ? (
-    <View style={[styles.bandV, { backgroundColor: band }, p.side === 'right' ? styles.bandBorderL : styles.bandBorderR]}>
-      <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(12, (H - 6) / 3.3)} vertical />
+    <View style={[styles.bandV, { width: bandW, backgroundColor: band }, p.side === 'right' ? styles.bandBorderL : styles.bandBorderR]}>
+      <Houses n={p.houses} color={p.ownerHex ?? '#2FB344'} size={Math.min(bandW - 2, (H - 6) / 3.3)} vertical />
     </View>
   ) : null;
   return (
@@ -166,9 +233,9 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
           face && <View style={{ marginLeft: p.side === 'left' ? 1 : 2, marginRight: p.side === 'right' ? 1 : 0 }}>{face}</View>
         )}
         <View style={styles.rowText}>
-          <T numberOfLines={2} style={[styles.name, { fontSize: nameSize, lineHeight: Math.round(nameSize * 1.25) }]}>{name}</T>
-          {isStation && <Stars n={p.houses} size={Math.max(7, Math.min(10, H / 4.6))} />}
-          {sidePrice !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: Math.round(priceSize * 1.28) }]}>{sidePrice}</T>}
+          <T style={[styles.name, { fontSize: fit.fs, lineHeight: fit.lh }, WRAP]}>{name}</T>
+          {isStation && <Stars n={p.houses} size={starSize} />}
+          {priceTxt !== '' && <T numberOfLines={1} style={[styles.price, minus && styles.minus, { fontSize: priceSize, lineHeight: priceLH }]}>{priceTxt}</T>}
         </View>
         {p.side === 'right' && bandEl}
       </View>
@@ -184,7 +251,7 @@ const styles = StyleSheet.create({
   row: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   rowText: { flex: 1, minWidth: 0, paddingHorizontal: 2, alignItems: 'center' },
   bandH: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  bandV: { alignSelf: 'stretch', width: 14, alignItems: 'center', justifyContent: 'center' },
+  bandV: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   bandBorderB: { borderBottomWidth: 0.75, borderColor: INK },
   bandBorderT: { borderTopWidth: 0.75, borderColor: INK },
   bandBorderL: { borderLeftWidth: 0.75, borderColor: INK },
@@ -196,8 +263,8 @@ const styles = StyleSheet.create({
   plus: { color: '#2B8A3E' },
   stars: { color: '#F59F00', fontWeight: '900', textAlign: 'center', textShadowColor: '#111', textShadowRadius: 1.5, letterSpacing: -0.5 },
   sideIconWrap: { marginLeft: 2, alignItems: 'center', justifyContent: 'center' },
-  sideFace: { position: 'absolute', right: -3, bottom: -2, transform: [{ scale: 0.8 }] },
-  ownerFace: { width: 13, height: 13, borderRadius: 7, backgroundColor: '#fff', borderWidth: 1.5 },
+  sideFace: { position: 'absolute', right: -4, bottom: -3, transform: [{ scale: 0.8 }] },
+  ownerFace: { backgroundColor: '#fff', borderWidth: 1.5 },
   corner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1, padding: 2 },
   cornerName: { color: INK, fontWeight: '800', textAlign: 'center' },
 });
