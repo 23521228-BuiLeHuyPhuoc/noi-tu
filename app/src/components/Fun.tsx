@@ -20,6 +20,7 @@ import { Portrait } from './Avatar';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { STICKERS, stickerOf } from '../stickers';
+import { KickInline } from './RoomTools';
 
 // ---------- Lắc & Xoay màn hình ----------
 
@@ -821,6 +822,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         variant="ink"
         onPress={() => send({ kind: 'poke', to: target.id })}
       />
+      <KickInline game={game} player={target} onDone={onClose} />
     </Sheet>
   );
 }

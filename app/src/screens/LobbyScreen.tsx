@@ -15,6 +15,7 @@ import {
 } from '../avatars';
 import { shareInvite } from '../web';
 import { GAME_META, RULES } from '../messages';
+import { RoomManageCard } from '../components/RoomTools';
 import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
@@ -125,6 +126,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           {n}/{room.maxPlayers} người trong phòng. Chạm vào avatar của bạn bè để chọc họ.
         </T>
       </Card>
+
+      <RoomManageCard game={game} room={room} />
 
       <T style={styles.section}>{isHost ? 'Chọn game' : 'Game của phòng'}</T>
       {isHost ? (

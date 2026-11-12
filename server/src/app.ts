@@ -2,7 +2,7 @@ import express from 'express';
 import { attachAvatarRoute, cloudinaryUploader, PhotoService, type AvatarUploader } from './avatar';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '../../shared/src/types';
+import { GAME_INFO, type ClientToServerEvents, type GameType, type ServerToClientEvents } from '../../shared/src/types';
 import type { Dictionary } from './dictionary';
 import { RoomManager, type RoomManagerOptions } from './roomManager';
 import { attachSocketHandlers, broadcastRoom } from './socket';
@@ -46,6 +46,24 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     // avatarUploads: ảnh tài khoản lưu lâu dài (Cloudinary); photoUploads: khách tải ảnh được (bộ nhớ tạm nếu thiếu Cloudinary)
     avatarUploads: !!avatarUploader, photoUploads: true,
   }));
+  // sảnh: các phòng công khai đang mở, để vào chơi cùng người khác
+  app.get('/api/rooms', (_req, res) => res.json({ ok: true, rooms: manager.listPublic() }));
+  // bảng xếp hạng số lần thắng (?game=<loại game> hoặc all)
+  app.get('/api/leaderboard', (req, res) => {
+    const g = String(req.query.game ?? 'all');
+    const game = g === 'all' ? null : (Object.keys(GAME_INFO) as GameType[]).find((x) => x === g);
+    if (game === undefined) {
+      res.status(400).json({ ok: false });
+      return;
+    }
+    store.leaderboard(game, 20).then(
+      (rows) => res.json({ ok: true, rows: rows.map((r, i) => ({ ...r, rank: i + 1 })) }),
+      (e) => {
+        logErr('leaderboard')(e);
+        res.status(500).json({ ok: false });
+      },
+    );
+  });
   app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
   const http = createServer(app);
 

@@ -8,6 +8,7 @@ import { GAME_META } from '../messages';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
+import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 
 const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
 
@@ -19,6 +20,7 @@ export function HomeScreen({ game }: { game: Game }) {
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<'login' | 'register' | null>(null);
   const [profile, setProfile] = useState(false);
+  const [board, setBoard] = useState(false);
   const user = game.user;
 
   useEffect(() => {
@@ -152,7 +154,12 @@ export function HomeScreen({ game }: { game: Game }) {
         ))}
 
         {!invite && join}
+
+        <T style={styles.section}>Vào phòng có sẵn</T>
+        <OpenRooms game={game} disabled={!online || busy} onJoin={(c) => run(() => game.joinRoom(c, trimmed))} />
+        <Button testID="leaderboard-open" icon="🏆" title="Bảng xếp hạng" variant="paper" onPress={() => setBoard(true)} />
       </ScrollView>
+      {board && <LeaderboardSheet game={game} onClose={() => setBoard(false)} />}
       {auth && <AuthSheet game={game} initial={auth} defaultName={name.trim()} onClose={() => setAuth(null)} />}
       {profile && (
         <ProfileSheet

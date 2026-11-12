@@ -202,6 +202,33 @@ export interface RoomState {
   serverNow: number;
   game: GameView | null;
   result: GameResult | null;
+  /** phòng công khai hiện trong sảnh "Phòng đang mở"; riêng tư thì chỉ vào được bằng mã hoặc link mời */
+  isPublic: boolean;
+}
+
+/** Một phòng công khai trong sảnh */
+export interface RoomSummary {
+  code: string;
+  gameType: GameType;
+  phase: Phase;
+  hostName: string;
+  hostAvatar: number;
+  hostAvatarUrl?: string;
+  players: number;
+  maxPlayers: number;
+  /** tên những người đang trong phòng */
+  names: string[];
+}
+
+/** Một dòng bảng xếp hạng (chỉ người chơi có tài khoản mới được lưu thành tích) */
+export interface LeaderRow {
+  rank: number;
+  id: string;
+  displayName: string;
+  avatar: number;
+  avatarUrl?: string;
+  won: number;
+  played: number;
 }
 
 export type GameView = WordChainView | BauCuaView | TyPhuView;
@@ -536,6 +563,8 @@ export type ErrorCode =
   | 'too_many_players'
   | 'too_few_players'
   | 'color_taken'
+  /** đã bị chủ phòng mời ra: không vào lại được phòng đó */
+  | 'kicked'
   | 'bad_request';
 
 export type Ack<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
@@ -557,6 +586,10 @@ export interface ClientToServerEvents {
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   'game:restart': (ack: (r: Ack) => void) => void;
   'room:leave': (ack: (r: Ack) => void) => void;
+  /** chủ phòng đổi phòng thành công khai / riêng tư */
+  'room:visibility': (p: { public: boolean }, ack: (r: Ack) => void) => void;
+  /** chủ phòng mời một người ra khỏi phòng */
+  'room:kick': (p: { playerId: string }, ack: (r: Ack) => void) => void;
   'fun:send': (f: FunSend, ack: (r: FunAck) => void) => void;
   /** đổi tên / mặt đại diện có sẵn ngay trong phòng (khách; người có tài khoản dùng auth:update) — được cả lúc đang chơi */
   'player:profile': (p: { name?: string; avatar?: number }, ack: (r: Ack) => void) => void;
@@ -575,4 +608,6 @@ export interface ServerToClientEvents {
   'fun:event': (e: FunEvent) => void;
   'chat:msg': (m: ChatMsg) => void;
   'chat:history': (ms: ChatMsg[]) => void;
+  /** bạn vừa bị chủ phòng mời ra khỏi phòng */
+  'room:kicked': (p: { code: string }) => void;
 }

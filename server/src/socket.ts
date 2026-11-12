@@ -184,6 +184,33 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       if (typeof ack === 'function') ack({ ok: true });
     });
 
+    socket.on('room:visibility', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.setPublic(session.playerId, p && typeof p === 'object' ? p.public : undefined));
+    });
+
+    // chủ phòng mời một người ra: báo riêng cho máy người đó rồi cho rời kênh của phòng
+    socket.on('room:kick', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      const target = p && typeof p === 'object' ? p.playerId : undefined;
+      const res = room.kick(session.playerId, target);
+      if (res.ok && typeof target === 'string') {
+        const k = key(room.code, target);
+        const sid = activeSocket.get(k);
+        activeSocket.delete(k);
+        const s = sid ? io.sockets.sockets.get(sid) : undefined;
+        if (s) {
+          s.emit('room:kicked', { code: room.code });
+          s.leave(room.code);
+        }
+      }
+      ack(res);
+    });
+
     // ném dép, khịa, hối, thả emoji, đánh nhau: phát cho cả phòng, có giới hạn tần suất chống spam
     socket.on('fun:send', (raw, ack) => {
       const reply = typeof ack === 'function' ? ack : () => {};

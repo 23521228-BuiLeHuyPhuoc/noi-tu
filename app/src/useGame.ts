@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
-  PublicUser, RoomSettings, RoomState, ServerToClientEvents, StickerId,
+  LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, ServerToClientEvents, StickerId,
 } from '../../shared/src/types';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
@@ -46,6 +46,14 @@ export interface Game {
   act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
   leave(): void;
+  /** chủ phòng mời một người ra khỏi phòng */
+  kick(playerId: string): Promise<string | null>;
+  /** chủ phòng đổi phòng thành công khai / riêng tư */
+  setPublic(value: boolean): Promise<string | null>;
+  /** các phòng công khai đang mở (null = không tải được) */
+  listRooms(): Promise<RoomSummary[] | null>;
+  /** bảng xếp hạng số lần thắng của một game hoặc mọi game (null = không tải được) */
+  leaderboard(game: GameType | 'all'): Promise<LeaderRow[] | null>;
   /** gửi chiêu ném/khịa/hối…; kết quả cho biết có bị giới hạn không */
   sendFun(f: FunSend): Promise<FunAck>;
   /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
@@ -172,6 +180,12 @@ export function useGame(): Game {
       for (const cb of funListeners.current) cb(e);
     });
     socket.on('chat:history', (ms) => setChat(ms));
+    // bị chủ phòng mời ra: về trang chủ, không tự vào lại phòng đó nữa
+    socket.on('room:kicked', (p) => {
+      if (roomCodeRef.current !== p.code) return;
+      setNotice('Bạn đã bị chủ phòng mời ra khỏi phòng.');
+      void forget();
+    });
     socket.on('chat:msg', (m) => setChat((xs) => [...xs.slice(-79), m]));
 
     storage.getPlayerId().then((id) => id && setMe(id));
@@ -292,6 +306,26 @@ export function useGame(): Game {
 
   const inRoom = () => !!roomCodeRef.current;
 
+  const listRooms = useCallback(async (): Promise<RoomSummary[] | null> => {
+    try {
+      const r = await fetch(`${SERVER_URL.replace(/\/$/, '')}/api/rooms`);
+      const j = (await r.json()) as { ok?: boolean; rooms?: RoomSummary[] };
+      return j.ok && Array.isArray(j.rooms) ? j.rooms : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const leaderboard = useCallback(async (g: GameType | 'all'): Promise<LeaderRow[] | null> => {
+    try {
+      const r = await fetch(`${SERVER_URL.replace(/\/$/, '')}/api/leaderboard?game=${encodeURIComponent(g)}`);
+      const j = (await r.json()) as { ok?: boolean; rows?: LeaderRow[] };
+      return j.ok && Array.isArray(j.rows) ? j.rows : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const saveProfile = useCallback(async (p: { name?: string; avatar?: number }): Promise<string | null> => {
     const name = p.name?.normalize('NFC').replace(/\s+/g, ' ').trim();
     if (p.name !== undefined && !name) return 'Tên không được để trống.';
@@ -360,6 +394,10 @@ export function useGame(): Game {
       socketRef.current?.emit('room:leave', () => {});
       void forget();
     },
+    kick: (playerId) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:kick', { playerId })),
+    setPublic: (value) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:visibility', { public: value })),
+    listRooms,
+    leaderboard,
     sendFun: async (f) => {
       const res = await call<FunAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:send', f));
       return res ?? { ok: false };

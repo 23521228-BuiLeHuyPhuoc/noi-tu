@@ -5,7 +5,12 @@
  */
 import { randomBytes, createHash } from 'node:crypto';
 import { MongoClient, ObjectId, type Collection, type Db } from 'mongodb';
-import type { GameStat, GameType, PublicUser } from '../../shared/src/types';
+import { GAME_INFO, type GameStat, type GameType, type LeaderRow, type PublicUser } from '../../shared/src/types';
+
+const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
+export type LeaderEntry = Omit<LeaderRow, 'rank'>;
+/** nhiều lần thắng hơn đứng trên; bằng nhau thì ai chơi ít ván hơn (tỉ lệ thắng cao hơn) đứng trên */
+const byRank = (a: LeaderEntry, b: LeaderEntry) => b.won - a.won || a.played - b.played || a.displayName.localeCompare(b.displayName, 'vi');
 
 export interface UserRecord {
   id: string;
@@ -30,6 +35,8 @@ export interface Store {
   deleteSession(token: string): Promise<void>;
   /** cộng ván đã chơi / đã thắng cho các tài khoản */
   recordGame(userIds: string[], game: GameType, winnerId: string | null): Promise<void>;
+  /** bảng xếp hạng số lần thắng của một game (null = cộng mọi game), chỉ người đã chơi ít nhất 1 ván */
+  leaderboard(game: GameType | null, limit: number): Promise<LeaderEntry[]>;
   /** lưu từ được cả phòng duyệt; trả về false nếu đã có */
   addWord(word: string, by: string): Promise<boolean>;
   listWords(): Promise<string[]>;
@@ -97,6 +104,21 @@ export class MemoryStore implements Store {
       s.played++;
       if (id === winnerId) s.won++;
     }
+  }
+  async leaderboard(game: GameType | null, limit: number) {
+    const games = game ? [game] : GAME_TYPES;
+    return [...this.users.values()]
+      .map((u): LeaderEntry => ({
+        id: u.id,
+        displayName: u.displayName,
+        avatar: u.avatar,
+        ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}),
+        won: games.reduce((s, g) => s + (u.stats[g]?.won ?? 0), 0),
+        played: games.reduce((s, g) => s + (u.stats[g]?.played ?? 0), 0),
+      }))
+      .filter((r) => r.played > 0)
+      .sort(byRank)
+      .slice(0, limit);
   }
   async addWord(word: string) {
     if (this.words.has(word)) return false;
@@ -219,6 +241,26 @@ export class MongoStore implements Store {
         },
       })),
     );
+  }
+  async leaderboard(game: GameType | null, limit: number) {
+    const games = game ? [game] : GAME_TYPES;
+    const sum = (f: 'won' | 'played') => ({ $add: games.map((g) => ({ $ifNull: [`$stats.${g}.${f}`, 0] })) });
+    const docs = await this.users
+      .aggregate<{ _id: ObjectId; displayName: string; avatar: number; avatarUrl?: string; won: number; played: number }>([
+        { $project: { displayName: 1, avatar: 1, avatarUrl: 1, won: sum('won'), played: sum('played') } },
+        { $match: { played: { $gt: 0 } } },
+        { $sort: { won: -1, played: 1, displayName: 1 } },
+        { $limit: limit },
+      ])
+      .toArray();
+    return docs.map((d): LeaderEntry => ({
+      id: d._id.toHexString(),
+      displayName: d.displayName,
+      avatar: d.avatar,
+      ...(d.avatarUrl ? { avatarUrl: d.avatarUrl } : {}),
+      won: d.won,
+      played: d.played,
+    })).sort(byRank);
   }
   async addWord(word: string, by: string) {
     try {

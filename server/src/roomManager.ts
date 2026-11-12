@@ -1,4 +1,5 @@
 import type { Dictionary, Rng } from './dictionary';
+import type { RoomSummary } from '../../shared/src/types';
 import { Room, type RoomOptions } from './room';
 
 // bỏ các ký tự dễ nhầm: I, O, 0, 1
@@ -38,6 +39,17 @@ export class RoomManager {
     });
     this.rooms.set(code, room);
     return room;
+  }
+
+  /** Các phòng công khai còn người kết nối: phòng chờ trước, đông người trước */
+  listPublic(limit = 30): RoomSummary[] {
+    const order = { lobby: 0, playing: 1, finished: 2 } as const;
+    return [...this.rooms.values()]
+      .filter((r) => r.isPublic && r.connectedCount > 0)
+      .map((r) => r.summary())
+      .filter((s): s is RoomSummary => !!s)
+      .sort((a, b) => order[a.phase] - order[b.phase] || b.players - a.players)
+      .slice(0, limit);
   }
 
   get(code: unknown): Room | undefined {

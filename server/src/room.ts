@@ -5,7 +5,7 @@ import {
   type CharacterAccessory, type CharacterAge, type CharacterBrows, type CharacterBuild, type CharacterEyes, type CharacterFace, type CharacterConfig, type CharacterDetail, type CharacterOutfit, type CharacterGender, type CharacterHair,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
-  type RoomSettings, type RoomState,
+  type RoomSettings, type RoomState, type RoomSummary,
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import { parseLook } from '../../shared/src/types';
@@ -66,6 +66,10 @@ export class Room {
   gameType: GameType = 'wordchain';
   settings: RoomSettings = { ludoPieces: 4, baucuaRounds: BAUCUA_DEFAULT_ROUNDS };
 
+  /** phòng công khai hiện trong sảnh "Phòng đang mở"; riêng tư thì chỉ vào được bằng mã hoặc link mời */
+  isPublic = true;
+  /** người đã bị chủ phòng mời ra: không vào lại được phòng này */
+  private readonly kicked = new Set<string>();
   private engine: GameEngine | null = null;
   private result: GameResult | null = null;
   private participants: string[] = [];
@@ -109,6 +113,7 @@ export class Room {
     const account = profile?.account === true;
     // khách không được mạo danh id tài khoản
     if (existingId?.startsWith(ACCOUNT_PREFIX) && !account) existingId = undefined;
+    if (existingId && this.kicked.has(existingId)) return { ok: false, error: 'kicked' };
     const existing = existingId ? this.find(existingId) : undefined;
     if (existing) {
       this.setConnected(existing.id, true);
@@ -321,6 +326,43 @@ export class Room {
     this.changed();
   }
 
+  /** Chủ phòng đổi phòng thành công khai / riêng tư (được cả lúc đang chơi). */
+  setPublic(byId: string, value: unknown): Result {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (typeof value !== 'boolean') return { ok: false, error: 'bad_request' };
+    if (this.isPublic !== value) {
+      this.isPublic = value;
+      this.changed();
+    }
+    return { ok: true };
+  }
+
+  /** Chủ phòng mời một người ra khỏi phòng (cả lúc đang chơi); người đó không vào lại được phòng này. */
+  kick(byId: string, targetId: unknown): Result {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (typeof targetId !== 'string' || targetId === byId || !this.find(targetId)) return { ok: false, error: 'bad_request' };
+    this.kicked.add(targetId);
+    this.removePlayer(targetId);
+    return { ok: true };
+  }
+
+  /** Thông tin gọn cho sảnh "Phòng đang mở" */
+  summary(): RoomSummary | null {
+    const host = this.find(this.hostId);
+    if (!host) return null;
+    return {
+      code: this.code,
+      gameType: this.gameType,
+      phase: this.phase,
+      hostName: host.name,
+      hostAvatar: host.avatar,
+      ...(host.avatarUrl ? { hostAvatarUrl: host.avatarUrl } : {}),
+      players: this.players.length,
+      maxPlayers: MAX_PLAYERS,
+      names: this.players.map((p) => p.name),
+    };
+  }
+
   /** Rời phòng hẳn (bấm thoát, hoặc mất kết nối quá lâu). */
   removePlayer(playerId: string): void {
     const p = this.find(playerId);
@@ -416,6 +458,7 @@ export class Room {
       serverNow: Date.now(),
       game: this.gameView(),
       result: this.result,
+      isPublic: this.isPublic,
     };
   }
 
