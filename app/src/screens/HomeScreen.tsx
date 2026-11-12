@@ -70,6 +70,13 @@ export function HomeScreen({ game }: { game: Game }) {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+        {!user && (
+          // khách: hai nút Đăng nhập / Đăng ký ở đầu trang
+          <View testID="auth-buttons" style={styles.authTop}>
+            <Button testID="auth-open" small variant="paper" title="Đăng nhập" disabled={!online} style={styles.authBtn} onPress={() => setAuth('login')} />
+            <Button testID="register-open" small variant="gold" title="Đăng ký" disabled={!online} style={styles.authBtn} onPress={() => setAuth('register')} />
+          </View>
+        )}
         <View style={styles.hero}>
           <T style={styles.logo}>Xóm Lầy</T>
           <T style={styles.tagline}>Nối từ Việt – Anh, bầu cua, cờ tỷ phú. Rủ bạn bè vào chơi ngay trên điện thoại.</T>
@@ -106,17 +113,7 @@ export function HomeScreen({ game }: { game: Game }) {
               />
             </View>
             <T style={styles.authHint}>Chạm vào ảnh để chọn mặt đại diện hoặc tải ảnh của bạn (đổi lại được cả trong ván).</T>
-            <View style={styles.authRow}>
-              <T style={styles.authHint}>Chơi khách, hoặc</T>
-              <Pressable testID="auth-open" disabled={!online} onPress={() => setAuth('login')} hitSlop={6}>
-                <T style={styles.authLink}>đăng nhập</T>
-              </Pressable>
-              <T style={styles.authHint}>/</T>
-              <Pressable testID="register-open" disabled={!online} onPress={() => setAuth('register')} hitSlop={6}>
-                <T style={styles.authLink}>tạo tài khoản</T>
-              </Pressable>
-              <T style={styles.authHint}>để lưu thành tích</T>
-            </View>
+            <T style={styles.authHint}>Chơi khách được luôn, hoặc đăng ký để giữ tên, Ruby và thành tích.</T>
           </Card>
         )}
 
@@ -213,7 +210,8 @@ const styles = StyleSheet.create({
   gamePlayers: { fontSize: 13, fontWeight: '700', color: C.jade },
   go: { fontSize: 36, fontWeight: '900', color: C.son },
   joinCard: { gap: 10 },
-  authRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4 },
+  authTop: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  authBtn: { minWidth: 104, marginBottom: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   authHint: { fontSize: 13, color: C.muted },
   authLink: { fontSize: 13, color: C.son, fontWeight: '800', textDecorationLine: 'underline' },

@@ -15,6 +15,11 @@ export const errorText: Record<ErrorCode, string> = {
 };
 
 export const authText: Record<AuthError, string> = {
+  invalid_email: 'Email chưa đúng dạng (vd: ten@gmail.com).',
+  email_taken: 'Email này đã dùng cho một tài khoản khác.',
+  bad_code: 'Mã chưa đúng, kiểm tra lại thư nhé.',
+  code_expired: 'Mã đã hết hạn hoặc nhập sai quá nhiều lần, gửi mã mới nhé.',
+  mail_disabled: 'Server chưa bật gửi mail nên chưa lấy lại mật khẩu được.',
   invalid_username: 'Tên đăng nhập 3–20 ký tự: chữ không dấu, số, dấu chấm hoặc gạch dưới.',
   invalid_password: 'Mật khẩu từ 6 đến 72 ký tự.',
   invalid_name: 'Tên hiển thị từ 1 đến 24 ký tự.',

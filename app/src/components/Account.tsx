@@ -68,24 +68,120 @@ function Field(props: React.ComponentProps<typeof TextInput> & { label: string }
 export function AuthSheet({ game, initial, defaultName, onClose }: {
   game: Game; initial: 'login' | 'register'; defaultName: string; onClose: () => void;
 }) {
-  const [mode, setMode] = useState(initial);
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initial);
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
   const [displayName, setDisplayName] = useState(defaultName);
   const [avatar, setAvatar] = useState(() => Math.floor(Math.random() * AVATAR_PRESETS.length));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // quên mật khẩu: bước 1 nhập email/tên, bước 2 nhập mã + mật khẩu mới
+  const [who, setWho] = useState('');
+  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [wait, setWait] = useState(0);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+
+  const mismatch = (mode === 'register' || (mode === 'forgot' && sent)) && password2.length > 0 && password !== password2;
+  const switchMode = (m: 'login' | 'register' | 'forgot') => {
+    setMode(m);
+    setError(null);
+    setPassword('');
+    setPassword2('');
+  };
 
   const submit = async () => {
+    if (mode === 'register' && password !== password2) return setError('Hai mật khẩu chưa khớp.');
     setBusy(true);
     const err =
       mode === 'login'
         ? await game.login(username.trim(), password)
-        : await game.register({ username: username.trim(), password, displayName: displayName.trim(), avatar });
+        : await game.register({ username: username.trim(), email: email.trim(), password, displayName: displayName.trim(), avatar });
     setBusy(false);
     if (err) setError(err);
     else onClose();
   };
+
+  const sendCode = async () => {
+    setBusy(true);
+    setError(null);
+    const err = await game.forgotPassword(who);
+    setBusy(false);
+    if (err) return setError(err);
+    setSent(true);
+    setWait(60);
+  };
+
+  const reset = async () => {
+    if (password !== password2) return setError('Hai mật khẩu chưa khớp.');
+    setBusy(true);
+    setError(null);
+    const err = await game.resetPassword(who, code, password);
+    setBusy(false);
+    if (err) setError(err);
+    else onClose();
+  };
+
+  if (mode === 'forgot') {
+    return (
+      <Sheet title="Quên mật khẩu" onClose={onClose}>
+        <Field
+          testID="forgot-who"
+          label="Email hoặc tên đăng nhập"
+          value={who}
+          onChangeText={(t) => setWho(t.replace(/\s/g, ''))}
+          placeholder="vd: ten@gmail.com"
+          keyboardType="email-address"
+          editable={!sent}
+        />
+        {!sent ? (
+          <Button testID="forgot-send" title={busy ? 'Đang gửi…' : 'Gửi mã qua email'} disabled={busy || who.length < 3} onPress={sendCode} />
+        ) : (
+          <>
+            <T testID="forgot-sent" style={styles.okNote}>
+              Nếu thông tin đúng, mã 6 số đã được gửi tới email của tài khoản (hết hạn sau 10 phút). Xem cả hộp thư Spam nhé.
+            </T>
+            <Field
+              testID="forgot-code"
+              label="Mã trong thư"
+              value={code}
+              onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
+              placeholder="6 chữ số"
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            <Field testID="forgot-password" label="Mật khẩu mới" value={password} onChangeText={setPassword} placeholder="ít nhất 6 ký tự" secureTextEntry maxLength={72} />
+            <Field testID="forgot-password2" label="Nhập lại mật khẩu mới" value={password2} onChangeText={setPassword2} secureTextEntry maxLength={72} onSubmitEditing={reset} />
+            {mismatch && <T testID="auth-mismatch" style={styles.mismatch}>Hai mật khẩu chưa khớp</T>}
+            <Button
+              testID="forgot-submit"
+              title={busy ? 'Đang xử lý…' : 'Đặt lại mật khẩu'}
+              disabled={busy || code.length !== 6 || password.length < 6 || password !== password2}
+              onPress={reset}
+            />
+            <Button
+              testID="forgot-resend"
+              small
+              variant="paper"
+              title={wait > 0 ? `Gửi lại mã sau ${wait} giây` : 'Gửi lại mã'}
+              disabled={busy || wait > 0}
+              onPress={sendCode}
+            />
+          </>
+        )}
+        {error && <T testID="auth-error" style={styles.error}>{error}</T>}
+        <Pressable testID="forgot-back" onPress={() => { setSent(false); setCode(''); switchMode('login'); }} hitSlop={6}>
+          <T style={styles.link}>‹ Quay lại đăng nhập</T>
+        </Pressable>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet title={mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'} onClose={onClose}>
@@ -96,10 +192,7 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
             testID={`auth-tab-${m}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: mode === m }}
-            onPress={() => {
-              setMode(m);
-              setError(null);
-            }}
+            onPress={() => switchMode(m)}
             style={[styles.tab, mode === m && styles.tabOn]}
           >
             <T style={[styles.tabText, mode === m && { color: C.gold }]}>{m === 'login' ? 'Đăng nhập' : 'Tạo mới'}</T>
@@ -108,12 +201,24 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
       </View>
       <Field
         testID="auth-username"
-        label="Tên đăng nhập"
+        label={mode === 'login' ? 'Tên đăng nhập hoặc email' : 'Tên đăng nhập'}
         value={username}
-        onChangeText={(t) => setUsername(t.toLowerCase().replace(/\s/g, ''))}
-        placeholder="vd: phuoc_lay"
-        maxLength={20}
+        onChangeText={(t) => setUsername(mode === 'login' ? t.replace(/\s/g, '') : t.toLowerCase().replace(/\s/g, ''))}
+        placeholder={mode === 'login' ? 'vd: phuoc_lay hoặc ten@gmail.com' : 'vd: phuoc_lay'}
+        maxLength={mode === 'login' ? 100 : 20}
+        keyboardType={mode === 'login' ? 'email-address' : 'default'}
       />
+      {mode === 'register' && (
+        <Field
+          testID="auth-email"
+          label="Email (để lấy lại mật khẩu khi quên)"
+          value={email}
+          onChangeText={(t) => setEmail(t.replace(/\s/g, ''))}
+          placeholder="vd: ten@gmail.com"
+          keyboardType="email-address"
+          maxLength={100}
+        />
+      )}
       <Field
         testID="auth-password"
         label="Mật khẩu"
@@ -124,8 +229,15 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
         maxLength={72}
         onSubmitEditing={mode === 'login' ? submit : undefined}
       />
+      {mode === 'login' && (
+        <Pressable testID="forgot-link" onPress={() => { setWho(username); switchMode('forgot'); }} hitSlop={6} style={{ alignSelf: 'flex-end' }}>
+          <T style={styles.link}>Quên mật khẩu?</T>
+        </Pressable>
+      )}
       {mode === 'register' && (
         <>
+          <Field testID="auth-password2" label="Nhập lại mật khẩu" value={password2} onChangeText={setPassword2} secureTextEntry maxLength={72} />
+          {mismatch && <T testID="auth-mismatch" style={styles.mismatch}>Hai mật khẩu chưa khớp</T>}
           <Field
             testID="auth-name"
             label="Tên hiển thị trong game"
@@ -143,11 +255,76 @@ export function AuthSheet({ game, initial, defaultName, onClose }: {
       <Button
         testID="auth-submit"
         title={busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-        disabled={busy || !username || !password || (mode === 'register' && !displayName.trim())}
+        disabled={
+          busy || !username || !password ||
+          (mode === 'register' && (!displayName.trim() || !email.includes('@') || password !== password2))
+        }
         onPress={submit}
       />
-      <T style={styles.note}>Tài khoản giúp lưu tên, mặt đại diện và thành tích các ván đã chơi.</T>
+      <T style={styles.note}>Tài khoản giúp lưu tên, mặt đại diện, Ruby và thành tích các ván đã chơi.</T>
     </Sheet>
+  );
+}
+
+/** Email và đổi mật khẩu trong hồ sơ (chỉ tài khoản) */
+function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
+  const [email, setEmail] = useState(user.email ?? '');
+  const [editing, setEditing] = useState(!user.email);
+  const [oldPw, setOldPw] = useState('');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const saveEmail = async () => {
+    setBusy(true);
+    const err = await game.setEmail(email);
+    setBusy(false);
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: 'Đã lưu email.' });
+    if (!err) setEditing(false);
+  };
+  const savePw = async () => {
+    if (pw !== pw2) return setMsg({ ok: false, text: 'Hai mật khẩu chưa khớp.' });
+    setBusy(true);
+    const err = await game.changePassword(oldPw, pw);
+    setBusy(false);
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: 'Đã đổi mật khẩu. Các máy khác đã bị đăng xuất.' });
+    if (!err) {
+      setOldPw('');
+      setPw('');
+      setPw2('');
+      setOpen(false);
+    }
+  };
+
+  return (
+    <View style={{ gap: 8 }}>
+      {!user.email && <T testID="profile-email-missing" style={styles.warnNote}>Thêm email để lấy lại mật khẩu khi quên.</T>}
+      {editing ? (
+        <View style={{ gap: 6 }}>
+          <Field testID="profile-email" label="Email" value={email} onChangeText={(t) => setEmail(t.replace(/\s/g, ''))} keyboardType="email-address" maxLength={100} />
+          <Button testID="profile-email-save" small variant="paper" title="Lưu email" disabled={busy || !email.includes('@')} onPress={saveEmail} />
+        </View>
+      ) : (
+        <View style={styles.emailRow}>
+          <T style={{ flex: 1 }}>📧 {user.email}</T>
+          <Button small variant="paper" title="Sửa" onPress={() => setEditing(true)} />
+        </View>
+      )}
+      {open ? (
+        <View style={{ gap: 6 }}>
+          <Field testID="pw-old" label="Mật khẩu hiện tại" value={oldPw} onChangeText={setOldPw} secureTextEntry maxLength={72} />
+          <Field testID="pw-new" label="Mật khẩu mới" value={pw} onChangeText={setPw} secureTextEntry maxLength={72} />
+          <Field testID="pw-new2" label="Nhập lại mật khẩu mới" value={pw2} onChangeText={setPw2} secureTextEntry maxLength={72} />
+          {pw2.length > 0 && pw !== pw2 && <T style={styles.mismatch}>Hai mật khẩu chưa khớp</T>}
+          <Button testID="pw-save" small variant="paper" title="Đổi mật khẩu" disabled={busy || !oldPw || pw.length < 6 || pw !== pw2} onPress={savePw} />
+        </View>
+      ) : (
+        <Button testID="pw-open" small variant="ghost" icon="🔑" title="Đổi mật khẩu" onPress={() => setOpen(true)} />
+      )}
+      {msg && <T style={msg.ok ? styles.okNote : styles.error}>{msg.text}</T>}
+    </View>
   );
 }
 
@@ -287,6 +464,7 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
       {note && <T testID="profile-note" style={styles.okNote}>{note}</T>}
       {error && <T testID="profile-error" style={styles.error}>{error}</T>}
       <Button testID="profile-save" title={busy ? 'Đang lưu…' : 'Lưu tên'} disabled={busy || uploading || !displayName.trim()} onPress={saveName} />
+      {user && <AccountSecurity game={game} user={user} />}
       {user && (
         <Button
           testID="logout-btn"
@@ -362,6 +540,10 @@ const styles = StyleSheet.create({
   userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink, overflow: 'hidden' },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   photoNote: { fontSize: 11, color: C.muted, lineHeight: 15 },
+  mismatch: { color: C.danger, fontWeight: '800', fontSize: 13 },
+  link: { color: C.son, fontWeight: '800', fontSize: 14, textDecorationLine: 'underline' },
+  warnNote: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  emailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   okNote: { color: C.ink, backgroundColor: '#D8F8E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   guestAvatar: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   editBadge: { position: 'absolute', right: -4, bottom: -4, fontSize: 16 },

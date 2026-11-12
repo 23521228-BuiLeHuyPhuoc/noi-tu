@@ -62,7 +62,13 @@ export interface Game {
   user: PublicUser | null;
   /** đã thử khôi phục phiên đăng nhập xong chưa */
   authReady: boolean;
-  register(p: { username: string; password: string; displayName: string; avatar?: number }): Promise<string | null>;
+  register(p: { username: string; email: string; password: string; displayName: string; avatar?: number }): Promise<string | null>;
+  /** gửi mã đặt lại mật khẩu tới email của tài khoản (luôn báo thành công nếu đúng dạng) */
+  forgotPassword(who: string): Promise<string | null>;
+  /** đặt mật khẩu mới bằng mã trong thư; thành công thì đăng nhập luôn */
+  resetPassword(who: string, code: string, password: string): Promise<string | null>;
+  setEmail(email: string): Promise<string | null>;
+  changePassword(oldPassword: string, password: string): Promise<string | null>;
   login(username: string, password: string): Promise<string | null>;
   updateProfile(p: { displayName?: string; avatar?: number }): Promise<string | null>;
   uploadAvatar(asset: AvatarUploadAsset): Promise<string | null>;
@@ -412,6 +418,17 @@ export function useGame(): Game {
     authReady,
     register: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:register', p)),
     login: (username, password) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:login', { username, password })),
+    forgotPassword: async (who) => {
+      const res = await call<{ ok: true } | { ok: false; error: 'mail_disabled' | 'invalid_username' | 'rate_limited' }>((s) =>
+        s.timeout(ACK_TIMEOUT).emitWithAck('auth:forgot', { who: who.trim() }));
+      if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
+      return res.ok ? null : authText[res.error];
+    },
+    resetPassword: (who, code, password) =>
+      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:reset', { who: who.trim(), code: code.trim(), password })),
+    setEmail: (email) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:setEmail', { email: email.trim() })),
+    changePassword: (oldPassword, password) =>
+      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:changePassword', { oldPassword, password })),
     updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
     uploadAvatar,
     removeAvatar,
