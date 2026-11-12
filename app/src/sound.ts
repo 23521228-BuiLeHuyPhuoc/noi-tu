@@ -1,5 +1,5 @@
 /** Âm thanh tổng hợp bằng Web Audio (không cần file). Tắt/bật được, nhớ trong máy. */
-type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'stamp' | 'siren' | 'cash' | 'flip' | 'boom' | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle' | 'clink' | 'blackout' | 'spin' | 'quake';
+type Sfx = 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose' | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'stamp' | 'siren' | 'cash' | 'flip' | 'boom' | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle' | 'clink' | 'blackout' | 'spin' | 'quake' | 'bark' | 'zap' | 'rocket';
 
 const KEY = 'xomlay.muted';
 let ctx: AudioContext | null = null;
@@ -163,6 +163,22 @@ export function play(sfx: Sfx): void {
         // tiếng xoáy gió chóng mặt lên xuống
         [0, 0.14, 0.28, 0.42, 0.56].forEach((t, i) => tone(i % 2 ? 320 : 620, 0.14, 'triangle', 0.09, t, i % 2 ? 620 : 320));
         return;
+      case 'bark':
+        // "gâu gâu"
+        [0, 0.22].forEach((t) => {
+          tone(520, 0.1, 'sawtooth', 0.12, t, 300);
+          tone(260, 0.12, 'square', 0.06, t + 0.02, 180);
+        });
+        return;
+      case 'zap':
+        // sét đánh: nổ tách rồi rền
+        noise(0.12, 0.3);
+        tone(1800, 0.1, 'sawtooth', 0.12, 0, 120);
+        return tone(70, 0.6, 'sine', 0.2, 0.08, 35);
+      case 'rocket':
+        // tên lửa vút lên
+        noise(0.5, 0.1);
+        return tone(180, 0.55, 'sawtooth', 0.07, 0, 1400);
       case 'quake':
         // tiếng động đất ầm ầm rung lắc
         noise(0.55, 0.24);

@@ -8,12 +8,15 @@ import type { DoodleKind, Mood, NicknameId } from '../../shared/src/types';
 type Entry<T> = { value: T; until: number };
 
 export type WobbleKind = 'spin' | 'shake' | 'blackout';
+/** màu phủ lên avatar: cháy đen (sét), băng, đỏ mặt (hôn gió) */
+export type TintKind = 'burnt' | 'ice' | 'blush';
 
 const mood = new Map<string, Entry<Mood>>();
 const doodle = new Map<string, Entry<DoodleKind>>();
 const nick = new Map<string, Entry<NicknameId>>();
 const charm = new Map<string, Entry<true>>();
 const wobble = new Map<string, Entry<WobbleKind>>();
+const tint = new Map<string, Entry<TintKind>>();
 
 let version = 0;
 const listeners = new Set<() => void>();
@@ -40,6 +43,7 @@ export const setDoodle = (id: string, d: DoodleKind, ms: number) => put(doodle, 
 export const setNick = (id: string, n: NicknameId, ms: number) => put(nick, id, n, ms);
 export const setCharm = (id: string, ms: number) => put(charm, id, true, ms);
 export const setWobble = (id: string, w: WobbleKind, ms = 3000) => put(wobble, id, w, ms);
+export const setTint = (id: string, t: TintKind, ms: number) => put(tint, id, t, ms);
 
 const live = <T,>(map: Map<string, Entry<T>>, id: string): T | undefined => {
   const e = map.get(id);
@@ -54,7 +58,7 @@ function subscribe(cb: () => void) {
 }
 const snapshot = () => version;
 
-export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean; wobble?: WobbleKind };
+export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean; wobble?: WobbleKind; tint?: TintKind };
 
 /** Tâm trạng/hình vẽ/biệt danh/bùa/rung xoay còn hiệu lực của một người; component tự vẽ lại khi có đổi hoặc hết hạn */
 export function useFace(id: string): Face {
@@ -65,5 +69,6 @@ export function useFace(id: string): Face {
     nick: live(nick, id),
     charm: !!live(charm, id),
     wobble: live(wobble, id),
+    tint: live(tint, id),
   };
 }

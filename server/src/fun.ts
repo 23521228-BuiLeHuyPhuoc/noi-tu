@@ -62,7 +62,8 @@ export const isScreenTroll = (k: FunSend['kind']) => SCREEN_KINDS.includes(k);
 /** Số liệu ngẫu nhiên do server bốc để mọi máy thấy cùng một cảnh */
 export function trollExtras(f: FunSend, rng: () => number = Math.random): Pick<FunEvent, 'count' | 'corner' | 'variant'> {
   if (f.kind === 'roach') return { count: 2 + Math.floor(rng() * 2) };
-  if (f.kind === 'ink') return { corner: Math.floor(rng() * 4) };
+  if (f.kind === 'ink' || f.kind === 'cake') return { corner: Math.floor(rng() * 4) };
+  if (f.kind === 'dog') return { variant: Math.floor(rng() * 2) };
   if (f.kind === 'honk') return { variant: Math.floor(rng() * 3) };
   return {};
 }
