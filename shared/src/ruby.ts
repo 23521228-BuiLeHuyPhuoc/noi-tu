@@ -1,6 +1,6 @@
 /**
- * Ruby: tiền tệ trong game, nạp bằng chuyển khoản (quét QR VietQR) rồi quản trị duyệt tay.
- * Dùng chung app + server: bảng giá, mã nạp riêng của từng tài khoản, địa chỉ ảnh QR.
+ * Ruby: tiền tệ trong game. Nạp bằng chuyển khoản đang tạm ngưng (đã gỡ QR và số tài khoản khỏi web);
+ * quản trị vẫn cộng được theo mã nạp. Dùng chung app + server: bảng giá, mã nạp riêng của từng tài khoản.
  * Ruby tách hẳn khỏi xu Bầu cua / Cờ tỷ phú: không cược, không đổi ra xu hay tiền.
  */
 
@@ -13,9 +13,6 @@ export const RUBY_PACKS: readonly { amount: number; ruby: number; bonus: number 
   { amount: 200_000, ruby: 2400, bonus: 20 },
   { amount: 500_000, ruby: 6250, bonus: 25 },
 ];
-
-/** tài khoản nhận tiền (thông tin công khai để người chơi chuyển khoản) */
-export const TOPUP_BANK = { bank: 'BIDV', bin: '970418', account: '6353025859', name: 'BUI LE HUY PHUOC' } as const;
 
 /** chữ cái của mã nạp: bỏ 0/O, 1/I cho khỏi đọc nhầm */
 export const TOPUP_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -42,14 +39,4 @@ export function newTopupCode(rand: () => number = Math.random): string {
 export function normalizeTopupCode(text: string): string | null {
   const flat = String(text ?? '').toUpperCase().replace(/[\s\-._]/g, '');
   return TOPUP_CODE_RE.exec(flat)?.[0] ?? null;
-}
-
-/** địa chỉ ảnh QR VietQR (img.vietqr.io) điền sẵn ngân hàng, số tài khoản, số tiền, nội dung */
-export function vietQrUrl(amount: number | null, memo: string): string {
-  const q = [
-    ...(amount !== null ? [`amount=${amount}`] : []),
-    `addInfo=${encodeURIComponent(memo)}`,
-    `accountName=${encodeURIComponent(TOPUP_BANK.name)}`,
-  ];
-  return `https://img.vietqr.io/image/${TOPUP_BANK.bin}-${TOPUP_BANK.account}-compact2.png?${q.join('&')}`;
 }

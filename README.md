@@ -105,14 +105,14 @@ Ruby là tiền trong game, chỉ dùng mua đồ vui; **không** cược trong 
 
 Lần được cộng **đầu tiên** của mỗi tài khoản nhân đôi. Số tiền không khớp gói: 1.000đ = 10 Ruby.
 
-**Người chơi:** Trang chủ → **Nạp Ruby** (hoặc bảng ✏️ → Nạp / lịch sử) → chọn gói → quét mã QR (BIDV 6353025859, BUI LE HUY PHUOC, nội dung là mã nạp riêng `XL……` của tài khoản) → bấm **Tôi đã chuyển khoản** → chờ duyệt.
+**Người chơi:** nạp Ruby bằng chuyển khoản **đang tạm ngưng** (đã gỡ QR và số tài khoản khỏi web); bảng **Nạp Ruby** chỉ còn số dư, yêu cầu cũ đang chờ và lịch sử. Ruby miễn phí vẫn nhận qua 🎁 Điểm danh.
 
 **Quản trị** (tài khoản có tên trong `ADMIN_USERNAMES`, mở nút **🛠 Quản trị** ở trang chủ hoặc bảng ✏️):
 - *Chờ duyệt*: mở app BIDV SmartBanking, thấy tiền về đúng mã thì bấm **Đã nhận tiền** (sửa ô "Thực nhận" nếu số tiền khác gói), không thấy thì **Không thấy**. Mỗi yêu cầu chỉ duyệt được một lần.
-- *Theo mã*: ai chuyển mà quên bấm "Tôi đã chuyển" thì nhập mã `XL……` + số tiền thấy trên app BIDV.
+- *Theo mã*: nhập mã `XL……` + số tiền để cộng Ruby cho tài khoản có mã đó.
 - *Doanh thu*: hôm nay / tháng này / tổng (giờ Việt Nam). *Cộng/trừ*: theo tên đăng nhập, bắt buộc ghi lý do, không làm âm số dư.
 
-Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=<tên đăng nhập tài khoản quản trị>` (nhiều người thì phân cách bằng dấu phẩy; tạo tài khoản đó trước). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại; nếu server lỡ chạy bộ nhớ tạm (`/health` → `"db":"memory"`) thì mọi lệnh quản trị bị chặn để người lạ không đăng ký trước tên quản trị (chỉ khi chạy thử trên máy mới đặt `ALLOW_MEMORY_ADMIN=1`). Đổi email cần nhập mật khẩu hiện tại; đổi/đặt lại mật khẩu thì các máy khác bị đăng xuất ngay. Ảnh QR lấy từ dịch vụ miễn phí img.vietqr.io; ảnh lỗi thì bảng nạp vẫn còn thông tin chữ để chuyển tay.
+Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=<tên đăng nhập tài khoản quản trị>` (nhiều người thì phân cách bằng dấu phẩy; tạo tài khoản đó trước). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại; nếu server lỡ chạy bộ nhớ tạm (`/health` → `"db":"memory"`) thì mọi lệnh quản trị bị chặn để người lạ không đăng ký trước tên quản trị (chỉ khi chạy thử trên máy mới đặt `ALLOW_MEMORY_ADMIN=1`). Đổi email cần nhập mật khẩu hiện tại; đổi/đặt lại mật khẩu thì các máy khác bị đăng xuất ngay.
 
 ## Gửi mã quên mật khẩu (Gmail)
 

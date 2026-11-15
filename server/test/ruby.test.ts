@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RUBY_PACKS, TOPUP_BANK, newTopupCode, normalizeTopupCode, rubyForAmount, vietQrUrl } from '../../shared/src/ruby';
+import { RUBY_PACKS, newTopupCode, normalizeTopupCode, rubyForAmount } from '../../shared/src/ruby';
 
 describe('Ruby: bảng giá, mã nạp, QR', () => {
   it('mỗi gói cho đúng số Ruby', () => {
@@ -26,13 +26,5 @@ describe('Ruby: bảng giá, mã nạp, QR', () => {
     expect(normalizeTopupCode('chuyen tien xl 8f3-k2q')).toBe('XL8F3K2Q');
     expect(normalizeTopupCode('NAP XL8F3K2Q CAM ON')).toBe('XL8F3K2Q');
     expect(normalizeTopupCode('khong co ma')).toBeNull();
-  });
-
-  it('URL QR VietQR điền sẵn BIDV, số tiền, mã và tên chủ tài khoản', () => {
-    expect(TOPUP_BANK).toEqual({ bank: 'BIDV', bin: '970418', account: '6353025859', name: 'BUI LE HUY PHUOC' });
-    expect(vietQrUrl(50000, 'XL8F3K2Q')).toBe(
-      'https://img.vietqr.io/image/970418-6353025859-compact2.png?amount=50000&addInfo=XL8F3K2Q&accountName=BUI%20LE%20HUY%20PHUOC',
-    );
-    expect(vietQrUrl(null, 'XL 1')).toBe('https://img.vietqr.io/image/970418-6353025859-compact2.png?addInfo=XL%201&accountName=BUI%20LE%20HUY%20PHUOC');
   });
 });

@@ -64,43 +64,14 @@ if (!(await boss.t('profile-card').waitFor({ timeout: 4000 }).then(() => true, (
 check((await boss.t('admin-open-home').count()) === 1, 'tài khoản boss thấy nút Quản trị');
 check((await an.t('admin-open-home').count()) === 0, 'người chơi thường không thấy nút Quản trị');
 
-// người chơi nạp gói 50.000đ
+// nạp bằng chuyển khoản đang tạm ngưng: không còn QR, không còn số tài khoản trên web
 await an.t('wallet-open').click();
-await an.t('pack-50000').waitFor({ timeout: 8000 });
-await an.page.screenshot({ path: `${SHOTS}/wallet-packs.png` });
-await an.t('pack-50000').click();
-// RN Web vẽ ảnh bằng một <img> bên trong khối có testID; chờ ảnh QR tải xong (mạng chậm)
-const qrImg = an.page.locator('[data-testid="topup-qr"] img').first();
-const qr = await qrImg.getAttribute('src', { timeout: 8000 }).catch(() => null);
-const qrLoaded = await an.page
-  .waitForFunction(() => {
-    const img = document.querySelector('[data-testid="topup-qr"] img');
-    return !!img && img.complete && img.naturalWidth > 0;
-  }, null, { timeout: 20000 })
-  .then(() => true, () => false);
-const code = (await an.t('topup-code').textContent()).trim();
-check(/^XL[0-9A-Z]{6}$/.test(code), `có mã nạp riêng (${code})`);
-check(!!qr && qr.includes('970418-6353025859') && qr.includes('amount=50000') && qr.includes(`addInfo=${code}`), 'QR VietQR đúng BIDV, số tiền và mã');
-check(qrLoaded, 'ảnh QR tải được từ img.vietqr.io');
-await an.page.screenshot({ path: `${SHOTS}/wallet-qr.png` });
-await an.t('topup-sent').click();
-await an.t('topup-pending').waitFor({ timeout: 8000 });
-check(true, 'bấm "Tôi đã chuyển khoản" thì hiện yêu cầu chờ duyệt');
-
-// quản trị duyệt
-await boss.t('admin-open-home').click();
-const approve = boss.page.locator('[data-testid^="admin-approve-"]').first();
-await approve.waitFor({ timeout: 8000 });
-await boss.page.screenshot({ path: `${SHOTS}/wallet-admin.png` });
-await approve.click();
-await boss.t('admin-msg').waitFor({ timeout: 8000 });
-check((await boss.t('admin-msg').textContent()).includes('1.100'), 'quản trị duyệt: cộng 1.100 Ruby (gói 50k lần đầu x2)');
-
-// người chơi thấy thông báo và số dư
-await an.t('ruby-toast').waitFor({ timeout: 8000 });
-check((await an.t('ruby-toast').textContent()).includes('1.100'), 'người chơi thấy thông báo +1.100 💎');
-await an.page.screenshot({ path: `${SHOTS}/wallet-toast.png` });
-check((await an.t('ruby-balance').textContent()).includes('1.100'), 'số dư trong bảng nạp cập nhật 1.100');
+await an.t('topup-paused').waitFor({ timeout: 8000 });
+await an.page.screenshot({ path: `${SHOTS}/wallet-paused.png` });
+check((await an.page.locator('[data-testid="topup-qr"]').count()) === 0, 'không còn ảnh QR');
+check((await an.t('pack-50000').count()) === 0, 'không còn chọn gói nạp');
+check(!(await an.page.content()).includes('6353025859'), 'không còn số tài khoản trên trang');
+check((await an.t('ruby-balance').count()) === 1, 'vẫn xem được số dư Ruby');
 
 await browser.close();
 console.log(failures ? `\n${failures} lỗi` : '\nTất cả OK');

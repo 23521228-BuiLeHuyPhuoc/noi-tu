@@ -1,16 +1,14 @@
 /**
- * Ví Ruby: chọn gói, quét QR chuyển khoản (BIDV), bấm "Tôi đã chuyển khoản" để chờ quản trị duyệt;
- * lịch sử Ruby; thông báo "+N 💎" ở mọi màn khi được duyệt.
+ * Ví Ruby: số dư, yêu cầu đang chờ, lịch sử Ruby; thông báo "+N 💎" ở mọi màn khi được cộng.
+ * Nạp bằng chuyển khoản đang tạm ngưng: đã gỡ QR và số tài khoản khỏi web.
  */
 import { useEffect, useState } from 'react';
-import { Image, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { RUBY_PACKS, TOPUP_BANK, vietQrUrl } from '../../../shared/src/ruby';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { RubyLedgerRow } from '../../../shared/src/types';
 import type { Game, WalletNotice } from '../useGame';
-import { copyText } from '../web';
 import { play } from '../sound';
 import { C } from '../theme';
-import { Button, T, useFeed } from '../ui';
+import { Button, T } from '../ui';
 import { Sheet } from './Sheet';
 import { Confetti } from './Fun';
 
@@ -21,32 +19,8 @@ const REASON_TEXT: Record<string, string> = {
   topup: 'Nạp Ruby', admin_adjust: 'Quản trị điều chỉnh', shop: 'Mua ở cửa hàng', skill: 'Dùng kỹ năng chọc', gift: 'Tặng quà', checkin: 'Điểm danh',
 };
 
-function CopyRow({ testID, label, value, copy }: { testID?: string; label: string; value: string; copy?: string }) {
-  const feed = useFeed();
-  return (
-    <View style={styles.row}>
-      <T style={styles.rowLabel}>{label}</T>
-      <T testID={testID} selectable style={styles.rowValue}>{value}</T>
-      {copy !== undefined && (
-        <Pressable
-          testID={testID ? `copy-${testID.replace('topup-', '')}` : undefined}
-          accessibilityRole="button"
-          accessibilityLabel={`Sao chép ${label}`}
-          hitSlop={8}
-          onPress={async () => (await copyText(copy)) && feed(`Đã sao chép ${label.toLowerCase()}`, 'info')}
-        >
-          <T style={styles.copy}>📋</T>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
 export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void }) {
-  const [amount, setAmount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [qrFailed, setQrFailed] = useState(false);
   const [history, setHistory] = useState<RubyLedgerRow[] | null>(null);
   const w = game.wallet;
   const { loadWallet } = game;
@@ -55,23 +29,12 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
     void loadWallet().then((e) => e && setError(e));
   }, [loadWallet]);
 
-  const sent = async () => {
-    if (amount === null) return;
-    setBusy(true);
-    setError(null);
-    const err = await game.requestTopup(amount);
-    setBusy(false);
-    if (err) setError(err);
-    else setAmount(null);
-  };
-
   const showHistory = async () => {
     const r = await game.rubyHistory();
     if (r.ok) setHistory(r.data);
     else setError(r.error);
   };
 
-  const pack = RUBY_PACKS.find((p) => p.amount === amount);
   return (
     <Sheet title="Nạp Ruby 💎" onClose={onClose}>
       <View style={styles.balanceRow}>
@@ -81,28 +44,11 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
 
       {!w ? (
         <T style={styles.muted}>{error ?? 'Đang tải ví…'}</T>
-      ) : amount === null ? (
+      ) : (
         <>
-          <T style={styles.h3}>Chọn gói</T>
-          <View style={styles.packs}>
-            {RUBY_PACKS.map((p) => (
-              <Pressable
-                key={p.amount}
-                testID={`pack-${p.amount}`}
-                accessibilityRole="button"
-                onPress={() => {
-                  setAmount(p.amount);
-                  setQrFailed(false);
-                }}
-                style={({ pressed }) => [styles.pack, pressed && { transform: [{ translateY: 2 }] }]}
-              >
-                <T style={styles.packRuby}>💎 {fmtRuby(w.firstTopupDone ? p.ruby : p.ruby * 2)}</T>
-                {!w.firstTopupDone && <T style={styles.packOld}>{fmtRuby(p.ruby)}</T>}
-                <T style={styles.packPrice}>{fmtVnd(p.amount)}</T>
-                {p.bonus > 0 && <T style={styles.bonus}>+{p.bonus}%</T>}
-                {!w.firstTopupDone && <T style={styles.x2}>x2 lần đầu</T>}
-              </Pressable>
-            ))}
+          <View testID="topup-paused" style={styles.pendingBox}>
+            <T style={styles.pendingTitle}>Nạp Ruby đang tạm ngưng</T>
+            <T style={styles.pendingItem}>Bạn vẫn nhận Ruby miễn phí qua 🎁 Điểm danh mỗi ngày.</T>
           </View>
           {w.pending.length > 0 && (
             <View testID="topup-pending" style={styles.pendingBox}>
@@ -132,38 +78,8 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
             <Button testID="ruby-history" small variant="paper" icon="🧾" title="Lịch sử Ruby" onPress={showHistory} />
           )}
         </>
-      ) : (
-        <>
-          <T style={styles.h3}>
-            Chuyển {fmtVnd(amount)} để nhận 💎 {fmtRuby(w.firstTopupDone ? pack!.ruby : pack!.ruby * 2)}
-          </T>
-          {!qrFailed && (
-            <Image
-              testID="topup-qr"
-              source={{ uri: vietQrUrl(amount, w.topupCode) }}
-              onError={() => setQrFailed(true)}
-              style={styles.qr}
-              resizeMode="contain"
-              accessibilityLabel="Mã QR chuyển khoản"
-            />
-          )}
-          <View style={styles.info}>
-            <CopyRow label="Ngân hàng" value={TOPUP_BANK.bank} />
-            <CopyRow testID="topup-account" label="Số tài khoản" value={TOPUP_BANK.account} copy={TOPUP_BANK.account} />
-            <CopyRow label="Chủ tài khoản" value={TOPUP_BANK.name} />
-            <CopyRow testID="topup-amount" label="Số tiền" value={fmtVnd(amount)} copy={String(amount)} />
-            <CopyRow testID="topup-code" label="Nội dung" value={w.topupCode} copy={w.topupCode} />
-          </View>
-          <T style={styles.warn}>⚠️ Giữ nguyên nội dung chuyển khoản {w.topupCode} để quản trị biết là bạn.</T>
-          {Platform.OS === 'web' && !qrFailed && (
-            <Button small variant="paper" icon="⬇️" title="Lưu ảnh QR" onPress={() => void Linking.openURL(vietQrUrl(amount, w.topupCode))} />
-          )}
-          {error && <T style={styles.error}>{error}</T>}
-          <Button testID="topup-sent" icon="✅" title={busy ? 'Đang gửi…' : 'Tôi đã chuyển khoản'} disabled={busy} onPress={sent} />
-          <Button small variant="paper" title="‹ Chọn gói khác" onPress={() => setAmount(null)} />
-        </>
       )}
-      {amount === null && error && w && <T style={styles.error}>{error}</T>}
+      {error && w && <T style={styles.error}>{error}</T>}
       <T style={styles.note}>Ruby chỉ dùng mua đồ vui trong game, không đổi ra tiền hay xu Bầu cua / Cờ tỷ phú.</T>
     </Sheet>
   );
