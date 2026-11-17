@@ -1,11 +1,13 @@
+import { Image } from './Image';
 import { useEffect, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { PublicPlayer } from '../../../shared/src/types';
-import { doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { Mood, PublicPlayer } from '../../../shared/src/types';
+import { avatarOf, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
 import { FrameWrap, NameText } from './Cosmetics';
+import { useMeasuredView } from '../viewMeasurements';
 
 /** màu phủ lên avatar theo chiêu: sét (cháy đen), băng, hôn gió (đỏ mặt) */
 const TINTS = {
@@ -13,6 +15,20 @@ const TINTS = {
   ice: { bg: 'rgba(120,205,255,0.55)', emoji: '🧊' },
   blush: { bg: 'rgba(255,70,110,0.38)', emoji: '😘' },
 } as const;
+
+function PortraitImage({ p, mood = 'normal', size }: { p: PortraitSource; mood?: Mood; size: number }) {
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const portrait = portraitOf(p, mood);
+  const uri = failedUri === portrait.uri ? portraitOf({ ...p, avatarUrl: undefined }, mood).uri : portrait.uri;
+  return (
+    <>
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ fontSize: size * 0.55 }}>{avatarOf(p.avatar).emoji}</Text>
+      </View>
+      <Image source={{ uri }} onError={() => setFailedUri(portrait.uri)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+    </>
+  );
+}
 
 export function Avatar({
   player, size = 52, active, dim, host, sub, me, onPress, ring, rank, editable,
@@ -34,6 +50,7 @@ export function Avatar({
   editable?: boolean;
 }) {
   const face = useFace(player.id);
+  const avatarRef = useMeasuredView(`avatar-${player.id}`);
   const pt = portraitOf(player, face.mood);
   const borderCol = ring ?? (player.character ? pt.hex : C.ink);
   const rot = useState(() => new Animated.Value(0))[0];
@@ -122,6 +139,8 @@ export function Avatar({
     >
       <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} active={active}>
       <Animated.View
+        ref={avatarRef}
+        collapsable={false}
         testID={`avatar-${player.id}`}
         style={[
           styles.circle,
@@ -139,7 +158,7 @@ export function Avatar({
           active && styles.active,
         ]}
       >
-        <Image source={{ uri: pt.uri }} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+        <PortraitImage p={player} mood={face.mood} size={size} />
         {face.doodle && (
           <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
         )}
@@ -223,7 +242,7 @@ export function Portrait({ p, size = 40, border = 2.5, frame }: { p: PortraitSou
         borderWidth: border, borderColor: p.character ? pt.hex : C.ink,
       }}
     >
-      <Image source={{ uri: pt.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      <PortraitImage p={p} size={size} />
     </View>
     </FrameWrap>
   );

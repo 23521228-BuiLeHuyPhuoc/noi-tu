@@ -1,5 +1,6 @@
+import { Image } from '../components/Image';
 import { useState, type ReactNode } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   AVATAR_PRESET_NAMES, AVATAR_PRESETS,
 } from '../../../shared/src/avatars';

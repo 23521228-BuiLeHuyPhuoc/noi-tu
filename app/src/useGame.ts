@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
-  Ack, ActionResult, AuthAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
+  Ack, ActionResult, AuthAck, ChaosAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
   LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TopupRequest,
   WalletError, WalletInfo,
 } from '../../shared/src/types';
@@ -66,6 +66,8 @@ export interface Game {
   leaderboard(game: GameType | 'all'): Promise<LeaderRow[] | null>;
   /** gửi chiêu ném/khịa/hối…; kết quả cho biết có bị giới hạn không */
   sendFun(f: FunSend): Promise<FunAck>;
+  /** admin: chọc loạn xạ cả phòng (mỗi người khác một món ngẫu nhiên, trừ Ruby một lần) */
+  sendChaos(): Promise<ChaosAck>;
   /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
   onFun(cb: (e: FunEvent) => void): () => void;
   /** tài khoản đang đăng nhập (null = chơi khách) */
@@ -511,6 +513,10 @@ export function useGame(): Game {
     sendFun: async (f) => {
       const res = await call<FunAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:send', f));
       return res ?? { ok: false };
+    },
+    sendChaos: async () => {
+      const res = await call<ChaosAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:chaos'));
+      return res ?? { ok: false, reason: 'busy' };
     },
     onFun: (cb) => {
       funListeners.current.add(cb);

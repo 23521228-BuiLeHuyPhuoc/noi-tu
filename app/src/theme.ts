@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /** Bảng màu & kiểu chữ "Xóm Lầy": đỏ son, vàng kim, mực, kiểu sticker viền dày */
 export const C = {
   son: '#B5121B', // nền
@@ -13,7 +15,7 @@ export const C = {
   onSon: '#FFE7C2', // chữ phụ trên nền đỏ
 };
 
-export const FONT = "'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+export const FONT = Platform.OS === 'web' ? "'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" : 'sans-serif';
 
 /** bóng đổ đặc kiểu sticker (không nhòe) */
 export const sticker = (dy = 4) => ({

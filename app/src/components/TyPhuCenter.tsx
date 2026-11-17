@@ -1,4 +1,5 @@
-import { Image, Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
+import { Image } from './Image';
+import { Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, type TyPhuGroup,
 } from '../../../shared/src/typhu';
@@ -12,8 +13,9 @@ import { shortCellName } from '../typhuNames';
 import { RISK_ICON } from '../typhuPictos';
 import type { CenterLayout, Rect } from '../typhuLayout';
 import type { DiceRollView, ThrowImpulse } from '../../../shared/src/dice';
-import { useShellTools } from './Shell';
+import { ChaosFloat, useShellTools } from './Shell';
 import { TyPhuDice3D } from './TyPhuDice3D';
+import { useMeasuredView } from '../viewMeasurements';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const abs = (r: Rect) => ({ position: 'absolute' as const, left: r.x, top: r.y, width: r.w, height: r.h });
@@ -100,6 +102,7 @@ function MiniBtn({ icon, label, onPress, testID, badge, size = 30 }: { icon: str
 }
 
 function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps }) {
+  const avatarRef = useMeasuredView(`avatar-${id}`);
   const { g } = p;
   const face = useFace(id);
   const color = p.colorOf(id);
@@ -137,6 +140,8 @@ function PlayerCard({ id, rect, p }: { id: string; rect: Rect; p: CenterProps })
     >
       <View style={{ width: rect.h - 4, height: rect.h - 4 }}>
         <View
+          ref={avatarRef}
+          collapsable={false}
           testID={`avatar-${id}`}
           style={[
             styles.wAvatar,
@@ -300,8 +305,8 @@ export function TyPhuCenter(p: CenterProps) {
   // khung hành động: viền+đệm 8, khe 4 giữa các phần, hàng nút 38, hàng trạng thái (statusH - 4)
   const trayH = Math.max(40, L.action.h - (8 + (L.wide ? 8 : 4) + 38 + (L.wide ? statusH - 4 : 0)) - 1);
   const canThrow = showRoll && !p.dice.animating;
-  // hàng nút nhỏ có tối đa 9 nút: bàn hẹp thì thu nhỏ nút cho vừa hàng, không tràn ra ô viền
-  const toolCount = 3 + (p.onPoke ? 1 : 0) + (p.onView ? 1 : 0) + (p.onRules ? 1 : 0) + (p.onSpeed ? 1 : 0) + (p.isHost ? 1 : 0);
+  // hàng nút nhỏ có tối đa 10 nút: bàn hẹp thì thu nhỏ nút cho vừa hàng, không tràn ra ô viền
+  const toolCount = 3 + (tools?.chaos ? 1 : 0) + (p.onPoke ? 1 : 0) + (p.onView ? 1 : 0) + (p.onRules ? 1 : 0) + (p.onSpeed ? 1 : 0) + (p.isHost ? 1 : 0);
   const toolGap = 6;
   const toolSize = clamp(Math.floor((L.tools.w - toolGap * (toolCount - 1)) / toolCount), 22, 30);
   return (
@@ -311,6 +316,12 @@ export function TyPhuCenter(p: CenterProps) {
         <View style={[abs(L.tools), styles.tools, { gap: toolGap }]}>
           <MiniBtn size={toolSize} testID="chat-open" label="Trò chuyện" icon="💬" onPress={tools.openChat} badge={tools.unread} />
           {p.onPoke && <MiniBtn size={toolSize} testID="poke-open" label="Chọc đối thủ" icon="😈" onPress={p.onPoke} />}
+          {tools.chaos && (
+            <View>
+              <MiniBtn size={toolSize} testID="chaos-btn" label="Chọc loạn xạ cả phòng" icon="🌪️" onPress={tools.chaos} />
+              {tools.chaosHits > 0 && <ChaosFloat key={tools.chaosHits} style={[styles.chaosFloat, { top: toolSize + 2 }]} />}
+            </View>
+          )}
           {p.onView && <MiniBtn size={toolSize} testID="view-mode" label={`Chế độ xem: ${p.viewLabel ?? ''}, chạm để đổi`} icon={p.viewLabel?.startsWith('3D') ? '3D' : p.viewLabel?.includes('tràn') ? '⛶' : '2D'} onPress={p.onView} />}
           {p.onRules && <MiniBtn size={toolSize} testID="rules-open" label="Luật chơi" icon="📖" onPress={p.onRules} />}
           {p.onSpeed && <MiniBtn size={toolSize} testID="speed-btn" label={`Tốc độ x${p.speed ?? 1}, chạm để đổi`} icon={`x${p.speed ?? 1}`} onPress={p.onSpeed} />}
@@ -415,6 +426,7 @@ export function TyPhuCenter(p: CenterProps) {
 }
 
 const styles = StyleSheet.create({
+  chaosFloat: { position: 'absolute', left: -16, right: -16, alignItems: 'center', zIndex: 5 },
   tools: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6 },
   mini: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center' },
   miniBadge: { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, borderWidth: 1.5, borderColor: C.ink, alignItems: 'center', justifyContent: 'center' },

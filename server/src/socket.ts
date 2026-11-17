@@ -1,14 +1,15 @@
 import type { Server, Socket } from 'socket.io';
-import type { AuthAck, ClientToServerEvents, FunAck, GameType, ServerToClientEvents } from '../../shared/src/types';
+import type { AuthAck, ChaosAck, ClientToServerEvents, FunAck, FunSend, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
-import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, RateLimiter, trollExtras, WindowLimiter } from './fun';
+import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, pickChaosPoke, RateLimiter, trollExtras, WindowLimiter } from './fun';
+import { isAdmin } from './admin';
 import { pokeItem } from '../../shared/src/pokes';
 import type { Auth } from './auth';
 import { PhotoService } from './avatar';
 import { attachWalletHandlers } from './wallet';
 import { attachShopHandlers, chargeRuby, cosmeticsOf, type ShopContext } from './shop';
-import { POKE_OVERFLOW_RUBY, STICKER_PACK_ID, isPaidSticker, shopItem, skillPrice } from '../../shared/src/shop';
+import { CHAOS_POKE_RUBY, POKE_OVERFLOW_RUBY, STICKER_PACK_ID, isPaidSticker, shopItem, skillPrice } from '../../shared/src/shop';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import type { UserRecord } from './store';
 
@@ -37,6 +38,8 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
     const trollLimiter = new RateLimiter(4, 3000);
     // chiêu rung/xoay/sụp nguồn/gián/mực/hối: mỗi người gửi tối đa 3 lần mỗi 15 giây
     const disruptSender = new WindowLimiter();
+    // admin "chọc loạn xạ": tối đa 3 lần liền, hồi 1 lần mỗi 1/3 giây
+    const chaosLimiter = new RateLimiter(3, 333);
     const authLimiter = new RateLimiter(6, 4000);
     const photoLimiter = new RateLimiter(2, 8000);
     const profileLimiter = new RateLimiter(8, 2000);
@@ -307,6 +310,46 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
         walletCtx?.store.addGiftPoints(f.to.slice(ACCOUNT_PREFIX.length), price).catch((e) => console.error('giftPoints', e));
       }
       reply({ ok: true });
+    };
+
+    // admin "chọc loạn xạ": mọi người khác đang kết nối dính một món ngẫu nhiên, trừ Ruby một lần mỗi lần bấm
+    socket.on('fun:chaos', (ack) => {
+      if (typeof ack !== 'function') return;
+      sendChaos().then(ack, (e) => {
+        console.error('chaos error', e);
+        ack({ ok: false, reason: 'busy' });
+      });
+    });
+
+    const chaosTargets = (room: Room, me: string) => room.players.filter((p) => p.connected && p.id !== me).map((p) => p.id);
+
+    const sendChaos = async (): Promise<ChaosAck> => {
+      if (!user || !walletCtx || !isAdmin(user.username)) return { ok: false, reason: 'forbidden' };
+      const r0 = currentRoom();
+      if (!r0 || !session) return { ok: false, reason: 'empty' };
+      if (!chaosLimiter.take()) return { ok: false, reason: 'busy' };
+      if (!chaosTargets(r0, session.playerId).length) return { ok: false, reason: 'empty' };
+      if ((await walletCtx.wallet.balance(user.id)) < CHAOS_POKE_RUBY) return { ok: false, reason: 'need_ruby' };
+      // từ đây tới lúc trừ Ruby là đồng bộ: lấy lại phòng vì có thể đã đổi trong lúc chờ
+      const room = currentRoom();
+      if (!room || !session) return { ok: false, reason: 'empty' };
+      const from = session.playerId;
+      const targets = chaosTargets(room, from);
+      if (!targets.length) return { ok: false, reason: 'empty' };
+      const events = targets.map((to) => {
+        const limited = room.disruptLimiter.wait(to) > 0;
+        const f: FunSend = { kind: 'poke', to, poke: pickChaosPoke(limited).id };
+        let pausedMs = 0;
+        if (isDisruptive(f) && !limited) {
+          room.disruptLimiter.take(to);
+          pausedMs = room.disrupt(to, pauseMsOf(f));
+        }
+        return { ...f, ...trollExtras(f), ...(limited && isDisruptive(f) ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}) };
+      });
+      const balance = await chargeRuby(walletCtx, user.id, CHAOS_POKE_RUBY, 'skill', 'chaos');
+      if (balance === null) return { ok: false, reason: 'need_ruby' };
+      for (const e of events) io.to(room.code).emit('fun:event', { ...e, chaos: true, id: ++funSeq, from });
+      return { ok: true, hit: events.length, cost: CHAOS_POKE_RUBY, balance };
     };
 
     socket.on('fun:quota', (ack) => {

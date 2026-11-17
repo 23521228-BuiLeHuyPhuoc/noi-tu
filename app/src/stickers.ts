@@ -1,4 +1,4 @@
-import type { ImageSourcePropType } from 'react-native';
+import { Platform, type ImageSourcePropType } from 'react-native';
 import type { StickerId } from '../../shared/src/types';
 
 // Bundled crops from the public Quỳnh Aka preview (Zalo pack 934a1d8821cdc89391dc).
@@ -53,7 +53,16 @@ function chuLaySvg(d: (typeof CHU_LAY_DEFS)[number]): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export const CHU_LAY_STICKERS: readonly { id: StickerId; alt: string; source: ImageSourcePropType }[] = CHU_LAY_DEFS.map((d) => ({
-  id: d.id, alt: d.alt, source: { uri: chuLaySvg(d) },
+const NATIVE_CHU_LAY = [
+  require('../assets/stickers/chu-01.png'), require('../assets/stickers/chu-02.png'),
+  require('../assets/stickers/chu-03.png'), require('../assets/stickers/chu-04.png'),
+  require('../assets/stickers/chu-05.png'), require('../assets/stickers/chu-06.png'),
+  require('../assets/stickers/chu-07.png'), require('../assets/stickers/chu-08.png'),
+  require('../assets/stickers/chu-09.png'), require('../assets/stickers/chu-10.png'),
+  require('../assets/stickers/chu-11.png'), require('../assets/stickers/chu-12.png'),
+];
+
+export const CHU_LAY_STICKERS: readonly { id: StickerId; alt: string; source: ImageSourcePropType }[] = CHU_LAY_DEFS.map((d, i) => ({
+  id: d.id, alt: d.alt, source: Platform.OS === 'web' ? { uri: chuLaySvg(d) } : NATIVE_CHU_LAY[i],
 }));
 

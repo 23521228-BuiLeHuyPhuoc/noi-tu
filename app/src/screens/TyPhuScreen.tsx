@@ -1,5 +1,6 @@
+import { Image } from '../components/Image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import { PLAYER_COLORS, type RoomState, type TyPhuView } from '../../../shared/src/types';
 import {
   TYPHU_BOARD, TYPHU_GROUPS, TYPHU_JAIL, TYPHU_JAIL_FINE, TYPHU_JAIL_MAX, TYPHU_JAIL_TICKET, TYPHU_PASS_START, TYPHU_STATION_MAX,

@@ -1,9 +1,11 @@
+import { useMeasuredView, viewRect, targetRect, type WindowRect } from '../viewMeasurements';
+import { Image } from './Image';
 /**
  * Lớp hiệu ứng "lầy": đồ bay từ người ném tới người bị ném, bong bóng câu khịa,
  * bị hối thì rung máy + lắc màn hình, pháo giấy khi thắng.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   CHAT_MAX, DOODLE_MS, EMOJIS, MAX_HP, NICK_MS,
   type ChatMsg, type DoodleKind, type FunEvent, type HitMove, type NicknameId, type PublicPlayer, type ThrowItem,
@@ -26,9 +28,11 @@ import { KickInline } from './RoomTools';
 import { PokeGallery } from './PokeGallery';
 import { POKES, type PokeItem } from '../../../shared/src/pokes';
 
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+
 // ---------- Lắc & Xoay màn hình ----------
 
-export type ShakeMode = 'normal' | 'quake' | 'spin';
+export type ShakeMode = 'normal' | 'quake' | 'spin' | 'mirror';
 const ShakeCtx = createContext<(mode?: ShakeMode) => void>(() => {});
 export const useShake = () => useContext(ShakeCtx);
 
@@ -36,8 +40,19 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
   const x = useState(() => new Animated.Value(0))[0];
   const y = useState(() => new Animated.Value(0))[0];
   const rot = useState(() => new Animated.Value(0))[0];
+  const mirror = useState(() => new Animated.Value(0))[0];
+  useEffect(() => () => { mirror.stopAnimation(); }, [mirror]);
 
   const shake = useCallback((mode: ShakeMode = 'normal') => {
+    if (mode === 'mirror') {
+      mirror.stopAnimation();
+      Animated.sequence([
+        Animated.timing(mirror, { toValue: 180, duration: 450, useNativeDriver: false }),
+        Animated.delay(2500),
+        Animated.timing(mirror, { toValue: 0, duration: 450, useNativeDriver: false }),
+      ]).start();
+      return;
+    }
     x.stopAnimation();
     y.stopAnimation();
     rot.stopAnimation();
@@ -88,9 +103,9 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
         ]),
       ),
     ).start();
-  }, [x, y, rot]);
+  }, [x, y, rot, mirror]);
 
-  const rotateDeg = rot.interpolate({
+  const rotateDeg = Animated.add(rot, mirror).interpolate({
     inputRange: [-360, 360],
     outputRange: ['-360deg', '360deg'],
   });
@@ -109,11 +124,12 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
 export type Rect = { x: number; y: number; w: number; h: number };
 
 /** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` (hỗ trợ cả màn hình xoay ngang 90° bởi Rotator) */
-export function rectOf(testId: string, origin: DOMRect | null, rotated = false): Rect | null {
-  if (typeof document === 'undefined' || !origin) return null;
-  const el = document.querySelector(`[data-testid="${testId}"]`);
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
+export function rectOf(testId: string, origin: WindowRect | null, rotated = false): Rect | null {
+  if (!origin) return null;
+  const r = typeof document === 'undefined'
+    ? targetRect(testId)
+    : document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect();
+  if (!r) return null;
   if (r.width === 0) return null;
   if (rotated) {
     return { x: r.top - origin.top, y: origin.right - r.right, w: r.height, h: r.width };
@@ -310,8 +326,8 @@ type Fx = FxIn & { id: number };
 export function FunLayer({ game, players, chat }: { game: Game; players: PublicPlayer[]; chat: ChatMsg[] }) {
   const [fx, setFx] = useState<Fx[]>([]);
   const [bubbles, setBubbles] = useState<BubbleItem[]>([]);
-  const [layerW, setLayerW] = useState(() => (typeof window === 'undefined' ? 390 : Math.min(window.innerWidth, 520)));
-  const layer = useRef<ComponentRef<typeof View>>(null);
+  const [layerW, setLayerW] = useState(() => (Math.min(Dimensions.get('window').width, 520)));
+  const layer = useMeasuredView();
   const seq = useRef(0);
   const feed = useFeed();
   const shake = useShake();
@@ -335,7 +351,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
     setBubbles((xs) => [...xs.filter((x) => x.from !== b.from), { ...b, key: ++seq.current }].slice(-6));
   }, []);
   const unsay = useCallback((key: number) => setBubbles((xs) => xs.filter((x) => x.key !== key)), []);
-  const origin = () => (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+  const origin = () => viewRect(layer.current);
 
   // tin nhắn mới: bong bóng dưới avatar người gửi
   useOnNew(chat, (m) => {
@@ -347,7 +363,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   useEffect(() => {
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
     return game.onFun((e: FunEvent) => {
-      const origin = (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       const fromR = rectOf(`avatar-${e.from}`, origin, rot);
       const toMe = 'to' in e && e.to === game.me;
@@ -470,12 +486,12 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
       // bị chọc đúng lúc đang tới lượt Nối từ: server bù lại thời gian
       if (toMe && e.pausedMs) feed(`⏸ Bị chọc nên được bù +${(e.pausedMs / 1000).toLocaleString('vi-VN')} giây vào lượt`, 'good');
     });
-  }, [game, add, feed, shake, say]);
+  }, [game, add, feed, shake, say, layer]);
 
   const sheetOpen = useSheetOpen();
   const placed = layoutBubbles(bubbles, layerW);
   return (
-    <View ref={layer} pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(e) => setLayerW(e.nativeEvent.layout.width)}>
+    <View ref={layer} collapsable={false} pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(e) => setLayerW(e.nativeEvent.layout.width)}>
       {fx.map((f) =>
         f.kind === 'fly' ? (
           <Flying key={f.id} emoji={f.emoji} from={f.from} to={f.to} fast={f.fast} onDone={() => { remove(f.id); f.after?.(); }} />
@@ -547,7 +563,7 @@ function Roach({ size, onDone: finish }: { size: Size; onDone: () => void }) {
         {squashed ? (
           <Text style={styles.squashed}>💥</Text>
         ) : (
-          <Animated.Image
+          <AnimatedImage
             source={{ uri: ROACH_URI }}
             style={{
               width: 44, height: 58,
@@ -674,8 +690,8 @@ type Troll = { id: number } & ({ kind: 'roach' } | { kind: 'ink'; corner: number
 export function TrollLayer({ game, players }: { game: Game; players: PublicPlayer[] }) {
   const [items, setItems] = useState<Troll[]>([]);
   const [size, setSize] = useState<Size>(() => ({
-    w: typeof window === 'undefined' ? 390 : Math.min(window.innerWidth, 520),
-    h: typeof window === 'undefined' ? 844 : window.innerHeight,
+    w: Math.min(Dimensions.get('window').width, 520),
+    h: Dimensions.get('window').height,
   }));
   const seq = useRef(0);
   const feed = useFeed();
@@ -887,6 +903,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   // màn ngang thấp (Cờ tỷ phú, điện thoại xoay ngang): danh sách tin ngắn lại để ô nhập luôn thấy
   const shortScreen = useStableWindow().height < 520;
   const kb = useKeyboardInset() > 0; // đang gõ: ẩn bớt hàng emoji/câu khịa để danh sách và ô nhập vừa phần trên bàn phím
+  const inputFirst = Platform.OS !== 'web' || shortScreen;
   const me = game.me;
   const send = async () => {
     const t = text.trim();
@@ -944,8 +961,8 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
   if (shopOpen) return <ShopSheet game={game} initialTab="sticker" onClose={() => setShopOpen(false)} />;
   return (
     <Sheet title="Tám chuyện" onClose={onClose}>
-      {shortScreen && inputRow}
-      {shortScreen && chatList}
+      {inputFirst && inputRow}
+      {inputFirst && chatList}
       {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
         {EMOJIS.map((e, i) => (
           <Button
@@ -975,7 +992,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
         ))}
       </ScrollView>}
       {!kb && <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán' : 'Nhãn dán · 21 (12 bộ Chữ Lầy mua bằng Ruby)'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />}
-      {showStickers && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
+      {showStickers && !kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
         {STICKERS.map((item) => <Pressable key={item.id} testID={`sticker-${item.id}`} accessibilityRole="button" accessibilityLabel={`Gửi nhãn dán ${item.alt}`} disabled={sending} style={[styles.stickerOption, sending && { opacity: 0.5 }]} onPress={async () => {
           if (sending) return;
           setSending(true);
@@ -1007,8 +1024,8 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
           </Pressable>
         ))}
       </ScrollView>}
-      {!shortScreen && chatList}
-      {!shortScreen && inputRow}
+      {!inputFirst && chatList}
+      {!inputFirst && inputRow}
     </Sheet>
   );
 }
@@ -1048,7 +1065,7 @@ function Piece({ i, width }: { i: number; width: number }) {
 }
 
 export function Confetti() {
-  const width = typeof window !== 'undefined' ? Math.min(window.innerWidth, 520) : 400;
+  const width = Math.min(Dimensions.get('window').width, 520);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', zIndex: 60 }]}>
       {Array.from({ length: 70 }, (_, i) => (

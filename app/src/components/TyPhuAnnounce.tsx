@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image } from './Image';
+import { StyleSheet, View } from 'react-native';
 import { C } from '../theme';
 import { T } from '../ui';
 import { FX_ICON, iconUri } from '../typhuCellIcons';

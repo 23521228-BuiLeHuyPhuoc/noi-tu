@@ -1,10 +1,11 @@
+import { useMeasuredView, viewRect } from '../viewMeasurements';
 /**
  * Hiệu ứng kho chọc ghẹo (shared/src/pokes.ts): 10 mẫu vẽ bằng Animated, mỗi món chỉ khác hình, màu, hạt giống.
  * Người bị chọc thấy mẫu "phủ màn hình" (mưa, dính, khổng lồ, đàn) cả màn hình; người khác chỉ thấy thu nhỏ quanh avatar.
  * Mọi vị trí ngẫu nhiên suy ra từ `variant` (hạt giống do server bốc) nên các máy thấy cùng một cảnh.
  */
-import { useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactElement } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactElement } from 'react';
+import { Dimensions, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { pokeItem, type PokeCategory, type PokeItem, type PokeTemplate } from '../../../shared/src/pokes';
 import type { FunEvent, PublicPlayer } from '../../../shared/src/types';
 import type { Game } from '../useGame';
@@ -740,11 +741,12 @@ function Scene({ s, w, h, onDone, impact }: { s: SceneData; w: number; h: number
 export function PokeLayer({ game, players }: { game: Game; players: PublicPlayer[] }) {
   const [scenes, setScenes] = useState<SceneData[]>([]);
   const [size, setSize] = useState(() => ({
-    w: typeof window === 'undefined' ? 390 : Math.min(window.innerWidth, 520),
-    h: typeof window === 'undefined' ? 844 : window.innerHeight,
+    w: Math.min(Dimensions.get('window').width, 520),
+    h: Dimensions.get('window').height,
   }));
-  const layer = useRef<ComponentRef<typeof View>>(null);
+  const layer = useMeasuredView();
   const seq = useRef(0);
+  const lastChaosSound = useRef(0);
   const feed = useFeed();
   const shake = useShake();
   const vp = useContext(ViewportContext);
@@ -774,12 +776,16 @@ export function PokeLayer({ game, players }: { game: Game; players: PublicPlayer
       if (e.kind !== 'poke' || !e.poke) return;
       const item = pokeItem(e.poke);
       if (!item) return;
-      const origin = (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       const toMe = e.to === game.me;
       const from = nameOf(e.from);
       const to = toMe ? 'bạn' : nameOf(e.to);
-      play(item.template === 'throw' || item.template === 'volley' || item.template === 'explode' ? 'whoosh' : 'pop');
+      // chọc loạn xạ: người đứng xem nghe tiếng tối đa một lần mỗi 300 ms, không nhận thông báo từng món
+      const now = Date.now();
+      const quiet = !!e.chaos && !toMe && now - lastChaosSound.current < 300;
+      if (e.chaos && !toMe && !quiet) lastChaosSound.current = now;
+      if (!quiet) play(item.template === 'throw' || item.template === 'volley' || item.template === 'explode' ? 'whoosh' : 'pop');
       setScenes((xs) => [
         ...xs.slice(-7),
         {
@@ -789,14 +795,16 @@ export function PokeLayer({ game, players }: { game: Game; players: PublicPlayer
           strong: toMe && !e.soft,
         },
       ]);
-      feed(`${item.emoji} ${from === 'bạn' ? 'Bạn' : from} → ${to}: ${item.name}!`, toMe ? (item.nice ? 'good' : 'bad') : 'fun');
+      if (e.chaos) {
+        if (toMe) feed(`🌪️ ${from} chọc loạn xạ cả phòng: ${item.emoji} ${item.name}!`, item.nice ? 'good' : 'bad');
+      } else feed(`${item.emoji} ${from === 'bạn' ? 'Bạn' : from} → ${to}: ${item.name}!`, toMe ? (item.nice ? 'good' : 'bad') : 'fun');
       if (toMe && e.pausedMs) feed(`⏸ Bị chọc nên được bù +${(e.pausedMs / 1000).toLocaleString('vi-VN')} giây vào lượt`, 'good');
     });
-  }, [game, feed]);
+  }, [game, feed, layer]);
 
   return (
     <View
-      ref={layer}
+      ref={layer} collapsable={false}
       pointerEvents="box-none"
       style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}
       onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}

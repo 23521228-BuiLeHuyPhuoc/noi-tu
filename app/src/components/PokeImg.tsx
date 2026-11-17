@@ -1,9 +1,10 @@
+import { Image } from './Image';
 /**
  * Hình 3D của món chọc (Microsoft Fluent Emoji, MIT, (c) Microsoft) tải từ jsDelivr.
  * Không tải được thì dùng ký tự emoji gốc. Hình đã tải được nhớ lại để lần sau hiện ngay.
  */
 import { memo, useEffect, useState } from 'react';
-import { Image, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { pokeImageUrl, type PokeItem } from '../../../shared/src/pokes';
 
 type State = 'ok' | 'fail';
@@ -15,10 +16,14 @@ export function preloadPoke(p: Pick<PokeItem, 'fluent'>, ms = 2200): Promise<Sta
   const url = pokeImageUrl(p);
   const k = known.get(url);
   if (k) return Promise.resolve(k);
-  if (typeof window === 'undefined' || typeof window.Image === 'undefined') return Promise.resolve('fail');
   let pending = waiting.get(url);
   if (!pending) {
-    pending = new Promise<State>((resolve) => {
+    pending = Platform.OS !== 'web' ? Image.prefetch(url).then((ok): State => {
+      const state = ok ? 'ok' : 'fail';
+      known.set(url, state);
+      waiting.delete(url);
+      return state;
+    }).catch((): State => { waiting.delete(url); return 'fail'; }) : new Promise<State>((resolve) => {
       const img = new window.Image();
       img.onload = () => { known.set(url, 'ok'); waiting.delete(url); resolve('ok'); };
       img.onerror = () => { known.set(url, 'fail'); waiting.delete(url); resolve('fail'); };
@@ -43,7 +48,7 @@ export function usePokeImage(p: Pick<PokeItem, 'fluent'>): State | undefined {
   return known.get(url) ?? (got?.url === url ? got.s : undefined);
 }
 
-const SHADOW = { filter: 'drop-shadow(0px 4px 4px rgba(42,10,16,0.35))' } as object;
+const SHADOW = Platform.OS === 'web' ? { filter: 'drop-shadow(0px 4px 4px rgba(42,10,16,0.35))' } as object : {};
 
 /** hình món chọc vuông `size` px; `ok` = false (hoặc hình lỗi) thì hiện emoji gốc */
 export const PokeImg = memo(function PokeImg({ item, size, ok = true, shadow = true, style }: {

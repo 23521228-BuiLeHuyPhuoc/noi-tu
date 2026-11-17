@@ -1,9 +1,10 @@
+import { useMeasuredView, viewRect } from '../viewMeasurements';
 /**
  * Sáu chiêu chọc miễn phí kiểu hoạt hình: bom thối, dép liên hoàn, gà mổ, mặt to, vỏ chuối, lật ngược màn hình.
  * Chỉ để vui, không ảnh hưởng ván chơi. Số liệu ngẫu nhiên (biến thể) do server bốc để mọi máy thấy cùng một cảnh.
  */
-import { useCallback, useContext, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Dimensions, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { FunEvent, PublicPlayer } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { quip } from '../messages';
@@ -13,7 +14,7 @@ import { play } from '../sound';
 import { vibrate } from '../web';
 import { FONT } from '../theme';
 import { useFeed } from '../ui';
-import { rectOf, type Rect } from './Fun';
+import { rectOf, useShake, type Rect } from './Fun';
 
 type Size = { w: number; h: number };
 const FART_WORDS = ['PHỤT!', 'PÙ!', 'TÈ TÈ!'];
@@ -249,12 +250,13 @@ function flipPage(ms: number, timer: { current: ReturnType<typeof setTimeout> | 
 }
 
 export function TrollFxLayer({ game, players }: { game: Game; players: PublicPlayer[] }) {
+  const shake = useShake();
   const [items, setItems] = useState<Item[]>([]);
   const [size, setSize] = useState<Size>(() => ({
-    w: typeof window === 'undefined' ? 390 : Math.min(window.innerWidth, 520),
-    h: typeof window === 'undefined' ? 844 : window.innerHeight,
+    w: Math.min(Dimensions.get('window').width, 520),
+    h: Dimensions.get('window').height,
   }));
-  const layer = useRef<ComponentRef<typeof View>>(null);
+  const layer = useMeasuredView();
   const seq = useRef(0);
   const feed = useFeed();
   const vp = useContext(ViewportContext);
@@ -292,7 +294,7 @@ export function TrollFxLayer({ game, players }: { game: Game; players: PublicPla
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
     return game.onFun((e: FunEvent) => {
       if (e.kind !== 'fart' && e.kind !== 'slipper' && e.kind !== 'chicken' && e.kind !== 'bigface' && e.kind !== 'banana' && e.kind !== 'mirror') return;
-      const origin = (layer.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       const toMe = e.to === game.me;
       const from = nameOf(e.from);
@@ -350,14 +352,15 @@ export function TrollFxLayer({ game, players }: { game: Game; players: PublicPla
         play('flip');
         if (toMe) {
           vibrate([80, 50, 80]);
-          flipPage(2500, flipTimer);
+          if (Platform.OS === 'web') flipPage(2500, flipTimer);
+          else shake('mirror');
         }
       }
     });
-  }, [game, feed, add, later]);
+  }, [game, feed, add, later, layer, shake]);
 
   return (
-    <View ref={layer} pointerEvents="box-none" style={styles.layer} onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View ref={layer} collapsable={false} pointerEvents="box-none" style={styles.layer} onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {items.map((it) =>
         it.kind === 'pop' ? (
           <Pop key={it.id} at={it.at} emoji={it.emoji} text={it.text} rise={it.rise} ms={it.ms} font={it.font} onDone={() => drop(it.id)} />

@@ -27,7 +27,8 @@ export function Rotator({ children }: { children: ReactNode }) {
     document.addEventListener('pointerdown', lock, { once: true });
     return () => document.removeEventListener('pointerdown', lock);
   }, []);
-  if (Platform.OS !== 'web' || H <= W) {
+  if (Platform.OS !== 'web') return children;
+  if (H <= W) {
     return <ViewportContext.Provider value={null}>{children}</ViewportContext.Provider>;
   }
   const style = {

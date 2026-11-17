@@ -1,4 +1,4 @@
-import { isHardPoke, pokeItem } from '../../shared/src/pokes';
+import { POKES, isHardPoke, pokeItem, type PokeItem } from '../../shared/src/pokes';
 import { GIFT_IDS, SKILL_IDS, type GiftId, type SkillId } from '../../shared/src/shop';
 import {
   DISRUPT_LIMIT, DISRUPT_PAUSE_MS, DISRUPT_WINDOW_MS, DOODLES, EMOJIS, HARD_DISRUPT_KINDS, MAX_HP, NICKNAMES,
@@ -77,6 +77,13 @@ export function trollExtras(f: FunSend, rng: () => number = Math.random): Pick<F
   // món trong kho chọc ghẹo: một hạt giống để mọi máy vẽ cùng một cảnh (vị trí, số lượng, góc...)
   if (f.kind === 'poke' && f.poke) return { variant: Math.floor(rng() * 1_000_000) };
   return {};
+}
+
+const SOFT_POKES = POKES.filter((p) => !isHardPoke(p));
+/** món ngẫu nhiên cho một người khi admin "chọc loạn xạ"; người đã bị chọc đủ giới hạn chỉ nhận món không phủ màn hình */
+export function pickChaosPoke(limited: boolean, rng: () => number = Math.random): PokeItem {
+  const pool = limited ? SOFT_POKES : POKES;
+  return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
 }
 
 /** Mỗi người bị chọc (key) chỉ nhận một chiêu phủ màn hình mỗi `ms` mili giây */

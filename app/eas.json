@@ -10,6 +10,13 @@
       "env": {
         "EXPO_PUBLIC_SERVER_URL": "https://noi-tu-server.onrender.com"
       }
+    },
+    "production": {
+      "extends": "preview",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 /** Các tiện ích riêng cho bản web chạy trên trình duyệt điện thoại. */
-import { Platform } from 'react-native';
+import { Keyboard, Platform, Share, Vibration } from 'react-native';
 
 const isWeb = Platform.OS === 'web' && typeof window !== 'undefined';
 
@@ -15,8 +15,8 @@ export function clearInviteParam(): void {
   if (isWeb && window.location.search) window.history.replaceState(null, '', window.location.pathname);
 }
 
-export function inviteLink(code: string): string | null {
-  return isWeb ? `${window.location.origin}/?room=${code}` : null;
+export function inviteLink(code: string): string {
+  return `${isWeb ? window.location.origin : 'https://noi-tu-web.onrender.com'}/?room=${encodeURIComponent(code)}`;
 }
 
 /**
@@ -26,7 +26,14 @@ export function inviteLink(code: string): string | null {
 export async function shareInvite(code: string): Promise<'shared' | 'copied' | 'failed'> {
   const link = inviteLink(code);
   const text = `Vào chơi Nối Từ với mình nhé! Mã phòng: ${code}`;
-  if (!isWeb || !link) return 'failed';
+  if (!isWeb) {
+    try {
+      const result = await Share.share({ message: `${text}\n${link}` });
+      return result.action === Share.sharedAction ? 'shared' : 'failed';
+    } catch {
+      return 'failed';
+    }
+  }
   if (navigator.share) {
     try {
       await navigator.share({ title: 'Nối Từ', text, url: link });
@@ -50,6 +57,10 @@ export async function copyText(text: string): Promise<boolean> {
 
 /** Rung nhẹ (Android). iPhone không hỗ trợ thì bỏ qua. */
 export function vibrate(ms: number | number[] = 120): void {
+  if (!isWeb) {
+    Vibration.vibrate(Array.isArray(ms) ? [0, ...ms] : ms);
+    return;
+  }
   if (isWeb && 'vibrate' in navigator) {
     try {
       navigator.vibrate(ms);
@@ -67,7 +78,13 @@ type VirtualKeyboardLike = EventTarget & { overlaysContent: boolean; boundingRec
  * iOS Safari dùng VisualViewport. Chỉ những thành phần cần thấy ô nhập mới tự nâng mình lên.
  */
 export function subscribeKeyboard(cb: (inset: number) => void): () => void {
-  if (!isWeb) return () => {};
+  if (!isWeb) {
+    const read = () => cb(Keyboard.metrics()?.height ?? 0);
+    const show = Keyboard.addListener('keyboardDidShow', read);
+    const hide = Keyboard.addListener('keyboardDidHide', () => cb(0));
+    read();
+    return () => { show.remove(); hide.remove(); };
+  }
   const vk = (navigator as unknown as { virtualKeyboard?: VirtualKeyboardLike }).virtualKeyboard;
   const vv = window.visualViewport;
   if (vk) vk.overlaysContent = true;

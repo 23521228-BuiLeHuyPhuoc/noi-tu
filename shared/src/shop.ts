@@ -18,6 +18,8 @@ export interface ShopItem {
 /** mỗi người có chừng này lượt chọc miễn phí mỗi ngày (giờ Việt Nam); hết thì 1 Ruby / lần */
 export const FREE_POKES_PER_DAY = 30;
 export const POKE_OVERFLOW_RUBY = 1;
+/** giá mỗi lần admin bấm "chọc loạn xạ" cả phòng */
+export const CHAOS_POKE_RUBY = 20;
 
 /** kỹ năng chọc trả phí (kind của FunSend) */
 export const SKILL_IDS = ['lightning', 'freeze', 'cake', 'water', 'dog', 'rocket', 'kiss', 'duck', 'ufo', 'disco', 'money'] as const;

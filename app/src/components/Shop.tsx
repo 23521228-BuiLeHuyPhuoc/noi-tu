@@ -1,9 +1,10 @@
+import { Image } from './Image';
 /**
  * Cửa hàng Ruby (kỹ năng chọc, trang trí avatar, sticker, quà) và bảng điểm danh 7 ngày.
  * Mọi quyền và số dư do server kiểm tra; app chỉ hiện và gọi lệnh.
  */
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import {
   CHECKIN_REWARDS, FREE_POKES_PER_DAY, itemsOfKind, type CheckinStatus, type CosmeticSlot, type ShopItem, type ShopKind,
 } from '../../../shared/src/shop';

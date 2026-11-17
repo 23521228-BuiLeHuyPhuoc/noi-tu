@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
@@ -19,15 +19,24 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const { height } = useStableWindow();
   // luôn bám màn hình (kể cả khi game tự xoay ngang): chiều cao tối đa tính bằng số theo màn, không theo khung cha
   // (khung bàn Cờ tỷ phú cao hơn màn ngang làm bảng tràn khỏi đáy, mất ô nhập chat / nút chọc)
-  const maxHeight = kb > 0 ? Math.max(220, height - kb - 12) : Math.max(220, Math.round(height * 0.94));
+  const maxHeight = kb > 0 && Platform.OS === 'web'
+    ? Math.max(220, height - kb - 12) : Math.max(120, Math.round(height * 0.94));
   const short = height < 520;
   useEffect(() => { bump(1); return () => bump(-1); }, []);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const back = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
+    return () => back.remove();
+  }, [onClose]);
   return (
     <View style={styles.root}>
       <Pressable accessibilityLabel="Đóng" style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.panel, sticker(0), { maxHeight }, short && styles.panelShort, kb > 0 && { marginBottom: kb }]}>
+      <View style={[styles.panel, sticker(0), { maxHeight }, short && styles.panelShort, kb > 0 && Platform.OS === 'web' && { marginBottom: kb }]}>
         <View style={styles.grip} />
-        <T style={styles.title}>{title}</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <T style={styles.title}>{title}</T>
+          <Pressable accessibilityLabel="Đóng bảng" onPress={onClose} hitSlop={12}><T style={{ fontSize: 24 }}>×</T></Pressable>
+        </View>
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>

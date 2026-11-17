@@ -161,46 +161,8 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   const current = room.players.find((p) => p.id === g.currentPlayerId);
   const history = [...g.history].reverse();
 
-  return (
-    <Shell
-      game={game}
-      room={room}
-      strip={{
-        order: g.order,
-        active: g.currentPlayerId,
-        dim: (p) => g.eliminated.includes(p.id),
-        sub: (p) => `${g.words[p.id] ?? 0} từ`,
-      }}
-      overlay={g.vote && <VoteCard vote={g.vote} game={game} />}
-    >
-      <Card style={styles.board}>
-        <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
-          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
-        </T>
-        <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
-          {isEn ? first : `${first} `}<T style={styles.last}>{last}</T>
-        </T>
-        <Definition definition={g.currentDefinition} current />
-        <T testID="next-count" style={styles.count}>
-          Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
-        </T>
-        {voting ? (
-          <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
-        ) : (
-          <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
-        )}
-        {!voting && (g.turnBonusMs ?? 0) > 0 && (
-          <T testID="turn-bonus" style={styles.bonus}>
-            ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
-          </T>
-        )}
-        {isEn && !isSpectator && !meOut && (
-          <T testID="en-progress" style={styles.progress}>
-            ⏱ Lượt của bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm dần tới 15s)' : ''} · 🆘 còn {myHints} · thêm 1 cứu trợ sau {toBonus} từ nữa
-          </T>
-        )}
-      </Card>
-
+  const controls = (
+    <>
       {isSpectator ? null : meOut ? (
         <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
       ) : myTurn ? (
@@ -274,6 +236,51 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           />
         )
       )}
+    </>
+  );
+
+  return (
+    <Shell
+      game={game}
+      room={room}
+      strip={{
+        order: g.order,
+        active: g.currentPlayerId,
+        dim: (p) => g.eliminated.includes(p.id),
+        sub: (p) => `${g.words[p.id] ?? 0} từ`,
+      }}
+      bottom={Platform.OS !== 'web' ? controls : undefined}
+      overlay={g.vote && <VoteCard vote={g.vote} game={game} />}
+    >
+      <Card style={styles.board}>
+        <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
+          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
+        </T>
+        <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
+          {isEn ? first : `${first} `}<T style={styles.last}>{last}</T>
+        </T>
+        <Definition definition={g.currentDefinition} current />
+        <T testID="next-count" style={styles.count}>
+          Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
+        </T>
+        {voting ? (
+          <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
+        ) : (
+          <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
+        )}
+        {!voting && (g.turnBonusMs ?? 0) > 0 && (
+          <T testID="turn-bonus" style={styles.bonus}>
+            ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
+          </T>
+        )}
+        {isEn && !isSpectator && !meOut && (
+          <T testID="en-progress" style={styles.progress}>
+            ⏱ Lượt của bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm dần tới 15s)' : ''} · 🆘 còn {myHints} · thêm 1 cứu trợ sau {toBonus} từ nữa
+          </T>
+        )}
+      </Card>
+
+      {Platform.OS === 'web' && controls}
 
       <Card style={styles.history}>
         {history.map((h, i) => (

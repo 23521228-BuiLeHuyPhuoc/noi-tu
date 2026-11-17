@@ -1,7 +1,7 @@
+import { Image } from './Image';
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Image,
   Pressable,
   StyleSheet,
   Text,

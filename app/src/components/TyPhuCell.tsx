@@ -1,5 +1,6 @@
+import { Image } from './Image';
 import { memo } from 'react';
-import { Image, Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type TextStyle } from 'react-native';
 import { TYPHU_BOARD, TYPHU_GROUPS, TYPHU_MAX_HOUSES, TYPHU_PASS_START, isTyPhuProperty } from '../../../shared/src/typhu';
 import { C } from '../theme';
 import { T } from '../ui';

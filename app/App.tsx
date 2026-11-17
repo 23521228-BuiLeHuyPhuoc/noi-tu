@@ -12,6 +12,7 @@ import { ShakeProvider } from './src/components/Fun';
 import { WalletNoticeLayer } from './src/components/Wallet';
 import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
+import { KeyboardFrame } from './src/components/KeyboardFrame';
 
 // Trên web, vùng tai thỏ/thanh home đã được xử lý bằng CSS env(safe-area-inset-*) trong public/index.html
 const Screen = Platform.OS === 'web' ? View : SafeAreaView;
@@ -33,6 +34,7 @@ export default function App() {
     <SafeAreaProvider>
       <Screen style={styles.root}>
         <StatusBar style="light" />
+        <KeyboardFrame>
         <FeedProvider>
           <ShakeProvider>
             {room && game.status !== 'online' && (
@@ -44,6 +46,7 @@ export default function App() {
             <WalletNoticeLayer game={game} />
           </ShakeProvider>
         </FeedProvider>
+        </KeyboardFrame>
       </Screen>
     </SafeAreaProvider>
   );

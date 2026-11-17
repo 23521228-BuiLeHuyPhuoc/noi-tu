@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image } from './Image';
+import { StyleSheet, View } from 'react-native';
 import { C } from '../theme';
 import { T } from '../ui';
 import { TYPHU_PASS_START } from '../../../shared/src/typhu';

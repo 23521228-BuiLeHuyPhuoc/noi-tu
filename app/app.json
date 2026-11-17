@@ -29,7 +29,18 @@
         {
           "photosPermission": "Cho phép Xóm Lầy chọn ảnh làm avatar."
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-asset"
     ],
     "extra": {
       "eas": {

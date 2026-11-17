@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
+import { useMeasuredView, viewRect } from '../viewMeasurements';
+import { Image } from '../components/Image';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import {
   BAUCUA_CHIPS, BAUCUA_LOAN, BAUCUA_SYMBOLS, type BauCuaSymbol, type BauCuaView, type PublicPlayer, type RoomState,
 } from '../../../shared/src/types';
@@ -271,7 +273,7 @@ function Reveal({ dice, myBets, delta, onDone }: {
   delta: number | undefined;
   onDone: () => void;
 }) {
-  const root = useRef<ComponentRef<typeof View>>(null);
+  const root = useMeasuredView();
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const [targets, setTargets] = useState<(Rect | null)[] | null>(null);
   const [phase, setPhase] = useState<'show' | 'after'>('show');
@@ -286,7 +288,7 @@ function Reveal({ dice, myBets, delta, onDone }: {
     Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: false }).start();
     const t1 = setTimeout(() => {
       // con nào trúng ô mình đặt thì bay vào ô đó
-      const origin = (root.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      const origin = viewRect(root.current);
       setTargets(dice.map((s) => (betOn(s) ? rectOf(`sym-${s}`, origin) : null)));
       setPhase('after');
       if (lost) {
@@ -388,9 +390,12 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disable
       pulse.setValue(0);
     };
   }, [glow, pulse]);
+  const tileRef = useMeasuredView(`sym-${s}`);
   const result = step === 'result';
   return (
     <Pressable
+      ref={tileRef}
+      collapsable={false}
       testID={`sym-${s}`}
       accessibilityRole="button"
       accessibilityLabel={`Đặt ${chip} xu vào ${SYMBOL[s].name}`}
@@ -440,7 +445,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const [resultBets, setResultBets] = useState<{ round: number; bets: Partial<Record<BauCuaSymbol, number>> }>({ round: 0, bets: {} });
   const lastBets = useRef<Partial<Record<BauCuaSymbol, number>>>({});
   const [flies, setFlies] = useState<Fly[]>([]);
-  const fxRoot = useRef<ComponentRef<typeof View>>(null);
+  const fxRoot = useMeasuredView();
   const flySeq = useRef(0);
   const left = useSecondsLeft(g.stepEndsAt, game.clockOffset);
   // màn hình thấp (điện thoại nhỏ / bàn phím mở): thu gọn để thấy cả bát lẫn chiếu
@@ -498,7 +503,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     const bets = g.bets;
     // đo vị trí ở khung hình kế tiếp (sau khi bố cục đã cập nhật)
     requestAnimationFrame(() => {
-      const origin = (fxRoot.current as unknown as HTMLElement | null)?.getBoundingClientRect() ?? null;
+      const origin = viewRect(fxRoot.current);
       const add: Fly[] = [];
       for (const [id, mine] of Object.entries(bets)) {
         for (const s of BAUCUA_SYMBOLS) {

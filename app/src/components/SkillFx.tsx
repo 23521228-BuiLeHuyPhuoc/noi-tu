@@ -1,3 +1,4 @@
+import { useMeasuredView, viewRect } from '../viewMeasurements';
 /**
  * Hiệu ứng của kỹ năng chọc trả Ruby, quà tặng và hiệu ứng vào phòng.
  * - sét / băng / bánh kem / nước / chó: phủ lên màn hình người bị chọc (người khác chỉ thấy avatar + thông báo)
@@ -13,10 +14,10 @@ import {
   useEffect,
   useRef,
   useState,
-  type ComponentRef,
 } from "react";
 import {
   AccessibilityInfo,
+  Dimensions,
   Animated,
   Easing,
   StyleSheet,
@@ -554,10 +555,10 @@ export function SkillLayer({
     { id: number; emoji: string; at: Rect; big?: boolean }[]
   >([]);
   const [size, setSize] = useState<Size>(() => ({
-    w: typeof window === "undefined" ? 390 : Math.min(window.innerWidth, 520),
-    h: typeof window === "undefined" ? 844 : window.innerHeight,
+    w: Math.min(Dimensions.get('window').width, 520),
+    h: Dimensions.get('window').height,
   }));
-  const layer = useRef<ComponentRef<typeof View>>(null);
+  const layer = useMeasuredView();
   const seq = useRef(0);
   const feed = useFeed();
   const vp = useContext(ViewportContext);
@@ -587,10 +588,7 @@ export function SkillLayer({
         ? "bạn"
         : (playersRef.current.find((p) => p.id === id)?.name ?? "?");
     return game.onFun((e: FunEvent) => {
-      const node = layer.current as unknown as {
-        getBoundingClientRect?: () => DOMRect;
-      } | null;
-      const origin = node?.getBoundingClientRect?.() ?? null;
+      const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       if (e.kind === "entrance") {
         play("sparkle");
@@ -752,13 +750,13 @@ export function SkillLayer({
         else land();
       }
     });
-  }, [game, feed, playersRef, rotatedRef, reducedRef]);
+  }, [game, feed, playersRef, rotatedRef, reducedRef, layer]);
 
   return (
     <ReducedMotion.Provider value={reduced}>
       {/* bay / nổ: nằm trên cùng, không bắt chạm */}
       <View
-        ref={layer}
+        ref={layer} collapsable={false}
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
         onLayout={(e) =>

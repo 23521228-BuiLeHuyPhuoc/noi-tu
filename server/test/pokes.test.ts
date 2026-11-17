@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { createGameServer, type GameServer } from '../src/app';
 import { MemoryStore } from '../src/store';
-import { cleanFun, isDisruptive, isHardFx, pauseMsOf } from '../src/fun';
+import { cleanFun, isDisruptive, isHardFx, pauseMsOf, pickChaosPoke } from '../src/fun';
 import { smallDict } from './helpers';
 import {
   HARD_POKE_TEMPLATES, POKES, POKE_CATEGORIES, POKE_TEMPLATES, isHardPoke, pokeImageUrl, pokeItem,
@@ -227,3 +227,14 @@ async function pair(a: Client, b: Client, nameA = 'An', nameB = 'Binh') {
   b.pid = joined.playerId;
   a.code = b.code = created.code;
 }
+
+describe('pickChaosPoke (chọc loạn xạ)', () => {
+  it('chưa chạm giới hạn: bốc đều trên cả kho (rng 0 → món đầu, rng gần 1 → món cuối)', () => {
+    expect(pickChaosPoke(false, () => 0)).toBe(POKES[0]);
+    expect(pickChaosPoke(false, () => 0.999999)).toBe(POKES[POKES.length - 1]);
+  });
+
+  it('đã chạm giới hạn: không bao giờ ra món phủ màn hình', () => {
+    for (let i = 0; i < 200; i++) expect(isHardPoke(pickChaosPoke(true, () => i / 200))).toBe(false);
+  });
+});

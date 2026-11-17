@@ -524,6 +524,8 @@ export type FunEvent = FunSend & {
   soft?: boolean;
   /** số mili giây được bù vào đồng hồ lượt của người bị chọc (đang tới lượt Nối từ) */
   pausedMs?: number;
+  /** món này thuộc một lần admin "chọc loạn xạ" cả phòng */
+  chaos?: true;
 };
 
 /** Các chiêu làm rung/lắc/xoay/che màn hình người bị chọc: mỗi người chỉ nhận tối đa DISRUPT_LIMIT lần mỗi DISRUPT_WINDOW_MS */
@@ -543,6 +545,10 @@ export type FunAck = {
   ok: boolean; /** bị giới hạn: thử lại sau chừng này ms */ retryMs?: number;
   reason?: 'limited' | 'busy' | 'quota' | 'need_ruby' | 'need_account';
 };
+/** kết quả "chọc loạn xạ" (chỉ admin): số người bị chọc, Ruby đã trừ, số dư mới */
+export type ChaosAck =
+  | { ok: true; hit: number; cost: number; balance: number }
+  | { ok: false; reason: 'forbidden' | 'empty' | 'need_ruby' | 'busy' };
 
 export const STICKER_IDS = [
   'quynh-01', 'quynh-02', 'quynh-03', 'quynh-04', 'quynh-05',
@@ -673,6 +679,7 @@ export interface ClientToServerEvents {
   /** chủ phòng mời một người ra khỏi phòng */
   'room:kick': (p: { playerId: string }, ack: (r: Ack) => void) => void;
   'fun:send': (f: FunSend, ack: (r: FunAck) => void) => void;
+  'fun:chaos': (ack: (r: ChaosAck) => void) => void;
   /** lượt chọc miễn phí hôm nay */
   'fun:quota': (ack: (r: { free: number; left: number }) => void) => void;
   // cửa hàng + điểm danh (chỉ tài khoản)

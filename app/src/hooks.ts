@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { useWindowDimensions, type View } from 'react-native';
+import { Platform, useWindowDimensions, type View } from 'react-native';
 import { subscribeKeyboard } from './web';
 
 /** Số giây còn lại tới mốc `endsAt` (ms, đồng hồ server) */
@@ -61,6 +61,9 @@ export function useKeyboardLift(ref: React.RefObject<ComponentRef<typeof View> |
   const [lift, setLift] = useState(0);
   const liftRef = useRef(0);
   useEffect(() => {
+    // Native screens are resized by KeyboardFrame; their host views can expose
+    // getBoundingClientRect without providing browser getComputedStyle.
+    if (Platform.OS !== 'web') return;
     let inset = 0;
     const recompute = () => {
       const el = ref.current as unknown as HTMLElement | null;
@@ -110,5 +113,5 @@ export function useStableWindow(): { width: number; height: number } {
   if (!keyboardDrop && (stable.width !== dims.width || stable.height !== dims.height)) {
     setStable({ width: dims.width, height: dims.height });
   }
-  return forced ?? stable;
+  return forced ?? (Platform.OS === 'web' ? stable : dims);
 }
