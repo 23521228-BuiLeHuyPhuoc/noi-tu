@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEYS = {
   name: 'noitu.name', playerId: 'noitu.playerId', room: 'noitu.room', token: 'xomlay.token',
   avatar: 'xomlay.guestAvatar', photo: 'xomlay.guestPhoto',
+  smooth: 'xomlay.smoothMode', theme: 'xomlay.localTheme',
 } as const;
 
 async function get(key: string): Promise<string | null> {
@@ -43,4 +44,10 @@ export const storage = {
   /** khách: địa chỉ ảnh đại diện đã tải lên */
   getPhoto: () => get(KEYS.photo),
   setPhoto: (v: string | null) => set(KEYS.photo, v),
+  /** chế độ siêu mượt cho máy yếu / phòng đông */
+  getSmoothMode: async () => (await get(KEYS.smooth)) === '1',
+  setSmoothMode: (on: boolean) => set(KEYS.smooth, on ? '1' : null),
+  /** map / màu nền cá nhân đã chọn */
+  getTheme: () => get(KEYS.theme),
+  setTheme: (v: string | null) => set(KEYS.theme, v),
 };

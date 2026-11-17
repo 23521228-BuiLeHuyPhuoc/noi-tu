@@ -8,6 +8,7 @@ import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, GAME_INFO, PLAYER_COLORS,
   type CharacterConfig, type CharacterLook, type GameType, type RoomState,
 } from '../../../shared/src/types';
+import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import {
   ACCESSORY_OPTIONS, AGE_OPTIONS, BROW_OPTIONS, BUILD_OPTIONS, DETAIL_OPTIONS,
@@ -21,9 +22,10 @@ import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 
-const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
+const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
 
 const PRESET_ORDER: number[] = [
+  26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
   16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 ];
@@ -32,6 +34,7 @@ type SectionId = 'mat' | 'da' | 'matmay' | 'muimieng' | 'toc' | 'rau' | 'trangph
 
 export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const [error, setError] = useState<string | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>({
     mat: true,
     da: false,
@@ -49,6 +52,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
   const n = room.players.length;
   const tooFew = n < info.min;
   const tooMany = n > info.max;
+  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
+  const ownedSet = new Set(game.user?.owned ?? []);
 
   const mePlayer = room.players.find((p) => p.id === game.me);
   const myChar: CharacterConfig = mePlayer?.character ?? { gender: 'nam', age: 'tre', hair: 'han', color: 0 };
@@ -114,7 +119,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               onPress={async () => setError(await game.start())}
             />
           ) : (
-            <T style={styles.wait}>Chờ chủ phòng bắt đầu…</T>
+            <T style={[styles.wait, { color: theme.onBg }]}>Chờ chủ phòng bắt đầu…</T>
           )}
         </>
       }
@@ -153,7 +158,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <T style={styles.section}>{isHost ? 'Chọn game' : 'Game của phòng'}</T>
+      <T style={[styles.section, { color: theme.onBg }]}>{isHost ? 'Chọn game (9 trò chơi)' : 'Game của phòng'}</T>
       {isHost ? (
         <View style={styles.games}>
           {GAMES.map((g) => {
@@ -168,7 +173,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                 style={[styles.pick, sticker(on ? 4 : 2), on && styles.pickOn]}
               >
                 <T style={styles.pickEmoji}>{GAME_META[g].emoji}</T>
-                <T numberOfLines={1} style={styles.pickName}>{GAME_INFO[g].name}</T>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T numberOfLines={1} style={styles.pickName}>{GAME_INFO[g].name}</T>
+                  <T style={{ fontSize: 10, fontWeight: '700', color: C.muted }}>{GAME_META[g].players}</T>
+                </View>
               </Pressable>
             );
           })}
@@ -177,6 +185,40 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={styles.chosen}>
           <T style={styles.pickEmoji}>{GAME_META[room.gameType].emoji}</T>
           <T style={styles.chosenName}>{info.name}</T>
+        </Card>
+      )}
+
+      {/* Map & Chủ đề màu phòng */}
+      {isHost && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🗺️ Map & Chủ Đề Phòng</T>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8 }}>
+            {ROOM_THEMES.map((t) => {
+              const unlocked = t.price === 0 || ownedSet.has(t.id);
+              const selected = (room.settings.roomTheme ?? 'son_mac_dinh') === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  testID={`lobby-map-${t.id}`}
+                  disabled={!unlocked}
+                  onPress={async () => {
+                    const e = await game.configure({ settings: { roomTheme: t.id } });
+                    if (e) feed(e, 'bad');
+                  }}
+                  style={[
+                    styles.mapChip,
+                    { backgroundColor: t.bg, borderColor: selected ? t.accent : C.ink },
+                    selected && { borderWidth: 3.5, transform: [{ scale: 1.04 }] },
+                    !unlocked && { opacity: 0.45 },
+                  ]}
+                >
+                  <T style={{ fontSize: 18 }}>{t.emoji}</T>
+                  <T style={{ fontSize: 11, fontWeight: '900', color: t.onBg }}>{t.name}</T>
+                  {!unlocked && <T style={{ fontSize: 10, fontWeight: '800', color: t.accent }}>💎{t.price}</T>}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </Card>
       )}
 
@@ -203,6 +245,97 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
+      {room.gameType === 'masoi' && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🐺 Bộ vai trò Ma Sói</T>
+          <View style={styles.roundRow}>
+            {(['classic', 'chaos'] as const).map((preset) => {
+              const active = (room.settings.masoiPreset ?? 'classic') === preset;
+              return (
+                <Button
+                  key={preset}
+                  testID={`masoi-preset-${preset}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={preset === 'classic' ? '⚖️ Cổ điển cân bằng' : '🔥 Hỗn loạn (có Kẻ Ngố)'}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { masoiPreset: preset } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'giandiep' && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🕵️ Tùy chọn Ai Là Gián Điệp</T>
+          <View style={styles.roundRow}>
+            <Button
+              testID="gd-toggle-mrwhite"
+              small
+              variant={(room.settings.giandiepMrWhite ?? n >= 5) ? 'jade' : 'paper'}
+              title={(room.settings.giandiepMrWhite ?? n >= 5) ? '🤍 Mr. White: BẬT' : '🤍 Mr. White: TẮT'}
+              disabled={!isHost}
+              style={{ flex: 1 }}
+              onPress={() => game.configure({ settings: { giandiepMrWhite: !(room.settings.giandiepMrWhite ?? n >= 5) } })}
+            />
+            {([1, 2, 3] as const).map((cnt) => (
+              <Button
+                key={cnt}
+                testID={`gd-spies-${cnt}`}
+                small
+                variant={(room.settings.giandiepSpies ?? 1) === cnt ? 'ink' : 'paper'}
+                title={`${cnt} Điệp`}
+                disabled={!isHost}
+                onPress={() => game.configure({ settings: { giandiepSpies: cnt } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 've_doan' && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🎨 Số vòng Vẽ & Đoán</T>
+          <View style={styles.roundRow}>
+            {[1, 2, 3].map((r) => (
+              <Button
+                key={r}
+                testID={`vd-rounds-${r}`}
+                small
+                variant={(room.settings.veDoanRounds ?? 2) === r ? 'ink' : 'paper'}
+                title={`${r} vòng`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { veDoanRounds: r } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'do_vui' && (
+        <Card style={{ gap: 8 }}>
+          <T style={styles.h3}>🧠 Số câu hỏi Đố Vui</T>
+          <View style={styles.roundRow}>
+            {([5, 10, 15] as const).map((q) => (
+              <Button
+                key={q}
+                testID={`dv-questions-${q}`}
+                small
+                variant={(room.settings.doVuiQuestions ?? 10) === q ? 'ink' : 'paper'}
+                title={`${q} câu`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { doVuiQuestions: q } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
       <Card style={{ gap: 10 }}>
         <View testID="character-customizer" style={styles.charHeader}>
           <View style={[styles.charPreviewWrap, { borderColor: myColor.hex, backgroundColor: myColor.light }]}>
@@ -225,7 +358,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </View>
 
         <View style={{ gap: 6 }}>
-          <T style={styles.optLabel}>🎭 Nhân vật mẫu (chọn nhanh rồi chỉnh thêm)</T>
+          <T style={styles.optLabel}>🎭 36 Nhân vật mẫu (chọn nhanh rồi chỉnh thêm)</T>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.presetRow}>
             {PRESET_ORDER.map((idx) => {
               const p = AVATAR_PRESETS[idx];
@@ -249,6 +382,16 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           </ScrollView>
         </View>
 
+        <Button
+          testID="char-detail-toggle"
+          small
+          variant="paper"
+          title={showDetail ? '▲ Thu gọn tủ đồ chi tiết' : '🎨 Mở tủ đồ chi tiết (Mặt, Tóc, Áo, Phụ kiện…)'}
+          onPress={() => setShowDetail((v) => !v)}
+        />
+
+        {showDetail && (
+        <>
         <SectionBox id="mat" title="😊 Mặt (khuôn mặt, hàm, cằm, má, dáng)" open={openSections.mat} onToggle={() => toggleSection('mat')}>
           <View style={{ gap: 4 }}>
             <T style={styles.optLabel}>Giới tính</T>
@@ -920,6 +1063,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
             })}
           </View>
         </View>
+        </>
+        )}
       </Card>
 
       <Card style={{ gap: 8 }}>
@@ -1063,4 +1208,8 @@ const styles = StyleSheet.create({
   rule: { fontSize: 15, lineHeight: 22 },
   wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
   error: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
+  mapChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 12, borderWidth: 2,
+  },
 });

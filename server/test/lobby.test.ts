@@ -46,7 +46,7 @@ describe('Phòng công khai / riêng tư và mời ra', () => {
 
   it('thông tin gọn cho sảnh', () => {
     const { room } = setup(['An', 'Bình']);
-    expect(room.summary()).toMatchObject({ code: 'ABC123', gameType: GAME, hostName: 'An', players: 2, maxPlayers: 6, names: ['An', 'Bình'], phase: 'lobby' });
+    expect(room.summary()).toMatchObject({ code: 'ABC123', gameType: GAME, hostName: 'An', players: 2, maxPlayers: 12, names: ['An', 'Bình'], phase: 'lobby' });
     room.dispose();
   });
 });

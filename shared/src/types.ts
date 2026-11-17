@@ -1,26 +1,57 @@
 import type { TyPhuMovement } from './typhu';
 import type { DiceRollView, ThrowImpulse } from './dice';
+import type { MaSoiView } from './masoi';
+import type { GianDiepView } from './giandiep';
+import type { VeDoanStroke, VeDoanView } from './vedoan';
+import type { BomTuView } from './bomtu';
+import type { DoVuiView } from './dovui';
 import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
 
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 12;
 export const MAX_NAME = 24;
 
 // ================= Phòng =================
 
-export type GameType = 'wordchain' | 'wordchain_en' | 'baucua' | 'typhu';
+export type GameType =
+  | 'wordchain'
+  | 'wordchain_en'
+  | 'baucua'
+  | 'typhu'
+  | 'masoi'
+  | 'giandiep'
+  | 've_doan'
+  | 'bom_tu'
+  | 'do_vui';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
-  wordchain: { name: 'Nối từ', min: 1, max: 6 },
-  wordchain_en: { name: 'Nối từ Anh', min: 1, max: 6 },
-  baucua: { name: 'Bầu cua', min: 1, max: 6 },
+  wordchain: { name: 'Nối từ', min: 1, max: 8 },
+  wordchain_en: { name: 'Nối từ Anh', min: 1, max: 8 },
+  baucua: { name: 'Bầu cua', min: 1, max: 12 },
   typhu: { name: 'Cờ tỷ phú', min: 2, max: 6 },
+  masoi: { name: 'Ma sói', min: 4, max: 12 },
+  giandiep: { name: 'Ai là gián điệp', min: 3, max: 12 },
+  ve_doan: { name: 'Vẽ & Đoán', min: 2, max: 12 },
+  bom_tu: { name: 'Bom chữ', min: 2, max: 12 },
+  do_vui: { name: 'Đố vui', min: 1, max: 12 },
 };
 
 export interface RoomSettings {
   /** số ván chơi bầu cua tới khi tự tổng kết */
   baucuaRounds?: number;
+  /** map / chủ đề màu của phòng */
+  roomTheme?: string;
+  /** chế độ bộ vai Ma Sói */
+  masoiPreset?: 'classic' | 'chaos';
+  /** Ai là gián điệp: có bật vai Mr. White không */
+  giandiepMrWhite?: boolean;
+  /** Ai là gián điệp: số lượng Gián Điệp */
+  giandiepSpies?: 1 | 2 | 3;
+  /** Vẽ & Đoán: số vòng vẽ mỗi người */
+  veDoanRounds?: number;
+  /** Đố vui: số lượng câu hỏi */
+  doVuiQuestions?: 5 | 10 | 15;
   /** @deprecated tương thích ngược */
   ludoPieces?: 2 | 4;
 }
@@ -32,7 +63,9 @@ export type CharacterHair =
   // thêm: đầu đinh, mohican, búi củ hành, xù/afro, mái bằng, highlight, đầu nấm, dài ngang lưng
   | 'dinh' | 'mohican' | 'buicu' | 'afro' | 'maibang' | 'highlight' | 'nam' | 'dailung'
   // thêm: tóc buộc thấp có tóc con, chải ngược phồng cao + lọn xoăn gáy, vuốt lệch phồng trước, rất ngắn dựng chỏm
-  | 'buocthap' | 'chaingoc' | 'vuotlech' | 'dungchom';
+  | 'buocthap' | 'chaingoc' | 'vuotlech' | 'dungchom'
+  // thêm: buộc hai chùm, wolfcut, mullet, tết bím, pompadour, tóc vấn, xoăn xù retro, hime cut
+  | 'twintails' | 'wolfcut' | 'mullet' | 'tetbim' | 'pompadour' | 'tocvan' | 'xoanxu' | 'hime';
 
 export const CHARACTER_GENDERS: CharacterGender[] = ['nam', 'nu', 'khac', 'lgbt'];
 export const CHARACTER_AGES: CharacterAge[] = ['nhi', 'tre', 'trung', 'lao'];
@@ -40,6 +73,7 @@ export const CHARACTER_HAIRS: CharacterHair[] = [
   'ngan', 'han', 'xoan', 'dai', 'bui', 'undercut',
   'dinh', 'mohican', 'buicu', 'afro', 'maibang', 'highlight', 'nam', 'dailung',
   'buocthap', 'chaingoc', 'vuotlech', 'dungchom',
+  'twintails', 'wolfcut', 'mullet', 'tetbim', 'pompadour', 'tocvan', 'xoanxu', 'hime',
 ];
 
 /** 11 tông da, từ rất sáng đến nâu sẫm (chỉ số 0..10) */
@@ -62,11 +96,16 @@ export type CharacterAccessory =
   | 'none' | 'kinhden' | 'raukem' | 'ria' | 'nonla' | 'nonbh' | 'bangdo'
   | 'khautrang' | 'muihe' | 'taitho' | 'bangcanhan' | 'troc' | 'mahong'
   // phụ kiện cầu vồng (LGBT+), ai cũng đeo được: ghim cài áo, cờ, mảng tóc, băng đô
-  | 'prideghim' | 'prideco' | 'pridetoc' | 'pridebang';
+  | 'prideghim' | 'prideco' | 'pridetoc' | 'pridebang'
+  // thêm: vương miện, kính cyber, tai mèo, sừng quỷ, vòng thiên thần, mặt nạ sói, kính điệp viên, hoa cài tóc, tai nghe gaming, kẹo mút, mặt nạ hổ, bịt mắt hải tặc
+  | 'vuongmien' | 'kinhcyber' | 'taimeo' | 'sungquy' | 'vongthienthan' | 'matnasoi'
+  | 'kinhdiepvien' | 'hoacaitoc' | 'tainghe' | 'keomut' | 'matnaho' | 'docnhan';
 export const CHARACTER_ACCESSORIES: CharacterAccessory[] = [
   'none', 'kinhden', 'raukem', 'ria', 'nonla', 'nonbh', 'bangdo',
   'khautrang', 'muihe', 'taitho', 'bangcanhan', 'troc', 'mahong',
   'prideghim', 'prideco', 'pridetoc', 'pridebang',
+  'vuongmien', 'kinhcyber', 'taimeo', 'sungquy', 'vongthienthan', 'matnasoi',
+  'kinhdiepvien', 'hoacaitoc', 'tainghe', 'keomut', 'matnaho', 'docnhan',
 ];
 
 /** chi tiết khuôn mặt: nốt ruồi, tàn nhang, lông mày rậm, răng hô, má lúm */
@@ -77,10 +116,13 @@ export const CHARACTER_DETAILS: CharacterDetail[] = ['none', 'notruoi', 'tannhan
 export type CharacterOutfit =
   | 'none' | 'aohoa' | 'dobo' | 'bala' | 'vestbong' | 'aodai' | 'dongphuc' | 'aomua' | 'dayvang'
   // thêm: áo thun cổ tròn, áo trắng cổ đứng bèo, sơ mi trắng mở cổ, ba lỗ đen khoét chữ U
-  | 'thun' | 'beo' | 'somi' | 'balden';
+  | 'thun' | 'beo' | 'somi' | 'balden'
+  // thêm: hoàng bào rồng vàng, áo choàng lông sói, áo khoác thám tử, hoodie RGB, kimono anh đào, giáp vàng, vest trắng, áo hiphop
+  | 'hoangbao' | 'aochoangsoi' | 'thamtu' | 'hoodiergb' | 'kimono' | 'giapvang' | 'vesttrang' | 'hiphop';
 export const CHARACTER_OUTFITS: CharacterOutfit[] = [
   'none', 'aohoa', 'dobo', 'bala', 'vestbong', 'aodai', 'dongphuc', 'aomua', 'dayvang',
   'thun', 'beo', 'somi', 'balden',
+  'hoangbao', 'aochoangsoi', 'thamtu', 'hoodiergb', 'kimono', 'giapvang', 'vesttrang', 'hiphop',
 ];
 
 /**
@@ -140,6 +182,10 @@ export const PLAYER_COLORS = [
   { id: 5, hex: '#F76707', light: '#FFE8CC', name: 'Cam Lửa' },
   { id: 6, hex: '#0CA678', light: '#C3FAE8', name: 'Ngọc Lam' },
   { id: 7, hex: '#D6336C', light: '#FCC2D7', name: 'Hồng Sen' },
+  { id: 8, hex: '#087F5B', light: '#C3FAE8', name: 'Lục Bảo' },
+  { id: 9, hex: '#4C6EF5', light: '#DBE4FF', name: 'Chàm Sáng' },
+  { id: 10, hex: '#AE3EC9', light: '#F8D6FF', name: 'Tử Đinh Hương' },
+  { id: 11, hex: '#5C7CFA', light: '#E5DBFF', name: 'Thiên Thanh' },
 ] as const;
 
 export interface CharacterConfig {
@@ -166,6 +212,8 @@ export interface PublicPlayer {
   id: string;
   /** trang trí đã trang bị (tài khoản): khung avatar, hiệu ứng tên, hào quang tới lượt */
   cosmetics?: PlayerCosmetics;
+  /** cấp bậc VIP Đại Gia (0..6) */
+  vipTier?: number;
   name: string;
   connected: boolean;
   /** chỉ số avatar (thú + màu), không trùng trong phòng */
@@ -190,6 +238,8 @@ export interface RankEntry {
 
 export interface GameResult {
   winnerId: string | null;
+  /** danh sách nhiều người thắng (cho game chia phe: Ma sói, Gián điệp...) */
+  winnerIds?: string[];
   ranking: RankEntry[];
   /** câu tổng kết hiển thị to */
   headline: string;
@@ -236,7 +286,7 @@ export interface LeaderRow {
   played: number;
 }
 
-export type GameView = WordChainView | BauCuaView | TyPhuView;
+export type GameView = WordChainView | BauCuaView | TyPhuView | MaSoiView | GianDiepView | VeDoanView | BomTuView | DoVuiView;
 
 // ================= Nối từ =================
 
@@ -415,6 +465,22 @@ export type GameAction =
   | { type: 'useTicket' }
   | { type: 'stayJail' }
   | { type: 'speed'; value: number }
+  | { type: 'ms_night'; target?: string | null; target2?: string | null; save?: boolean; poison?: string | null }
+  | { type: 'ms_wolfChat'; text: string }
+  | { type: 'ms_ready' }
+  | { type: 'ms_vote'; target: string | 'skip' }
+  | { type: 'ms_hunter'; target: string | 'skip' }
+  | { type: 'gd_clue'; text: string }
+  | { type: 'gd_ready' }
+  | { type: 'gd_vote'; target: string | 'skip' }
+  | { type: 'gd_guess'; word: string }
+  | { type: 'vd_pick'; word: string }
+  | { type: 'vd_stroke'; stroke: VeDoanStroke }
+  | { type: 'vd_undo' }
+  | { type: 'vd_clear' }
+  | { type: 'vd_guess'; text: string }
+  | { type: 'bt_submit'; word: string }
+  | { type: 'dv_answer'; choice: 0 | 1 | 2 | 3 }
   | { type: 'end' };
 
 export type ActionError =
@@ -445,7 +511,9 @@ export type ActionError =
   | 'loan_denied'
   // cờ tỷ phú
   | 'cannot_build'
-  | 'no_money';
+  | 'no_money'
+  // ai là gián điệp
+  | 'word_leaked';
 
 /** `word`: từ server đã hiểu (sau khi chuẩn hóa / dịch ngược bộ gõ) — app dùng để hiện và xin duyệt đúng từ */
 export type ActionResult = { ok: true; hint?: string; word?: string } | { ok: false; reason: ActionError; word?: string };
@@ -508,6 +576,14 @@ export type FunSend =
   | { kind: 'ufo'; to: string }
   | { kind: 'disco'; to: string }
   | { kind: 'money'; to: string }
+  | { kind: 'paparazzi'; to: string }
+  | { kind: 'cupid_arrow'; to: string }
+  | { kind: 'ghost_scare'; to: string }
+  | { kind: 'shark'; to: string }
+  | { kind: 'royal_seal'; to: string }
+  | { kind: 'meteor'; to: string }
+  | { kind: 'blackhole'; to: string }
+  | { kind: 'dragon_roar'; to: string }
   /** tặng quà: người tặng trả Ruby, người nhận được điểm quà */
   | { kind: 'gift'; to: string; gift: GiftId }
   /** chỉ server phát: người có hiệu ứng vào phòng vừa vào (from = người đó) */
@@ -534,12 +610,16 @@ export type FunEvent = FunSend & {
 export const DISRUPT_LIMIT = 3;
 export const DISRUPT_WINDOW_MS = 15_000;
 /** chiêu chỉ có tác dụng làm phiền màn hình: quá giới hạn thì bị chặn hẳn */
-export const HARD_DISRUPT_KINDS = ['quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog', 'duck', 'ufo', 'disco', 'money', 'mirror'] as const;
+export const HARD_DISRUPT_KINDS = [
+  'quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog',
+  'duck', 'ufo', 'disco', 'money', 'mirror', 'paparazzi', 'ghost_scare', 'royal_seal', 'meteor', 'blackhole', 'dragon_roar',
+] as const;
 /** thời gian (ms) được bù vào lượt Nối từ khi người đang tới lượt dính chiêu */
 export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
   blackout: 4500, spin: 3500, roach: 3000, ink: 2000, quake: 1500, poke: 1000, hit: 1000, throw: 1000,
   lightning: 2000, freeze: 3000, cake: 2000, water: 2000, dog: 2500,
   duck: 3500, ufo: 3500, disco: 4000, money: 3000, mirror: 2500,
+  paparazzi: 2500, ghost_scare: 3000, royal_seal: 2500, meteor: 3000, blackhole: 4000, dragon_roar: 4000,
 };
 /** tổng thời gian bù tối đa trong một lượt */
 export const DISRUPT_MAX_BONUS_MS = 15_000;
@@ -590,6 +670,10 @@ export interface PublicUser {
   equipped: Equipped;
   /** điểm quà đã nhận */
   giftPoints: number;
+  /** tổng Ruby đã chi tiêu (dùng tính cấp bậc VIP Đại Gia) */
+  rubySpent?: number;
+  /** cấp bậc Đại Gia 0..6 */
+  vipTier?: number;
 }
 
 /** yêu cầu nạp Ruby chờ quản trị duyệt (thời gian: ms) */
@@ -686,7 +770,7 @@ export interface ClientToServerEvents {
   'fun:quota': (ack: (r: { free: number; left: number }) => void) => void;
   // cửa hàng + điểm danh (chỉ tài khoản)
   'shop:get': (ack: ShopAck<ShopInfo>) => void;
-  'shop:buy': (p: { itemId: string }, ack: ShopAck<{ balance: number; owned: string[] }>) => void;
+  'shop:buy': (p: { itemId: string }, ack: ShopAck<{ balance: number; owned: string[]; rubySpent?: number; vipTier?: number }>) => void;
   'shop:equip': (p: { slot: CosmeticSlot; itemId: string | null }, ack: ShopAck<{ equipped: Equipped }>) => void;
   'checkin:status': (ack: ShopAck<CheckinStatus>) => void;
   'checkin:claim': (ack: ShopAck<{ reward: number; balance: number; streak: number; day: number }>) => void;

@@ -8,6 +8,7 @@ import {
   type RoomSettings, type RoomState, type RoomSummary,
 } from '../../shared/src/types';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
+import { ROOM_THEMES } from '../../shared/src/themes';
 import type { PlayerCosmetics } from '../../shared/src/shop';
 import { parseLook } from '../../shared/src/types';
 import { HpBoard, TargetCooldown, WindowLimiter } from './fun';
@@ -16,6 +17,11 @@ import type { GameEngine } from './games/engine';
 import { WordChainGame } from './games/wordchain';
 import { BauCuaGame } from './games/baucua';
 import { TyPhuGame } from './games/typhu';
+import { MaSoiGame } from './games/masoi';
+import { GianDiepGame } from './games/giandiep';
+import { VeDoanGame } from './games/vedoan';
+import { BomTuGame } from './games/bomtu';
+import { DoVuiGame } from './games/dovui';
 
 export interface RoomOptions {
   /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
@@ -24,7 +30,7 @@ export interface RoomOptions {
   rng?: Rng;
   onChange?: (room: Room) => void;
   /** ván vừa kết thúc (để cộng thành tích cho tài khoản) */
-  onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null }) => void;
+  onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null; winnerIds?: string[] }) => void;
   /** cả phòng duyệt một từ mới */
   learnWord?: (word: string, byName: string) => void;
 }
@@ -39,6 +45,8 @@ interface Player {
   account: boolean;
   /** trang trí đã trang bị (tài khoản) */
   cosmetics?: PlayerCosmetics;
+  /** cấp bậc VIP (0..6) */
+  vipTier?: number;
   /** người chơi đã tự chỉnh nhân vật trong phòng: không tự đổi theo avatar tài khoản nữa */
   characterCustom?: boolean;
   /** người chơi máy (chủ phòng thêm vào) */
@@ -58,10 +66,12 @@ const DEFAULT_GENDERS = CHARACTER_GENDERS.slice(0, 3);
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
 
 /** tên người chơi máy */
-const BOT_NAMES = ['Máy Tèo', 'Máy Tí', 'Máy Mít', 'Máy Bông', 'Máy Su', 'Máy Bi'];
+const BOT_NAMES = ['Máy Tèo', 'Máy Tí', 'Máy Mít', 'Máy Bông', 'Máy Su', 'Máy Bi', 'Máy Đậu', 'Máy Khoai', 'Máy Bắp', 'Máy Cam', 'Máy Xoài', 'Máy Na'];
 /** máy "suy nghĩ" bao lâu trước mỗi nước (ms) */
 const BOT_THINK_MS: Record<GameType, [number, number]> = {
   wordchain: [1500, 3200], wordchain_en: [1500, 3200], baucua: [700, 2200], typhu: [900, 1700],
+  masoi: [300, 700], giandiep: [350, 750],
+  ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -152,7 +162,8 @@ export class Room {
     const bot = this.players.find((p) => p.bot && this.participants.includes(p.id) && engine.botAction!(p.id));
     if (!bot) return;
     const [lo, hi] = BOT_THINK_MS[this.gameType];
-    const delay = Math.round(lo + this.botRng() * (hi - lo));
+    const raw = Math.round(lo + this.botRng() * (hi - lo));
+    const delay = this.opts.turnMs ? Math.min(raw, Math.max(12, Math.floor(this.opts.turnMs / 6))) : raw;
     this.botTimer = setTimeout(() => {
       this.botTimer = undefined;
       if (this.phase !== 'playing' || this.engine !== engine) return;
@@ -179,14 +190,17 @@ export class Room {
   // ---------- người chơi ----------
 
   /** Vào phòng. Nếu ván đang diễn ra, người mới vẫn được vào ở chế độ xem (spectator). */
-  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean; cosmetics?: PlayerCosmetics }): Result<{ playerId: string }> {
+  addPlayer(rawName: unknown, existingId?: string, profile?: { avatar?: number; avatarUrl?: string; account?: boolean; cosmetics?: PlayerCosmetics; vipTier?: number }): Result<{ playerId: string }> {
     const account = profile?.account === true;
     // khách không được mạo danh id tài khoản
     if (existingId?.startsWith(ACCOUNT_PREFIX) && !account) existingId = undefined;
     if (existingId && this.kicked.has(existingId)) return { ok: false, error: 'kicked' };
     const existing = existingId ? this.find(existingId) : undefined;
     if (existing) {
-      if (account) this.setCosmetics(existing.id, profile?.cosmetics);
+      if (account) {
+        this.setCosmetics(existing.id, profile?.cosmetics);
+        this.setVipTier(existing.id, profile?.vipTier);
+      }
       this.setConnected(existing.id, true);
       return { ok: true, playerId: existing.id };
     }
@@ -198,7 +212,11 @@ export class Room {
     // tài khoản và khách đã tự chọn mặt đại diện: dựng nhân vật theo mặt đó
     const preset = this.presetFor(profile?.avatar);
     const character: CharacterConfig = preset ?? this.spreadCharacter();
-    this.players.push({ id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account, ...(profile?.cosmetics ? { cosmetics: profile.cosmetics } : {}) });
+    this.players.push({
+      id, name: this.uniqueName(name), connected: true, avatar: this.freeAvatar(profile?.avatar), avatarUrl: profile?.avatarUrl, character, account,
+      ...(profile?.cosmetics ? { cosmetics: profile.cosmetics } : {}),
+      ...(profile?.vipTier ? { vipTier: profile.vipTier } : {}),
+    });
     if (!this.hostId) this.hostId = id;
     this.changed();
     return { ok: true, playerId: id };
@@ -363,6 +381,17 @@ export class Room {
     this.changed();
   }
 
+  /** cập nhật cấp VIP của người chơi */
+  setVipTier(playerId: string, vipTier: number | undefined): void {
+    const p = this.find(playerId);
+    if (!p) return;
+    const next = vipTier && vipTier > 0 ? vipTier : undefined;
+    if (p.vipTier === next) return;
+    if (next) p.vipTier = next;
+    else delete p.vipTier;
+    this.changed();
+  }
+
   /** người chơi dính chiêu làm rung/che màn hình: bù thời gian lượt nếu game hỗ trợ. Trả về số ms được bù. */
   disrupt(playerId: string, ms: number): number {
     if (this.phase !== 'playing' || !this.engine?.disrupt) return 0;
@@ -462,7 +491,18 @@ export class Room {
 
   configure(byId: string, gameType?: unknown, settings?: Partial<RoomSettings>): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
-    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    const themeOnly =
+      gameType === undefined &&
+      settings !== undefined &&
+      settings.roomTheme !== undefined &&
+      settings.ludoPieces === undefined &&
+      settings.baucuaRounds === undefined &&
+      settings.masoiPreset === undefined &&
+      settings.giandiepMrWhite === undefined &&
+      settings.giandiepSpies === undefined &&
+      settings.veDoanRounds === undefined &&
+      settings.doVuiQuestions === undefined;
+    if (!themeOnly && this.phase === 'playing') return { ok: false, error: 'room_playing' };
     if (gameType !== undefined) {
       if (!GAME_TYPES.includes(gameType as GameType)) return { ok: false, error: 'bad_request' };
       this.gameType = gameType as GameType;
@@ -475,8 +515,34 @@ export class Room {
       if (!BAUCUA_ROUND_OPTIONS.includes(settings.baucuaRounds as BauCuaRounds)) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, baucuaRounds: settings.baucuaRounds };
     }
-    // đổi game sau khi kết thúc thì quay về phòng chờ
-    if (this.phase === 'finished') this.backToLobby();
+    if (settings?.masoiPreset !== undefined) {
+      if (settings.masoiPreset !== 'classic' && settings.masoiPreset !== 'chaos') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, masoiPreset: settings.masoiPreset };
+    }
+    if (settings?.giandiepMrWhite !== undefined) {
+      if (typeof settings.giandiepMrWhite !== 'boolean') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, giandiepMrWhite: settings.giandiepMrWhite };
+    }
+    if (settings?.giandiepSpies !== undefined) {
+      if (settings.giandiepSpies !== 1 && settings.giandiepSpies !== 2 && settings.giandiepSpies !== 3) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, giandiepSpies: settings.giandiepSpies };
+    }
+    if (settings?.veDoanRounds !== undefined) {
+      if (settings.veDoanRounds !== 1 && settings.veDoanRounds !== 2 && settings.veDoanRounds !== 3) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, veDoanRounds: settings.veDoanRounds };
+    }
+    if (settings?.doVuiQuestions !== undefined) {
+      if (settings.doVuiQuestions !== 5 && settings.doVuiQuestions !== 10 && settings.doVuiQuestions !== 15) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, doVuiQuestions: settings.doVuiQuestions };
+    }
+    if (settings?.roomTheme !== undefined) {
+      if (typeof settings.roomTheme !== 'string' || !ROOM_THEMES.some((t) => t.id === settings.roomTheme)) {
+        return { ok: false, error: 'bad_request' };
+      }
+      this.settings = { ...this.settings, roomTheme: settings.roomTheme };
+    }
+    // đổi game sau khi kết thúc thì quay về phòng chờ (riêng đổi map thì giữ nguyên màn hiện tại)
+    if (!themeOnly && this.phase === 'finished') this.backToLobby();
     this.changed();
     return { ok: true };
   }
@@ -519,7 +585,11 @@ export class Room {
     return { ok: true };
   }
 
-  toPublic(): RoomState {
+  get hasPerPlayerView(): boolean {
+    return this.phase === 'playing' && !!this.engine?.perPlayerView;
+  }
+
+  toPublic(viewerId?: string): RoomState {
     return {
       code: this.code,
       phase: this.phase,
@@ -534,21 +604,22 @@ export class Room {
         ...(this.isSpectator(p.id) ? { spectator: true } : {}),
         ...(p.account ? { account: true } : {}),
         ...(p.cosmetics ? { cosmetics: p.cosmetics } : {}),
+        ...(p.vipTier ? { vipTier: p.vipTier } : {}),
         ...(p.bot ? { bot: true } : {}),
       })),
       maxPlayers: MAX_PLAYERS,
       gameType: this.gameType,
       settings: this.settings,
       serverNow: Date.now(),
-      game: this.gameView(),
+      game: this.gameView(viewerId),
       result: this.result,
       isPublic: this.isPublic,
     };
   }
 
   /** trạng thái ván; tên người chơi luôn lấy theo tên hiện tại trong phòng (đổi tên giữa ván vẫn khớp) */
-  private gameView(): RoomState['game'] {
-    const view = this.engine ? this.engine.view() : null;
+  private gameView(viewerId?: string): RoomState['game'] {
+    const view = this.engine ? this.engine.view(viewerId) : null;
     if (!view || !('names' in view) || !view.names) return view;
     const names = { ...view.names };
     for (const p of this.players) if (p.id in names) names[p.id] = p.name;
@@ -585,6 +656,16 @@ export class Room {
         return new BauCuaGame(ctx);
       case 'typhu':
         return new TyPhuGame(ctx);
+      case 'masoi':
+        return new MaSoiGame(ctx);
+      case 'giandiep':
+        return new GianDiepGame(ctx);
+      case 've_doan':
+        return new VeDoanGame(ctx);
+      case 'bom_tu':
+        return new BomTuGame(ctx);
+      case 'do_vui':
+        return new DoVuiGame(ctx);
       default:
         return new WordChainGame(ctx, 'vi');
     }
@@ -597,7 +678,7 @@ export class Room {
     this.engine?.dispose();
     for (const p of this.players) if (!p.connected) this.scheduleRemoval(p);
     this.changed();
-    this.opts.onFinish?.({ gameType: this.gameType, participants: this.participants, winnerId: result.winnerId });
+    this.opts.onFinish?.({ gameType: this.gameType, participants: this.participants, winnerId: result.winnerId, winnerIds: result.winnerIds });
   }
 
   private backToLobby(): void {
@@ -619,6 +700,7 @@ export class Room {
       a !== undefined && Number.isInteger(a) && a >= 0 && a < AVATAR_COUNT && !used.has(a);
     if (ok(wanted)) return wanted;
     if (ok(fallback)) return fallback;
+    if (used.size >= AVATAR_COUNT) return wanted ?? 0;
     let avatar = Math.floor(this.rng() * AVATAR_COUNT);
     while (used.has(avatar)) avatar = (avatar + 1) % AVATAR_COUNT;
     return avatar;

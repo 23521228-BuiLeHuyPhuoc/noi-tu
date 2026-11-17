@@ -1,13 +1,15 @@
 import { Image } from './Image';
 /**
- * Cửa hàng Ruby (kỹ năng chọc, trang trí avatar, sticker, quà) và bảng điểm danh 7 ngày.
+ * Cửa hàng Ruby (kỹ năng chọc, 8 ô trang trí VIP, sticker, quà đại gia) & điểm danh 7 ngày.
  * Mọi quyền và số dư do server kiểm tra; app chỉ hiện và gọi lệnh.
  */
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
-  CHECKIN_REWARDS, FREE_POKES_PER_DAY, itemsOfKind, type CheckinStatus, type CosmeticSlot, type ShopItem, type ShopKind,
+  CHECKIN_REWARDS, FREE_POKES_PER_DAY, VIP_TIERS, itemsOfKind, prestigePoints, vipOf,
+  type CheckinStatus, type CosmeticSlot, type ShopItem, type ShopKind,
 } from '../../../shared/src/shop';
+import { themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { CHU_LAY_STICKERS } from '../stickers';
 import { play } from '../sound';
@@ -16,7 +18,7 @@ import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { WalletSheet, fmtRuby } from './Wallet';
 import { Confetti } from './Fun';
-import { NameText } from './Cosmetics';
+import { NameText, TitleBadge, VipBadge, chatBubbleStyleOf, chatBubbleTextColorOf } from './Cosmetics';
 import { Portrait } from './Avatar';
 
 type Tab = 'skill' | 'deco' | 'sticker' | 'gift';
@@ -26,19 +28,24 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'sticker', label: '🔤 Sticker' },
   { id: 'gift', label: '🎁 Quà' },
 ];
-const DECO: { slot: CosmeticSlot; title: string }[] = [
-  { slot: 'frame', title: 'Khung avatar' },
-  { slot: 'nameFx', title: 'Hiệu ứng tên' },
-  { slot: 'aura', title: 'Hào quang khi tới lượt' },
-  { slot: 'entrance', title: 'Vào phòng' },
+const DECO: { slot: CosmeticSlot; title: string; short: string }[] = [
+  { slot: 'frame', title: '👑 Khung avatar', short: 'Khung' },
+  { slot: 'nameFx', title: '✨ Hiệu ứng tên', short: 'Tên' },
+  { slot: 'aura', title: '🌟 Hào quang tới lượt', short: 'Hào quang' },
+  { slot: 'pet', title: '🐾 Thú cưng kề vai', short: 'Thú cưng' },
+  { slot: 'title', title: '🎖️ Danh hiệu Phú Hào', short: 'Danh hiệu' },
+  { slot: 'chatBubble', title: '💬 Bong bóng chat VIP', short: 'Chat' },
+  { slot: 'entrance', title: '🚪 Hiệu ứng vào phòng', short: 'Vào phòng' },
+  { slot: 'roomTheme', title: '🗺️ Map & Chủ đề phòng', short: 'Map' },
 ];
 
 export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game; onClose: () => void; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [decoFilter, setDecoFilter] = useState<'all' | CosmeticSlot>('all');
   const [walletOpen, setWalletOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ frame?: string; nameFx?: string }>({});
+  const [preview, setPreview] = useState<Partial<Record<CosmeticSlot, string>>>({});
   const feed = useFeed();
   const user = game.user;
   const { loadShop } = game;
@@ -58,6 +65,13 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
   const owned = new Set(user.owned ?? []);
   const equipped = user.equipped ?? {};
 
+  const pts = prestigePoints(user.rubySpent, user.owned);
+  const vip = vipOf(pts);
+  const nextVip = VIP_TIERS.find((t) => t.tier === vip.tier + 1) ?? null;
+  const vipPct = nextVip
+    ? Math.max(0.04, Math.min(1, (pts - vip.minPoints) / Math.max(1, nextVip.minPoints - vip.minPoints)))
+    : 1;
+
   const buy = async (item: ShopItem) => {
     setBusy(item.id);
     setError(null);
@@ -74,7 +88,7 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
     setBusy(null);
     if (err) setError(err);
     else {
-      setPreview({});
+      setPreview((prev) => ({ ...prev, [slot]: undefined }));
       play('sparkle');
     }
   };
@@ -87,8 +101,8 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
       <Button testID={`topup-${item.id}`} small variant="paper" title={`Thiếu ${fmtRuby(item.price - ruby)} · Nạp thêm`} onPress={() => setWalletOpen(true)} />
     );
 
-  const row = (item: ShopItem, action: React.ReactNode, extra?: React.ReactNode) => (
-    <View key={item.id} testID={`shop-item-${item.id}`} style={styles.item}>
+  const row = (item: ShopItem, action: ReactNode, extra?: ReactNode) => (
+    <View key={item.id} testID={`shop-item-${item.id}`} style={[styles.item, item.price >= 1000 && styles.itemVip]}>
       <T style={styles.itemEmoji}>{item.emoji}</T>
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
         <T style={styles.itemName}>{item.name}</T>
@@ -104,14 +118,41 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
 
   const frameNow = preview.frame ?? equipped.frame;
   const fxNow = preview.nameFx ?? equipped.nameFx;
+  const auraNow = preview.aura ?? equipped.aura;
+  const petNow = preview.pet ?? equipped.pet;
+  const titleNow = preview.title ?? equipped.title;
+  const bubbleNow = preview.chatBubble ?? equipped.chatBubble;
+  const themeNow = themeById(preview.roomTheme ?? equipped.roomTheme);
+  const bStyle = chatBubbleStyleOf(bubbleNow);
+  const bColor = chatBubbleTextColorOf(bubbleNow);
+
   const section = (kind: ShopKind) => itemsOfKind(kind);
+  const visibleDeco = decoFilter === 'all' ? DECO : DECO.filter((d) => d.slot === decoFilter);
 
   return (
-    <Sheet title="Cửa hàng 🛍️" onClose={onClose}>
+    <Sheet title="Cửa hàng Phú Hào 🛍️" onClose={onClose}>
       <View style={styles.balanceRow}>
         <T testID="shop-balance" style={styles.balance}>💎 {fmtRuby(ruby)}</T>
         <Button testID="shop-topup" small variant="gold" title="Nạp thêm" onPress={() => setWalletOpen(true)} />
       </View>
+
+      {/* Thanh Đẳng Cấp VIP Prestige */}
+      <View testID="vip-progress-card" style={styles.vipCard}>
+        <View style={styles.vipTop}>
+          <VipBadge tier={vip.tier} />
+          <T style={styles.vipTitle}>{vip.tier > 0 ? vip.name : 'Chưa vào bảng VIP'}</T>
+          <T style={styles.vipPts}>{fmtRuby(pts)} điểm</T>
+        </View>
+        <View style={styles.vipTrack}>
+          <View style={[styles.vipFill, { width: `${vipPct * 100}%`, backgroundColor: vip.color }]} />
+        </View>
+        <T style={styles.vipSub}>
+          {nextVip
+            ? `Còn 💎 ${fmtRuby(Math.max(0, nextVip.minPoints - pts))} nữa lên ${nextVip.badge} ${nextVip.name}!`
+            : '🔱 Đã chạm đỉnh Thiên Đế Chí Tôn (VIP Tối Thượng)!'}
+        </T>
+      </View>
+
       <View style={styles.tabs}>
         {TABS.map((x) => (
           <Pressable key={x.id} testID={`shop-tab-${x.id}`} accessibilityRole="tab" accessibilityState={{ selected: tab === x.id }} onPress={() => setTab(x.id)} style={[styles.tab, tab === x.id && styles.tabOn]}>
@@ -132,18 +173,61 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
 
       {tab === 'deco' && (
         <>
-          <View style={styles.preview}>
-            <Portrait p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }} size={72} frame={frameNow} />
-            <NameText fx={fxNow} style={styles.previewName}>{user.displayName}</NameText>
+          {/* Sân Khấu Xem Thử Trực Tiếp 8 Ô + Map */}
+          <View testID="shop-live-stage" style={[styles.preview, { backgroundColor: themeNow.bg, borderColor: themeNow.accent }]}>
+            <Portrait
+              p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }}
+              size={70}
+              frame={frameNow}
+              aura={auraNow}
+              pet={petNow}
+              active={true}
+            />
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {vip.tier > 0 && <VipBadge tier={vip.tier} compact />}
+                <NameText fx={fxNow} style={[styles.previewName, { color: themeNow.accent }]}>{user.displayName}</NameText>
+              </View>
+              {titleNow && <TitleBadge title={titleNow} />}
+              <View style={[styles.previewBubble, bStyle]}>
+                <T style={[{ fontSize: 12, fontWeight: '800', color: C.ink }, bColor ? { color: bColor } : null]}>
+                  Map: {themeNow.emoji} {themeNow.name}
+                </T>
+              </View>
+            </View>
+            {Object.values(preview).some(Boolean) && (
+              <Button testID="preview-reset" small variant="paper" title="Đặt lại" onPress={() => setPreview({})} />
+            )}
           </View>
-          <T style={styles.note}>Mua một lần, dùng mãi; mỗi ô trang bị một món. Bấm “Xem thử” để xem trước khung và tên.</T>
-          {DECO.map(({ slot, title }) => (
+
+          <T style={styles.note}>Mua một lần, dùng mãi · 8 ô trang bị riêng biệt + tích điểm VIP Phú Hào!</T>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
+            <Pressable
+              testID="deco-filter-all"
+              onPress={() => setDecoFilter('all')}
+              style={[styles.filterPill, decoFilter === 'all' && styles.filterOn]}
+            >
+              <T style={[styles.filterTxt, decoFilter === 'all' && { color: C.gold }]}>Tất cả (8)</T>
+            </Pressable>
+            {DECO.map((d) => (
+              <Pressable
+                key={d.slot}
+                testID={`deco-filter-${d.slot}`}
+                onPress={() => setDecoFilter(d.slot)}
+                style={[styles.filterPill, decoFilter === d.slot && styles.filterOn]}
+              >
+                <T style={[styles.filterTxt, decoFilter === d.slot && { color: C.gold }]}>{d.short}</T>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {visibleDeco.map(({ slot, title }) => (
             <View key={slot} style={{ gap: 8 }}>
               <T style={styles.sectionLabel}>{title}</T>
               {section(slot).map((it) => {
                 const has = owned.has(it.id);
                 const on = equipped[slot] === it.id;
-                const tryable = slot === 'frame' || slot === 'nameFx';
                 const action = has ? (
                   on ? (
                     <Button testID={`unequip-${it.id}`} small variant="paper" title="Gỡ" disabled={busy !== null} onPress={() => equip(slot, null)} />
@@ -152,7 +236,13 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
                   )
                 ) : (
                   <>
-                    {tryable && <Button testID={`try-${it.id}`} small variant="paper" title="Xem thử" onPress={() => setPreview((p) => ({ ...p, [slot]: it.id }))} />}
+                    <Button
+                      testID={`try-${it.id}`}
+                      small
+                      variant="paper"
+                      title={preview[slot] === it.id ? 'Đang thử' : 'Xem thử'}
+                      onPress={() => setPreview((p) => ({ ...p, [slot]: p[slot] === it.id ? undefined : it.id }))}
+                    />
                     {buyButton(it)}
                   </>
                 );
@@ -178,7 +268,7 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
       {tab === 'gift' && (
         <>
           <T style={styles.note}>
-            Quà tặng trong phòng: chạm vào avatar bạn bè rồi chọn “Tặng quà”. Bạn trả Ruby, cả phòng thấy hiệu ứng, người nhận được điểm quà 💝 (không nhận Ruby).
+            Quà tặng trong phòng: chạm vào avatar bạn bè rồi chọn “Tặng quà”. Bạn trả Ruby, cả phòng thấy siêu hiệu ứng, người nhận được điểm quà 💝 và bạn tăng cấp VIP!
           </T>
           {section('gift').map((it) => row(it, null))}
           <T style={styles.note}>Điểm quà của bạn: 💝 {fmtRuby(user.giftPoints ?? 0)}</T>
@@ -250,19 +340,38 @@ const styles = StyleSheet.create({
   error: { color: C.ink, backgroundColor: '#FFD6D6', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'space-between' },
   balance: { fontSize: 22, fontWeight: '900', color: C.son },
+  vipCard: { backgroundColor: '#1E1B4B', borderRadius: 14, borderWidth: 2, borderColor: C.gold, padding: 10, gap: 6 },
+  vipTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  vipTitle: { color: '#FEF08A', fontWeight: '900', fontSize: 13, flex: 1 },
+  vipPts: { color: '#CBD5E1', fontWeight: '800', fontSize: 11 },
+  vipTrack: { height: 7, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden' },
+  vipFill: { height: '100%', borderRadius: 99 },
+  vipSub: { color: '#E2E8F0', fontSize: 11, fontWeight: '700' },
   tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 14, padding: 4, gap: 4 },
   tab: { flex: 1, minHeight: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   tabOn: { backgroundColor: C.ink },
   tabText: { fontWeight: '800', fontSize: 12, textAlign: 'center' },
-  sectionLabel: { fontSize: 14, fontWeight: '800', color: C.muted },
+  filterRow: { gap: 6, paddingVertical: 2 },
+  filterPill: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, backgroundColor: C.mist, borderWidth: 1.5, borderColor: '#D0C9B8' },
+  filterOn: { backgroundColor: C.ink, borderColor: C.ink },
+  filterTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
+  sectionLabel: { fontSize: 14, fontWeight: '900', color: C.ink, marginTop: 2 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 14, padding: 10 },
+  itemVip: { backgroundColor: '#FFF8E1', borderWidth: 1.5, borderColor: '#F59E0B' },
   itemEmoji: { fontSize: 30 },
   itemName: { fontSize: 15, fontWeight: '800' },
   itemDesc: { fontSize: 12, color: C.muted, lineHeight: 15 },
   itemAct: { alignItems: 'flex-end', gap: 4, maxWidth: 170 },
   price: { fontSize: 13, fontWeight: '900', color: C.son },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: C.ink, borderRadius: 14, padding: 14 },
-  previewName: { fontSize: 18, fontWeight: '800', color: C.gold, flexShrink: 1 },
+  preview: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 16,
+    borderWidth: 2.5, padding: 14, overflow: 'visible',
+  },
+  previewName: { fontSize: 18, fontWeight: '900', flexShrink: 1 },
+  previewBubble: {
+    alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4,
+    borderRadius: 10, backgroundColor: '#FFFDF8', borderWidth: 1.5, borderColor: C.ink,
+  },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   stickerThumb: { width: 76, height: 58 },
   owned: { fontSize: 13, fontWeight: '800', color: C.jade },

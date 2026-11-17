@@ -4,7 +4,7 @@
  */
 import type { Socket } from 'socket.io';
 import {
-  CHECKIN_REWARDS, COSMETIC_SLOTS, FREE_POKES_PER_DAY, checkinPlan, isOwnable, shopItem, vnDay,
+  CHECKIN_REWARDS, COSMETIC_SLOTS, FREE_POKES_PER_DAY, checkinPlan, isOwnable, prestigePoints, shopItem, vipOf, vnDay,
   type Equipped, type PlayerCosmetics,
 } from '../../shared/src/shop';
 import type { ClientToServerEvents, ServerToClientEvents } from '../../shared/src/types';
@@ -49,7 +49,12 @@ export class FunQuota {
 /** trừ Ruby của một tài khoản rồi báo số dư mới tới mọi máy của họ; null nếu không đủ Ruby */
 export async function chargeRuby(ctx: WalletContext, userId: string, amount: number, reason: RubyReason, ref: string): Promise<number | null> {
   const balance = await ctx.wallet.creditRuby(userId, -amount, reason, ref);
-  if (balance !== null) ctx.events.update(userId, { ruby: balance, delta: -amount, reason });
+  if (balance !== null) {
+    if (amount > 0 && (reason === 'skill' || reason === 'gift' || reason === 'shop')) {
+      await ctx.store.addRubySpent(userId, amount).catch(() => {});
+    }
+    ctx.events.update(userId, { ruby: balance, delta: -amount, reason });
+  }
   return balance;
 }
 
@@ -60,13 +65,16 @@ export function cosmeticsOf(eq: Equipped | undefined): PlayerCosmetics | undefin
   if (eq.frame) out.frame = eq.frame;
   if (eq.nameFx) out.nameFx = eq.nameFx;
   if (eq.aura) out.aura = eq.aura;
+  if (eq.pet) out.pet = eq.pet;
+  if (eq.title) out.title = eq.title;
+  if (eq.chatBubble) out.chatBubble = eq.chatBubble;
   return Object.keys(out).length ? out : undefined;
 }
 
 /** Gắn lệnh cửa hàng + điểm danh cho một socket. `onEquipped`: báo để cập nhật hồ sơ trong phòng. */
 export function attachShopHandlers(socket: Sock, ctx: ShopContext, getUser: () => UserRecord | null, onEquipped: (u: UserRecord) => void): void {
   const { wallet, store, events } = ctx;
-  const limiter = new RateLimiter(12, 600);
+  const limiter = new RateLimiter(24, 300);
   type Fail = { ok: false; error: 'need_account' | 'bad_request' | 'not_found' | 'insufficient' | 'already_owned' | 'not_owned' | 'already_claimed' | 'rate_limited' };
   type Reply = (r: Fail | ({ ok: true } & Record<string, unknown>)) => void;
 
@@ -85,7 +93,8 @@ export function attachShopHandlers(socket: Sock, ctx: ShopContext, getUser: () =
 
   socket.on('shop:get', (ack) => handle(ack, async (u, reply) => {
     const [f, ruby] = await Promise.all([fresh(u), wallet.balance(u.id)]);
-    reply({ ok: true, ruby, owned: f.owned ?? [], equipped: f.equipped ?? {}, giftPoints: f.giftPoints ?? 0 });
+    const vipTier = vipOf(prestigePoints(f.rubySpent, f.owned)).tier;
+    reply({ ok: true, ruby, owned: f.owned ?? [], equipped: f.equipped ?? {}, giftPoints: f.giftPoints ?? 0, rubySpent: f.rubySpent ?? 0, vipTier });
   }));
 
   socket.on('shop:buy', (p, ack) => handle(ack, async (u, reply) => {
@@ -100,8 +109,12 @@ export function attachShopHandlers(socket: Sock, ctx: ShopContext, getUser: () =
       events.update(u.id, { ruby: back, delta: 0, reason: 'shop' });
       return reply({ ok: false, error: 'already_owned' });
     }
+    await store.addRubySpent(u.id, item.price);
+    const f = await fresh(u);
+    const vipTier = vipOf(prestigePoints(f.rubySpent, f.owned)).tier;
+    onEquipped(f);
     events.update(u.id, { ruby: balance, delta: -item.price, reason: 'shop' });
-    reply({ ok: true, balance, owned: (await fresh(u)).owned ?? [] });
+    reply({ ok: true, balance, owned: f.owned ?? [], rubySpent: f.rubySpent ?? 0, vipTier });
   }));
 
   socket.on('shop:equip', (p, ack) => handle(ack, async (u, reply) => {

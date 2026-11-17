@@ -1,12 +1,12 @@
 import { Image } from './Image';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Mood, PublicPlayer } from '../../../shared/src/types';
 import { avatarOf, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
-import { FrameWrap, NameText } from './Cosmetics';
+import { FrameWrap, NameText, TitleBadge, VipBadge } from './Cosmetics';
 import { useMeasuredView } from '../viewMeasurements';
 
 /** màu phủ lên avatar theo chiêu: sét (cháy đen), băng, hôn gió (đỏ mặt) */
@@ -39,21 +39,21 @@ function BombBadge() {
   );
 }
 
-function PortraitImage({ p, mood = 'normal', size }: { p: PortraitSource; mood?: Mood; size: number }) {
+const PortraitImage = memo(function PortraitImage({ p, mood = 'normal', size, resolvedUri }: { p: PortraitSource; mood?: Mood; size: number; resolvedUri?: string }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
-  const portrait = portraitOf(p, mood);
-  const uri = failedUri === portrait.uri ? portraitOf({ ...p, avatarUrl: undefined }, mood).uri : portrait.uri;
+  const primary = resolvedUri ?? portraitOf(p, mood).uri;
+  const uri = failedUri === primary ? portraitOf({ ...p, avatarUrl: undefined }, mood).uri : primary;
   return (
     <>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={{ fontSize: size * 0.55 }}>{avatarOf(p.avatar).emoji}</Text>
       </View>
-      <Image source={{ uri }} onError={() => setFailedUri(portrait.uri)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
+      <Image source={{ uri }} onError={() => setFailedUri(primary)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
     </>
   );
-}
+});
 
-export function Avatar({
+export const Avatar = memo(function Avatar({
   player, size = 52, active, dim, host, sub, me, onPress, ring, rank, editable,
 }: {
   player: PublicPlayer;
@@ -160,7 +160,7 @@ export function Avatar({
       accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : onPress ? `Chọc ${player.name}` : player.name}
       style={[styles.wrap, { minWidth: size + 22, maxWidth: size + 64 }, dim && { opacity: 0.4 }]}
     >
-      <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} active={active}>
+      <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} pet={cos?.pet} active={active}>
       <Animated.View
         ref={avatarRef}
         collapsable={false}
@@ -181,7 +181,7 @@ export function Avatar({
           active && styles.active,
         ]}
       >
-        <PortraitImage p={player} mood={face.mood} size={size} />
+        <PortraitImage p={player} mood={face.mood} size={size} resolvedUri={pt.uri} />
         {face.doodle && (
           <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
         )}
@@ -219,8 +219,14 @@ export function Avatar({
         )}
       </Animated.View>
       </FrameWrap>
+      {(cos?.title || (player.vipTier && player.vipTier > 0)) && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, flexWrap: 'wrap', marginTop: active ? 4 : 1 }}>
+          {player.vipTier && player.vipTier > 0 ? <VipBadge tier={player.vipTier} compact /> : null}
+          {cos?.title ? <TitleBadge title={cos.title} /> : null}
+        </View>
+      )}
       {/* tên đầy đủ, xuống dòng khi dài (không cắt bớt) */}
-      <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: 7 }]}>
+      <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: cos?.title || player.vipTier ? 1 : 7 }]}>
         {face.morph === 'flipname' ? Array.from(player.name).reverse().join('') : player.name}{me ? ' (bạn)' : ''}
       </NameText>
       {face.nick && (
@@ -229,7 +235,7 @@ export function Avatar({
       {sub !== undefined && <Text style={styles.sub}>{sub}</Text>}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', gap: 3 },
@@ -278,18 +284,18 @@ const styles = StyleSheet.create({
 });
 
 /** Chân dung tròn dùng chung (kết quả, trò chuyện, tài khoản): cùng cách vẽ như trong ván. */
-export function Portrait({ p, size = 40, border = 2.5, frame }: { p: PortraitSource; size?: number; border?: number; frame?: string }) {
+export const Portrait = memo(function Portrait({ p, size = 40, border = 2.5, frame, aura, pet, active }: { p: PortraitSource; size?: number; border?: number; frame?: string; aura?: string; pet?: string; active?: boolean }) {
   const pt = portraitOf(p);
   return (
-    <FrameWrap size={size} frame={frame}>
+    <FrameWrap size={size} frame={frame} aura={aura} pet={pet} active={active}>
     <View
       style={{
         width: size, height: size, borderRadius: size / 2, backgroundColor: pt.light, overflow: 'hidden',
         borderWidth: border, borderColor: p.character ? pt.hex : C.ink,
       }}
     >
-      <PortraitImage p={p} size={size} />
+      <PortraitImage p={p} size={size} resolvedUri={pt.uri} />
     </View>
     </FrameWrap>
   );
-}
+});

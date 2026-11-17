@@ -31,6 +31,8 @@ export interface EngineContext {
 }
 
 export interface GameEngine {
+  /** Game có dữ liệu mật theo từng người chơi (Ma sói, Gián điệp, Vẽ & Đoán, Đố vui) */
+  readonly perPlayerView?: boolean;
   start(players: EnginePlayer[]): void;
   action(playerId: string, action: GameAction): ActionResult;
   /** người chơi rời phòng giữa ván */
@@ -46,7 +48,7 @@ export interface GameEngine {
    * Room tự hẹn giờ (giả vờ suy nghĩ) rồi gọi action() như người thật.
    */
   botAction?(playerId: string): GameAction | null;
-  view(): GameView;
+  view(viewerId?: string): GameView;
   dispose(): void;
 }
 

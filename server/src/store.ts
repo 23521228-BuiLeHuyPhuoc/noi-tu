@@ -7,7 +7,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { MongoClient, ObjectId, type Collection, type Db } from 'mongodb';
 import { MemoryWalletStore } from './walletStore';
 import { isAdmin } from './admin';
-import type { CosmeticSlot, Equipped } from '../../shared/src/shop';
+import { prestigePoints, vipOf, type CosmeticSlot, type Equipped } from '../../shared/src/shop';
 import { GAME_INFO, type GameStat, type GameType, type LeaderRow, type PublicUser } from '../../shared/src/types';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
@@ -40,6 +40,8 @@ export interface UserRecord {
   checkin?: { lastDay: string; streak: number };
   /** điểm quà đã nhận */
   giftPoints?: number;
+  /** tổng Ruby đã tiêu (tính cấp VIP) */
+  rubySpent?: number;
 }
 
 export interface ResetRecord {
@@ -77,8 +79,10 @@ export interface Store {
   /** nhận điểm danh hôm nay; false nếu ngày đó đã nhận (nguyên tử, có điều kiện lastDay khác today) */
   claimCheckin(userId: string, today: string, streak: number): Promise<boolean>;
   addGiftPoints(userId: string, points: number): Promise<void>;
-  /** cộng ván đã chơi / đã thắng cho các tài khoản */
-  recordGame(userIds: string[], game: GameType, winnerId: string | null): Promise<void>;
+  /** cộng dồn Ruby đã tiêu để nâng cấp VIP */
+  addRubySpent(userId: string, amount: number): Promise<void>;
+  /** cộng ván đã chơi / đã thắng cho các tài khoản (hỗ trợ 1 người hoặc cả phe thắng) */
+  recordGame(userIds: string[], game: GameType, winnerId: string | string[] | null): Promise<void>;
   /** bảng xếp hạng số lần thắng của một game (null = cộng mọi game), chỉ người đã chơi ít nhất 1 ván */
   leaderboard(game: GameType | null, limit: number): Promise<LeaderEntry[]>;
   /** lưu từ được cả phòng duyệt; trả về false nếu đã có */
@@ -88,10 +92,13 @@ export interface Store {
 }
 
 export function toPublic(u: UserRecord): PublicUser {
+  const vipTier = vipOf(prestigePoints(u.rubySpent, u.owned)).tier;
   return {
     id: u.id, username: u.username, ...(u.email ? { email: u.email } : {}), displayName: u.displayName, avatar: u.avatar,
     ...(u.avatarUrl ? { avatarUrl: u.avatarUrl } : {}), stats: u.stats ?? {}, ruby: u.ruby ?? 0,
     owned: [...(u.owned ?? [])], equipped: { ...(u.equipped ?? {}) }, giftPoints: u.giftPoints ?? 0,
+    ...(u.rubySpent ? { rubySpent: u.rubySpent } : {}),
+    ...(vipTier > 0 ? { vipTier } : {}),
     // mọi đường trả hồ sơ (đăng nhập, sửa hồ sơ, tải ảnh) đều mang cờ quản trị
     ...(isAdmin(u.username) ? { admin: true as const } : {}),
   };
@@ -229,13 +236,18 @@ export class MemoryStore implements Store {
     const u = this.users.get(userId);
     if (u) u.giftPoints = (u.giftPoints ?? 0) + points;
   }
-  async recordGame(userIds: string[], game: GameType, winnerId: string | null) {
+  async addRubySpent(userId: string, amount: number) {
+    const u = this.users.get(userId);
+    if (u && amount > 0) u.rubySpent = (u.rubySpent ?? 0) + amount;
+  }
+  async recordGame(userIds: string[], game: GameType, winnerId: string | string[] | null) {
+    const winSet = new Set(Array.isArray(winnerId) ? winnerId : winnerId ? [winnerId] : []);
     for (const id of userIds) {
       const u = this.users.get(id);
       if (!u) continue;
       const s = (u.stats[game] ??= { played: 0, won: 0 });
       s.played++;
-      if (id === winnerId) s.won++;
+      if (winSet.has(id)) s.won++;
     }
   }
   async leaderboard(game: GameType | null, limit: number) {
@@ -285,6 +297,7 @@ interface UserDoc {
   equipped?: Equipped;
   checkin?: { lastDay: string; streak: number };
   giftPoints?: number;
+  rubySpent?: number;
 }
 
 const fromDoc = (d: UserDoc): UserRecord => ({
@@ -305,6 +318,7 @@ const fromDoc = (d: UserDoc): UserRecord => ({
   equipped: d.equipped ?? {},
   checkin: d.checkin,
   giftPoints: d.giftPoints ?? 0,
+  rubySpent: d.rubySpent ?? 0,
 });
 
 export class MongoStore implements Store {
@@ -469,14 +483,18 @@ export class MongoStore implements Store {
   async addGiftPoints(userId: string, points: number) {
     if (ObjectId.isValid(userId)) await this.users.updateOne({ _id: new ObjectId(userId) }, { $inc: { giftPoints: points } });
   }
-  async recordGame(userIds: string[], game: GameType, winnerId: string | null) {
+  async addRubySpent(userId: string, amount: number) {
+    if (ObjectId.isValid(userId) && amount > 0) await this.users.updateOne({ _id: new ObjectId(userId) }, { $inc: { rubySpent: amount } });
+  }
+  async recordGame(userIds: string[], game: GameType, winnerId: string | string[] | null) {
     const ids = userIds.filter((id) => ObjectId.isValid(id));
     if (ids.length === 0) return;
+    const winSet = new Set(Array.isArray(winnerId) ? winnerId : winnerId ? [winnerId] : []);
     await this.users.bulkWrite(
       ids.map((id) => ({
         updateOne: {
           filter: { _id: new ObjectId(id) },
-          update: { $inc: { [`stats.${game}.played`]: 1, [`stats.${game}.won`]: id === winnerId ? 1 : 0 } },
+          update: { $inc: { [`stats.${game}.played`]: 1, [`stats.${game}.won`]: winSet.has(id) ? 1 : 0 } },
         },
       })),
     );

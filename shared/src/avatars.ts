@@ -126,6 +126,67 @@ export const AVATAR_PRESETS: readonly CharacterConfig[] = [
       earring: 'da', ring: 'hoa', maphan: 'co', babyhair: 'co', molepos: 'ma', tilt: 'phai', pose: 'chongcam',
     },
   },
+  // 26..35: 10 nhân vật mới mở rộng cho Ma sói, Gián điệp & Party VIP
+  {
+    // 26: Thám Tử Lừng Danh
+    gender: 'nam', age: 'tre', hair: 'pompadour', color: 1, accessory: 'kinhdiepvien', outfit: 'thamtu', detail: 'none',
+    skin: 2, face: 'vuong', build: 'vua', eyes: 'to', brows: 'ray',
+    look: { jaw: 'ro', mouth: 'khep', nose: 'ro', gaze: 'trai', pose: 'chongcam' },
+  },
+  {
+    // 27: Sói Đầu Đàn
+    gender: 'nam', age: 'tre', hair: 'wolfcut', color: 0, accessory: 'matnasoi', outfit: 'aochoangsoi', detail: 'longmay',
+    skin: 5, face: 'nhon', build: 'khoe', eyes: 'motmi', brows: 'ray',
+    look: { jaw: 'ro', browshape: 'gap', mouth: 'cuoirang', tattoo: 'co', tattooside: 'trai' },
+  },
+  {
+    // 28: Tiên Tri Vũ Trụ
+    gender: 'nu', age: 'tre', hair: 'dailung', color: 4, accessory: 'vongthienthan', outfit: 'vesttrang', detail: 'notruoi',
+    skin: 1, face: 'xoan', build: 'gay', eyes: 'to', brows: 'lieu',
+    look: { liner: 'co', lipcolor: 'hongnau', mouth: 'cuoitu', earring: 'da', maphan: 'co' },
+  },
+  {
+    // 29: Phú Bà Kim Cương
+    gender: 'nu', age: 'trung', hair: 'tocvan', color: 7, accessory: 'vuongmien', outfit: 'hoangbao', detail: 'notruoi',
+    skin: 2, face: 'oval', build: 'vua', eyes: 'to', brows: 'lieu',
+    look: { liner: 'co', lipcolor: 'do', lipthick: 'day', earring: 'da', ring: 'hoa', watch: 'bac', pose: 'chumnguc' },
+  },
+  {
+    // 30: Pháp Sư Hắc Ám
+    gender: 'khac', age: 'tre', hair: 'mullet', color: 10, accessory: 'sungquy', outfit: 'aochoangsoi', detail: 'none',
+    skin: 0, face: 'nhon', build: 'gay', eyes: 'motmi', brows: 'ray',
+    look: { browshape: 'gap', lipcolor: 'do', mouth: 'he', gaze: 'phai', haircolor: 'den' },
+  },
+  {
+    // 31: Chiến Thần Gaming
+    gender: 'nam', age: 'tre', hair: 'undercut', color: 9, accessory: 'tainghe', outfit: 'hoodiergb', detail: 'none',
+    skin: 3, face: 'ovalvuong', build: 'vua', eyes: 'to', brows: 'macdinh',
+    look: { haircolor: 'highlight', mouth: 'cuoirang', watch: 'toi', pose: 'baochan' },
+  },
+  {
+    // 32: Tiểu Thư Anh Đào
+    gender: 'nu', age: 'nhi', hair: 'hime', color: 7, accessory: 'hoacaitoc', outfit: 'kimono', detail: 'malum',
+    skin: 0, face: 'tron', build: 'gay', eyes: 'to', brows: 'lieu',
+    look: { maphan: 'co', lipcolor: 'cam', mouth: 'cuoitu', babyhair: 'co' },
+  },
+  {
+    // 33: Điệp Viên 007
+    gender: 'nam', age: 'trung', hair: 'vuotlech', color: 8, accessory: 'kinhcyber', outfit: 'vesttrang', detail: 'none',
+    skin: 4, face: 'vuong', build: 'khoe', eyes: 'macdinh', brows: 'ray',
+    look: { jaw: 'ro', ria: 'manh', watch: 'bac', mouth: 'khep', tilt: 'phai' },
+  },
+  {
+    // 34: Hoàng Đế Đại Gia
+    gender: 'nam', age: 'lao', hair: 'tocvan', color: 3, accessory: 'vuongmien', outfit: 'hoangbao', detail: 'longmay',
+    skin: 3, face: 'oval', build: 'khoe', eyes: 'hip', brows: 'ray',
+    look: { ria: 'vua', raucam: 'vua', ring: 'hoa', watch: 'bac', pose: 'baochan' },
+  },
+  {
+    // 35: Idol Tóp Tóp
+    gender: 'nu', age: 'tre', hair: 'twintails', color: 5, accessory: 'taimeo', outfit: 'hiphop', detail: 'tannhang',
+    skin: 1, face: 'ovalngan', build: 'vua', eyes: 'to', brows: 'macdinh',
+    look: { maphan: 'co', lipcolor: 'do', mouth: 'he', haircolor: 'highlight', tilt: 'trai' },
+  },
 ];
 
 /** Tên gọi của từng chân dung mẫu (cho chú thích) */
@@ -134,4 +195,6 @@ export const AVATAR_PRESET_NAMES: readonly string[] = [
   'Phượt Thủ Nón Sơn', 'Cô Má Hồng', 'Giang Hồ Băng Keo', 'Chị Kính Râm', 'Sếp Đầu Trọc', 'Bé Mái Bằng', 'Cu Tóc Xù', 'Chú Ria Lệch',
   'Cô Phương Hằng', 'Chị Phiến', 'Thầy Huấn', 'Khá Bảnh', 'Lộc Fuho', 'Bà Tân Vlog', 'Thông Soái Ca', 'Chị Đại Chợ Lớn',
   'Thánh Mukbang', 'Idol Cầu Vồng',
+  'Thám Tử Lừng Danh', 'Sói Đầu Đàn', 'Tiên Tri Vũ Trụ', 'Phú Bà Kim Cương', 'Pháp Sư Hắc Ám',
+  'Chiến Thần Gaming', 'Tiểu Thư Anh Đào', 'Điệp Viên 007', 'Hoàng Đế Đại Gia', 'Idol Tóp Tóp',
 ];

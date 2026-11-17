@@ -1,10 +1,10 @@
 import { useMeasuredView, viewRect } from '../viewMeasurements';
 /**
  * Hiệu ứng của kỹ năng chọc trả Ruby, quà tặng và hiệu ứng vào phòng.
- * - sét / băng / bánh kem / nước / chó: phủ lên màn hình người bị chọc (người khác chỉ thấy avatar + thông báo)
- * - tên lửa / hôn gió: bay từ người gửi tới avatar người nhận
- * - quà: hiệu ứng tràn màn hình cho cả phòng, không chặn thao tác
- * - vào phòng: sao rơi + câu "X đã xuất hiện"
+ * - sét / băng / bánh kem / nước / chó / paparazzi / hù ma / ấn ký / thiên thạch / hố đen / rồng thần: phủ lên màn hình người bị chọc
+ * - tên lửa / hôn gió / mũi tên ái tình / cá mập: bay từ người gửi tới avatar người nhận
+ * - quà: hiệu ứng tràn màn hình cho cả phòng, không chặn thao tác (tới Cung Điện Ngân Hà 5000💎)
+ * - vào phòng: 7 mẫu hiệu ứng khi vào phòng
  * Chỉ để vui, không ảnh hưởng ván chơi.
  */
 import {
@@ -33,8 +33,9 @@ import { play } from "../sound";
 import { vibrate } from "../web";
 import { C, FONT } from "../theme";
 import { T, useFeed } from "../ui";
-import { Confetti, rectOf, type Rect } from "./Fun";
+import { Confetti, rectOf, useShake, type Rect } from "./Fun";
 import { ComicSkillFx, type ComicKind } from "./ComicSkillFx";
+import { getSmoothModeSync } from "../smoothMode";
 
 type Size = { w: number; h: number };
 const ReducedMotion = createContext(false);
@@ -250,9 +251,14 @@ type GiftShow = { id: number; gift: string; from: string; to: string };
 const GIFT_MS: Record<string, number> = {
   gift_rose: 3200,
   gift_cake: 4000,
+  gift_diamond_ring: 3800,
   gift_car: 3600,
   gift_yacht: 4600,
+  gift_private_jet: 4200,
   gift_castle: 5200,
+  gift_golden_dragon: 5000,
+  gift_island: 5200,
+  gift_galaxy_palace: 5800,
 };
 
 function GiftFx({
@@ -268,16 +274,29 @@ function GiftFx({
   const ms = GIFT_MS[g.gift] ?? 3500;
   const t = useRun(ms, onDone);
   const emoji = item?.emoji ?? "🎁";
-  const big =
+  const flyAcross =
     g.gift === "gift_car" ||
     g.gift === "gift_yacht" ||
-    g.gift === "gift_castle";
+    g.gift === "gift_private_jet" ||
+    g.gift === "gift_golden_dragon";
+  const grandStage =
+    g.gift === "gift_castle" ||
+    g.gift === "gift_island" ||
+    g.gift === "gift_galaxy_palace" ||
+    g.gift === "gift_diamond_ring";
+  const isGalaxy = g.gift === "gift_galaxy_palace";
+  const count = getSmoothModeSync() ? 8 : 16;
   const [hearts] = useState(() =>
-    Array.from({ length: 14 }, (_, i) => ({
+    Array.from({ length: count }, (_, i) => ({
       x: Math.random() * Math.max(40, size.w - 40),
       d: Math.random() * 0.4,
       s: 24 + Math.random() * 22,
-      e: i % 3 === 0 ? "🌹" : "❤️",
+      e:
+        g.gift === "gift_diamond_ring"
+          ? i % 2 === 0 ? "💍" : "💎"
+          : g.gift === "gift_galaxy_palace"
+            ? i % 3 === 0 ? "🌌" : i % 3 === 1 ? "⭐" : "💎"
+            : i % 3 === 0 ? "🌹" : "❤️",
       i,
     })),
   );
@@ -285,6 +304,7 @@ function GiftFx({
     <Animated.View
       style={[
         styles.giftBanner,
+        isGalaxy && { backgroundColor: "rgba(25,10,55,0.92)", borderColor: "#E879F9" },
         {
           opacity: t.interpolate({
             inputRange: [0, 0.08, 0.85, 1],
@@ -301,7 +321,8 @@ function GiftFx({
         },
       ]}
     >
-      <T style={styles.giftText}>
+      <T style={[styles.giftText, isGalaxy && { color: "#F5D0FE" }]}>
+        {isGalaxy ? "🌌 CHÍ TÔN TẶNG QUÀ: " : ""}
         {g.from} tặng {g.to} {emoji} {item?.name ?? "quà"}
       </T>
     </Animated.View>
@@ -312,7 +333,18 @@ function GiftFx({
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
     >
-      {g.gift === "gift_rose" &&
+      {isGalaxy && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(18, 8, 48, 0.55)",
+              opacity: t.interpolate({ inputRange: [0, 0.12, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+            },
+          ]}
+        />
+      )}
+      {(g.gift === "gift_rose" || g.gift === "gift_diamond_ring" || isGalaxy) &&
         hearts.map((h) => (
           <Animated.Text
             key={h.i}
@@ -365,42 +397,39 @@ function GiftFx({
           </Animated.View>
         </>
       )}
-      {big && (
+      {(flyAcross || grandStage) && (
         <>
-          {g.gift === "gift_castle" && <Confetti />}
+          {(g.gift === "gift_castle" || g.gift === "gift_golden_dragon" || g.gift === "gift_island" || isGalaxy) && <Confetti />}
           <Animated.Text
             style={{
               position: "absolute",
-              fontSize: g.gift === "gift_castle" ? 150 : 130,
-              top: size.h * 0.34,
-              left: t.interpolate({
-                inputRange: [0, 1],
-                outputRange: [
-                  g.gift === "gift_castle" ? size.w * 0.12 : -200,
-                  g.gift === "gift_castle" ? size.w * 0.12 : size.w + 60,
-                ],
-              }),
-              opacity:
-                g.gift === "gift_castle"
-                  ? t.interpolate({
-                      inputRange: [0, 0.12, 0.85, 1],
-                      outputRange: [0, 1, 1, 0],
-                    })
-                  : 1,
-              transform:
-                g.gift === "gift_castle"
-                  ? [
-                      {
-                        scale: t.interpolate({
-                          inputRange: [0, 0.2, 1],
-                          outputRange: [0.3, 1.15, 1],
-                        }),
-                      },
-                    ]
-                  : [],
+              fontSize: isGalaxy ? 156 : grandStage ? 140 : 126,
+              top: size.h * 0.33,
+              left: grandStage
+                ? size.w * 0.5 - (isGalaxy ? 78 : 70)
+                : t.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-200, size.w + 60],
+                  }),
+              opacity: grandStage
+                ? t.interpolate({
+                    inputRange: [0, 0.12, 0.85, 1],
+                    outputRange: [0, 1, 1, 0],
+                  })
+                : 1,
+              transform: grandStage
+                ? [
+                    {
+                      scale: t.interpolate({
+                        inputRange: [0, 0.2, 1],
+                        outputRange: [0.3, 1.15, 1],
+                      }),
+                    },
+                  ]
+                : [],
             }}
           >
-            {emoji}
+            {isGalaxy ? "🏰" : emoji}
           </Animated.Text>
           {[0, 1, 2, 3].map((k) => (
             <Animated.Text
@@ -419,7 +448,7 @@ function GiftFx({
                 }),
               }}
             >
-              ✨
+              {isGalaxy ? "🪐" : "✨"}
             </Animated.Text>
           ))}
         </>
@@ -429,19 +458,33 @@ function GiftFx({
   );
 }
 
-/** sao rơi + "X đã xuất hiện" khi người có hiệu ứng vào phòng */
+const ENTRANCE_CFG: Record<string, { glyphA: string; glyphB: string; text: (n: string) => string; bg?: string; border?: string }> = {
+  enter_star: { glyphA: "⭐", glyphB: "🌟", text: (n) => `🌟 ${n} đã xuất hiện!` },
+  enter_red_carpet: { glyphA: "🌹", glyphB: "🟥", text: (n) => `🟥 Trải thảm đỏ đón ${n}!`, bg: "rgba(130,10,16,0.92)", border: "#FFD43B" },
+  enter_supercar: { glyphA: "🏎️", glyphB: "💨", text: (n) => `🏎️ ${n} đánh siêu xe tới sảnh!`, bg: "rgba(15,23,42,0.9)", border: "#38BDF8" },
+  enter_thunder_god: { glyphA: "⚡", glyphB: "🌩️", text: (n) => `🌩️ Lôi Thần ${n} giáng lâm!`, bg: "rgba(25,18,55,0.92)", border: "#38BDF8" },
+  enter_fireworks: { glyphA: "🎆", glyphB: "🎇", text: (n) => `🎆 Pháo hoa rực rỡ đón ${n}!`, bg: "rgba(40,10,35,0.9)", border: "#FF6FA5" },
+  enter_dragon_descent: { glyphA: "🐉", glyphB: "🔥", text: (n) => `🐉 Thần Long ${n} xuất thế!`, bg: "rgba(65,12,12,0.94)", border: "#FACC15" },
+  enter_galaxy_portal: { glyphA: "🌀", glyphB: "🌌", text: (n) => `🌌 Chí Tôn ${n} bước ra từ Ngân Hà!`, bg: "rgba(22,8,55,0.95)", border: "#E879F9" },
+};
+
+/** hiệu ứng vào phòng đa dạng theo trang bị entrance */
 function EntranceFx({
   name,
+  fx,
   size,
   onDone,
 }: {
   name: string;
+  fx?: string;
   size: Size;
   onDone: () => void;
 }) {
-  const t = useRun(3200, onDone);
+  const cfg = ENTRANCE_CFG[fx ?? "enter_star"] ?? ENTRANCE_CFG.enter_star;
+  const t = useRun(3400, onDone);
+  const count = getSmoothModeSync() ? 7 : 16;
   const [stars] = useState(() =>
-    Array.from({ length: 16 }, (_, i) => ({
+    Array.from({ length: count }, (_, i) => ({
       x: Math.random() * Math.max(40, size.w - 30),
       d: Math.random() * 0.4,
       s: 22 + Math.random() * 20,
@@ -463,7 +506,7 @@ function EntranceFx({
             fontSize: s.s,
             top: t.interpolate({
               inputRange: [s.d, Math.min(1, s.d + 0.55)],
-              outputRange: [-40, size.h * 0.7],
+              outputRange: [-40, size.h * 0.72],
               extrapolate: "clamp",
             }),
             opacity: t.interpolate({
@@ -472,12 +515,14 @@ function EntranceFx({
             }),
           }}
         >
-          {s.i % 2 ? "⭐" : "🌟"}
+          {s.i % 2 ? cfg.glyphA : cfg.glyphB}
         </Animated.Text>
       ))}
       <Animated.View
         style={[
           styles.giftBanner,
+          cfg.bg ? { backgroundColor: cfg.bg } : null,
+          cfg.border ? { borderColor: cfg.border } : null,
           {
             top: size.h * 0.22,
             opacity: t.interpolate({
@@ -487,18 +532,173 @@ function EntranceFx({
           },
         ]}
       >
-        <T style={styles.giftText}>🌟 {name} đã xuất hiện!</T>
+        <T style={styles.giftText}>{cfg.text(name)}</T>
       </Animated.View>
     </View>
+  );
+}
+
+type VipScreenKind = "paparazzi" | "ghost_scare" | "royal_seal" | "blackhole" | "dragon_roar" | "meteor";
+
+function VipSkillScreenFx({
+  kind,
+  size,
+  onDone,
+}: {
+  kind: VipScreenKind;
+  size: Size;
+  onDone: () => void;
+}) {
+  const dur = kind === "blackhole" ? 3600 : kind === "dragon_roar" ? 3400 : 2800;
+  const t = useRun(dur, onDone);
+  if (kind === "paparazzi") {
+    return (
+      <Animated.View
+        testID="skill-fx-paparazzi"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: "#FFFFFF",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.08, 0.16, 0.28, 0.4, 0.85, 1], outputRange: [0, 0.95, 0.15, 0.9, 0.25, 0.2, 0] }),
+          },
+        ]}
+      >
+        <View style={[styles.giftBanner, { top: size.h * 0.32, backgroundColor: "#B5121B" }]}>
+          <T style={styles.giftText}>📸 TÁCH! LÊN TRANG NHẤT BÁO LÁ CẢI!</T>
+        </View>
+      </Animated.View>
+    );
+  }
+  if (kind === "ghost_scare") {
+    return (
+      <Animated.View
+        testID="skill-fx-ghost_scare"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: "rgba(10, 5, 25, 0.72)",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 0.9, 0] }),
+          },
+        ]}
+      >
+        <Animated.Text
+          style={{
+            fontSize: 130,
+            transform: [{ scale: t.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.35, 1.1] }) }],
+          }}
+        >
+          👻
+        </Animated.Text>
+        <T style={[styles.giftText, { marginTop: 12 }]}>HÚ HỒN CHƯA?! 👻</T>
+      </Animated.View>
+    );
+  }
+  if (kind === "blackhole") {
+    return (
+      <Animated.View
+        testID="skill-fx-blackhole"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: "rgba(18, 4, 42, 0.65)",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.15, 0.82, 1], outputRange: [0, 1, 1, 0] }),
+          },
+        ]}
+      >
+        <Animated.Text
+          style={{
+            fontSize: 150,
+            transform: [
+              { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "720deg"] }) },
+              { scale: t.interpolate({ inputRange: [0, 0.3, 0.8, 1], outputRange: [0.2, 1.3, 1.1, 0.2] }) },
+            ],
+          }}
+        >
+          🌀
+        </Animated.Text>
+        <T style={[styles.giftText, { color: "#E879F9", marginTop: 10 }]}>🕳️ HỐ ĐEN VŨ TRỤ HÚT SẠCH!</T>
+      </Animated.View>
+    );
+  }
+  if (kind === "royal_seal") {
+    return (
+      <Animated.View
+        testID="skill-fx-royal_seal"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+          },
+        ]}
+      >
+        <Animated.View
+          style={{
+            borderWidth: 5,
+            borderColor: "#FFD43B",
+            backgroundColor: "rgba(155, 14, 22, 0.92)",
+            borderRadius: 18,
+            paddingHorizontal: 22,
+            paddingVertical: 14,
+            transform: [
+              { rotate: "-9deg" },
+              { scale: t.interpolate({ inputRange: [0, 0.14, 0.25, 1], outputRange: [2.4, 0.95, 1, 1] }) },
+            ],
+          }}
+        >
+          <T style={{ color: "#FFD43B", fontSize: 24, fontWeight: "900", textAlign: "center" }}>🏮 TRẪM CHỈ ĐỊNH! 🏮</T>
+        </Animated.View>
+      </Animated.View>
+    );
+  }
+  const isDragon = kind === "dragon_roar";
+  return (
+    <Animated.View
+      testID={`skill-fx-${kind}`}
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          backgroundColor: isDragon ? "rgba(60, 10, 10, 0.45)" : "rgba(70, 20, 0, 0.35)",
+          opacity: t.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+        },
+      ]}
+    >
+      <Animated.Text
+        style={{
+          position: "absolute",
+          fontSize: 120,
+          top: isDragon ? size.h * 0.28 : t.interpolate({ inputRange: [0, 1], outputRange: [-60, size.h * 0.65] }),
+          left: isDragon ? t.interpolate({ inputRange: [0, 1], outputRange: [-140, size.w + 40] }) : t.interpolate({ inputRange: [0, 1], outputRange: [size.w * 0.8, size.w * 0.15] }),
+        }}
+      >
+        {isDragon ? "🐉" : "☄️"}
+      </Animated.Text>
+      <View style={[styles.giftBanner, { top: size.h * 0.16 }]}>
+        <T style={styles.giftText}>{isDragon ? "🐉 RỒNG THẦN GẦM THÉT!" : "☄️ THIÊN THẠCH GIÁNG THẾ!"}</T>
+      </View>
+    </Animated.View>
   );
 }
 
 // ---------- lớp gắn vào Shell ----------
 
 type Screen = { id: number; kind: ComicKind; player?: PublicPlayer };
+type VipScreen = { id: number; kind: VipScreenKind };
 type Show =
   | { id: number; kind: "gift"; g: GiftShow }
-  | { id: number; kind: "entrance"; name: string };
+  | { id: number; kind: "entrance"; name: string; fx?: string };
 
 const SKILL_LINE: Record<string, (from: string, to: string) => string> = {
   duck: (a, b) => `${a} cử đàn vịt đòi nợ ${b}!`,
@@ -512,6 +712,14 @@ const SKILL_LINE: Record<string, (from: string, to: string) => string> = {
   dog: (a, b) => `🐕 ${a} thả chó đuổi ${b}!`,
   rocket: (a, b) => `🚀 ${a} bắn tên lửa vào ${b}!`,
   kiss: (a, b) => `😘 ${a} gửi nụ hôn gió cho ${b}`,
+  paparazzi: (a, b) => `📸 ${a} chụp lén paparazzi ${b}!`,
+  cupid_arrow: (a, b) => `💘 ${a} bắn mũi tên ái tình vào ${b}!`,
+  ghost_scare: (a, b) => `👻 ${a} thả ma hù ${b} giữa đêm!`,
+  shark: (a, b) => `🦈 ${a} gọi cá mập cắn ${b}!`,
+  royal_seal: (a, b) => `🏮 ${a} đóng Ấn Ký Hoàng Gia lên ${b}!`,
+  meteor: (a, b) => `☄️ ${a} triệu hồi thiên thạch dội xuống ${b}!`,
+  blackhole: (a, b) => `🕳️ ${a} mở hố đen vũ trụ hút ${b}!`,
+  dragon_roar: (a, b) => `🐉 ${a} gọi Rồng Thần gầm thét vào ${b}!`,
 };
 
 export function SkillLayer({
@@ -522,8 +730,11 @@ export function SkillLayer({
   players: PublicPlayer[];
 }) {
   const [screens, setScreens] = useState<Screen[]>([]);
+  const [vipScreens, setVipScreens] = useState<VipScreen[]>([]);
   const [reduced, setReduced] = useState(false);
   const reducedRef = useLatest(reduced);
+  const shake = useShake();
+  const shakeRef = useLatest(shake);
   useEffect(() => {
     let alive = true;
     const update = (value: boolean) => {
@@ -569,6 +780,10 @@ export function SkillLayer({
     (id: number) => setScreens((xs) => xs.filter((x) => x.id !== id)),
     [],
   );
+  const dropVipScreen = useCallback(
+    (id: number) => setVipScreens((xs) => xs.filter((x) => x.id !== id)),
+    [],
+  );
   const dropShow = useCallback(
     (id: number) => setShows((xs) => xs.filter((x) => x.id !== id)),
     [],
@@ -597,6 +812,7 @@ export function SkillLayer({
           {
             id: ++seq.current,
             kind: "entrance",
+            fx: e.fx,
             name: nameOf(e.from) === "bạn" ? "Bạn" : nameOf(e.from),
           },
         ]);
@@ -636,7 +852,7 @@ export function SkillLayer({
           from === "bạn" ? "Bạn" : from,
           toMe ? "bạn" : nameOf(e.to),
         ),
-        toMe && k !== "kiss" ? "bad" : "fun",
+        toMe && k !== "kiss" && k !== "cupid_arrow" ? "bad" : "fun",
       );
       if (k === "duck" || k === "ufo" || k === "disco" || k === "money") {
         setMood(e.to, k === "disco" || k === "money" ? "smug" : "shock", 2500);
@@ -748,9 +964,55 @@ export function SkillLayer({
             },
           ]);
         else land();
+      } else if (k === "cupid_arrow" || k === "shark") {
+        const fromR = rectOf(`avatar-${e.from}`, origin, rot);
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
+        const isCupid = k === "cupid_arrow";
+        const land = () => {
+          if (isCupid) {
+            setTint(e.to, "blush", 3500);
+            setMood(e.to, "smug", 3000);
+            play("sparkle");
+          } else {
+            setMood(e.to, "shock", 3000);
+            setWobble(e.to, "shake", 1600);
+            play("boom");
+            if (toMe && !e.soft) {
+              vibrate([120, 60, 160]);
+              shakeRef.current("normal");
+            }
+          }
+          if (toR)
+            setBursts((xs) => [
+              ...xs.slice(-6),
+              { id: ++seq.current, emoji: isCupid ? "💖" : "💥", at: toR, big: !isCupid },
+            ]);
+        };
+        play("whoosh");
+        if (fromR && toR && !reducedRef.current)
+          setFlights((xs) => [
+            ...xs.slice(-6),
+            { id: ++seq.current, emoji: isCupid ? "💘" : "🦈", from: fromR, to: toR, ms: 750, arc: isCupid, after: land },
+          ]);
+        else land();
+      } else if (k === "paparazzi" || k === "ghost_scare" || k === "royal_seal" || k === "meteor" || k === "blackhole" || k === "dragon_roar") {
+        setMood(e.to, k === "blackhole" ? "dizzy" : "shock", 3400);
+        setWobble(e.to, k === "blackhole" ? "spin" : "shake", k === "blackhole" ? 3200 : 1800);
+        play(k === "dragon_roar" || k === "meteor" ? "boom" : k === "paparazzi" ? "zap" : "siren");
+        const toR = rectOf(`avatar-${e.to}`, origin, rot);
+        if (toR)
+          setBursts((xs) => [
+            ...xs.slice(-6),
+            { id: ++seq.current, emoji: k === "paparazzi" ? "📸" : k === "ghost_scare" ? "👻" : k === "royal_seal" ? "🏮" : k === "meteor" ? "💥" : k === "blackhole" ? "🌀" : "🐉", at: toR, big: true },
+          ]);
+        if (toMe && !e.soft) {
+          vibrate([140, 60, 200]);
+          if (k === "royal_seal" || k === "meteor" || k === "dragon_roar") shakeRef.current("quake");
+          setVipScreens((xs) => [...xs.slice(-2), { id: ++seq.current, kind: k }]);
+        }
       }
     });
-  }, [game, feed, playersRef, rotatedRef, reducedRef, layer]);
+  }, [game, feed, playersRef, rotatedRef, reducedRef, shakeRef, layer]);
 
   return (
     <ReducedMotion.Provider value={reduced}>
@@ -793,11 +1055,19 @@ export function SkillLayer({
               <EntranceFx
                 key={s.id}
                 name={s.name}
+                fx={s.fx}
                 size={size}
                 onDone={() => dropShow(s.id)}
               />
             ),
           )}
+        </View>
+      )}
+      {vipScreens.length > 0 && (
+        <View pointerEvents="none" style={styles.layer}>
+          {vipScreens.map((v) => (
+            <VipSkillScreenFx key={v.id} kind={v.kind} size={size} onDone={() => dropVipScreen(v.id)} />
+          ))}
         </View>
       )}
       {screens.length > 0 && (

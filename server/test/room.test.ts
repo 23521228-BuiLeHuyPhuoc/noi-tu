@@ -33,13 +33,17 @@ describe('Room — phòng chờ', () => {
     expect(room.addPlayer('x'.repeat(25))).toEqual({ ok: false, error: 'invalid_name' });
   });
 
-  it('từ chối tên rỗng, phòng đầy; vào khi đang chơi thì ở chế độ xem (spectator) và không được thao tác', () => {
-    const { room, ids } = setup(['A', 'B', 'C', 'D', 'E', 'F']);
+  it('từ chối tên rỗng, phòng đầy 12 người; vào khi đang chơi thì ở chế độ xem (spectator) và không được thao tác', () => {
+    const { room, ids } = setup(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']);
     expect(room.addPlayer('   ')).toEqual({ ok: false, error: 'invalid_name' });
-    expect(room.addPlayer('G')).toEqual({ ok: false, error: 'room_full' });
-    room.removePlayer(ids[5]);
+    expect(room.addPlayer('M')).toEqual({ ok: false, error: 'room_full' });
+    room.removePlayer(ids[11]);
+    room.removePlayer(ids[10]);
+    room.removePlayer(ids[9]);
+    room.removePlayer(ids[8]);
+    room.removePlayer(ids[7]);
     room.start(ids[0]);
-    const joined = room.addPlayer('G');
+    const joined = room.addPlayer('M');
     expect(joined.ok).toBe(true);
     if (joined.ok) {
       const gPlayer = room.toPublic().players.find((p) => p.id === joined.playerId);

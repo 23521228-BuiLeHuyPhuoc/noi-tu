@@ -478,7 +478,12 @@ export function useGame(): Game {
   // các hàm dùng làm điều kiện của useEffect ở màn hình: giữ nguyên danh tính giữa các lần vẽ
   const loadShop = useCallback(async () => {
     const r = await shopCall<ShopInfo>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:get'));
-    if (r.ok) setUser((u) => (u ? { ...u, ruby: r.data.ruby, owned: r.data.owned, equipped: r.data.equipped, giftPoints: r.data.giftPoints } : u));
+    if (r.ok) {
+      setUser((u) => (u ? {
+        ...u, ruby: r.data.ruby, owned: r.data.owned, equipped: r.data.equipped, giftPoints: r.data.giftPoints,
+        rubySpent: r.data.rubySpent ?? u.rubySpent, vipTier: r.data.vipTier ?? u.vipTier,
+      } : u));
+    }
     return r;
   }, [shopCall]);
   const checkinStatus = useCallback(() => shopCall<CheckinStatus>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('checkin:status')), [shopCall]);
@@ -590,9 +595,13 @@ export function useGame(): Game {
     adminRevenue: () => walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),
     loadShop,
     buyItem: async (itemId) => {
-      const r = await shopCall<{ balance: number; owned: string[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:buy', { itemId }));
+      const r = await shopCall<{ balance: number; owned: string[]; rubySpent?: number; vipTier?: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:buy', { itemId }));
       if (!r.ok) return r.error;
-      setUser((u) => (u ? { ...u, ruby: r.data.balance, owned: r.data.owned } : u));
+      setUser((u) => (u ? {
+        ...u, ruby: r.data.balance, owned: r.data.owned,
+        ...(r.data.rubySpent !== undefined ? { rubySpent: r.data.rubySpent } : {}),
+        ...(r.data.vipTier !== undefined ? { vipTier: r.data.vipTier } : {}),
+      } : u));
       return null;
     },
     equipItem: async (slot, itemId) => {

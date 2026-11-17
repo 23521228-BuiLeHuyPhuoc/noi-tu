@@ -84,6 +84,11 @@ export class Dictionary {
     return this.insert(raw);
   }
 
+  /** Toàn bộ từ hợp lệ đang có trong từ điển (dùng lập chỉ mục cho game Bom chữ, v.v.). */
+  allWords(): ReadonlySet<string> {
+    return this.words;
+  }
+
   private insert(raw: string): string | null {
     const w = this.norm(raw);
     if (!w || this.words.has(w) || this.banned.has(w)) return null;

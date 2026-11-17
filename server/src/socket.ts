@@ -9,7 +9,8 @@ import type { Auth } from './auth';
 import { PhotoService } from './avatar';
 import { attachWalletHandlers } from './wallet';
 import { attachShopHandlers, chargeRuby, cosmeticsOf, type ShopContext } from './shop';
-import { CHAOS_POKE_RUBY, POKE_OVERFLOW_RUBY, STICKER_PACK_ID, isPaidSticker, shopItem, skillPrice } from '../../shared/src/shop';
+import { CHAOS_POKE_RUBY, POKE_OVERFLOW_RUBY, STICKER_PACK_ID, isPaidSticker, prestigePoints, shopItem, skillPrice, vipOf } from '../../shared/src/shop';
+import { isFreeTheme } from '../../shared/src/themes';
 import { AVATAR_PRESETS } from '../../shared/src/avatars';
 import type { UserRecord } from './store';
 
@@ -17,7 +18,16 @@ type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 export function broadcastRoom(io: IO, room: Room): void {
-  io.to(room.code).emit('room:state', room.toPublic());
+  if (!room.hasPerPlayerView) {
+    io.to(room.code).emit('room:state', room.toPublic());
+    return;
+  }
+  const sids = io.sockets.adapter.rooms.get(room.code);
+  if (!sids) return;
+  for (const sid of sids) {
+    const s = io.sockets.sockets.get(sid);
+    if (s) s.emit('room:state', room.toPublic((s.data as { playerId?: string }).playerId));
+  }
 }
 
 let funSeq = 0;
@@ -61,6 +71,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const { code, playerId } = session;
       socket.leave(code);
       session = null;
+      (socket.data as { playerId?: string }).playerId = undefined;
       const room = manager.get(code);
       const mine = activeSocket.get(key(code, playerId)) === socket.id;
       if (mine) activeSocket.delete(key(code, playerId));
@@ -81,15 +92,22 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const already = !!wanted && room.has(wanted);
       socket.join(room.code);
       const res = room.addPlayer(displayName, wanted, user
-        ? { avatar: user.avatar, avatarUrl: user.avatarUrl, account: true, cosmetics: cosmeticsOf(user.equipped) }
+        ? {
+            avatar: user.avatar,
+            avatarUrl: user.avatarUrl,
+            account: true,
+            cosmetics: cosmeticsOf(user.equipped),
+            vipTier: vipOf(prestigePoints(user.rubySpent, user.owned)).tier,
+          }
         : { avatar: guestAvatar, avatarUrl: guestUrl });
       if (!res.ok) {
         socket.leave(room.code);
         return res;
       }
       session = { code: room.code, playerId: res.playerId };
+      (socket.data as { playerId?: string }).playerId = res.playerId;
       activeSocket.set(key(room.code, res.playerId), socket.id);
-      socket.emit('room:state', room.toPublic());
+      socket.emit('room:state', room.toPublic(res.playerId));
       socket.emit('chat:history', room.chatLog);
       // hiệu ứng vào phòng (chỉ lần đầu vào, không phát lại khi nối lại)
       const fx = user?.equipped?.entrance;
@@ -158,6 +176,21 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const room = currentRoom();
       if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
       if (!p || typeof p !== 'object') return ack({ ok: false, error: 'bad_request' });
+      const theme = p.settings?.roomTheme;
+      if (theme !== undefined && !isFreeTheme(theme)) {
+        if (!user || !walletCtx) return ack({ ok: false, error: 'bad_request' });
+        const pid = session.playerId;
+        walletCtx.store.userById(user.id).then(
+          (u) => {
+            const cur = currentRoom();
+            if (!cur || session?.playerId !== pid) return ack({ ok: false, error: 'not_in_room' });
+            if (!u?.owned?.includes(theme)) return ack({ ok: false, error: 'bad_request' });
+            ack(cur.configure(pid, p.gameType, p.settings));
+          },
+          () => ack({ ok: false, error: 'bad_request' }),
+        );
+        return;
+      }
       ack(room.configure(session.playerId, p.gameType, p.settings));
     });
 
@@ -468,6 +501,7 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       if (room && session?.playerId === ACCOUNT_PREFIX + updated.id) {
         room.updateProfile(session.playerId, updated.displayName, updated.avatar, updated.avatarUrl);
         room.setCosmetics(session.playerId, cosmeticsOf(updated.equipped));
+        room.setVipTier(session.playerId, vipOf(prestigePoints(updated.rubySpent, updated.owned)).tier);
       }
     };
     auth.profiles.on('updated', profileChanged);

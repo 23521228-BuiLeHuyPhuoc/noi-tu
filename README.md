@@ -1,63 +1,44 @@
 # Xóm Lầy
 
-Game chơi cùng bạn bè ngay trên trình duyệt điện thoại: **Nối từ**, **Nối từ Anh**, **Bầu cua**, **Cờ tỷ phú**. Phòng tối đa 6 người, mời bằng link hoặc mã phòng.
+Game party đa người chơi ngay trên trình duyệt điện thoại & máy tính: **9 trò chơi** hỗ trợ tới **12 người / phòng**, mời bằng link hoặc mã 6 ký tự:
+- 🔤 **Nối từ** (1–8 người) & 🇬🇧 **Nối từ Anh** (1–8 người)
+- 🦀 **Bầu cua** (1–12 người) & 🏦 **Cờ tỷ phú** (2–6 người)
+- 🐺 **Ma Sói / Werewolf** (4–12 người — 9 vai trò, Kênh Sói ban đêm, Cặp Đôi, Thợ Săn, Kẻ Ngố)
+- 🕵️ **Ai là gián điệp** (3–12 người — 160 cặp từ, vai Mr. White, chống lộ từ)
+- 🎨 **Vẽ & Đoán** (2–12 người — Bảng vẽ vector, 180+ từ, bot biết vẽ nét mẫu)
+- 💣 **Bom Chữ** (2–12 người — Gõ từ chứa âm tiết trước khi bom phát nổ)
+- 🧠 **Đấu Trường Đố Vui** (1–12 người — 200 câu hỏi, chuỗi streak, câu cuối x2)
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
-- Nhập tên (chơi khách) hoặc bấm **Đăng ký** / **Đăng nhập** ở đầu trang để giữ tên, mặt đại diện và thành tích các ván đã chơi. Đăng ký cần email và nhập mật khẩu 2 lần; đăng nhập bằng tên đăng nhập hoặc email; **Quên mật khẩu?** gửi mã 6 số qua email. Đổi email, đổi mật khẩu trong bảng ✏️.
-- **Đổi tên, mặt đại diện, tải ảnh của mình ở bất cứ đâu**: trang chủ (chạm vào ảnh cạnh ô tên), phòng chờ hay giữa ván (nút ✏️ trên thanh trên, hoặc chạm vào avatar của chính mình). Khách cũng tải ảnh được. Tên hiện đầy đủ dưới avatar, dài thì xuống dòng.
-- Chạm vào game muốn chơi để tạo phòng → **Gửi link mời bạn bè** qua Zalo/Messenger. Bạn bè bấm link là vào thẳng phòng.
-- Chủ phòng đổi game được ngay trong phòng chờ hoặc sau mỗi ván.
-- Nút 💬: **trò chuyện**, thả emoji bay lên, câu khịa có sẵn và 9 mẫu sticker Quỳnh Aka. Tin nhắn hiện thành bong bóng dưới avatar người gửi.
-- Chạm vào avatar bạn bè để **đánh nhau** (tát 🖐️, đấm 👊, đá 🦶, chưởng 🌀; máu ảo, K.O. thì hồi đầy, không ảnh hưởng ván chơi), **ném** 🩴🍅🥚💩🌹💖 hoặc **hối** (rung máy họ).
-- Các chiêu làm rung/xoay/che màn hình (động đất, xoay màn hình, sụp nguồn, gián, mực, hối) **mỗi người chỉ dính tối đa 3 lần trong 15 giây**; đánh/ném quá giới hạn vẫn bay tới avatar nhưng không rung màn hình. Bị chọc đúng lúc đang tới lượt Nối từ thì **được bù lại thời gian** (sụp nguồn +4,5s, xoay +3,5s…, tối đa 15s mỗi lượt).
+- **Hệ thống Nhân vật, Chọc lầy, VIP Phú Hào & Map Phòng**:
+  - 36 nhân vật mẫu + tùy biến sâu tóc, mắt, mũi, miệng, trang phục, phụ kiện, hình xăm và 12 màu đại diện.
+  - 11 **Map / Chủ đề màu phòng** (5 miễn phí + 6 Map động hiệu ứng Ruby: Tết Cổ Truyền, Hoa Anh Đào, Phố Ẩm Thực, Sòng Bài Hoàng Gia, Long Cung, Cung Trăng Ngân Hà).
+  - **8 ô trang bị VIP** (`frame`, `nameFx`, `aura`, `entrance`, `pet`, `title`, `chatBubble`, `roomTheme`) + **Cấp bậc VIP Phú Hào 1→6** (lên tới *Thiên Đế Chí Tôn*), 19 kỹ năng chọc trả Ruby, 10 quà đại gia (tới 5.000 💎) và bộ Sticker Chữ Lầy.
+  - **Tối ưu chống lag phòng 12 người**: Cache SVG 300 ảnh (LRU), tách tick bộ đếm giây từng widget, đăng ký trạng thái chọc theo từng avatar (`funState`), đồng bộ shader GPU CSS 60fps trên web và chế độ **⚡ Siêu mượt**.
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
-- Lần đầu mở sau một lúc không ai chơi, server miễn phí cần khoảng 1 phút để thức dậy.
 
 ```
 noi-tu/
-  shared/   kiểu dữ liệu + chuẩn hóa tiếng Việt & tiếng Anh (dùng chung app & server)
-  server/   Node.js + Socket.IO, trọng tài của mọi ván chơi
-    src/games/   wordchain.ts, baucua.ts, typhu.ts (luật từng game)
-  app/      giao diện (React Native Web qua Expo), xuất ra trang web cho điện thoại
-  e2e/      test giao diện tự động (nhiều trình duyệt chơi thật với nhau)
-  docs/     thiết kế
+  shared/   kiểu dữ liệu, từ vựng, bộ vai Ma Sói / Gián Điệp / Đố Vui / Vẽ & Đoán / Map / Shop VIP
+  server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho mọi game
+    src/games/   wordchain.ts, baucua.ts, typhu.ts, masoi.ts, giandiep.ts, vedoan.ts, bomtu.ts, dovui.ts
+  app/      giao diện React Native Web (Expo) + bộ CSS shader GPU
+  e2e/      test trình duyệt thật (Playwright đa màn hình & kiểm tra hình ảnh)
+  docs/     tài liệu thiết kế các phase (00–08)
 ```
 
-## Luật chơi
+## Tóm tắt 9 trò chơi
 
-**Nối từ** (1–6 người)
-- Mỗi từ gồm đúng 2 chữ. Chữ đầu của từ mới phải trùng chữ cuối của từ trước. Không dùng lại từ đã dùng.
-- Chữ đầu được điền sẵn và khóa lại, chỉ cần gõ chữ thứ hai.
-- Mỗi lượt 30 giây, gõ sai được gõ lại. Hết giờ thì bị loại; người còn lại cuối cùng thắng.
-- Màn hình hiện số từ còn nối được. Mỗi người có 1 quyền **Cứu trợ**: bấm là server nối hộ luôn một từ hợp lệ (không cần điền rồi bấm Gửi).
-- Từ có nghĩa mà kho từ chưa có: bấm **Xin cả phòng duyệt** (mỗi lượt 1 lần). Đồng hồ tạm dừng 12 giây cho mọi người bỏ phiếu; đồng ý nhiều hơn phản đối thì từ được tính, thêm vào kho từ và lưu vào CSDL cho các ván sau.
-- Kho từ ~79.600 từ 2 chữ, gộp từ 13 nguồn (từ điển Việt–Việt, Việt–Anh, Wiktionary, lời giải nghĩa Anh–Việt, lượng từ + danh từ như "cái bàn", "quả cam"). Xem `server/scripts/build-dictionary.ts`.
-- Có 25.976 giải nghĩa kèm nguồn; từ chưa có định nghĩa hiện **Chưa có giải nghĩa**.
-- Gõ dấu kiểu cũ hay mới đều được (hoà = hòa, thuỷ = thủy).
-
-**Nối từ Anh** (1–6 người)
-- Mỗi từ là 1 từ đơn tiếng Anh (`a–z`, tối thiểu 2 ký tự). Chữ cái đầu của từ mới phải trùng chữ cái cuối của từ trước (ví dụ: `art` → `tits` → `sex`). Không dùng lại từ đã dùng.
-- Chữ cái đầu được điền sẵn và khóa lại, người chơi chỉ cần gõ phần còn lại của từ (hoặc gõ cả từ cũng được). Gạch nối được bỏ qua (`x-ray` = `xray`).
-- Quên tắt bộ gõ tiếng Việt cũng không sao: Telex biến `xmas` thành `xmá`, `box` thành `bõ`… server tự dịch ngược; nếu không đoán ra thì nhắc tắt bộ gõ.
-- **Thời gian mỗi lượt giảm dần theo từng người**: 30 giây lúc đầu, mỗi từ tự nối đúng bớt 0,5 giây, tới 30 từ thì còn 15 giây và giữ ở đó.
-- **Cứu trợ**: 1 lần mỗi ván, cứ mỗi 30 từ tự nối đúng được thêm 1 lần; bấm là nối hộ luôn (từ nhờ cứu trợ không tính vào số từ tự nối đúng).
-- **Xin cả phòng duyệt** và **chú thích nghĩa tiếng Việt theo từ loại + phiên âm IPA** giống game Nối từ tiếng Việt; dạng biến đổi ghi rõ gốc (`took` → "quá khứ của take").
-- Kho từ **210.987 từ tiếng Anh** chỉ lấy từ nguồn uy tín: **SCOWL** (bộ từ của aspell/hunspell), **ENABLE1**, **WordNet**, **Wiktionary tiếng Việt** và **Từ điển Anh–Việt FVDP** (Hồ Ngọc Đức); bỏ tên riêng và viết tắt. **130.549 mục giải nghĩa** (khoảng 98% từ thông dụng). Chi tiết: `server/data/DEFINITIONS-SOURCES.md`, cách dựng lại: `server/scripts/build-en-dictionary.py`.
-
-**Bầu cua** (1–6 người, xu ảo)
-- Mỗi người 1.000 xu. Chọn chip rồi chạm vào con vật để đặt cược trong 20 giây. Tiền của mọi người vun thành chồng xu trên từng ô (mỗi người một màu). Hết giờ **máy tự lắc**, không ai lắc tay.
-- Bát úp ngay trên bàn khi lắc, rồi mở ra để lộ 3 con. Con nào trúng ô mình đặt thì bay vào ô đó và ô sáng lên; trật hết thì… mưa rơi. Trúng mấy con ăn gấp bấy nhiêu lần tiền cược, trượt thì mất.
-- Cháy túi thì **vay nóng** 500 xu (bị ghi nợ). Chủ phòng bấm **Tổng kết** để xếp hạng theo xu trừ nợ.
-
-**Cờ tỷ phú** (2–6 người)
-- Bàn 40 ô, đất là các tỉnh thành, chia 8 bộ màu, cùng các ga và công ty tiện ích. Mỗi người 1.500 xu.
-- Đổ 2 xúc xắc, quân di chuyển từng bước trên bàn. Dừng ở đất trống thì mua hoặc bỏ qua; dừng ở đất người khác thì trả tiền thuê (gấp đôi nếu họ có đủ bộ màu).
-- Có đủ bộ màu thì chạm vào ô đất để xây nhà (tối đa 3 nhà + khách sạn), tiền thuê tăng mạnh.
-- Ga tính tiền thuê theo số ga sở hữu; tiện ích tính theo tổng xúc xắc và số công ty sở hữu.
-- Đi qua Xuất phát nhận 200 xu. Ô Cơ hội và Khí vận rút thẻ, ô Thuế nộp tiền, ô Vào tù thì vào tù (đổ đôi hoặc nộp 50 xu để ra).
-- Đổ đôi được đổ tiếp, 3 lần đôi liên tiếp thì vào tù. Hết tiền tự bán nhà/đất, vẫn thiếu thì phá sản.
-- Người trụ lại cuối cùng thắng; chủ phòng có thể **Tổng kết** sớm (xếp theo tổng tài sản).
+1. **Nối từ (1–8 người)**: Nối từ 2 chữ tiếng Việt từ kho ~79.600 từ, 30s/lượt, có Cứu trợ & Xin duyệt từ mới.
+2. **Nối từ Anh (1–8 người)**: Nối từ tiếng Anh từ kho 210.987 từ (SCOWL/ENABLE1/WordNet), dịch ngược bộ gõ Telex/VNI, giải nghĩa tiếng Việt + IPA, thời gian co dần từ 30s xuống 15s theo chuỗi.
+3. **Bầu cua (1–12 người, xu ảo)**: 1.000 xu, cược 6 linh vật trong 20s, mở bát 3D, vay nóng 500 xu khi cháy túi, tổng kết theo số ván 10–30.
+4. **Cờ tỷ phú (2–6 người)**: Bàn 40 ô Việt Nam, mua đất, nâng 3 nhà + khách sạn, bến ga, công ty tiện ích, Cơ hội/Khí vận, bán tài sản tránh phá sản.
+5. **Ma Sói (4–12 người)**: 9 vai trò (`Sói`, `Tiên Tri`, `Bảo Vệ`, `Phù Thủy`, `Thợ Săn`, `Thần Tình Yêu`, `Kẻ Ngố`, `Thám Tử`, `Dân Làng`), bot thông minh & Kênh Sói ban đêm.
+6. **Ai là gián điệp (3–12 người)**: 160 cặp từ tiếng Việt 8 chủ đề, chặn tự động lỗi nhắc từ khóa (`word_leaked`), Mr. White đoán từ lật kèo khi bị loại.
+7. **Vẽ & Đoán (2–12 người)**: Bảng vẽ SVG đa màu mượt mà (`0..1000`), gợi ý chữ cái dần theo giờ, 25+ bộ nét vẽ mẫu cho Bot.
+8. **Bom Chữ (2–12 người)**: Quả bom hẹn giờ chuyền tay đòi từ 2 chữ hợp lệ chứa âm tiết bom; mất hết 3 tim là bị loại.
+9. **Đấu Trường Đố Vui (1–12 người)**: 200 câu hỏi trắc nghiệm A/B/C/D đa lĩnh vực, thưởng tốc độ + streak + x2 điểm ở 2 câu cuối.
 
 ---
 

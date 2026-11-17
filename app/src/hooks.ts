@@ -2,16 +2,27 @@ import { createContext, useContext, useEffect, useRef, useState, type ComponentR
 import { Platform, useWindowDimensions, type View } from 'react-native';
 import { subscribeKeyboard } from './web';
 
-/** Số giây còn lại tới mốc `endsAt` (ms, đồng hồ server) */
+function computeSecondsLeft(endsAt: number | null, offset: number, max: number): number {
+  if (!endsAt) return 0;
+  return Math.min(max, Math.max(0, Math.ceil((endsAt - (Date.now() + offset)) / 1000)));
+}
+
+/** Số giây còn lại tới mốc `endsAt` (ms, đồng hồ server); chỉ vẽ lại khi số giây nguyên thay đổi */
 export function useSecondsLeft(endsAt: number | null, offset: number, max = 999): number {
-  const [now, setNow] = useState(() => Date.now());
+  const current = computeSecondsLeft(endsAt, offset, max);
+  const [state, setState] = useState<{ endsAt: number | null; val: number }>(() => ({ endsAt, val: current }));
+  if (state.endsAt !== endsAt) {
+    setState({ endsAt, val: current });
+  }
   useEffect(() => {
     if (!endsAt) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
+    const t = setInterval(() => {
+      const next = computeSecondsLeft(endsAt, offset, max);
+      setState((prev) => (prev.endsAt === endsAt && prev.val === next ? prev : { endsAt, val: next }));
+    }, 250);
     return () => clearInterval(t);
-  }, [endsAt]);
-  if (!endsAt) return 0;
-  return Math.min(max, Math.max(0, Math.ceil((endsAt - (now + offset)) / 1000)));
+  }, [endsAt, offset, max]);
+  return endsAt ? (state.endsAt === endsAt ? state.val : current) : 0;
 }
 
 /**

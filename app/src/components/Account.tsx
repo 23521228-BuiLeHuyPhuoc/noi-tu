@@ -6,6 +6,7 @@ import { GAME_INFO, MAX_NAME, type GameType, type PublicUser, type RoomState } f
 import type { Game } from '../useGame';
 import { AVATAR_PRESETS, type PortraitSource } from '../avatars';
 import { Portrait } from './Avatar';
+import { NameText, TitleBadge, VipBadge } from './Cosmetics';
 import { SERVER_URL } from '../config';
 import { C, FONT } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
@@ -34,10 +35,6 @@ function AvatarPicker({ value, onChange, disabled = false }: { value: number; on
       ))}
     </View>
   );
-}
-
-function UserAvatar({ avatar, avatarUrl, size = 60, frame }: { avatar: number; avatarUrl?: string; size?: number; frame?: string }) {
-  return <Portrait p={{ avatar, avatarUrl }} size={size} frame={frame} />;
 }
 
 /** Server cũ không có trường avatarUploads (hoặc không gọi được): vẫn hiện nút tải ảnh. */
@@ -518,17 +515,29 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
   );
 }
 
-const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu'];
+const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
 
 export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void; onShop?: () => void }) {
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);
   const won = Object.values(user.stats).reduce((s, x) => s + (x?.won ?? 0), 0);
+  const eq = user.equipped ?? {};
   return (
     <Card style={{ gap: 10 }}>
       <View testID="profile-card" style={styles.profileRow}>
-        <UserAvatar avatar={user.avatar} avatarUrl={user.avatarUrl} frame={user.equipped?.frame} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <T style={styles.pname}>{user.displayName}</T>
+        <Portrait
+          p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }}
+          size={60}
+          frame={eq.frame}
+          aura={eq.aura}
+          pet={eq.pet}
+          active={!!eq.aura}
+        />
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {(user.vipTier ?? 0) > 0 && <VipBadge tier={user.vipTier} compact />}
+            <NameText fx={eq.nameFx} style={styles.pname}>{user.displayName}</NameText>
+          </View>
+          {eq.title && <TitleBadge title={eq.title} />}
           <T style={styles.puser}>@{user.username}</T>
           <T style={styles.pstat}>{played} ván · {won} lần thắng</T>
           {(user.giftPoints ?? 0) > 0 && <T testID="gift-points" style={styles.pgift}>💝 {(user.giftPoints ?? 0).toLocaleString('vi-VN')} điểm quà</T>}

@@ -87,6 +87,14 @@ export const HAIR_OPTIONS: { id: CharacterHair; label: string }[] = [
   { id: 'chaingoc', label: 'Chải ngược xoăn gáy' },
   { id: 'vuotlech', label: 'Vuốt lệch phồng' },
   { id: 'dungchom', label: 'Rất ngắn dựng chỏm' },
+  { id: 'twintails', label: 'Buộc hai chùm' },
+  { id: 'wolfcut', label: 'Wolfcut cá tính' },
+  { id: 'mullet', label: 'Mullet gáy dài' },
+  { id: 'tetbim', label: 'Tết bím hai bên' },
+  { id: 'pompadour', label: 'Pompadour cổ điển' },
+  { id: 'tocvan', label: 'Tóc vấn hoàng gia' },
+  { id: 'xoanxu', label: 'Xoăn xù retro' },
+  { id: 'hime', label: 'Tóc Hime công chúa' },
 ];
 
 export const FACE_OPTIONS: { id: CharacterFace; label: string }[] = [
@@ -140,6 +148,18 @@ export const ACCESSORY_OPTIONS: { id: CharacterAccessory; label: string; icon: s
   { id: 'prideco', label: 'Cờ cầu vồng', icon: '🏳️‍🌈' },
   { id: 'pridetoc', label: 'Tóc cầu vồng', icon: '🌈' },
   { id: 'pridebang', label: 'Băng đô cầu vồng', icon: '🌈' },
+  { id: 'vuongmien', label: 'Vương miện vàng', icon: '👑' },
+  { id: 'kinhcyber', label: 'Kính Cyber', icon: '🕶️' },
+  { id: 'taimeo', label: 'Tai mèo', icon: '🐱' },
+  { id: 'sungquy', label: 'Sừng quỷ', icon: '😈' },
+  { id: 'vongthienthan', label: 'Vòng thiên thần', icon: '😇' },
+  { id: 'matnasoi', label: 'Mặt nạ sói', icon: '🐺' },
+  { id: 'kinhdiepvien', label: 'Kính điệp viên', icon: '🕵️' },
+  { id: 'hoacaitoc', label: 'Hoa cài tóc', icon: '🌸' },
+  { id: 'tainghe', label: 'Tai nghe RGB', icon: '🎧' },
+  { id: 'keomut', label: 'Kẹo mút', icon: '🍭' },
+  { id: 'matnaho', label: 'Mặt nạ hổ', icon: '🐯' },
+  { id: 'docnhan', label: 'Bịt mắt hải tặc', icon: '🏴‍☠️' },
 ];
 
 export const DETAIL_OPTIONS: { id: CharacterDetail; label: string; icon: string }[] = [
@@ -165,6 +185,14 @@ export const OUTFIT_OPTIONS: { id: CharacterOutfit; label: string; icon: string 
   { id: 'dongphuc', label: 'Đồng phục', icon: '🎒' },
   { id: 'aomua', label: 'Áo mưa', icon: '🌧️' },
   { id: 'dayvang', label: 'Dây chuyền vàng', icon: '💰' },
+  { id: 'hoangbao', label: 'Hoàng bào rồng', icon: '👑' },
+  { id: 'aochoangsoi', label: 'Áo choàng sói', icon: '🐺' },
+  { id: 'thamtu', label: 'Áo thám tử', icon: '🕵️' },
+  { id: 'hoodiergb', label: 'Hoodie Gaming', icon: '🎮' },
+  { id: 'kimono', label: 'Kimono anh đào', icon: '🌸' },
+  { id: 'giapvang', label: 'Giáp chiến thần', icon: '🛡️' },
+  { id: 'vesttrang', label: 'Vest trắng VIP', icon: '🤍' },
+  { id: 'hiphop', label: 'Hip-hop dây xích', icon: '🎤' },
 ];
 
 export const MOOD_EMOJI: Record<Mood, string> = { normal: '', smug: '😏', cry: '😭', angry: '😡', shock: '😱', dizzy: '😵‍💫' };
@@ -417,6 +445,51 @@ function outfitSvg(o: CharacterOutfit, col: string, ink: string, skin: string, l
         <circle cx="50" cy="83.5" r="4.6" fill="none" stroke="#FFF9DB" stroke-width="0.9"/>
         <text x="50" y="86.8" font-size="9.5" font-weight="900" text-anchor="middle" fill="${ink}" font-family="sans-serif">$</text>
         ${sparkle(44, 79, 2.8)}${sparkle(56, 81, 2.4)}`;
+    case 'hoangbao':
+      return `${body('#D97706')}
+        <path d="M18 98 C20 79, 32 72, 50 72 C68 72, 80 79, 82 98 Z" fill="#F59F00" stroke="${ink}" stroke-width="2"/>
+        <path d="M36 70 L50 86 L64 70 L60 68 L50 79 L40 68 Z" fill="#B5121B" stroke="${ink}" stroke-width="1.8"/>
+        <circle cx="50" cy="88" r="5" fill="#B5121B" stroke="#FFF3BF" stroke-width="1.6"/>
+        ${sparkle(31, 82, 2.6)}${sparkle(69, 82, 2.6)}`;
+    case 'aochoangsoi':
+      return `${body('#2B2D42')}
+        <path d="M21 77 C26 67, 36 69, 43 74 Q50 79 57 74 C64 69, 74 67, 79 77 L75 88 Q50 80 25 88 Z" fill="#8D99AE" stroke="${ink}" stroke-width="2.1" stroke-linejoin="round"/>
+        <path d="M29 73 L33 82 M40 73 L43 81 M50 75 L50 83 M60 73 L57 81 M71 73 L67 82" stroke="#EDF2F4" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="38" cy="84" r="2.2" fill="url(#goldG)" stroke="${ink}" stroke-width="1"/><circle cx="62" cy="84" r="2.2" fill="url(#goldG)" stroke="${ink}" stroke-width="1"/>`;
+    case 'thamtu':
+      return `${body('#8C6A4A')}
+        <path d="M40 69 L50 96 L60 69 Z" fill="#F8F9FA" stroke="${ink}" stroke-width="1.6"/>
+        <path d="M48 73 L52 73 L53 95 L50 98 L47 95 Z" fill="#212529"/>
+        <path d="M38 69 L28 79 L41 85 L50 89 Z M62 69 L72 79 L59 85 L50 89 Z" fill="#A67C52" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="42" cy="92" r="1.5" fill="#3E2723"/><circle cx="58" cy="92" r="1.5" fill="#3E2723"/>`;
+    case 'hoodiergb':
+      return `${body('#18181B')}
+        <path d="M31 70 C36 78, 64 78, 69 70 L66 67 Q50 74 34 67 Z" fill="#27272A" stroke="#00F0FF" stroke-width="2"/>
+        <path d="M20 82 Q34 86 42 98 M80 82 Q66 86 58 98" stroke="#FF00E5" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <line x1="44" y1="76" x2="44" y2="91" stroke="#00F0FF" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="56" y1="76" x2="56" y2="91" stroke="#FF00E5" stroke-width="1.8" stroke-linecap="round"/>`;
+    case 'kimono':
+      return `${body('#FF85B3')}
+        <path d="M38 69 L54 98 L46 98 L33 74 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M62 69 L44 98 L53 98 L67 74 Z" fill="#FF6B9D" stroke="${ink}" stroke-width="1.8"/>
+        <rect x="26" y="88" width="48" height="10" fill="#E03131" stroke="${ink}" stroke-width="1.6"/>
+        <circle cx="29" cy="81" r="3" fill="#FFF"/><circle cx="71" cy="80" r="3" fill="#FFF"/>`;
+    case 'giapvang':
+      return `${body('#495057')}
+        <path d="M18 82 Q34 70 50 76 Q66 70 82 82 L78 98 L22 98 Z" fill="url(#goldG)" stroke="${ink}" stroke-width="2.2"/>
+        <polygon points="50,78 55,86 50,94 45,86" fill="#00D2FF" stroke="${ink}" stroke-width="1.4"/>
+        ${sparkle(33, 81, 2.8)}${sparkle(67, 81, 2.8)}`;
+    case 'vesttrang':
+      return `${body('#F8F9FA')}
+        <path d="M40 70 L50 96 L60 70 Z" fill="#212529"/>
+        <path d="M35 70 L46 97 L38 97 L27 80 Z M65 70 L54 97 L62 97 L73 80 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M44 74 L50 78 L56 74 L50 81 Z" fill="url(#goldG)" stroke="${ink}" stroke-width="1.1"/>`;
+    case 'hiphop':
+      return `${body('#3B0764')}
+        <path d="M38 70 Q50 80 62 70" fill="${skinShadow}" stroke="${ink}" stroke-width="1.8"/>
+        <path d="M36 72 Q50 93 64 72" fill="none" stroke="url(#goldG)" stroke-width="3.6" stroke-linecap="round"/>
+        <rect x="44" y="81" width="12" height="9" rx="2" fill="url(#goldG)" stroke="${ink}" stroke-width="1.5"/>
+        <text x="50" y="88" font-size="6.5" font-weight="900" text-anchor="middle" fill="${ink}">VIP</text>`;
     default:
       return '';
   }
@@ -831,6 +904,51 @@ function extraHair(h: CharacterHair, f: string, ink: string, accent: string): { 
         back: '',
         front: `<path d="M25.5 38 C25.5 23.5, 35 19.5, 43 19.5 L45.5 11 L49.5 16.5 L53 9.5 L56.5 17.5 L60.5 12 L59.5 19.5 C67.5 20.5, 74.5 24.5, 74.5 38 C66.5 29.5, 33.5 29.5, 25.5 38 Z" ${st} stroke-linejoin="round"/>`,
       };
+    case 'twintails':
+      return {
+        back: `<path d="M23 36 C12 42, 9 64, 15 80 C20 75, 23 61, 25 48 Z M77 36 C88 42, 91 64, 85 80 C80 75, 77 61, 75 48 Z" ${st} stroke-linejoin="round"/>
+          <circle cx="23" cy="37" r="3.2" fill="${accent}" stroke="${ink}" stroke-width="1.4"/><circle cx="77" cy="37" r="3.2" fill="${accent}" stroke="${ink}" stroke-width="1.4"/>`,
+        front: `<path d="M23 42 C22 20, 36 15, 50 17 C64 15, 78 20, 77 42 C70 30, 58 26, 50 32 C42 26, 30 30, 23 42 Z" ${st}/>${shine}`,
+      };
+    case 'wolfcut':
+      return {
+        back: `<path d="M20 42 L13 62 L21 59 L17 74 L27 68 L73 68 L83 74 L79 59 L87 62 L80 42 Z" ${st} stroke-linejoin="round"/>`,
+        front: `<path d="M22 44 C20 19, 36 13, 50 15 C64 13, 80 19, 78 44 L72 34 L63 39 L56 28 L50 37 L44 28 L37 39 L28 34 Z" ${st} stroke-linejoin="round"/>${shine}`,
+      };
+    case 'mullet':
+      return {
+        back: `<path d="M22 48 C18 68, 22 86, 28 94 L72 94 C78 86, 82 68, 78 48 Z" ${st}/>`,
+        front: `<path d="M25 38 C24 19, 37 14, 50 15 C63 14, 76 19, 75 38 C68 27, 56 24, 50 28 C44 24, 32 27, 25 38 Z" ${st}/>${shine}`,
+      };
+    case 'tetbim':
+      return {
+        back: `<g ${st}><ellipse cx="22" cy="54" rx="4.5" ry="6" /><ellipse cx="21" cy="64" rx="4" ry="5.5" /><ellipse cx="22" cy="73" rx="3.2" ry="4.5" />
+          <ellipse cx="78" cy="54" rx="4.5" ry="6" /><ellipse cx="79" cy="64" rx="4" ry="5.5" /><ellipse cx="78" cy="73" rx="3.2" ry="4.5" /></g>
+          <path d="M19 77 L25 77 M75 77 L81 77" stroke="${accent}" stroke-width="3" stroke-linecap="round"/>`,
+        front: `<path d="M24 41 C23 20, 37 15, 50 17 C63 15, 77 20, 76 41 C68 29, 57 25, 50 29 C43 25, 32 29, 24 41 Z" ${st}/>${shine}`,
+      };
+    case 'pompadour':
+      return {
+        back: '',
+        front: `<path d="M25 39 C23 24, 31 12, 48 8 C66 4, 77 15, 75 38 C68 27, 54 22, 36 28 C31 30, 28 34, 25 39 Z" ${st} stroke-linejoin="round"/>
+          <path d="M35 19 Q52 10 66 18" stroke="#FFFFFF" stroke-width="1.8" fill="none" opacity="0.28" stroke-linecap="round"/>`,
+      };
+    case 'tocvan':
+      return {
+        back: `<ellipse cx="50" cy="11" rx="14" ry="8" ${st}/><line x1="33" y1="11" x2="67" y2="11" stroke="url(#goldG)" stroke-width="2.4" stroke-linecap="round"/>`,
+        front: `<path d="M24 42 C24 21, 36 16, 50 16 C64 16, 76 21, 76 42 C68 29, 57 25, 50 28 C43 25, 32 29, 24 42 Z" ${st}/>${shine}`,
+      };
+    case 'xoanxu':
+      return {
+        back: `<circle cx="22" cy="48" r="9" ${st}/><circle cx="24" cy="60" r="8" ${st}/><circle cx="78" cy="48" r="9" ${st}/><circle cx="76" cy="60" r="8" ${st}/>`,
+        front: `<circle cx="31" cy="24" r="9" ${st}/><circle cx="43" cy="18" r="10" ${st}/><circle cx="57" cy="18" r="10" ${st}/><circle cx="69" cy="24" r="9" ${st}/>
+          <path d="M24 40 C26 29, 74 29, 76 40 C65 32, 35 32, 24 40 Z" fill="${f}"/>`,
+      };
+    case 'hime':
+      return {
+        back: `<path d="M21 43 C19 66, 20 88, 25 96 L75 96 C80 88, 81 66, 79 43 Z" ${st}/>`,
+        front: `<path d="M23 40 C22 19, 36 15, 50 15 C64 15, 78 19, 77 40 L76 64 L70 64 L70 33 Q50 36 30 33 L30 64 L24 64 Z" ${st} stroke-linejoin="round"/>${shine}`,
+      };
     default:
       return null;
   }
@@ -1024,15 +1142,92 @@ function accessoryParts(acc: CharacterAccessory | undefined, hairFill: string, i
         <path d="M25 30 Q50 21 75 30 L75.5 37 Q50 28 24.5 37 Z" fill="url(#pr)" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
         <path d="M74 31 L90 24 L86 33 L92 41 L75 36 Z" fill="#7048E8" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`;
       break;
+    case 'vuongmien':
+      parts.hat = `<path d="M30 22 L33 6 L43 15 L50 4 L57 15 L67 6 L70 22 Z" fill="url(#goldG)" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="50" cy="14" r="2.2" fill="#E03131"/><circle cx="38" cy="16" r="1.7" fill="#339AF0"/><circle cx="62" cy="16" r="1.7" fill="#339AF0"/>`;
+      break;
+    case 'kinhcyber':
+      parts.face = `<path d="M24 45 L30 43 L70 43 L76 45 L72 52 L53 52 L50 48 L47 52 L28 52 Z" fill="#0C1220" stroke="#00F0FF" stroke-width="2" stroke-linejoin="round"/>
+        <line x1="32" y1="47.5" x2="68" y2="47.5" stroke="#FF00E5" stroke-width="2" stroke-linecap="round"/>`;
+      break;
+    case 'taimeo':
+      parts.behind = `<path d="M24 27 L20 6 L39 18 Z" fill="#212529" stroke="${ink}" stroke-width="2.1" stroke-linejoin="round"/>
+        <path d="M26 22 L23 11 L35 18 Z" fill="#FF85B3"/>
+        <path d="M76 27 L80 6 L61 18 Z" fill="#212529" stroke="${ink}" stroke-width="2.1" stroke-linejoin="round"/>
+        <path d="M74 22 L77 11 L65 18 Z" fill="#FF85B3"/>`;
+      break;
+    case 'sungquy':
+      parts.behind = `<path d="M31 24 C22 14, 24 4, 34 3 C31 10, 34 17, 39 21 Z" fill="#B5121B" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M69 24 C78 14, 76 4, 66 3 C69 10, 66 17, 61 21 Z" fill="#B5121B" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`;
+      break;
+    case 'vongthienthan':
+      parts.hat = `<ellipse cx="50" cy="8" rx="19" ry="5" fill="none" stroke="#FFF3BF" stroke-width="4.5"/>
+        <ellipse cx="50" cy="8" rx="19" ry="5" fill="none" stroke="#F59F00" stroke-width="2"/>`;
+      break;
+    case 'matnasoi':
+      parts.face = `<path d="M25 46 L27 29 L38 35 L50 28 L62 35 L73 29 L75 46 L68 55 L55 50 L50 56 L45 50 L32 55 Z" fill="#495057" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+        <polygon points="35,45 43,43 41,49" fill="#FF4D4D"/><polygon points="65,45 57,43 59,49" fill="#FF4D4D"/>`;
+      break;
+    case 'kinhdiepvien':
+      parts.face = `<rect x="28" y="42" width="19" height="10" rx="3" fill="#111" stroke="#495057" stroke-width="1.8"/>
+        <rect x="53" y="42" width="19" height="10" rx="3" fill="#111" stroke="#495057" stroke-width="1.8"/>
+        <line x1="47" y1="45" x2="53" y2="45" stroke="#495057" stroke-width="2"/>
+        <circle cx="72" cy="54" r="2.2" fill="#00F0FF" stroke="${ink}" stroke-width="1"/>`;
+      break;
+    case 'hoacaitoc':
+      parts.hat = `<g transform="translate(71 25)"><circle cx="-3.5" cy="0" r="3.8" fill="#FF85B3" stroke="${ink}" stroke-width="1.2"/><circle cx="3.5" cy="0" r="3.8" fill="#FF85B3" stroke="${ink}" stroke-width="1.2"/>
+        <circle cx="0" cy="-3.5" r="3.8" fill="#FF85B3" stroke="${ink}" stroke-width="1.2"/><circle cx="0" cy="3.5" r="3.8" fill="#FF85B3" stroke="${ink}" stroke-width="1.2"/>
+        <circle cx="0" cy="0" r="2.4" fill="#FFD43B"/></g>`;
+      break;
+    case 'tainghe':
+      parts.hat = `<path d="M22 46 C20 14, 80 14, 78 46" fill="none" stroke="#212529" stroke-width="5" stroke-linecap="round"/>
+        <rect x="17" y="40" width="9" height="17" rx="4" fill="#18181B" stroke="#00F0FF" stroke-width="2"/>
+        <rect x="74" y="40" width="9" height="17" rx="4" fill="#18181B" stroke="#FF00E5" stroke-width="2"/>`;
+      break;
+    case 'keomut':
+      parts.face = `<line x1="56" y1="62" x2="68" y2="75" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="56" cy="61" r="4.5" fill="#FF4D8D" stroke="${ink}" stroke-width="1.5"/>
+        <path d="M54 60 Q56 58 58 61" stroke="#FFF" stroke-width="1.2" fill="none"/>`;
+      break;
+    case 'matnaho':
+      parts.face = `<path d="M27 42 Q50 32 73 42 L68 55 Q50 51 32 55 Z" fill="#FF922B" stroke="${ink}" stroke-width="1.9" stroke-linejoin="round"/>
+        <path d="M35 45 L42 46 L39 50 Z M65 45 L58 46 L61 50 Z" fill="#FFF"/>
+        <path d="M47 36 L53 36 M50 34 L50 41" stroke="${ink}" stroke-width="2"/>`;
+      break;
+    case 'docnhan':
+      parts.face = `<line x1="25" y1="40" x2="74" y2="52" stroke="${ink}" stroke-width="2.2"/>
+        <path d="M31 43 L46 43 L44 53 Q38.5 56 33 53 Z" fill="#111" stroke="#F59F00" stroke-width="1.6" stroke-linejoin="round"/>`;
+      break;
     default:
   }
   void skin;
   return parts;
 }
 
+const MAX_SVG_CACHE = 300;
+const svgCache = new Map<string, string>();
+
+function canonicalLookKey(look?: CharacterLook): string {
+  if (!look) return '';
+  const keys = Object.keys(look).sort() as LookKey[];
+  return keys.map((k) => `${k}:${look[k] ?? ''}`).join(',');
+}
+
+function configCacheKey(c: CharacterConfig, mood: Mood): string {
+  return `${c.gender}|${c.age}|${c.hair}|${c.color}|${c.accessory ?? ''}|${c.detail ?? ''}|${c.outfit ?? ''}|${c.skin ?? ''}|${c.face ?? ''}|${c.build ?? ''}|${c.eyes ?? ''}|${c.brows ?? ''}|${canonicalLookKey(c.look)}|${mood}`;
+}
+
 /** Vẽ chân dung SVG sắc nét theo cấu hình nhân vật (đầy đủ nét mặt, da, mắt, mày, mũi, môi, tóc, râu, trang phục, phụ kiện, hình xăm) và tâm trạng. */
 export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): string {
   const c: CharacterConfig = cfg ?? { gender: 'nam', age: 'tre', hair: 'han', color: 0 };
+  const cacheKey = configCacheKey(c, mood);
+  const cached = svgCache.get(cacheKey);
+  if (cached) {
+    // LRU: đưa mục vừa dùng lên cuối để không bị đẩy ra sớm
+    svgCache.delete(cacheKey);
+    svgCache.set(cacheKey, cached);
+    return cached;
+  }
   const look = c.look;
   const col = playerColorOf(c.color);
   const hairFill =
@@ -1187,24 +1382,21 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
       ${mf?.over ?? ''}
     </g>
   </svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  const uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  if (svgCache.size >= MAX_SVG_CACHE) {
+    const oldest = svgCache.keys().next().value;
+    if (oldest !== undefined) svgCache.delete(oldest);
+  }
+  svgCache.set(cacheKey, uri);
+  return uri;
 }
 
-const svgCache = new Map<string, string>();
 /**
- * Chân dung theo nhân vật + tâm trạng (có nhớ lại). Dùng cho mọi nơi muốn đổi mặt theo sự kiện,
+ * Chân dung theo nhân vật + tâm trạng (có nhớ lại trong cache LRU). Dùng cho mọi nơi muốn đổi mặt theo sự kiện,
  * vd Tỷ phú: `portraitUri(p.character, 'smug')` khi giàu lên, `'cry'` khi sạt nghiệp.
  */
 export function portraitUri(character?: CharacterConfig, mood: Mood = 'normal'): string {
-  const lk = character?.look ? JSON.stringify(character.look) : '';
-  const k = `${character ? `${character.gender}|${character.age}|${character.hair}|${character.color}|${character.accessory ?? ''}|${character.detail ?? ''}|${character.outfit ?? ''}|${character.skin ?? ''}|${character.face ?? ''}|${character.build ?? ''}|${character.eyes ?? ''}|${character.brows ?? ''}|${lk}` : '-'}|${mood}`;
-  let u = svgCache.get(k);
-  if (!u) {
-    if (svgCache.size > 400) svgCache.clear();
-    u = characterSvgUri(character, mood);
-    svgCache.set(k, u);
-  }
-  return u;
+  return characterSvgUri(character, mood);
 }
 
 /** Tạo một cấu hình nhân vật ngẫu nhiên đa dạng (giữ nguyên màu đại diện hiện tại của người chơi) */

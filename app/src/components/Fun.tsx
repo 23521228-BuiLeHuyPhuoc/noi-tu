@@ -27,6 +27,8 @@ import { ShopSheet } from './Shop';
 import { KickInline } from './RoomTools';
 import { PokeGallery } from './PokeGallery';
 import { POKES, type PokeItem } from '../../../shared/src/pokes';
+import { getSmoothModeSync } from '../smoothMode';
+import { chatBubbleStyleOf, chatBubbleTextColorOf } from './Cosmetics';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -149,14 +151,24 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
-/** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` (hỗ trợ cả màn hình xoay ngang 90° bởi Rotator) */
+const rectCache = new Map<string, { at: number; r: WindowRect | null }>();
+
+/** Vị trí phần tử có testID trên màn hình, tính từ góc của `origin` (hỗ trợ cả màn hình xoay ngang 90° bởi Rotator); có cache theo frame chống reflow khi chọc nhiều người */
 export function rectOf(testId: string, origin: WindowRect | null, rotated = false): Rect | null {
   if (!origin) return null;
-  const r = typeof document === 'undefined'
-    ? targetRect(testId)
-    : document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect();
-  if (!r) return null;
-  if (r.width === 0) return null;
+  const now = Date.now();
+  let r: WindowRect | null | undefined;
+  const hit = rectCache.get(testId);
+  if (hit && now - hit.at < 32) {
+    r = hit.r;
+  } else {
+    r = typeof document === 'undefined'
+      ? targetRect(testId)
+      : document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect() ?? null;
+    if (rectCache.size > 48) rectCache.clear();
+    rectCache.set(testId, { at: now, r });
+  }
+  if (!r || r.width === 0) return null;
   if (rotated) {
     return { x: r.top - origin.top, y: origin.right - r.right, w: r.height, h: r.width };
   }
@@ -217,7 +229,7 @@ function Splat({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => v
   );
 }
 
-type BubbleItem = { key: number; from: string; name: string; text: string; at: Rect; chat: boolean; stickerId?: ChatMsg['stickerId'] };
+type BubbleItem = { key: number; from: string; name: string; text: string; at: Rect; chat: boolean; stickerId?: ChatMsg['stickerId']; bubbleFx?: string };
 type Placed = { left: number; top: number; w: number; h: number; tailX: number; named: boolean };
 
 /**
@@ -252,6 +264,8 @@ function Bubble({ item, pos, onDone }: { item: BubbleItem; pos: Placed; onDone: 
   }, [item.chat, item.key]);
   const asset = item.stickerId ? stickerOf(item.stickerId) : undefined;
   const stacked = pos.top > item.at.y + item.at.h + 24;
+  const customStyle = item.chat ? chatBubbleStyleOf(item.bubbleFx) : undefined;
+  const customColor = item.chat ? chatBubbleTextColorOf(item.bubbleFx) : undefined;
   return (
     <View
       testID={`bubble-${item.from}`}
@@ -259,12 +273,13 @@ function Bubble({ item, pos, onDone }: { item: BubbleItem; pos: Placed; onDone: 
         styles.bubble,
         sticker(3),
         item.chat && styles.chatBubble,
+        customStyle,
         { left: pos.left, top: pos.top, width: pos.w, height: pos.h, zIndex: 90 + item.key % 50 },
       ]}
     >
       {!stacked && <View style={[styles.tail, item.chat && { backgroundColor: C.ink }, { left: pos.tailX - 6 }]} />}
-      {pos.named && <Text numberOfLines={2} style={[styles.bubbleName, item.chat && { color: C.onSon }]}>{item.name}</Text>}
-      {asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.bubbleSticker} resizeMode="contain" /> : <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.bubbleText, item.chat && { color: C.gold }]}>{item.text}</Text>}
+      {pos.named && <Text numberOfLines={2} style={[styles.bubbleName, item.chat && { color: customColor ?? C.onSon }]}>{item.name}</Text>}
+      {asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.bubbleSticker} resizeMode="contain" /> : <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.bubbleText, item.chat && { color: customColor ?? C.gold }]}>{item.text}</Text>}
     </View>
   );
 }
@@ -352,6 +367,8 @@ type Fx = FxIn & { id: number };
 export function FunLayer({ game, players, chat }: { game: Game; players: PublicPlayer[]; chat: ChatMsg[] }) {
   const [fx, setFx] = useState<Fx[]>([]);
   const [bubbles, setBubbles] = useState<BubbleItem[]>([]);
+  const [combo, setCombo] = useState<number>(0);
+  const comboRef = useRef<{ count: number; until: number; timer?: ReturnType<typeof setTimeout> }>({ count: 0, until: 0 });
   const [layerW, setLayerW] = useState(() => (Math.min(Dimensions.get('window').width, 520)));
   const layer = useMeasuredView();
   const seq = useRef(0);
@@ -383,12 +400,26 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
   useOnNew(chat, (m) => {
     if (m.from !== game.me) play('chat');
     const at = rectOf(`avatar-${m.from}`, origin(), rotatedRef.current);
-    if (at) say({ from: m.from, name: m.from === game.me ? 'Bạn' : m.name, text: m.kind === 'sticker' ? (stickerOf(m.stickerId)?.alt ?? 'Nhãn dán') : m.text, stickerId: m.stickerId, at, chat: true });
+    const bubbleFx = playersRef.current.find((p) => p.id === m.from)?.cosmetics?.chatBubble;
+    if (at) say({ from: m.from, name: m.from === game.me ? 'Bạn' : m.name, text: m.kind === 'sticker' ? (stickerOf(m.stickerId)?.alt ?? 'Nhãn dán') : m.text, stickerId: m.stickerId, at, chat: true, bubbleFx });
   });
 
   useEffect(() => {
     const nameOf = (id: string) => (id === game.me ? 'bạn' : playersRef.current.find((p) => p.id === id)?.name ?? '?');
     return game.onFun((e: FunEvent) => {
+      if (e.kind !== 'emoji' && e.kind !== 'taunt' && e.kind !== 'entrance') {
+        const now = Date.now();
+        const cur = comboRef.current;
+        const nextCount = now <= cur.until ? cur.count + 1 : 1;
+        cur.count = nextCount;
+        cur.until = now + 4000;
+        if (cur.timer) clearTimeout(cur.timer);
+        cur.timer = setTimeout(() => {
+          comboRef.current.count = 0;
+          setCombo(0);
+        }, 4000);
+        if (nextCount >= 2) setCombo(nextCount);
+      }
       const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       const fromR = rectOf(`avatar-${e.from}`, origin, rot);
@@ -532,6 +563,13 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
       {!sheetOpen && bubbles.map((b, i) => (
         <Bubble key={b.key} item={b} pos={placed[i]} onDone={() => unsay(b.key)} />
       ))}
+      {combo >= 2 && (
+        <View testID="poke-combo" style={[styles.comboBadge, sticker(3)]}>
+          <Text style={styles.comboText}>
+            {combo >= 7 ? `🌪️ SIÊU BÃO XÓM LẦY x${combo}!` : combo >= 4 ? `⚡ LIÊN HOÀN x${combo}!` : `🔥 COMBO x${combo}!`}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -780,8 +818,18 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
 
 // ---------- Bảng chọn đồ để ném / hối ----------
 
+type ThrowFilter = 'all' | 'skill' | 'gift' | 'troll' | 'hit';
+const THROW_FILTERS: { id: ThrowFilter; label: string }[] = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'skill', label: '⚡ Kỹ năng VIP' },
+  { id: 'gift', label: '🎁 Quà Đại Gia' },
+  { id: 'troll', label: '😈 Chọc lầy' },
+  { id: 'hit', label: '🥊 Đánh & Ném' },
+];
+
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
   const [pane, setPane] = useState<'doodle' | 'nick' | null>(null);
+  const [filter, setFilter] = useState<ThrowFilter>('all');
   const [shopOpen, setShopOpen] = useState(false);
   const [kho, setKho] = useState(false);
   const [quota, setQuota] = useState<{ free: number; left: number } | null>(null);
@@ -805,9 +853,22 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
   };
   const hit = (move: HitMove) => send({ kind: 'hit', to: target.id, move });
   if (shopOpen) return <ShopSheet game={game} onClose={() => setShopOpen(false)} />;
+  const show = (sec: Exclude<ThrowFilter, 'all'>) => filter === 'all' || filter === sec;
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
       {quota && <T testID="poke-quota" style={styles.quota}>🎟️ Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)</T>}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
+        {THROW_FILTERS.map((f) => (
+          <Pressable
+            key={f.id}
+            testID={`poke-filter-${f.id}`}
+            onPress={() => setFilter(f.id)}
+            style={[styles.filterPill, filter === f.id && styles.filterPillOn]}
+          >
+            <T style={[styles.filterPillTxt, filter === f.id && { color: C.gold }]}>{f.label}</T>
+          </Pressable>
+        ))}
+      </ScrollView>
       <Button
         testID="poke-kho-open"
         variant={kho ? 'ink' : 'gold'}
@@ -816,95 +877,140 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         onPress={() => setKho((v) => !v)}
       />
       {kho && <PokeGallery onPick={(p: PokeItem) => send({ kind: 'poke', to: target.id, poke: p.id })} />}
-      <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
-      <View style={styles.hits}>
-        {HITS.map((h) => (
-          <View key={h.move} style={styles.hitCell}>
-            <Button testID={`hit-${h.move}`} title={h.emoji} big variant="ink" onPress={() => hit(h.move)} />
-            <T style={styles.cellLabel}>{h.name}</T>
-          </View>
-        ))}
-      </View>
-
-      <T style={styles.sectionLabel}>😈 Chọc mất dạy (chỉ để cười thôi nha)</T>
-      <T style={styles.limitNote}>Rung, xoay, sụp nguồn, gián, mực, hối: mỗi người chỉ dính tối đa 3 lần mỗi 15 giây. Đang tới lượt nối từ thì được bù lại thời gian.</T>
-      {pane ? (
+      {show('hit') && (
         <>
-      {pane === 'doodle' && (
-        <View testID="doodle-pane" style={styles.pane}>
-          <T style={styles.paneTitle}>Vẽ gì lên mặt {target.name}? (20 giây)</T>
-          <View style={styles.paneRow}>
-            {DOODLE_OPTIONS.map((d) => (
-              <Button key={d.doodle} testID={`doodle-${d.doodle}`} small variant="paper" icon={d.emoji} title={d.name} style={styles.paneBtn} onPress={() => send({ kind: 'doodle', to: target.id, doodle: d.doodle as DoodleKind })} />
+          <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
+          <View style={styles.hits}>
+            {HITS.map((h) => (
+              <View key={h.move} style={styles.hitCell}>
+                <Button testID={`hit-${h.move}`} title={h.emoji} big variant="ink" onPress={() => hit(h.move)} />
+                <T style={styles.cellLabel}>{h.name}</T>
+              </View>
             ))}
           </View>
-        </View>
-      )}
-      {pane === 'nick' && (
-        <View testID="nick-pane" style={styles.pane}>
-          <T style={styles.paneTitle}>Gắn biệt danh cho {target.name} (60 giây)</T>
-          <View style={styles.paneRow}>
-            {NICK_IDS.map((n) => (
-              <Button key={n} testID={`nick-${n}`} small variant="paper" title={nickText(n)} style={styles.paneBtn} onPress={() => send({ kind: 'nick', to: target.id, nick: n as NicknameId })} />
-            ))}
-          </View>
-        </View>
-      )}
-
-          <Button testID="troll-back" small variant="paper" title="‹ Quay lại" style={{ alignSelf: 'flex-start' }} onPress={() => setPane(null)} />
         </>
-      ) : (
-      <View style={styles.trolls}>
-        <Button testID="troll-doodle" icon="🖍️" title="Vẽ bậy" variant={pane === 'doodle' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'doodle' ? null : 'doodle')} />
-        <Button testID="troll-roach" icon="🪳" title="Thả gián" variant="gold" style={styles.troll} onPress={() => send({ kind: 'roach', to: target.id })} />
-        <Button testID="troll-ink" icon="🦑" title="Tạt mực" variant="gold" style={styles.troll} onPress={() => send({ kind: 'ink', to: target.id })} />
-        <Button testID="troll-nick" icon="🏷️" title="Biệt danh" variant={pane === 'nick' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'nick' ? null : 'nick')} />
-        <Button testID="troll-honk" icon="📢" title="Bật loa" variant="gold" style={styles.troll} onPress={() => send({ kind: 'honk', to: target.id })} />
-        <Button testID="troll-cry" icon="😭" title="Khóc thuê" variant="gold" style={styles.troll} onPress={() => send({ kind: 'cry', to: target.id })} />
-        <Button testID="troll-blackout" icon="🔌" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
-        <Button testID="troll-spin" icon="🌀" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
-        <Button testID="troll-quake" icon="🌋" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
-        <Button testID="troll-fart" icon="💨" title="Thả bom thối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'fart', to: target.id })} />
-        <Button testID="troll-slipper" icon="🩴" title="Dép bay liên hoàn" variant="gold" style={styles.troll} onPress={() => send({ kind: 'slipper', to: target.id })} />
-        <Button testID="troll-chicken" icon="🐔" title="Gà mổ" variant="gold" style={styles.troll} onPress={() => send({ kind: 'chicken', to: target.id })} />
-        <Button testID="troll-bigface" icon="🤪" title="Mặt to" variant="gold" style={styles.troll} onPress={() => send({ kind: 'bigface', to: target.id })} />
-        <Button testID="troll-banana" icon="🍌" title="Vỏ chuối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'banana', to: target.id })} />
-        <Button testID="troll-mirror" icon="🪞" title="Lật ngược màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'mirror', to: target.id })} />
-        <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
-      </View>
       )}
 
-      <T style={styles.sectionLabel}>⚡ Kỹ năng trả Ruby</T>
-      <View style={styles.trolls}>
-        {SKILL_IDS.map((id) => {
-          const it = shopItem(id)!;
-          return <Button key={id} testID={`skill-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} small variant="ink" style={styles.troll} onPress={() => send({ kind: id, to: target.id })} />;
-        })}
-      </View>
-      <T style={styles.sectionLabel}>🎁 Tặng quà (người nhận được điểm quà)</T>
-      <View style={styles.trolls}>
-        {GIFT_IDS.map((id) => {
-          const it = shopItem(id)!;
-          return <Button key={id} testID={`gift-${id}`} icon={it.emoji} title={`${it.name} 💎${it.price}`} small variant="jade" style={styles.troll} onPress={() => send({ kind: 'gift', to: target.id, gift: id })} />;
-        })}
-      </View>
-      <Button testID="shop-open-throw" small variant="paper" icon="🛍️" title="Cửa hàng" style={{ alignSelf: 'flex-start' }} onPress={() => setShopOpen(true)} />
+      {show('troll') && (
+        <>
+          <T style={styles.sectionLabel}>😈 Chọc mất dạy (chỉ để cười thôi nha)</T>
+          <T style={styles.limitNote}>Rung, xoay, sụp nguồn, gián, mực, hối: mỗi người chỉ dính tối đa 3 lần mỗi 15 giây. Đang tới lượt nối từ thì được bù lại thời gian.</T>
+          {pane ? (
+            <>
+              {pane === 'doodle' && (
+                <View testID="doodle-pane" style={styles.pane}>
+                  <T style={styles.paneTitle}>Vẽ gì lên mặt {target.name}? (20 giây)</T>
+                  <View style={styles.paneRow}>
+                    {DOODLE_OPTIONS.map((d) => (
+                      <Button key={d.doodle} testID={`doodle-${d.doodle}`} small variant="paper" icon={d.emoji} title={d.name} style={styles.paneBtn} onPress={() => send({ kind: 'doodle', to: target.id, doodle: d.doodle as DoodleKind })} />
+                    ))}
+                  </View>
+                </View>
+              )}
+              {pane === 'nick' && (
+                <View testID="nick-pane" style={styles.pane}>
+                  <T style={styles.paneTitle}>Gắn biệt danh cho {target.name} (60 giây)</T>
+                  <View style={styles.paneRow}>
+                    {NICK_IDS.map((n) => (
+                      <Button key={n} testID={`nick-${n}`} small variant="paper" title={nickText(n)} style={styles.paneBtn} onPress={() => send({ kind: 'nick', to: target.id, nick: n as NicknameId })} />
+                    ))}
+                  </View>
+                </View>
+              )}
+              <Button testID="troll-back" small variant="paper" title="‹ Quay lại" style={{ alignSelf: 'flex-start' }} onPress={() => setPane(null)} />
+            </>
+          ) : (
+            <View style={styles.trolls}>
+              <Button testID="troll-doodle" icon="🖍️" title="Vẽ bậy" variant={pane === 'doodle' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'doodle' ? null : 'doodle')} />
+              <Button testID="troll-roach" icon="🪳" title="Thả gián" variant="gold" style={styles.troll} onPress={() => send({ kind: 'roach', to: target.id })} />
+              <Button testID="troll-ink" icon="🦑" title="Tạt mực" variant="gold" style={styles.troll} onPress={() => send({ kind: 'ink', to: target.id })} />
+              <Button testID="troll-nick" icon="🏷️" title="Biệt danh" variant={pane === 'nick' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'nick' ? null : 'nick')} />
+              <Button testID="troll-honk" icon="📢" title="Bật loa" variant="gold" style={styles.troll} onPress={() => send({ kind: 'honk', to: target.id })} />
+              <Button testID="troll-cry" icon="😭" title="Khóc thuê" variant="gold" style={styles.troll} onPress={() => send({ kind: 'cry', to: target.id })} />
+              <Button testID="troll-blackout" icon="🔌" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
+              <Button testID="troll-spin" icon="🌀" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
+              <Button testID="troll-quake" icon="🌋" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
+              <Button testID="troll-fart" icon="💨" title="Thả bom thối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'fart', to: target.id })} />
+              <Button testID="troll-slipper" icon="🩴" title="Dép bay liên hoàn" variant="gold" style={styles.troll} onPress={() => send({ kind: 'slipper', to: target.id })} />
+              <Button testID="troll-chicken" icon="🐔" title="Gà mổ" variant="gold" style={styles.troll} onPress={() => send({ kind: 'chicken', to: target.id })} />
+              <Button testID="troll-bigface" icon="🤪" title="Mặt to" variant="gold" style={styles.troll} onPress={() => send({ kind: 'bigface', to: target.id })} />
+              <Button testID="troll-banana" icon="🍌" title="Vỏ chuối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'banana', to: target.id })} />
+              <Button testID="troll-mirror" icon="🪞" title="Lật ngược màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'mirror', to: target.id })} />
+              <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
+            </View>
+          )}
+        </>
+      )}
 
-      <T style={styles.sectionLabel}>Ném đồ</T>
-      <View style={styles.grid}>
-        {THROWS.map((t) => (
-          <View key={t.item} style={styles.cell}>
-            <Button
-              testID={`throw-${t.item}`}
-              title={t.emoji}
-              big
-              variant="paper"
-              onPress={() => send({ kind: 'throw', to: target.id, item: t.item })}
-            />
-            <T style={styles.cellLabel}>{t.name}</T>
+      {show('skill') && (
+        <>
+          <T style={styles.sectionLabel}>⚡ Kỹ năng VIP trả Ruby (hiệu ứng cực ngầu)</T>
+          <View style={styles.trolls}>
+            {SKILL_IDS.map((id) => {
+              const it = shopItem(id)!;
+              const mythic = it.price >= 50;
+              return (
+                <Button
+                  key={id}
+                  testID={`skill-${id}`}
+                  icon={it.emoji}
+                  title={`${it.name} 💎${it.price}`}
+                  small
+                  variant={mythic ? 'gold' : 'ink'}
+                  style={styles.troll}
+                  onPress={() => send({ kind: id, to: target.id })}
+                />
+              );
+            })}
           </View>
-        ))}
-      </View>
+        </>
+      )}
+
+      {show('gift') && (
+        <>
+          <T style={styles.sectionLabel}>🎁 Tặng quà Phú Hào (tặng điểm quà & lên VIP)</T>
+          <View style={styles.trolls}>
+            {GIFT_IDS.map((id) => {
+              const it = shopItem(id)!;
+              const mega = it.price >= 500;
+              return (
+                <Button
+                  key={id}
+                  testID={`gift-${id}`}
+                  icon={it.emoji}
+                  title={`${it.name} 💎${it.price}`}
+                  small
+                  variant={mega ? 'gold' : 'jade'}
+                  style={styles.troll}
+                  onPress={() => send({ kind: 'gift', to: target.id, gift: id })}
+                />
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      <Button testID="shop-open-throw" small variant="paper" icon="🛍️" title="Cửa hàng VIP" style={{ alignSelf: 'flex-start' }} onPress={() => setShopOpen(true)} />
+
+      {show('hit') && (
+        <>
+          <T style={styles.sectionLabel}>Ném đồ</T>
+          <View style={styles.grid}>
+            {THROWS.map((t) => (
+              <View key={t.item} style={styles.cell}>
+                <Button
+                  testID={`throw-${t.item}`}
+                  title={t.emoji}
+                  big
+                  variant="paper"
+                  onPress={() => send({ kind: 'throw', to: target.id, item: t.item })}
+                />
+                <T style={styles.cellLabel}>{t.name}</T>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
       <Button
         testID="poke-btn"
         icon="⏰"
@@ -972,12 +1078,14 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
         const mine = m.from === me;
         const pl = players.find((p) => p.id === m.from);
         const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
+        const bStyle = chatBubbleStyleOf(pl?.cosmetics?.chatBubble);
+        const bColor = chatBubbleTextColorOf(pl?.cosmetics?.chatBubble);
         return (
           <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
-            <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} />
-            <View style={[styles.msg, mine ? styles.msgMine : null]}>
-              {!mine && <T style={styles.msgName}>{m.name}</T>}
-              {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }]}>{m.text}</T>}
+            <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} frame={pl?.cosmetics?.frame} />
+            <View style={[styles.msg, mine ? styles.msgMine : null, bStyle]}>
+              {!mine && <T style={[styles.msgName, bColor ? { color: bColor } : null]}>{m.name}</T>}
+              {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>{m.text}</T>}
             </View>
           </View>
         );
@@ -1092,9 +1200,10 @@ function Piece({ i, width }: { i: number; width: number }) {
 
 export function Confetti() {
   const width = Math.min(Dimensions.get('window').width, 520);
+  const count = getSmoothModeSync() ? 22 : 70;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', zIndex: 60 }]}>
-      {Array.from({ length: 70 }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <Piece key={i} i={i} width={width} />
       ))}
     </View>
@@ -1162,4 +1271,26 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: 0, fontFamily: FONT, backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, height: 46,
     fontSize: 16, color: C.ink, borderWidth: 2, borderColor: C.ink,
   },
+  comboBadge: {
+    position: 'absolute',
+    top: 86,
+    alignSelf: 'center',
+    backgroundColor: '#181016',
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    zIndex: 98,
+  },
+  comboText: {
+    fontFamily: FONT,
+    fontSize: 13,
+    fontWeight: '900',
+    color: C.gold,
+  },
+  filterPill: {
+    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 99,
+    backgroundColor: C.mist, borderWidth: 1.5, borderColor: '#D0C9B8',
+  },
+  filterPillOn: { backgroundColor: C.ink, borderColor: C.ink },
+  filterPillTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
 });

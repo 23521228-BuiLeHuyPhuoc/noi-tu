@@ -98,11 +98,12 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     ...opts,
     room: {
       ...opts.room,
-      // cộng thành tích cho người chơi có tài khoản
-      onFinish: ({ gameType, participants, winnerId }) => {
+      // cộng thành tích cho người chơi có tài khoản (hỗ trợ cả thắng đơn và thắng theo phe)
+      onFinish: ({ gameType, participants, winnerId, winnerIds }) => {
         const ids = participants.filter((id) => id.startsWith(ACCOUNT_PREFIX)).map((id) => id.slice(ACCOUNT_PREFIX.length));
-        const winner = winnerId?.startsWith(ACCOUNT_PREFIX) ? winnerId.slice(ACCOUNT_PREFIX.length) : null;
-        if (ids.length) store.recordGame(ids, gameType, winner).catch(logErr('recordGame'));
+        const rawWinners = winnerIds && winnerIds.length > 0 ? winnerIds : winnerId ? [winnerId] : [];
+        const winners = rawWinners.filter((id) => id.startsWith(ACCOUNT_PREFIX)).map((id) => id.slice(ACCOUNT_PREFIX.length));
+        if (ids.length) store.recordGame(ids, gameType, winners.length <= 1 ? (winners[0] ?? null) : winners).catch(logErr('recordGame'));
       },
       // từ được cả phòng duyệt: dùng được ngay và lưu vào CSDL
       learnWord: (word, byName) => {

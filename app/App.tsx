@@ -8,7 +8,13 @@ import { WordChainScreen } from './src/screens/WordChainScreen';
 import { BauCuaScreen } from './src/screens/BauCuaScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { TyPhuScreen } from './src/screens/TyPhuScreen';
+import { MaSoiScreen } from './src/screens/MaSoiScreen';
+import { GianDiepScreen } from './src/screens/GianDiepScreen';
+import { VeDoanScreen } from './src/screens/VeDoanScreen';
+import { BomTuScreen } from './src/screens/BomTuScreen';
+import { DoVuiScreen } from './src/screens/DoVuiScreen';
 import { ShakeProvider } from './src/components/Fun';
+import { FxStyles } from './src/components/FxStyles';
 import { WalletNoticeLayer } from './src/components/Wallet';
 import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
@@ -27,11 +33,17 @@ export default function App() {
   else if (room.phase === 'finished' && room.result) body = <ResultScreen game={game} room={room} />;
   else if (room.game?.type === 'baucua') body = <BauCuaScreen game={game} room={room} />;
   else if (room.game?.type === 'typhu') body = <TyPhuScreen game={game} room={room} />;
+  else if (room.game?.type === 'masoi') body = <MaSoiScreen game={game} room={room} />;
+  else if (room.game?.type === 'giandiep') body = <GianDiepScreen game={game} room={room} />;
+  else if (room.game?.type === 've_doan') body = <VeDoanScreen game={game} room={room} />;
+  else if (room.game?.type === 'bom_tu') body = <BomTuScreen game={game} room={room} />;
+  else if (room.game?.type === 'do_vui') body = <DoVuiScreen game={game} room={room} />;
   else if (room.game?.type === 'wordchain' || room.game?.type === 'wordchain_en') body = <WordChainScreen game={game} room={room} />;
   else body = <HomeScreen game={game} />;
 
   return (
     <SafeAreaProvider>
+      <FxStyles />
       <Screen style={styles.root}>
         <StatusBar style="light" />
         <KeyboardFrame>

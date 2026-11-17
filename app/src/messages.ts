@@ -4,7 +4,7 @@ import type { ActionError, AuthError, WalletError, BauCuaSymbol, DoodleKind, Err
 export const errorText: Record<ErrorCode, string> = {
   invalid_name: 'Tên phải từ 1 đến 24 ký tự.',
   room_not_found: 'Không tìm thấy phòng. Kiểm tra lại mã phòng nhé.',
-  room_full: 'Phòng đã đủ 6 người.',
+  room_full: 'Phòng đã đủ 12 người.',
   room_playing: 'Phòng đang chơi, đợi ván sau nhé.',
   not_host: 'Chỉ chủ phòng mới làm được việc này.',
   not_in_room: 'Bạn không còn ở trong phòng.',
@@ -76,6 +76,7 @@ export const actionText: Record<ActionError, string> = {
   loan_denied: 'Còn xu thì chưa được vay đâu.',
   cannot_build: 'Chưa xây được ở đây (cần đủ bộ màu và đủ tiền).',
   no_money: 'Không đủ tiền.',
+  word_leaked: 'Không được nhắc thẳng từ khóa trong gợi ý nhé!',
 };
 
 export const HITS: { move: HitMove; emoji: string; name: string }[] = [
@@ -86,10 +87,15 @@ export const HITS: { move: HitMove; emoji: string; name: string }[] = [
 ];
 
 export const GAME_META: Record<GameType, { emoji: string; tagline: string; players: string }> = {
-  wordchain: { emoji: '🔤', tagline: 'con mèo → mèo mướp → mướp đắng…', players: '1–6 người' },
-  wordchain_en: { emoji: '🇬🇧', tagline: 'art → tits → sex… nối chữ cái cuối', players: '1–6 người' },
-  baucua: { emoji: '🦀', tagline: 'Đặt cược, máy lắc bát, mở bát. Xu ảo thôi!', players: '1–6 người' },
+  wordchain: { emoji: '🔤', tagline: 'con mèo → mèo mướp → mướp đắng…', players: '1–8 người' },
+  wordchain_en: { emoji: '🇬🇧', tagline: 'art → tits → sex… nối chữ cái cuối', players: '1–8 người' },
+  baucua: { emoji: '🦀', tagline: 'Đặt cược, máy lắc bát, mở bát. Xu ảo thôi!', players: '1–12 người' },
   typhu: { emoji: '🏦', tagline: 'Mua đất Sài Gòn, Hà Nội, xây khách sạn, thu tiền thuê', players: '2–6 người' },
+  masoi: { emoji: '🐺', tagline: 'Đêm nhắm mắt bắt Sói, ngày suy luận treo cổ!', players: '4–12 người' },
+  giandiep: { emoji: '🕵️', tagline: 'Ai cầm từ khác? Lắng nghe gợi ý để lật mặt gián điệp!', players: '3–12 người' },
+  ve_doan: { emoji: '🎨', tagline: 'Vẽ hình siêu lầy cho cả xóm đua nhau đoán từ khóa!', players: '2–12 người' },
+  bom_tu: { emoji: '💣', tagline: 'Gõ nhanh từ có tiếng bom đang cháy để chuyền trước khi nổ!', players: '2–12 người' },
+  do_vui: { emoji: '🧠', tagline: 'Đấu trường trắc nghiệm tốc độ, câu cuối x2 cực căng!', players: '1–12 người' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -115,6 +121,31 @@ export const RULES: Record<GameType, string[]> = {
     'Mỗi người 1.500$. Đổ 2 xúc xắc, dừng ở đất trống thì được mua.',
     'Dừng ở đất người khác phải trả tiền thuê (đủ bộ cùng màu thì x2). Dừng ở đất của mình thì nâng nhà, lên khách sạn.',
     'Đi vượt qua Xuất phát nhận 500$. Thiếu tiền thì tự chọn bán từng lô; bán hết vẫn thiếu mới phá sản. Người trụ lại cuối cùng thắng.',
+  ],
+  masoi: [
+    'Mỗi người nhận một vai trò bí mật (Ma Sói, Tiên Tri, Bảo Vệ, Phù Thủy, Thợ Săn, Thần Tình Yêu, Kẻ Ngố, Thám Tử, Dân Làng).',
+    'Ban đêm: Sói bàn bạc trong Kênh Sói và cắn 1 người; Tiên Tri soi thân phận; Bảo Vệ canh gác; Phù Thủy quyết định cứu hoặc đầu độc.',
+    'Ban ngày: Cả làng thảo luận và bỏ phiếu treo cổ kẻ khả nghi. Phe Dân thắng khi diệt hết Sói; Phe Sói thắng khi số Sói ≥ số Dân.',
+  ],
+  giandiep: [
+    'Đa số người chơi (Dân Thường) giữ cùng 1 từ khóa; Gián Điệp giữ từ gần giống; Mr. White không có từ nào.',
+    'Mỗi vòng lần lượt từng người nói 1 câu mô tả (cấm nhắc thẳng từ khóa của mình).',
+    'Sau đó cả phòng bỏ phiếu loại 1 kẻ khả nghi. Mr. White bị loại được đoán từ khóa của Dân để lật kèo thắng!',
+  ],
+  ve_doan: [
+    'Mỗi lượt 1 họa sĩ chọn từ bí mật và vẽ bằng ngón tay hoặc chuột trong 55 giây.',
+    'Người đoán đúng càng sớm càng được nhiều điểm; họa sĩ cũng được cộng điểm theo số người đoán đúng.',
+    'Từ khóa sẽ tự hé lộ vài chữ cái theo thời gian để gợi ý cho cả phòng.',
+  ],
+  bom_tu: [
+    'Mỗi người có 3 tim ❤️. Quả bom mang 1 tiếng ngẫu nhiên đếm ngược rất nhanh!',
+    'Đến lượt cầm bom phải gõ ngay 1 từ tiếng Việt 2 chữ có chứa tiếng đó để chuyền qua người kế tiếp.',
+    'Bom nổ trên tay ai thì mất 1 tim; người sống sót cuối cùng giành chiến thắng!',
+  ],
+  do_vui: [
+    'Trả lời nhanh các câu hỏi trắc nghiệm 4 đáp án A/B/C/D trong 15 giây mỗi câu.',
+    'Trả lời càng nhanh và giữ chuỗi đúng liên tiếp (streak) càng được thưởng thêm điểm.',
+    '2 câu cuối cùng được nhân đôi số điểm (x2) để tạo cơ hội lội ngược dòng ngoạn mục!',
   ],
 };
 
