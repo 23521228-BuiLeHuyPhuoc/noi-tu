@@ -52,10 +52,10 @@ afterEach(async () => {
 });
 
 describe('Phase 2 — Cấp VIP Đại Gia, 8 ô trang bị, Map phòng & Kỹ năng/Quà mới', () => {
-  it('hàm tính cấp bậc VIP và kho 36 mẫu avatar, 11 map nhất quán', () => {
+  it('hàm tính cấp bậc VIP và kho 36 mẫu avatar, 15 map nhất quán', () => {
     expect(AVATAR_PRESETS).toHaveLength(36);
     expect(AVATAR_PRESET_NAMES).toHaveLength(36);
-    expect(ROOM_THEMES).toHaveLength(11);
+    expect(ROOM_THEMES).toHaveLength(15);
     expect(vipOf(0).tier).toBe(0);
     expect(vipOf(200).tier).toBe(1);
     expect(vipOf(1500).tier).toBe(3);

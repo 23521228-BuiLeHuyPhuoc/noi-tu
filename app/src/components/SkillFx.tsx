@@ -249,14 +249,19 @@ type GiftShow = { id: number; gift: string; from: string; to: string };
 const GIFT_MS: Record<string, number> = {
   gift_rose: 3200,
   gift_cake: 4000,
+  gift_gold_slipper: 4000,
   gift_diamond_ring: 3800,
   gift_car: 3600,
+  gift_durian_crate: 4200,
   gift_yacht: 4600,
   gift_private_jet: 4200,
   gift_castle: 5200,
+  gift_gold_bullion: 5200,
   gift_golden_dragon: 5000,
   gift_island: 5200,
   gift_galaxy_palace: 5800,
+  gift_space_fleet: 6000,
+  gift_omega_throne: 6500,
 };
 
 function GiftFx({
@@ -274,27 +279,37 @@ function GiftFx({
   const emoji = item?.emoji ?? "🎁";
   const flyAcross =
     g.gift === "gift_car" ||
+    g.gift === "gift_durian_crate" ||
     g.gift === "gift_yacht" ||
     g.gift === "gift_private_jet" ||
-    g.gift === "gift_golden_dragon";
+    g.gift === "gift_golden_dragon" ||
+    g.gift === "gift_space_fleet";
   const grandStage =
     g.gift === "gift_castle" ||
+    g.gift === "gift_gold_slipper" ||
+    g.gift === "gift_gold_bullion" ||
     g.gift === "gift_island" ||
     g.gift === "gift_galaxy_palace" ||
+    g.gift === "gift_omega_throne" ||
     g.gift === "gift_diamond_ring";
-  const isGalaxy = g.gift === "gift_galaxy_palace";
-  const count = getSmoothModeSync() ? 8 : 16;
+  const isGalaxy = g.gift === "gift_galaxy_palace" || g.gift === "gift_omega_throne" || g.gift === "gift_space_fleet";
+  const isOmega = g.gift === "gift_omega_throne";
+  const count = getSmoothModeSync() ? 8 : 18;
   const [hearts] = useState(() =>
     Array.from({ length: count }, (_, i) => ({
       x: Math.random() * Math.max(40, size.w - 40),
       d: Math.random() * 0.4,
       s: 24 + Math.random() * 22,
       e:
-        g.gift === "gift_diamond_ring"
-          ? i % 2 === 0 ? "💍" : "💎"
-          : g.gift === "gift_galaxy_palace"
-            ? i % 3 === 0 ? "🌌" : i % 3 === 1 ? "⭐" : "💎"
-            : i % 3 === 0 ? "🌹" : "❤️",
+        g.gift === "gift_omega_throne"
+          ? i % 3 === 0 ? "👑" : i % 3 === 1 ? "💎" : "🔱"
+          : g.gift === "gift_gold_bullion" || g.gift === "gift_gold_slipper"
+            ? i % 2 === 0 ? "🪙" : "🩴"
+            : g.gift === "gift_diamond_ring"
+              ? i % 2 === 0 ? "💍" : "💎"
+              : isGalaxy
+                ? i % 3 === 0 ? "🌌" : i % 3 === 1 ? "⭐" : "💎"
+                : i % 3 === 0 ? "🌹" : "❤️",
       i,
     })),
   );
@@ -302,7 +317,7 @@ function GiftFx({
     <Animated.View
       style={[
         styles.giftBanner,
-        isGalaxy && { backgroundColor: "rgba(25,10,55,0.92)", borderColor: "#E879F9" },
+        isGalaxy && { backgroundColor: isOmega ? "rgba(68,26,3,0.95)" : "rgba(25,10,55,0.94)", borderColor: isOmega ? "#FFD700" : "#E879F9" },
         {
           opacity: t.interpolate({
             inputRange: [0, 0.08, 0.85, 1],
@@ -312,15 +327,15 @@ function GiftFx({
             {
               scale: t.interpolate({
                 inputRange: [0, 0.1, 1],
-                outputRange: [0.6, 1.08, 1],
+                outputRange: [0.6, 1.1, 1],
               }),
             },
           ],
         },
       ]}
     >
-      <T style={[styles.giftText, isGalaxy && { color: "#F5D0FE" }]}>
-        {isGalaxy ? "🌌 CHÍ TÔN TẶNG QUÀ: " : ""}
+      <T style={[styles.giftText, isGalaxy && { color: isOmega ? "#FEF08A" : "#F5D0FE" }]}>
+        {isOmega ? "👑 ĐẠI ĐẾ BAN THƯỞNG 10.000💎: " : isGalaxy ? "🌌 CHÍ TÔN TẶNG QUÀ: " : ""}
         {g.from} tặng {g.to} {emoji} {item?.name ?? "quà"}
       </T>
     </Animated.View>
@@ -336,20 +351,19 @@ function GiftFx({
           style={[
             StyleSheet.absoluteFill,
             {
-              backgroundColor: "rgba(18, 8, 48, 0.55)",
+              backgroundColor: isOmega ? "rgba(66, 32, 6, 0.62)" : "rgba(18, 8, 48, 0.58)",
               opacity: t.interpolate({ inputRange: [0, 0.12, 0.85, 1], outputRange: [0, 1, 1, 0] }),
             },
           ]}
         />
       )}
-      {(g.gift === "gift_rose" || g.gift === "gift_diamond_ring" || isGalaxy) &&
+      {(g.gift === "gift_rose" || g.gift === "gift_diamond_ring" || g.gift === "gift_gold_slipper" || g.gift === "gift_gold_bullion" || isGalaxy) &&
         hearts.map((h) => (
-          <Animated.Text
+          <Animated.View
             key={h.i}
             style={{
               position: "absolute",
               left: h.x,
-              fontSize: h.s,
               top: t.interpolate({
                 inputRange: [h.d, 1],
                 outputRange: [size.h + 20, -50],
@@ -361,8 +375,8 @@ function GiftFx({
               }),
             }}
           >
-            {h.e}
-          </Animated.Text>
+            <EmojiIcon emoji={h.e} size={Math.round(h.s)} glow="rgba(255,215,0,0.65)" />
+          </Animated.View>
         ))}
       {g.gift === "gift_cake" && (
         <>
@@ -426,7 +440,7 @@ function GiftFx({
                 : [],
             }}
           >
-            <EmojiIcon emoji={isGalaxy ? "🏰" : emoji} size={isGalaxy ? 156 : grandStage ? 140 : 126} />
+            <EmojiIcon emoji={isOmega ? "👑" : g.gift === "gift_galaxy_palace" ? "🏰" : emoji} size={isOmega ? 168 : isGalaxy ? 156 : grandStage ? 140 : 126} glow="rgba(255,215,0,0.8)" />
           </Animated.View>
           {[0, 1, 2, 3].map((k) => (
             <Animated.View
@@ -457,11 +471,16 @@ function GiftFx({
 const ENTRANCE_CFG: Record<string, { glyphA: string; glyphB: string; text: (n: string) => string; bg?: string; border?: string }> = {
   enter_star: { glyphA: "⭐", glyphB: "🌟", text: (n) => `🌟 ${n} đã xuất hiện!` },
   enter_red_carpet: { glyphA: "🌹", glyphB: "🟥", text: (n) => `🟥 Trải thảm đỏ đón ${n}!`, bg: "rgba(130,10,16,0.92)", border: "#FFD43B" },
-  enter_supercar: { glyphA: "🏎️", glyphB: "💨", text: (n) => `🏎️ ${n} đánh siêu xe tới sảnh!`, bg: "rgba(15,23,42,0.9)", border: "#38BDF8" },
-  enter_thunder_god: { glyphA: "⚡", glyphB: "🌩️", text: (n) => `🌩️ Lôi Thần ${n} giáng lâm!`, bg: "rgba(25,18,55,0.92)", border: "#38BDF8" },
-  enter_fireworks: { glyphA: "🎆", glyphB: "🎇", text: (n) => `🎆 Pháo hoa rực rỡ đón ${n}!`, bg: "rgba(40,10,35,0.9)", border: "#FF6FA5" },
+  enter_clown_parade: { glyphA: "🤡", glyphB: "🎪", text: (n) => `🎪 Kèn trống rộn ràng! Vua Hề ${n} đổ bộ!`, bg: "rgba(124,45,18,0.94)", border: "#FACC15" },
+  enter_supercar: { glyphA: "🏎️", glyphB: "💨", text: (n) => `🏎️ ${n} đánh siêu xe nẹt pô tới sảnh!`, bg: "rgba(15,23,42,0.92)", border: "#38BDF8" },
+  enter_thunder_god: { glyphA: "⚡", glyphB: "🌩️", text: (n) => `🌩️ Lôi Thần ${n} giáng lâm!`, bg: "rgba(25,18,55,0.94)", border: "#38BDF8" },
+  enter_helicopter_vip: { glyphA: "🚁", glyphB: "💸", text: (n) => `🚁 Chủ Tịch ${n} đáp trực thăng riêng rải tiền!`, bg: "rgba(6,78,59,0.94)", border: "#FACC15" },
+  enter_fireworks: { glyphA: "🎆", glyphB: "🎇", text: (n) => `🎆 Pháo hoa rực rỡ đón ${n}!`, bg: "rgba(40,10,35,0.92)", border: "#FF6FA5" },
+  enter_rainbow_unicorn: { glyphA: "🦄", glyphB: "🌈", text: (n) => `🦄 ${n} cưỡi Kỳ Lân Cầu Vồng Ố Dề giáng trần!`, bg: "rgba(131,24,67,0.94)", border: "#F472B6" },
   enter_dragon_descent: { glyphA: "🐉", glyphB: "🔥", text: (n) => `🐉 Thần Long ${n} xuất thế!`, bg: "rgba(65,12,12,0.94)", border: "#FACC15" },
+  enter_gold_throne: { glyphA: "👑", glyphB: "🪙", text: (n) => `👑 Bát kiệu ngai vàng rước Phú Hào ${n}!`, bg: "rgba(66,32,6,0.95)", border: "#FFD700" },
   enter_galaxy_portal: { glyphA: "🌀", glyphB: "🌌", text: (n) => `🌌 Chí Tôn ${n} bước ra từ Ngân Hà!`, bg: "rgba(22,8,55,0.95)", border: "#E879F9" },
+  enter_emperor_decree: { glyphA: "🔱", glyphB: "👑", text: (n) => `🔱 THÁNH CHỈ LÂM TRIỀU: Quỳ nghênh Đại Đế ${n}!`, bg: "rgba(59,7,100,0.96)", border: "#FFD700" },
 };
 
 /** hiệu ứng vào phòng đa dạng theo trang bị entrance */
@@ -533,7 +552,22 @@ function EntranceFx({
   );
 }
 
-type VipScreenKind = "paparazzi" | "ghost_scare" | "royal_seal" | "blackhole" | "dragon_roar" | "meteor";
+type VipScreenKind =
+  | "paparazzi"
+  | "ghost_scare"
+  | "royal_seal"
+  | "blackhole"
+  | "dragon_roar"
+  | "meteor"
+  | "clown_honk"
+  | "bsod_crash"
+  | "gold_slipper_storm"
+  | "police_siren"
+  | "coffin_meme"
+  | "ban_hammer"
+  | "rainbow_overload"
+  | "jackpot_rain"
+  | "supreme_judgement";
 
 function VipSkillScreenFx({
   kind,
@@ -544,8 +578,136 @@ function VipSkillScreenFx({
   size: Size;
   onDone: () => void;
 }) {
-  const dur = kind === "blackhole" ? 3600 : kind === "dragon_roar" ? 3400 : 2800;
+  const dur =
+    kind === "supreme_judgement" || kind === "jackpot_rain" || kind === "bsod_crash"
+      ? 3800
+      : kind === "blackhole" || kind === "dragon_roar" || kind === "police_siren"
+        ? 3400
+        : 2900;
   const t = useRun(dur, onDone);
+
+  if (kind === "bsod_crash") {
+    return (
+      <Animated.View
+        testID="skill-fx-bsod_crash"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: "#0050EF",
+            paddingHorizontal: 28,
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.06, 0.86, 1], outputRange: [0, 0.96, 0.96, 0] }),
+          },
+        ]}
+      >
+        <T style={{ color: "#FFFFFF", fontSize: 64, fontWeight: "900", marginBottom: 10 }}>:(</T>
+        <T style={{ color: "#FFFFFF", fontSize: 19, fontWeight: "800", lineHeight: 26 }}>
+          Máy của bạn vừa sập nguồn vì ĐỘ LẦY VƯỢT NGƯỠNG CHO PHÉP!
+        </T>
+        <T style={{ color: "#DBEAFE", fontSize: 13, fontWeight: "700", marginTop: 12 }}>
+          Mã dừng: 0x0000DEAD_XOM_LAY_TROLL · Đang thu thập nỗi nhục (99%)...
+        </T>
+      </Animated.View>
+    );
+  }
+  if (kind === "police_siren") {
+    return (
+      <Animated.View
+        testID="skill-fx-police_siren"
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(15,23,42,0.62)",
+            opacity: t.interpolate({ inputRange: [0, 0.08, 0.88, 1], outputRange: [0, 1, 1, 0] }),
+          },
+        ]}
+      >
+        <Animated.View
+          style={{
+            borderWidth: 5,
+            borderColor: "#EF4444",
+            backgroundColor: "#1E3A8A",
+            borderRadius: 22,
+            paddingHorizontal: 24,
+            paddingVertical: 16,
+            alignItems: "center",
+            gap: 8,
+            transform: [{ scale: t.interpolate({ inputRange: [0, 0.2, 0.5, 1], outputRange: [0.5, 1.12, 0.98, 1.04] }) }],
+          }}
+        >
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            <EmojiIcon emoji="🚨" size={44} glow="rgba(239,68,68,0.95)" />
+            <EmojiIcon emoji="🚔" size={44} glow="rgba(59,130,246,0.95)" />
+            <EmojiIcon emoji="🚨" size={44} glow="rgba(239,68,68,0.95)" />
+          </View>
+          <T style={{ color: "#FEF08A", fontSize: 22, fontWeight: "900", textAlign: "center" }}>
+            ĐỨNG IM! CẢNH SÁT CHÍNH TẢ & LẦY LỘI VÂY BẮT!
+          </T>
+        </Animated.View>
+      </Animated.View>
+    );
+  }
+  if (kind === "gold_slipper_storm" || kind === "clown_honk" || kind === "rainbow_overload" || kind === "jackpot_rain" || kind === "supreme_judgement" || kind === "ban_hammer" || kind === "coffin_meme") {
+    const cfgMap: Record<string, { bg: string; border: string; title: string; main: string; rain: [string, string] }> = {
+      gold_slipper_storm: { bg: "rgba(120,53,15,0.68)", border: "#FACC15", title: "🩴 BÃO DÉP TỔ ONG 24K VẢ TỚI TẤP!", main: "🩴", rain: ["🩴", "🪙"] },
+      clown_honk: { bg: "rgba(124,45,18,0.68)", border: "#FB923C", title: "🤡 PHONG TƯỚC CHÚA HỀ RẠP XIẾC!", main: "🤡", rain: ["🎈", "🎪"] },
+      rainbow_overload: { bg: "rgba(131,24,67,0.62)", border: "#F472B6", title: "🦄 CẦU VỒNG Ố DỀ QUÁ TẢI MÀN HÌNH!", main: "🦄", rain: ["🌈", "✨"] },
+      jackpot_rain: { bg: "rgba(66,32,6,0.72)", border: "#FFD700", title: "🎰 NỔ HŨ ĐỘC ĐẮC 777 VÀNG RÒNG!", main: "🎰", rain: ["🪙", "💎"] },
+      supreme_judgement: { bg: "rgba(46,16,101,0.76)", border: "#FFD700", title: "🔱 PHÁN QUYẾT THIÊN ĐẾ: VẠN KIẾM QUY TÔNG!", main: "🔱", rain: ["⚔️", "👑"] },
+      ban_hammer: { bg: "rgba(69,10,10,0.74)", border: "#EF4444", title: "🔨 BÚA TẠ 9999 TẤN DẬP NÁT KHUNG HÌNH!", main: "🔨", rain: ["💥", "⚡"] },
+      coffin_meme: { bg: "rgba(17,24,39,0.78)", border: "#FACC15", title: "⚰️ NHẠC NỔI LÊN! ĐỘI KHIÊNG HÒM TỚI ĐÓN!", main: "⚰️", rain: ["🎶", "🕶️"] },
+    };
+    const cfg = cfgMap[kind];
+    return (
+      <Animated.View
+        testID={`skill-fx-${kind}`}
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: cfg.bg,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: t.interpolate({ inputRange: [0, 0.1, 0.86, 1], outputRange: [0, 1, 1, 0] }),
+          },
+        ]}
+      >
+        {(kind === "rainbow_overload" || kind === "jackpot_rain" || kind === "supreme_judgement") && <Confetti />}
+        {Array.from({ length: 12 }, (_, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              position: "absolute",
+              left: ((i * 29 + 7) % 88) * (size.w / 100),
+              top: t.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-50 - (i % 4) * 45, size.h + 40],
+              }),
+            }}
+          >
+            <EmojiIcon emoji={i % 2 === 0 ? cfg.rain[0] : cfg.rain[1]} size={32} glow="rgba(255,215,0,0.75)" />
+          </Animated.View>
+        ))}
+        <Animated.View
+          style={{
+            transform: [
+              { scale: t.interpolate({ inputRange: [0, 0.18, 0.4, 1], outputRange: [2.2, 0.92, 1.15, 1.05] }) },
+              { rotate: kind === "ban_hammer" ? t.interpolate({ inputRange: [0, 0.2, 1], outputRange: ["-45deg", "0deg", "4deg"] }) : "0deg" },
+            ],
+          }}
+        >
+          <EmojiIcon emoji={cfg.main} size={132} glow="rgba(255,215,0,0.9)" />
+        </Animated.View>
+        <View style={[styles.giftBanner, { top: size.h * 0.15, borderColor: cfg.border }]}>
+          <T style={[styles.giftText, { color: "#FEF08A" }]}>{cfg.title}</T>
+        </View>
+      </Animated.View>
+    );
+  }
   if (kind === "paparazzi") {
     return (
       <Animated.View
@@ -724,6 +886,15 @@ const SKILL_LINE: Record<string, (from: string, to: string) => string> = {
   meteor: (a, b) => `☄️ ${a} triệu hồi thiên thạch dội xuống ${b}!`,
   blackhole: (a, b) => `🕳️ ${a} mở hố đen vũ trụ hút ${b}!`,
   dragon_roar: (a, b) => `🐉 ${a} gọi Rồng Thần gầm thét vào ${b}!`,
+  clown_honk: (a, b) => `🤡 ${a} đội tóc giả Chúa Hề lên đầu ${b}!`,
+  bsod_crash: (a, b) => `💻 ${a} thả Màn Hình Xanh BSOD làm đơ máy ${b}!`,
+  gold_slipper_storm: (a, b) => `🩴 ${a} ném Bão Dép Tổ Ong 24K vào mặt ${b}!`,
+  police_siren: (a, b) => `🚨 ${a} báo Cảnh Sát Lầy Lội vây bắt ${b}!`,
+  coffin_meme: (a, b) => `⚰️ ${a} gọi Đội Khiêng Hòm tới tiễn ${b}!`,
+  ban_hammer: (a, b) => `🔨 ${a} giáng Búa Tạ 9999 Tấn lên ${b}!`,
+  rainbow_overload: (a, b) => `🦄 ${a} xả Cầu Vồng Ố Dề mù mắt ${b}!`,
+  jackpot_rain: (a, b) => `🎰 ${a} nổ Hũ Vàng 9999 dội thẳng vào ${b}!`,
+  supreme_judgement: (a, b) => `🔱 ${a} giáng Phán Quyết Thiên Đế trấn áp ${b}!`,
 };
 
 export function SkillLayer({
@@ -999,19 +1170,42 @@ export function SkillLayer({
             { id: ++seq.current, emoji: isCupid ? "💘" : "🦈", from: fromR, to: toR, ms: 750, arc: isCupid, after: land },
           ]);
         else land();
-      } else if (k === "paparazzi" || k === "ghost_scare" || k === "royal_seal" || k === "meteor" || k === "blackhole" || k === "dragon_roar") {
-        setMood(e.to, k === "blackhole" ? "dizzy" : "shock", 3400);
-        setWobble(e.to, k === "blackhole" ? "spin" : "shake", k === "blackhole" ? 3200 : 1800);
-        play(k === "dragon_roar" || k === "meteor" ? "boom" : k === "paparazzi" ? "zap" : "siren");
+      } else if (
+        k === "paparazzi" ||
+        k === "ghost_scare" ||
+        k === "royal_seal" ||
+        k === "meteor" ||
+        k === "blackhole" ||
+        k === "dragon_roar" ||
+        k === "clown_honk" ||
+        k === "bsod_crash" ||
+        k === "gold_slipper_storm" ||
+        k === "police_siren" ||
+        k === "coffin_meme" ||
+        k === "ban_hammer" ||
+        k === "rainbow_overload" ||
+        k === "jackpot_rain" ||
+        k === "supreme_judgement"
+      ) {
+        setMood(e.to, k === "blackhole" || k === "bsod_crash" || k === "ban_hammer" ? "dizzy" : k === "clown_honk" ? "cry" : "shock", 3600);
+        setWobble(e.to, k === "blackhole" || k === "rainbow_overload" ? "spin" : "shake", 2400);
+        play(k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement" ? "boom" : k === "paparazzi" || k === "bsod_crash" ? "zap" : "siren");
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
+        const burstEmoji: Record<string, string> = {
+          paparazzi: "📸", ghost_scare: "👻", royal_seal: "🏮", meteor: "💥", blackhole: "🌀", dragon_roar: "🐉",
+          clown_honk: "🤡", bsod_crash: "💻", gold_slipper_storm: "🩴", police_siren: "🚨", coffin_meme: "⚰️",
+          ban_hammer: "🔨", rainbow_overload: "🦄", jackpot_rain: "🎰", supreme_judgement: "🔱",
+        };
         if (toR)
           setBursts((xs) => [
             ...xs.slice(-6),
-            { id: ++seq.current, emoji: k === "paparazzi" ? "📸" : k === "ghost_scare" ? "👻" : k === "royal_seal" ? "🏮" : k === "meteor" ? "💥" : k === "blackhole" ? "🌀" : "🐉", at: toR, big: true },
+            { id: ++seq.current, emoji: burstEmoji[k] ?? "💥", at: toR, big: true },
           ]);
         if (toMe && !e.soft) {
-          vibrate([140, 60, 200]);
-          if (k === "royal_seal" || k === "meteor" || k === "dragon_roar") shakeRef.current("quake");
+          vibrate([140, 60, 220]);
+          if (k === "royal_seal" || k === "meteor" || k === "dragon_roar" || k === "ban_hammer" || k === "supreme_judgement" || k === "gold_slipper_storm") {
+            shakeRef.current("quake");
+          }
           setVipScreens((xs) => [...xs.slice(-2), { id: ++seq.current, kind: k }]);
         }
       }

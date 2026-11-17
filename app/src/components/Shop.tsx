@@ -1,7 +1,7 @@
 import { Image } from './Image';
 /**
- * Cửa hàng Ruby (kỹ năng chọc, 8 ô trang trí VIP, sticker, quà đại gia) & điểm danh 7 ngày.
- * Vector icons Fluent Emoji Flat + gradient VIP cards.
+ * Cửa hàng Ruby (kỹ năng chọc lố lăng, 8 ô trang trí VIP Đại Gia, sticker, siêu quà) & điểm danh 7 ngày.
+ * Hỗ trợ hiển thị cả trong Sheet lẫn nhúng trực tiếp làm Fragment "Phú Hào" ở Trang chủ Mobile!
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,13 +23,15 @@ import { NameText, TitleBadge, VipBadge, chatBubbleStyleOf, chatBubbleTextColorO
 import { Portrait } from './Avatar';
 import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
 
-type Tab = 'skill' | 'deco' | 'sticker' | 'gift';
-const TABS: { id: Tab; emoji: string; label: string }[] = [
-  { id: 'skill', emoji: '⚡', label: 'Kỹ năng' },
-  { id: 'deco', emoji: '🖼️', label: 'Trang trí' },
+export type ShopTabId = 'skill' | 'deco' | 'sticker' | 'gift';
+
+const TABS: { id: ShopTabId; emoji: string; label: string }[] = [
+  { id: 'deco', emoji: '👑', label: 'Hóa Trang VIP' },
+  { id: 'skill', emoji: '⚡', label: 'Chiêu Lầy' },
+  { id: 'gift', emoji: '🎁', label: 'Siêu Quà' },
   { id: 'sticker', emoji: '🔤', label: 'Sticker' },
-  { id: 'gift', emoji: '🎁', label: 'Quà' },
 ];
+
 const DECO: { slot: CosmeticSlot; title: string; short: string }[] = [
   { slot: 'frame', title: '👑 Khung avatar', short: 'Khung' },
   { slot: 'nameFx', title: '✨ Hiệu ứng tên', short: 'Tên' },
@@ -41,49 +43,69 @@ const DECO: { slot: CosmeticSlot; title: string; short: string }[] = [
   { slot: 'roomTheme', title: '🗺️ Map & Chủ đề phòng', short: 'Map' },
 ];
 
-export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game; onClose: () => void; initialTab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+export function ShopBody({
+  game,
+  initialTab = 'skill',
+  onRequestAuth,
+  onOpenWallet,
+}: {
+  game: Game;
+  initialTab?: ShopTabId;
+  onRequestAuth?: () => void;
+  onOpenWallet?: () => void;
+}) {
+  const [tab, setTab] = useState<ShopTabId>(initialTab);
   const [decoFilter, setDecoFilter] = useState<'all' | CosmeticSlot>('all');
-  const [walletOpen, setWalletOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<Partial<Record<CosmeticSlot, string>>>({});
+  const [preview, setPreview] = useState<Partial<Record<CosmeticSlot, string>>>({
+    // Khách chưa đăng nhập vào xem mặc định thấy ngay bộ đồ Đại Gia rực rỡ để kích thích sở hữu!
+    ...(game.user ? {} : {
+      frame: 'frame_emperor_omega',
+      nameFx: 'name_omega_emperor',
+      aura: 'aura_omega_divine',
+      pet: 'pet_celestial_qilin',
+      title: 'title_thien_de',
+      chatBubble: 'bubble_emperor_jade',
+      roomTheme: 'map_hoang_kim_dien',
+    }),
+  });
   const feed = useFeed();
   const user = game.user;
+  const userId = user?.id;
   const { loadShop } = game;
+
   useEffect(() => {
-    void loadShop();
-  }, [loadShop]);
+    if (userId) void loadShop();
+  }, [loadShop, userId]);
 
-  if (walletOpen) return <WalletSheet game={game} onClose={() => setWalletOpen(false)} />;
-  if (!user) {
-    return (
-      <Sheet title="Cửa hàng 🛍️" onClose={onClose}>
-        <T style={styles.note}>Cần đăng nhập tài khoản để mua đồ bằng Ruby.</T>
-      </Sheet>
-    );
-  }
-  const ruby = user.ruby ?? 0;
-  const owned = new Set(user.owned ?? []);
-  const equipped = user.equipped ?? {};
+  const ruby = user?.ruby ?? 0;
+  const owned = new Set(user?.owned ?? []);
+  const equipped = user?.equipped ?? {};
 
-  const pts = prestigePoints(user.rubySpent, user.owned);
+  const pts = user ? prestigePoints(user.rubySpent, user.owned) : 0;
   const vip = vipOf(pts);
   const nextVip = VIP_TIERS.find((t) => t.tier === vip.tier + 1) ?? null;
   const vipPct = nextVip
-    ? Math.max(0.04, Math.min(1, (pts - vip.minPoints) / Math.max(1, nextVip.minPoints - vip.minPoints)))
+    ? Math.max(0.05, Math.min(1, (pts - vip.minPoints) / Math.max(1, nextVip.minPoints - vip.minPoints)))
     : 1;
 
   const buy = async (item: ShopItem) => {
+    if (!user) {
+      onRequestAuth?.();
+      return;
+    }
     setBusy(item.id);
     setError(null);
     const err = await game.buyItem(item.id);
     setBusy(null);
     if (err) return setError(err);
     play('coin');
-    feed(`Đã mua ${item.name}`, 'good');
+    feed(`🎉 Đã tậu siêu phẩm ${item.name}!`, 'good');
   };
+
   const equip = async (slot: CosmeticSlot, id: string | null) => {
+    if (!user) return;
     setBusy(id ?? slot);
     setError(null);
     const err = await game.equipItem(slot, id);
@@ -95,32 +117,81 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
     }
   };
 
-  const buyButton = (item: ShopItem) =>
-    ruby >= item.price ? (
-      <Button testID={`buy-${item.id}`} small variant="gold" title={`Mua 💎${fmtRuby(item.price)}`} disabled={busy !== null} onPress={() => buy(item)} />
+  const buyButton = (item: ShopItem) => {
+    if (!user) {
+      return (
+        <Button
+          testID={`guest-buy-${item.id}`}
+          small
+          variant="gold"
+          title={`Đăng ký mua 💎${fmtRuby(item.price)}`}
+          onPress={() => onRequestAuth?.()}
+        />
+      );
+    }
+    return ruby >= item.price ? (
+      <Button
+        testID={`buy-${item.id}`}
+        small
+        variant="gold"
+        title={`Mua 💎${fmtRuby(item.price)}`}
+        disabled={busy !== null}
+        onPress={() => void buy(item)}
+      />
     ) : (
-      <Button testID={`topup-${item.id}`} small variant="paper" title={`Thiếu ${fmtRuby(item.price - ruby)} · Nạp thêm`} onPress={() => setWalletOpen(true)} />
+      <Button
+        testID={`topup-${item.id}`}
+        small
+        variant="paper"
+        title={`Thiếu ${fmtRuby(item.price - ruby)} · Nạp thêm`}
+        onPress={() => onOpenWallet?.()}
+      />
     );
+  };
 
-  const row = (item: ShopItem, action: ReactNode, extra?: ReactNode) => (
-    <View key={item.id} testID={`shop-item-${item.id}`} style={[styles.item, item.price >= 1000 && styles.itemVip]}>
-      <View style={[styles.itemIconWrap, item.price >= 1000 && styles.itemIconVip]}>
-        <EmojiIcon emoji={item.emoji} size={28} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <T style={styles.itemName}>{item.name}</T>
-        {item.desc ? <T style={styles.itemDesc}>{item.desc}</T> : null}
-        {extra}
-      </View>
-      <View style={styles.itemAct}>
-        <View style={styles.pricePill}>
-          <RubyIcon size={13} />
-          <T style={styles.price}>{fmtRuby(item.price)}</T>
+  const row = (item: ShopItem, action: ReactNode, extra?: ReactNode) => {
+    const isMythic = item.price >= 2000;
+    const isVip = item.price >= 800 && !isMythic;
+    return (
+      <View
+        key={item.id}
+        testID={`shop-item-${item.id}`}
+        style={[
+          styles.item,
+          isVip && styles.itemVip,
+          isMythic && styles.itemMythic,
+        ]}
+      >
+        <View style={[styles.itemIconWrap, isVip && styles.itemIconVip, isMythic && styles.itemIconMythic]}>
+          <EmojiIcon emoji={item.emoji} size={30} glow={isMythic} />
         </View>
-        {action}
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <T style={[styles.itemName, isMythic && { color: '#FEF08A' }]}>{item.name}</T>
+            {isMythic && (
+              <View style={styles.mythicTag}>
+                <T style={styles.mythicTagTxt}>🔱 THẦN THOẠI</T>
+              </View>
+            )}
+            {isVip && (
+              <View style={styles.vipTag}>
+                <T style={styles.vipTagTxt}>👑 ĐẠI GIA</T>
+              </View>
+            )}
+          </View>
+          {item.desc ? <T style={[styles.itemDesc, isMythic && { color: '#E9D5FF' }]}>{item.desc}</T> : null}
+          {extra}
+        </View>
+        <View style={styles.itemAct}>
+          <View style={styles.pricePill}>
+            <RubyIcon size={13} />
+            <T style={[styles.price, isMythic && { color: '#FDE047' }]}>{fmtRuby(item.price)}</T>
+          </View>
+          {action}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const frameNow = preview.frame ?? equipped.frame;
   const fxNow = preview.nameFx ?? equipped.nameFx;
@@ -136,31 +207,52 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
   const visibleDeco = decoFilter === 'all' ? DECO : DECO.filter((d) => d.slot === decoFilter);
 
   return (
-    <Sheet title="Cửa hàng Phú Hào 🛍️" onClose={onClose}>
-      <View style={styles.balanceRow}>
-        <View style={styles.rubyInline}>
-          <RubyIcon size={22} />
-          <T testID="shop-balance" style={styles.balance}>{fmtRuby(ruby)}</T>
+    <View style={{ gap: 10 }}>
+      {user ? (
+        <View style={styles.balanceRow}>
+          <View style={styles.rubyInline}>
+            <RubyIcon size={22} />
+            <T testID="shop-balance" style={styles.balance}>{fmtRuby(ruby)}</T>
+          </View>
+          <Button
+            testID="shop-topup"
+            small
+            variant="gold"
+            iconNode={<UiIcon name="Plus" size={14} color="#271400" />}
+            title="Nạp thêm Ruby"
+            onPress={() => onOpenWallet?.()}
+          />
         </View>
-        <Button testID="shop-topup" small variant="gold" iconNode={<UiIcon name="Plus" size={14} color="#271400" />} title="Nạp thêm" onPress={() => setWalletOpen(true)} />
-      </View>
+      ) : (
+        <LinearGradient colors={['#4C1D95', '#831843', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.guestWhaleBanner}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <T style={{ color: '#FEF08A', fontWeight: '900', fontSize: 15 }}>💎 ĐẶC QUYỀN ĐẠI GIA XÓM LẦY</T>
+            <T style={{ color: '#F8FAFC', fontSize: 12, fontWeight: '700' }}>
+              Thử miễn phí mọi Khung 3 Vòng, Hào Quang Cầu Vồng, Màn Hình Xanh BSOD & Quà Ngai Vàng 10.000💎 ngay bên dưới!
+            </T>
+          </View>
+          <Button small variant="gold" title="Đăng ký ngay" onPress={() => onRequestAuth?.()} />
+        </LinearGradient>
+      )}
 
       {/* Thanh Đẳng Cấp VIP Prestige */}
       <LinearGradient colors={[...GRADS.vipDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} testID="vip-progress-card" style={styles.vipCard}>
         <View style={styles.vipTop}>
-          <VipBadge tier={vip.tier} />
-          <T style={styles.vipTitle}>{vip.tier > 0 ? vip.name : 'Chưa vào bảng VIP'}</T>
+          <VipBadge tier={user ? vip.tier : 6} />
+          <T style={styles.vipTitle}>
+            {user ? (vip.tier > 0 ? vip.name : 'Chưa vào bảng VIP Phú Hào') : 'Xem trước cấp Chí Tôn Vũ Trụ (VIP 6)'}
+          </T>
           <T style={styles.vipPts}>{fmtRuby(pts)} điểm</T>
         </View>
         <View style={styles.vipTrack}>
-          <View style={[styles.vipFill, { width: `${vipPct * 100}%`, backgroundColor: vip.color }]} />
+          <View style={[styles.vipFill, { width: `${(user ? vipPct : 1) * 100}%`, backgroundColor: user ? vip.color : '#F472B6' }]} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
           {nextVip ? (
             <>
               <T style={styles.vipSub}>Còn</T>
               <RubyIcon size={12} />
-              <T style={styles.vipSub}>{fmtRuby(Math.max(0, nextVip.minPoints - pts))} nữa lên</T>
+              <T style={styles.vipSub}>{fmtRuby(Math.max(0, nextVip.minPoints - pts))} nữa thăng cấp</T>
               <EmojiIcon emoji={nextVip.badge} size={13} />
               <T style={styles.vipSub}>{nextVip.name}!</T>
             </>
@@ -177,7 +269,14 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
         {TABS.map((x) => {
           const on = tab === x.id;
           return (
-            <Pressable key={x.id} testID={`shop-tab-${x.id}`} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setTab(x.id)} style={[styles.tab, on && styles.tabOn]}>
+            <Pressable
+              key={x.id}
+              testID={`shop-tab-${x.id}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              onPress={() => setTab(x.id)}
+              style={[styles.tab, on && styles.tabOn]}
+            >
               <EmojiIcon emoji={x.emoji} size={15} />
               <T style={[styles.tabText, on && { color: C.gold }]}>{x.label}</T>
             </Pressable>
@@ -189,7 +288,7 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
       {tab === 'skill' && (
         <>
           <T style={styles.note}>
-            Mỗi ngày bạn có {FREE_POKES_PER_DAY} lượt chọc miễn phí (đánh, ném, khịa, hối…), hết thì 1 Ruby / lần. Kỹ năng dưới đây trả Ruby mỗi lần dùng, chọn trong bảng chọc khi chạm vào avatar bạn bè. Chỉ để vui, không ảnh hưởng thắng thua.
+            Mỗi ngày có {FREE_POKES_PER_DAY} lượt chọc cơ bản miễn phí. 28 Tuyệt Kỹ Đại Gia dưới đây trả Ruby mỗi lần tung chiêu — phủ kín màn hình đối thủ bằng Màn Hình Xanh BSOD, Mưa Dép Vàng 24K, Còi Cảnh Sát, Búa Ban Vĩnh Viễn & Thiên Đế Phán Quyết!
           </T>
           {section('skill').map((it) => row(it, null))}
         </>
@@ -200,8 +299,8 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
           {/* Sân Khấu Xem Thử Trực Tiếp 8 Ô + Map */}
           <View testID="shop-live-stage" style={[styles.preview, { backgroundColor: themeNow.bg, borderColor: themeNow.accent }]}>
             <Portrait
-              p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }}
-              size={70}
+              p={{ avatar: user?.avatar ?? game.guest.avatar ?? 0, avatarUrl: user?.avatarUrl ?? game.guest.avatarUrl }}
+              size={72}
               frame={frameNow}
               aura={auraNow}
               pet={petNow}
@@ -209,10 +308,16 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
             />
             <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {vip.tier > 0 && <VipBadge tier={vip.tier} compact />}
-                <NameText fx={fxNow} style={[styles.previewName, { color: themeNow.accent }]}>{user.displayName}</NameText>
+                {(user ? vip.tier > 0 : true) && <VipBadge tier={user ? vip.tier : 6} compact />}
+                <NameText fx={fxNow} style={[styles.previewName, { color: themeNow.accent }]}>
+                  {user?.displayName ?? 'Đại Gia Xóm Lầy'}
+                </NameText>
               </View>
-              {titleNow && <TitleBadge title={titleNow} />}
+              {titleNow && (
+                <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+                  <TitleBadge title={titleNow} />
+                </View>
+              )}
               <View style={[styles.previewBubble, bStyle]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <EmojiIcon emoji={themeNow.emoji} size={14} />
@@ -223,11 +328,11 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
               </View>
             </View>
             {Object.values(preview).some(Boolean) && (
-              <Button testID="preview-reset" small variant="paper" iconNode={<UiIcon name="RotateCcw" size={14} color={C.ink} />} title="Đặt lại" onPress={() => setPreview({})} />
+              <Button testID="preview-reset" small variant="paper" iconNode={<UiIcon name="RotateCcw" size={14} color={C.ink} />} title="Gốc" onPress={() => setPreview({})} />
             )}
           </View>
 
-          <T style={styles.note}>Mua một lần, dùng mãi · 8 ô trang bị riêng biệt + tích điểm VIP Phú Hào!</T>
+          <T style={styles.note}>Mua 1 lần sở hữu vĩnh viễn · Phối đồng bộ 8 ô phụ kiện lố lăng + thăng cấp VIP Phú Hào!</T>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
             <Pressable
@@ -264,9 +369,9 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
                   const on = equipped[slot] === it.id;
                   const action = has ? (
                     on ? (
-                      <Button testID={`unequip-${it.id}`} small variant="paper" title="Gỡ" disabled={busy !== null} onPress={() => equip(slot, null)} />
+                      <Button testID={`unequip-${it.id}`} small variant="paper" title="Gỡ" disabled={busy !== null} onPress={() => void equip(slot, null)} />
                     ) : (
-                      <Button testID={`equip-${it.id}`} small variant="jade" title="Trang bị" disabled={busy !== null} onPress={() => equip(slot, it.id)} />
+                      <Button testID={`equip-${it.id}`} small variant="jade" title="Trang bị" disabled={busy !== null} onPress={() => void equip(slot, it.id)} />
                     )
                   ) : (
                     <>
@@ -299,7 +404,7 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
 
       {tab === 'sticker' && (
         <>
-          <T style={styles.note}>Bộ “Chữ Lầy” 12 sticker chữ to viền đậm. Mua một lần, gửi trong khung trò chuyện.</T>
+          <T style={styles.note}>Bộ “Chữ Lầy” 12 sticker chữ to viền đậm. Mua một lần, gửi thả ga trong khung chat.</T>
           <View style={styles.stickerGrid}>
             {CHU_LAY_STICKERS.map((s) => (
               <Image key={s.id} source={s.source} accessibilityLabel={s.alt} style={styles.stickerThumb} resizeMode="contain" />
@@ -320,15 +425,31 @@ export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game;
       {tab === 'gift' && (
         <>
           <T style={styles.note}>
-            Quà tặng trong phòng: chạm vào avatar bạn bè rồi chọn “Tặng quà”. Bạn trả Ruby, cả phòng thấy siêu hiệu ứng, người nhận được điểm quà và bạn tăng cấp VIP!
+            15 Siêu Quà Đại Gia (tới 10.000💎 Ngai Vàng Vũ Trụ Chí Tôn!): chạm avatar bạn bè trong phòng rồi bấm “Tặng quà” để nổ pháo hoa toàn màn hình & vinh danh Phú Hào!
           </T>
           {section('gift').map((it) => row(it, null))}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <EmojiIcon emoji="💝" size={15} />
-            <T style={styles.note}>Điểm quà của bạn: {fmtRuby(user.giftPoints ?? 0)}</T>
-          </View>
+          {user && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <EmojiIcon emoji="💝" size={15} />
+              <T style={styles.note}>Điểm quà bạn đã nhận: {fmtRuby(user.giftPoints ?? 0)}</T>
+            </View>
+          )}
         </>
       )}
+    </View>
+  );
+}
+
+export function ShopSheet({ game, onClose, initialTab = 'skill' }: { game: Game; onClose: () => void; initialTab?: ShopTabId }) {
+  const [walletOpen, setWalletOpen] = useState(false);
+  if (walletOpen) return <WalletSheet game={game} onClose={() => setWalletOpen(false)} />;
+  return (
+    <Sheet title="Cửa hàng Phú Hào 🛍️" onClose={onClose}>
+      <ShopBody
+        game={game}
+        initialTab={initialTab}
+        onOpenWallet={() => setWalletOpen(true)}
+      />
     </Sheet>
   );
 }
@@ -384,7 +505,7 @@ export function CheckinSheet({ game, onClose, onChanged }: { game: Game; onClose
                   <UiIcon name="CheckCircle2" size={24} color={C.jadeDeep} />
                 ) : day === 7 ? (
                   <EmojiIcon emoji="🎁" size={24} />
-                ) : (
+                  ) : (
                   <RubyIcon size={22} />
                 )}
               </View>
@@ -406,6 +527,10 @@ export function CheckinSheet({ game, onClose, onChanged }: { game: Game; onClose
 const styles = StyleSheet.create({
   note: { fontSize: 13, color: C.muted, lineHeight: 18 },
   error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  guestWhaleBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 18,
+    borderWidth: 2, borderColor: '#FACC15',
+  },
   balanceRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'space-between',
     backgroundColor: C.mist, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16,
@@ -420,9 +545,9 @@ const styles = StyleSheet.create({
   vipFill: { height: '100%', borderRadius: 99 },
   vipSub: { color: '#E2E8F0', fontSize: 11, fontWeight: '700' },
   tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 14, padding: 4, gap: 4 },
-  tab: { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 4 },
+  tab: { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4 },
   tabOn: { backgroundColor: C.ink },
-  tabText: { fontWeight: '800', fontSize: 12, textAlign: 'center', color: C.ink },
+  tabText: { fontWeight: '800', fontSize: 11.5, textAlign: 'center', color: C.ink },
   filterRow: { gap: 6, paddingVertical: 2 },
   filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.1)' },
   filterOn: { backgroundColor: C.ink, borderColor: C.ink },
@@ -430,19 +555,25 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 14, fontWeight: '900', color: C.ink },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 16, padding: 10 },
   itemVip: { backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B' },
+  itemMythic: { backgroundColor: '#1E1136', borderWidth: 2, borderColor: '#FACC15' },
   itemIconWrap: {
-    width: 46, height: 46, borderRadius: 14, backgroundColor: '#FFFFFF',
+    width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFFFFF',
     borderWidth: 1, borderColor: 'rgba(15,23,42,0.08)', alignItems: 'center', justifyContent: 'center',
   },
   itemIconVip: { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' },
-  itemName: { fontSize: 15, fontWeight: '800', color: C.ink },
-  itemDesc: { fontSize: 12, color: C.muted, lineHeight: 15 },
+  itemIconMythic: { backgroundColor: '#3B0764', borderColor: '#F472B6', borderWidth: 1.5 },
+  mythicTag: { backgroundColor: '#EC4899', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 },
+  mythicTagTxt: { fontSize: 9.5, fontWeight: '900', color: '#FEF08A' },
+  vipTag: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#D97706', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
+  vipTagTxt: { fontSize: 9.5, fontWeight: '900', color: '#92400E' },
+  itemName: { fontSize: 15, fontWeight: '900', color: C.ink },
+  itemDesc: { fontSize: 12, color: C.muted, lineHeight: 16 },
   itemAct: { alignItems: 'flex-end', gap: 4, maxWidth: 175 },
   pricePill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   price: { fontSize: 13, fontWeight: '900', color: C.son },
   preview: {
     flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 18,
-    borderWidth: 2, padding: 14, overflow: 'visible',
+    borderWidth: 2.5, padding: 14, overflow: 'visible',
   },
   previewName: { fontSize: 18, fontWeight: '900', flexShrink: 1 },
   previewBubble: {

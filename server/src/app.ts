@@ -110,6 +110,9 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         const w = dict.add(word) ?? dict.en?.add(word) ?? null;
         if (w) store.addWord(w, byName).catch(logErr('addWord'));
       },
+      onCroakTick: (room, payload) => {
+        io.to(room.code).emit('croak:tick', payload);
+      },
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });

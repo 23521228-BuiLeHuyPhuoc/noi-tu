@@ -1,19 +1,11 @@
 import {
-  MASOI_ROLES, buildMaSoiDeck,
-  type MaSoiDeadEntry, type MaSoiLogItem, type MaSoiPhase, type MaSoiRole, type MaSoiView,
+  MASOI_PHASE_SECONDS, MASOI_ROLES, buildMaSoiDeck,
+  type MaSoiDeadEntry, type MaSoiLogItem, type MaSoiPhase, type MaSoiRole, type MaSoiSpeed, type MaSoiView,
 } from '../../../shared/src/masoi';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
-const DEFAULT_SEC: Record<MaSoiPhase, number> = {
-  role_reveal: 6,
-  night_cupid: 14,
-  night_active: 22,
-  night_witch: 14,
-  hunter_shot: 12,
-  day_discuss: 35,
-  day_vote: 25,
-};
+// Đã thay bằng MASOI_PHASE_SECONDS theo tốc độ phòng (slow / normal / fast)
 
 export class MaSoiGame implements GameEngine {
   readonly perPlayerView = true;
@@ -27,7 +19,7 @@ export class MaSoiGame implements GameEngine {
   private day = 1;
   private phase: MaSoiPhase = 'role_reveal';
   private phaseEndsAt: number | null = null;
-  private phaseSeconds = DEFAULT_SEC.role_reveal;
+  private phaseSeconds = 12;
   private phaseStartedAt = 0;
 
   private guardLastId: string | null = null;
@@ -63,8 +55,14 @@ export class MaSoiGame implements GameEngine {
 
   constructor(private readonly ctx: EngineContext) {}
 
+  private speed(): MaSoiSpeed {
+    const s = this.ctx.settings.masoiSpeed;
+    return s === 'slow' || s === 'fast' ? s : 'normal';
+  }
+
   private msFor(p: MaSoiPhase): number {
-    const def = DEFAULT_SEC[p] * 1000;
+    const table = MASOI_PHASE_SECONDS[this.speed()] ?? MASOI_PHASE_SECONDS.normal;
+    const def = (table[p] ?? 25) * 1000;
     return this.ctx.turnMs ? Math.min(def, Math.max(400, this.ctx.turnMs)) : def;
   }
 
@@ -648,6 +646,7 @@ export class MaSoiGame implements GameEngine {
     return {
       type: 'masoi',
       day: this.day,
+      speed: this.speed(),
       phase: this.phase,
       phaseEndsAt: this.phaseEndsAt,
       phaseSeconds: this.phaseSeconds,
@@ -670,7 +669,7 @@ export class MaSoiGame implements GameEngine {
       } : {}),
       ...(myRole === 'tientri' ? { seerHistory: [...this.seerHistory] } : {}),
       ...(myRole === 'thamtu' ? { detectiveHistory: [...this.detectiveHistory] } : {}),
-      ...(myRole === 'baove' ? { guardLastId: this.guardLastId } : {}),
+      ...(myRole === 'baove' ? { guardLastId: this.guardLastId, guardCurrentTargetId: this.guardTarget } : {}),
       ...(myRole === 'phuthuy' ? {
         witchState: {
           healLeft: this.healLeft,

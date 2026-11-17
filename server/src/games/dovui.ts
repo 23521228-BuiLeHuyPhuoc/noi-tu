@@ -1,10 +1,10 @@
-import { DO_VUI_QUESTIONS, type DoVuiPhase, type DoVuiQuestion, type DoVuiView } from '../../../shared/src/dovui';
+import { questionsForTopic, type DoVuiPhase, type DoVuiQuestion, type DoVuiView } from '../../../shared/src/dovui';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const DEFAULT_SEC: Record<DoVuiPhase, number> = {
-  question: 15,
-  reveal: 4,
+  question: 22,
+  reveal: 5,
 };
 
 export class DoVuiGame implements GameEngine {
@@ -41,7 +41,7 @@ export class DoVuiGame implements GameEngine {
       this.streaks.set(p.id, 0);
     }
     const total = this.ctx.settings.doVuiQuestions ?? 10;
-    const pool = [...DO_VUI_QUESTIONS];
+    const pool = questionsForTopic(this.ctx.settings.doVuiTopic ?? 'all');
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(this.ctx.rng() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -179,6 +179,8 @@ export class DoVuiGame implements GameEngine {
       phaseEndsAt: this.phaseEndsAt,
       phaseSeconds: this.phaseSeconds,
       category: q?.category ?? '',
+      selectedTopic: this.ctx.settings.doVuiTopic ?? 'all',
+      difficulty: q?.difficulty,
       question: q?.q ?? '',
       options: q?.options ?? ['', '', '', ''],
       doublePoints,

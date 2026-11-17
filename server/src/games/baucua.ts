@@ -23,20 +23,26 @@ export class BauCuaGame implements GameEngine {
   private balances: Record<string, number> = {};
   private debts: Record<string, number> = {};
   private bets: Record<string, Bets> = {};
+  private prevBets: Record<string, Bets> = {};
   private round = 1;
   private step: BauCuaView['step'] = 'betting';
   private stepEndsAt = 0;
   private dice: BauCuaSymbol[] = [];
   private lastDeltas: Record<string, number> | null = null;
   private recent: BauCuaSymbol[][] = [];
+  private luckySymbol: BauCuaSymbol | null = null;
+  private luckyMult: 2 | 3 = 2;
+  private tripleStorm = false;
   private over = false;
   private readonly timer = new Timer();
   private readonly betMs: number;
   private readonly maxRounds: number;
+  private readonly mode: 'classic' | 'jackpot';
 
   constructor(private readonly ctx: EngineContext) {
     this.betMs = ctx.turnMs ?? BAUCUA_BET_SECONDS * 1000;
     this.maxRounds = ctx.settings.baucuaRounds ?? BAUCUA_DEFAULT_ROUNDS;
+    this.mode = ctx.settings.baucuaMode ?? 'classic';
   }
 
   start(players: EnginePlayer[]): void {
@@ -46,6 +52,7 @@ export class BauCuaGame implements GameEngine {
       this.balances[p.id] = BAUCUA_START;
       this.debts[p.id] = 0;
       this.bets[p.id] = {};
+      this.prevBets[p.id] = {};
     }
     this.beginBetting();
   }
@@ -62,6 +69,41 @@ export class BauCuaGame implements GameEngine {
         if (a.amount > this.available(playerId)) return { ok: false, reason: 'insufficient' };
         const mine = this.bets[playerId];
         mine[a.symbol] = Math.min(MAX_BET_PER_SYMBOL, (mine[a.symbol] ?? 0) + a.amount);
+        this.ctx.changed();
+        return { ok: true };
+      }
+      case 'bc_allin': {
+        if (this.step !== 'betting') return { ok: false, reason: 'not_betting' };
+        if (!BAUCUA_SYMBOLS.includes(a.symbol)) return { ok: false, reason: 'bad_action' };
+        const avail = this.available(playerId);
+        if (avail <= 0) return { ok: false, reason: 'insufficient' };
+        const mine = this.bets[playerId];
+        const roomLeft = MAX_BET_PER_SYMBOL - (mine[a.symbol] ?? 0);
+        if (roomLeft <= 0) return { ok: false, reason: 'bad_action' };
+        mine[a.symbol] = (mine[a.symbol] ?? 0) + Math.min(avail, roomLeft);
+        this.ctx.changed();
+        return { ok: true };
+      }
+      case 'bc_rebet': {
+        if (this.step !== 'betting') return { ok: false, reason: 'not_betting' };
+        const entries = Object.entries(this.prevBets[playerId] ?? {}).filter(([, v]) => (v ?? 0) > 0) as [BauCuaSymbol, number][];
+        if (entries.length === 0) return { ok: false, reason: 'bad_action' };
+        const need = entries.reduce((s, [, v]) => s + v, 0);
+        if (this.balances[playerId] < need) return { ok: false, reason: 'insufficient' };
+        this.bets[playerId] = Object.fromEntries(entries.map(([sym, v]) => [sym, Math.min(MAX_BET_PER_SYMBOL, v)]));
+        this.ctx.changed();
+        return { ok: true };
+      }
+      case 'bc_double': {
+        if (this.step !== 'betting') return { ok: false, reason: 'not_betting' };
+        const mine = this.bets[playerId] ?? {};
+        const entries = Object.entries(mine).filter(([, v]) => (v ?? 0) > 0) as [BauCuaSymbol, number][];
+        if (entries.length === 0) return { ok: false, reason: 'bad_action' };
+        const staked = entries.reduce((s, [, v]) => s + v, 0);
+        if (staked > this.available(playerId)) return { ok: false, reason: 'insufficient' };
+        for (const [sym, v] of entries) {
+          mine[sym] = Math.min(MAX_BET_PER_SYMBOL, v * 2);
+        }
         this.ctx.changed();
         return { ok: true };
       }
@@ -108,6 +150,10 @@ export class BauCuaGame implements GameEngine {
       debts: pick(this.debts),
       recent: this.recent,
       names: this.names,
+      mode: this.mode,
+      luckySymbol: this.luckySymbol,
+      luckyMult: this.luckyMult,
+      tripleStorm: this.step === 'result' ? this.tripleStorm : false,
     };
   }
 
@@ -145,6 +191,13 @@ export class BauCuaGame implements GameEngine {
 
   private beginBetting(): void {
     this.step = 'betting';
+    this.tripleStorm = false;
+    if (this.mode === 'jackpot') {
+      this.luckySymbol = BAUCUA_SYMBOLS[Math.floor(this.ctx.rng() * 6) % 6];
+      this.luckyMult = this.ctx.rng() < 0.35 ? 3 : 2;
+    } else {
+      this.luckySymbol = null;
+    }
     this.stepEndsAt = Date.now() + this.betMs;
     this.timer.set(this.betMs, () => this.beginRolling());
     this.ctx.changed();
@@ -161,11 +214,26 @@ export class BauCuaGame implements GameEngine {
 
   private reveal(): void {
     const deltas: Record<string, number> = {};
+    const isTriple = this.dice.length === 3 && this.dice[0] === this.dice[1] && this.dice[1] === this.dice[2];
+    this.tripleStorm = this.mode === 'jackpot' && isTriple;
     for (const id of this.ids) {
+      const curBets = this.bets[id] ?? {};
+      if (Object.values(curBets).some((v) => (v ?? 0) > 0)) {
+        this.prevBets[id] = { ...curBets };
+      }
       let d = 0;
-      for (const [sym, amount] of Object.entries(this.bets[id] ?? {}) as [BauCuaSymbol, number][]) {
+      for (const [sym, amount] of Object.entries(curBets) as [BauCuaSymbol, number][]) {
         const hits = this.dice.filter((x) => x === sym).length;
-        d += hits > 0 ? amount * hits : -amount;
+        if (hits > 0) {
+          let win = amount * hits;
+          if (this.mode === 'jackpot') {
+            if (this.luckySymbol === sym) win *= this.luckyMult;
+            if (isTriple) win += amount;
+          }
+          d += win;
+        } else {
+          d -= amount;
+        }
       }
       this.balances[id] += d;
       deltas[id] = d;

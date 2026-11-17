@@ -11,12 +11,18 @@ const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..');
 const REPO = path.resolve(ROOT, '..');
 
-const fluent = require('@iconify-json/fluent-emoji-flat/icons.json');
-const fluentChars = require('@iconify-json/fluent-emoji-flat/chars.json');
+const fluentRich = require('@iconify-json/fluent-emoji/icons.json');
+const fluentRichChars = require('@iconify-json/fluent-emoji/chars.json');
+const fluentFlat = require('@iconify-json/fluent-emoji-flat/icons.json');
+const fluentFlatChars = require('@iconify-json/fluent-emoji-flat/chars.json');
 const gameIcons = require('@iconify-json/game-icons/icons.json');
 
-const FLUENT_VB = `0 0 ${fluent.width ?? 32} ${fluent.height ?? 32}`;
+const FLUENT_VB = `0 0 ${fluentRich.width ?? 32} ${fluentRich.height ?? 32}`;
 const GAME_VB = `0 0 ${gameIcons.width ?? 512} ${gameIcons.height ?? 512}`;
+
+function getFluentDef(key) {
+  return fluentRich.icons[key] ?? fluentFlat.icons[key] ?? null;
+}
 
 /** Ánh xạ tường minh cho chuỗi ghép, ký tự đặc biệt hoặc icon cần bản sắc đẹp hơn */
 const FLUENT_OVERRIDES = {
@@ -50,6 +56,7 @@ const FLUENT_OVERRIDES = {
   '✔': 'check-mark-button',
   '▶': 'play-button',
   '◀': 'reverse-button',
+  '👉': 'backhand-index-pointing-right-default',
   '❤': 'red-heart',
   '❤️': 'red-heart',
   '❤️‍🔥': 'heart-on-fire',
@@ -157,9 +164,21 @@ const FLUENT_OVERRIDES = {
   '🌬': 'wind-face',
   '🧜‍♀️': 'mermaid',
   '🧑‍🚀': 'astronaut',
+  '☣': 'biohazard',
+  '☣️': 'biohazard',
+  '⚰': 'coffin',
+  '⚰️': 'coffin',
+  '☘': 'shamrock',
+  '☘️': 'shamrock',
+  '⚙': 'gear',
+  '⚙️': 'gear',
+  '⚠': 'warning',
+  '⚠️': 'warning',
+  '♟': 'chess-pawn',
+  '♟️': 'chess-pawn',
 };
 
-/** Bộ RPG Game Icons chọn lọc cho Ma Sói, Bom Chữ, Đấu Trường & Badges */
+/** Bộ RPG Game Icons chọn lọc cho 14 trò chơi (Ma Sói, Gián Điệp, Chia Chác, Hội Bàn Tròn, Đầm Lầy, Caro, Lô Tô, Đấu Trường & Badges) */
 const CURATED_GAME_ICONS = [
   'wolf-head',
   'wolf-howl',
@@ -185,7 +204,22 @@ const CURATED_GAME_ICONS = [
   'skull-crossed-bones',
   'treasure-map',
   'trophy-cup',
-];
+  'revolver',
+  'pistol-gun',
+  'cash',
+  'diamonds',
+  'card-joker',
+  'card-random',
+  'frog',
+  'frog-prince',
+  'lily-pads',
+  'tic-tac-toe',
+  'police-badge',
+  'hammer-drop',
+  'lightning-storm',
+  'crowned-skull',
+  'fire-ring',
+].filter((k) => Boolean(gameIcons.icons[k]));
 
 function stripVs(s) {
   return s.replace(/\uFE0F/g, '');
@@ -199,12 +233,12 @@ function resolveFluentKey(emoji) {
   const clean = emoji.trim();
   if (FLUENT_OVERRIDES[clean]) {
     const key = FLUENT_OVERRIDES[clean];
-    if (fluent.icons[key]) return key;
+    if (getFluentDef(key)) return key;
   }
   const stripped = stripVs(clean);
   if (FLUENT_OVERRIDES[stripped]) {
     const key = FLUENT_OVERRIDES[stripped];
-    if (fluent.icons[key]) return key;
+    if (getFluentDef(key)) return key;
   }
   const candidates = [
     toHexSequence(clean),
@@ -213,7 +247,10 @@ function resolveFluentKey(emoji) {
     [...stripped].map((c) => c.codePointAt(0).toString(16)).filter((h) => h !== '200d').join('-'),
   ];
   for (const hex of candidates) {
-    if (fluentChars[hex] && fluent.icons[fluentChars[hex]]) return fluentChars[hex];
+    const rk = fluentRichChars[hex];
+    if (rk && getFluentDef(rk)) return rk;
+    const fk = fluentFlatChars[hex];
+    if (fk && getFluentDef(fk)) return fk;
   }
   return null;
 }
@@ -259,13 +296,13 @@ for (const em of [...discovered].sort()) {
 }
 
 // Thêm các biểu tượng cơ bản bổ sung phòng fallback
-for (const extra of ['sparkles', 'star', 'crown', 'gem-stone', 'coin', 'trophy', 'game-die']) {
-  if (fluent.icons[extra]) usedFluentKeys.add(extra);
+for (const extra of ['sparkles', 'star', 'crown', 'gem-stone', 'coin', 'trophy', 'game-die', 'frog', 'water-pistol', 'joker', 'pool-8-ball']) {
+  if (getFluentDef(extra)) usedFluentKeys.add(extra);
 }
 
 const fluentEntries = {};
 for (const k of [...usedFluentKeys].sort()) {
-  const def = fluent.icons[k];
+  const def = getFluentDef(k);
   if (def?.body) {
     fluentEntries[k] = { v: def.left || def.top || def.width || def.height ? `${def.left ?? 0} ${def.top ?? 0} ${def.width ?? 32} ${def.height ?? 32}` : FLUENT_VB, b: def.body };
   }

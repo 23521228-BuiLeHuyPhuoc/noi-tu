@@ -77,6 +77,10 @@ export const actionText: Record<ActionError, string> = {
   cannot_build: 'Chưa xây được ở đây (cần đủ bộ màu và đủ tiền).',
   no_money: 'Không đủ tiền.',
   word_leaked: 'Không được nhắc thẳng từ khóa trong gợi ý nhé!',
+  wrong_pos: 'Từ này chưa đúng từ loại / luật thử thách của ván!',
+  kinh_false: 'Kinh hụt rồi! Chưa đủ 5 số trên hàng, bị phạt khóa hô Kinh 2 lượt bóng!',
+  kinh_locked: 'Bạn đang bị khóa hô Kinh do báo nhầm trước đó, chờ đọc thêm số nhé!',
+  cell_occupied: 'Ô này đã có người đánh rồi!',
 };
 
 export const HITS: { move: HitMove; emoji: string; name: string }[] = [
@@ -95,7 +99,12 @@ export const GAME_META: Record<GameType, { emoji: string; tagline: string; playe
   giandiep: { emoji: '🕵️', tagline: 'Ai cầm từ khác? Lắng nghe gợi ý để lật mặt gián điệp!', players: '3–12 người' },
   ve_doan: { emoji: '🎨', tagline: 'Vẽ hình siêu lầy cho cả xóm đua nhau đoán từ khóa!', players: '2–12 người' },
   bom_tu: { emoji: '💣', tagline: 'Gõ nhanh từ có tiếng bom đang cháy để chuyền trước khi nổ!', players: '2–12 người' },
-  do_vui: { emoji: '🧠', tagline: 'Đấu trường trắc nghiệm tốc độ, câu cuối x2 cực căng!', players: '1–12 người' },
+  do_vui: { emoji: '🧠', tagline: 'Đấu trường kiến thức CNTT, OOP, DSA, JS/TS & Tiếng Anh C1-C2 cực gắt!', players: '1–12 người' },
+  cah: { emoji: '🃏', tagline: 'Ghép thẻ trắng mất não vào câu khuyết tên bạn bè trong phòng!', players: '3–12 người' },
+  cashnguns: { emoji: '🔫', tagline: 'Chĩa súng đạn thật/giả, đấu trí đầu hàng và chia chác kim cương!', players: '3–12 người' },
+  loto: { emoji: '🎱', tagline: 'Rao vè 90 số rộn ràng, dò vé giấy 3×9 và hô KINH giật giải!', players: '2–12 người' },
+  caro: { emoji: '⭕', tagline: 'Cờ Caro 15×15 đại chiến 2–4 phe, hỗ trợ luật chặn hai đầu!', players: '2–4 người' },
+  croaksquad: { emoji: '🐸', tagline: 'Ếch co-op nuốt đồng đội rồi nhổ bắn vượt vực thẳm & mở cổng!', players: '2–6 người thật' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -143,9 +152,34 @@ export const RULES: Record<GameType, string[]> = {
     'Bom nổ trên tay ai thì mất 1 tim; người sống sót cuối cùng giành chiến thắng!',
   ],
   do_vui: [
-    'Trả lời nhanh các câu hỏi trắc nghiệm 4 đáp án A/B/C/D trong 15 giây mỗi câu.',
-    'Trả lời càng nhanh và giữ chuỗi đúng liên tiếp (streak) càng được thưởng thêm điểm.',
-    '2 câu cuối cùng được nhân đôi số điểm (x2) để tạo cơ hội lội ngược dòng ngoạn mục!',
+    'Chọn chuyên đề chuyên sâu (OOP, DSA, JS/TS, Node/Backend, React Native/FE, Fullstack/System, Tiếng Anh C1–C2) hoặc Tổng hợp.',
+    'Trả lời nhanh 4 đáp án A/B/C/D trong 15 giây; giữ chuỗi đúng (streak) nhận thêm điểm thưởng.',
+    '2 câu cuối nhân đôi điểm số (x2) kèm giải thích kỹ thuật chi tiết sau mỗi câu!',
+  ],
+  cah: [
+    'Mỗi vòng lật 1 Thẻ Đen khuyết chỗ trống (tự động điểm mặt tên thật người chơi trong phòng!).',
+    'Mỗi người bí mật chọn 1 Thẻ Trắng bựa nhất trên tay nộp ẩn danh (có 1 quyền Đổi Bài mới mỗi ván).',
+    'Cả phòng bình chọn câu ghép "mất não" nhất (không tự bầu mình) để trao điểm vô địch!',
+  ],
+  cashnguns: [
+    'Mỗi tay anh chị có 3 máu ❤️ và băng đạn 8 viên (5 Đạn Giả Click! + 3 Đạn Thật Bang!).',
+    'Bí mật nạp đạn và chĩa súng vào 1 người khác; Bố Già có quyền ép 1 người đổi hướng súng.',
+    '15 giây Cân Não: bấm Đầu Hàng để né đạn (nhịn chia tiền), hoặc Đứng Lại ăn đạn / chia chiến lợi phẩm & Kim Cương!',
+  ],
+  loto: [
+    'Mỗi người nhận 1 tờ vé Lô Tô 3×9 chuẩn hội chợ (mỗi hàng 5 số từ 1–90).',
+    'Nhà cái rao vè tiếng Việt từng con số; dò và chấm các số đã gọi trên vé của bạn (ai đạt 4/5 số sẽ báo ĐỢI!).',
+    'Đủ 5 số trên 1 hàng ngang thì bấm HÔ KINH ngay! Báo nhầm Kinh hụt sẽ bị phạt khóa nút 2 lượt số!',
+  ],
+  caro: [
+    'Bàn cờ 15×15 hỗ trợ từ 2 đến 4 người chơi cùng lúc (X, O, ▲, ◆).',
+    'Ai xếp được 5 quân liên tiếp theo hàng ngang, dọc hoặc chéo trước là thắng.',
+    'Khi bật luật "Chặn hai đầu": chuỗi đúng 5 quân bị đối phương chặn sát cả 2 đầu sẽ chưa được tính thắng.',
+  ],
+  croaksquad: [
+    'Game đi cảnh giải đố phối hợp 2–6 người chơi thật (không dùng máy): cả đội cùng nhau vượt 3 màn đầm lầy.',
+    'Phóng lưỡi nuốt đồng đội vào bụng rồi ngắm đường cong quỹ đạo để nhổ/bắn bạn qua vực sâu hoặc lên vách cao!',
+    'Phối hợp dẫm công tắc giữ cầu, nhặt chìa khóa mở cổng đá và đưa cả đội chạm Cổng Đích để qua màn!',
   ],
 };
 

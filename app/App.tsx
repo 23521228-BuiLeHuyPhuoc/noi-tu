@@ -21,6 +21,11 @@ import { GianDiepScreen } from './src/screens/GianDiepScreen';
 import { VeDoanScreen } from './src/screens/VeDoanScreen';
 import { BomTuScreen } from './src/screens/BomTuScreen';
 import { DoVuiScreen } from './src/screens/DoVuiScreen';
+import { CahScreen } from './src/screens/CahScreen';
+import { CashGunsScreen } from './src/screens/CashGunsScreen';
+import { LotoScreen } from './src/screens/LotoScreen';
+import { CaroScreen } from './src/screens/CaroScreen';
+import { CroakSquadScreen } from './src/screens/CroakSquadScreen';
 import { ShakeProvider } from './src/components/Fun';
 import { FxStyles } from './src/components/FxStyles';
 import { WalletNoticeLayer } from './src/components/Wallet';
@@ -54,6 +59,11 @@ export default function App() {
   else if (room.game?.type === 've_doan') body = <VeDoanScreen game={game} room={room} />;
   else if (room.game?.type === 'bom_tu') body = <BomTuScreen game={game} room={room} />;
   else if (room.game?.type === 'do_vui') body = <DoVuiScreen game={game} room={room} />;
+  else if (room.game?.type === 'cah') body = <CahScreen game={game} room={room} />;
+  else if (room.game?.type === 'cashnguns') body = <CashGunsScreen game={game} room={room} />;
+  else if (room.game?.type === 'loto') body = <LotoScreen game={game} room={room} />;
+  else if (room.game?.type === 'caro') body = <CaroScreen game={game} room={room} />;
+  else if (room.game?.type === 'croaksquad') body = <CroakSquadScreen game={game} room={room} />;
   else if (room.game?.type === 'wordchain' || room.game?.type === 'wordchain_en') body = <WordChainScreen game={game} room={room} />;
   else body = <HomeScreen game={game} />;
 
@@ -63,18 +73,18 @@ export default function App() {
       <Screen style={styles.root}>
         <StatusBar style="light" />
         <KeyboardFrame>
-        <FeedProvider>
-          <ShakeProvider>
-            {room && game.status !== 'online' && (
-              <View style={styles.offline}>
-                <UiIcon name="RefreshCw" size={14} color={C.gold} />
-                <T style={styles.offlineText}>Mất kết nối, đang nối lại…</T>
-              </View>
-            )}
-            {body}
-            <WalletNoticeLayer game={game} />
-          </ShakeProvider>
-        </FeedProvider>
+          <FeedProvider>
+            <ShakeProvider>
+              {room && game.status !== 'online' && (
+                <View style={styles.offline}>
+                  <UiIcon name="RefreshCw" size={14} color={C.gold} />
+                  <T style={styles.offlineText}>Mất kết nối, đang nối lại…</T>
+                </View>
+              )}
+              {body}
+              <WalletNoticeLayer game={game} />
+            </ShakeProvider>
+          </FeedProvider>
         </KeyboardFrame>
       </Screen>
     </SafeAreaProvider>

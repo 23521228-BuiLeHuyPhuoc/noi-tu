@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
 import { hasVietMarks } from '../../../shared/src/en';
+import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES } from '../../../shared/src/pos';
 import {
   EN_HINT_EVERY, EN_RAMP_WORDS, EN_TURN_MIN_RATIO, TURN_SECONDS, enTurnMs,
   type RoomState, type WordChainView, type WordDefinition, type WordHistoryItem, type WordVote,
@@ -253,12 +254,39 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
         order: g.order,
         active: g.currentPlayerId,
         dim: (p) => g.eliminated.includes(p.id),
-        sub: (p) => `${g.words[p.id] ?? 0} từ`,
+        sub: (p) => {
+          const st = g.streaks?.[p.id] ?? 0;
+          return st >= 2 ? `🔥${st} · ${g.words[p.id] ?? 0} từ` : `${g.words[p.id] ?? 0} từ`;
+        },
       }}
       bottom={Platform.OS !== 'web' ? controls : undefined}
       overlay={g.vote && <VoteCard vote={g.vote} game={game} />}
     >
       <Card style={styles.board}>
+        {(g.difficulty && g.difficulty !== 'normal') || (g.rule && g.rule !== 'free') || (g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 ? (
+          <View style={styles.challengeRow} testID="wordchain-badges">
+            {g.difficulty && g.difficulty !== 'normal' && (
+              <View style={[styles.challengePill, g.difficulty === 'hell' ? styles.pillHell : g.difficulty === 'hard' ? styles.pillHard : styles.pillEasy]}>
+                <EmojiIcon emoji={WORDCHAIN_DIFFICULTIES[g.difficulty].emoji} size={13} />
+                <T style={styles.challengeTxt}>{WORDCHAIN_DIFFICULTIES[g.difficulty].name}</T>
+              </View>
+            )}
+            {g.rule && g.rule !== 'free' && (
+              <View style={[styles.challengePill, g.ruleRelaxed ? styles.pillRelaxed : styles.pillRule]}>
+                <EmojiIcon emoji={WORDCHAIN_RULES[g.rule].emoji} size={13} />
+                <T style={styles.challengeTxt}>
+                  {WORDCHAIN_RULES[g.rule].name}{g.ruleRelaxed ? ' (Tự nới lượt này!)' : ''}
+                </T>
+              </View>
+            )}
+            {(g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 && (
+              <View style={[styles.challengePill, styles.pillStreak]}>
+                <EmojiIcon emoji="🔥" size={13} />
+                <T style={styles.challengeTxt}>Combo x{g.streaks?.[g.currentPlayerId ?? '']}</T>
+              </View>
+            )}
+          </View>
+        ) : null}
         <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
           {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
         </T>
@@ -457,4 +485,13 @@ const styles = StyleSheet.create({
   wordText: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
   by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right', wordBreak: 'break-word' } as object,
   sys: { color: C.muted, fontSize: 14, fontStyle: 'italic', paddingVertical: 3 },
+  challengeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 2 },
+  challengePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: C.ink },
+  pillEasy: { backgroundColor: '#DCFCE7', borderColor: '#16A34A' },
+  pillHard: { backgroundColor: '#FFEDD5', borderColor: '#EA580C' },
+  pillHell: { backgroundColor: '#FEE2E2', borderColor: '#DC2626' },
+  pillRule: { backgroundColor: '#F3E8FF', borderColor: '#9333EA' },
+  pillRelaxed: { backgroundColor: '#FEF9C3', borderColor: '#CA8A04' },
+  pillStreak: { backgroundColor: '#FEF08A', borderColor: '#D97706' },
+  challengeTxt: { fontSize: 11.5, fontWeight: '900', color: C.ink },
 });

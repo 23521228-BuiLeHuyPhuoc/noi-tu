@@ -121,19 +121,38 @@ export class TyPhuGame implements GameEngine {
   private log: TyPhuView['log'] = [];
   private logSeq = 0;
   private card: TyPhuView['card'] = null;
+  private readonly mode: 'classic' | 'chaos_festival';
+  private festivalCell: number | null = null;
+  private jackpotPool = 0;
+  private buyoutOffer: { cell: number; ownerId: string; price: number } | null = null;
   private over = false;
   private readonly timer = new Timer();
   private readonly turnMs: number;
 
   constructor(private readonly ctx: EngineContext) {
     this.turnMs = ctx.turnMs ?? TYPHU_TURN_SECONDS * 1000;
+    this.mode = ctx.settings.typhuMode ?? 'classic';
   }
 
   start(players: EnginePlayer[]): void {
     this.players = players.map((p) => ({ ...p, cash: TYPHU_START_CASH, pos: 0, jail: null, bankrupt: false, doubles: 0 }));
     this.names = Object.fromEntries(players.map((p) => [p.id, p.name]));
     this.current = 0;
+    if (this.mode === 'chaos_festival') {
+      this.jackpotPool = 200;
+      this.rotateFestival();
+    }
     this.beginRoll();
+  }
+
+  private rotateFestival(): void {
+    if (this.mode !== 'chaos_festival') return;
+    const lands = TYPHU_BOARD.flatMap((c, i) => (c.kind === 'land' ? [i] : []));
+    if (lands.length === 0) return;
+    const pool = lands.filter((i) => i !== this.festivalCell);
+    const pickFrom = pool.length > 0 ? pool : lands;
+    this.festivalCell = pickFrom[Math.floor(this.ctx.rng() * pickFrom.length) % pickFrom.length];
+    this.addLog('info', `🎉 Lễ Hội Du Lịch bùng nổ tại ${TYPHU_BOARD[this.festivalCell].name} (tiền thuê x2)!`);
   }
 
   action(playerId: string, a: GameAction): ActionResult {
@@ -166,6 +185,7 @@ export class TyPhuGame implements GameEngine {
         // không tự bán nhà đất: thiếu tiền mặt thì người chơi tự bán trước
         if (me.cash < TYPHU_JAIL_FINE) return { ok: false, reason: 'no_money' };
         me.cash -= TYPHU_JAIL_FINE;
+        if (this.mode === 'chaos_festival') this.jackpotPool += TYPHU_JAIL_FINE;
         me.jail = null;
         this.addLog('jail', `${me.name} trả ${fmt(TYPHU_JAIL_FINE)}$ để ra tù`);
         this.rollStep();
@@ -198,6 +218,20 @@ export class TyPhuGame implements GameEngine {
         this.afterLanding();
         return { ok: true };
       }
+      case 'buyout': {
+        if (this.step !== 'buyout' || !this.buyoutOffer) return { ok: false, reason: 'bad_action' };
+        const { cell, ownerId, price } = this.buyoutOffer;
+        if (me.cash < price) return { ok: false, reason: 'no_money' };
+        const prevOwner = this.players.find((p) => p.id === ownerId);
+        me.cash -= price;
+        if (prevOwner && !prevOwner.bankrupt) prevOwner.cash += price;
+        this.owners[cell] = me.id;
+        this.addLog('buy', `🔥 THÂU TÓM! ${me.name} chi ${fmt(price)}$ mua đứt ${TYPHU_BOARD[cell].name} từ tay ${prevOwner?.name ?? 'đối thủ'}!`);
+        this.buyoutOffer = null;
+        this.pendingBuy = null;
+        this.afterLanding();
+        return { ok: true };
+      }
       case 'skip':
         if (this.step === 'ticket') {
           this.skipTicket();
@@ -205,6 +239,10 @@ export class TyPhuGame implements GameEngine {
         }
         if (this.step === 'upgrade') {
           this.skipUpgrade();
+          return { ok: true };
+        }
+        if (this.step === 'buyout') {
+          this.skipBuyout();
           return { ok: true };
         }
         if (this.step !== 'buy') return { ok: false, reason: 'bad_action' };
@@ -261,6 +299,15 @@ export class TyPhuGame implements GameEngine {
         if (cell === null) return { type: 'skip' };
         return me.cash - upgradeCostOf(cell) >= reserve ? { type: 'build', cell } : { type: 'skip' };
       }
+      case 'buyout': {
+        if (!this.buyoutOffer) return { type: 'skip' };
+        const { cell, price } = this.buyoutOffer;
+        const c = TYPHU_BOARD[cell];
+        const completes = c.kind === 'land' && groupCells(c.group).filter((i) => i !== cell).every((i) => this.owners[i] === me.id);
+        return (me.cash - price >= reserve * 1.5 || (completes && me.cash - price >= reserve * 0.5))
+          ? { type: 'buyout' }
+          : { type: 'skip' };
+      }
       case 'manage':
         return { type: 'endTurn' };
       case 'debt': {
@@ -285,6 +332,7 @@ export class TyPhuGame implements GameEngine {
     this.bankrupt(p, null, 'đã rời bàn');
     if (this.checkEnd()) return;
     if (idx === this.current) this.nextPlayer();
+    else if (this.step === 'buyout' && this.buyoutOffer?.ownerId === playerId) this.skipBuyout();
     else this.ctx.changed();
   }
 
@@ -312,7 +360,7 @@ export class TyPhuGame implements GameEngine {
       step: this.step,
       dice: this.dice ? [...this.dice] : null,
       rollId: this.rollId,
-      pendingBuy: this.step === 'buy' || this.step === 'upgrade' ? this.pendingBuy : null,
+      pendingBuy: this.step === 'buy' || this.step === 'upgrade' || this.step === 'buyout' ? this.pendingBuy : null,
       tickets: Object.fromEntries(this.players.map((p) => [p.id, this.tickets[p.id] ?? 0])),
       debt: this.step === 'debt' && this.debt ? { amount: this.debt.amount, to: this.debt.to?.id ?? null, why: this.debt.why } : null,
       turnEndsAt: this.over ? null : this.turnEndsAt,
@@ -322,6 +370,10 @@ export class TyPhuGame implements GameEngine {
       roll: this.throwView,
       speed: this.speed,
       extraRoll: this.step === 'roll' && this.rolledDouble,
+      mode: this.mode,
+      festivalCell: this.festivalCell,
+      jackpotPool: this.jackpotPool,
+      buyoutOffer: this.step === 'buyout' ? this.buyoutOffer : null,
     };
   }
 
@@ -367,7 +419,10 @@ export class TyPhuGame implements GameEngine {
    * không truyền gì = bán 1 lần (1 cấp nếu có, hết nhà thì bán đất).
    */
   private sell(me: TPlayer, cell: unknown, levels?: unknown, land?: unknown): ActionResult {
-    if (this.step !== 'roll' && this.step !== 'buy' && this.step !== 'upgrade' && this.step !== 'manage' && this.step !== 'debt') {
+    if (
+      this.step !== 'roll' && this.step !== 'buy' && this.step !== 'upgrade'
+      && this.step !== 'buyout' && this.step !== 'manage' && this.step !== 'debt'
+    ) {
       return { ok: false, reason: 'bad_action' };
     }
     if (typeof cell !== 'number' || !Number.isInteger(cell) || cell < 0 || cell >= TYPHU_BOARD.length) {
@@ -524,24 +579,28 @@ export class TyPhuGame implements GameEngine {
   private rentAt(cell: number, owner: string): number {
     const c = TYPHU_BOARD[cell];
     const count = Object.entries(this.owners).filter(([i, id]) => id === owner && TYPHU_BOARD[Number(i)].kind === c.kind).length;
-    if (c.kind === 'station') return stationRent(count, this.houses[cell] ?? 0);
-    if (c.kind === 'utility') return utilityRent(count, (this.dice?.[0] ?? 0) + (this.dice?.[1] ?? 0));
-    return rentOf(cell, this.houses[cell] ?? 0, this.ownsGroup(owner, cell));
+    let base: number;
+    if (c.kind === 'station') base = stationRent(count, this.houses[cell] ?? 0);
+    else if (c.kind === 'utility') base = utilityRent(count, (this.dice?.[0] ?? 0) + (this.dice?.[1] ?? 0));
+    else base = rentOf(cell, this.houses[cell] ?? 0, this.ownsGroup(owner, cell));
+    if (this.mode === 'chaos_festival' && this.festivalCell === cell) return base * 2;
+    return base;
   }
 
   /** Xử lý ô vừa dừng. `allowCard`: có được rút thẻ không (tránh rút liên tiếp) */
   private land(allowCard: boolean): void {
     const me = this.players[this.current];
-    const c = TYPHU_BOARD[me.pos];
+    const pos = me.pos;
+    const c = TYPHU_BOARD[pos];
     switch (c.kind) {
       case 'land':
       case 'station':
       case 'utility': {
-        const owner = this.owners[me.pos];
+        const owner = this.owners[pos];
         if (!owner) {
           // đủ tiền nếu tự bán bớt nhà đất thì vẫn hỏi mua (người chơi tự chọn bán)
           if (me.cash + this.liquidValue(me) >= c.price) {
-            this.pendingBuy = me.pos;
+            this.pendingBuy = pos;
             this.step = 'buy';
             // không đếm ngược khi chọn mua: chỉ tự bỏ qua nếu treo máy quá lâu
             this.armIdle();
@@ -550,9 +609,9 @@ export class TyPhuGame implements GameEngine {
           }
           this.addLog('info', `${me.name} không đủ tiền mua ${c.name}`);
         } else if (owner === me.id) {
-          const lv = this.houses[me.pos] ?? 0;
-          if (lv < maxLevelOf(me.pos) && me.cash + this.liquidValue(me, me.pos) >= upgradeCostOf(me.pos)) {
-            this.pendingBuy = me.pos;
+          const lv = this.houses[pos] ?? 0;
+          if (lv < maxLevelOf(pos) && me.cash + this.liquidValue(me, pos) >= upgradeCostOf(pos)) {
+            this.pendingBuy = pos;
             this.step = 'upgrade';
             this.armIdle();
             this.ctx.changed();
@@ -565,9 +624,23 @@ export class TyPhuGame implements GameEngine {
             this.addLog('info', `${o.name} đang ngồi tù, ${me.name} vào ${c.name} không mất tiền thuê`);
             break;
           }
-          const rent = this.rentAt(me.pos, owner);
+          const rent = this.rentAt(pos, owner);
           return this.pay(me, rent, o, `trả tiền thuê ${c.name}`, () => {
-            this.addLog('rent', `${me.name} trả ${fmt(rent)}$ tiền thuê ${c.name} cho ${o.name}`);
+            const festTag = this.mode === 'chaos_festival' && this.festivalCell === pos ? ' (Lễ Hội x2!)' : '';
+            this.addLog('rent', `${me.name} trả ${fmt(rent)}$ tiền thuê ${c.name} cho ${o.name}${festTag}`);
+            if (this.mode === 'chaos_festival' && !me.bankrupt && this.owners[pos] === o.id) {
+              const lv = this.houses[pos] ?? 0;
+              const isMaxHotel = c.kind === 'land' && lv >= TYPHU_MAX_HOUSES;
+              const buyoutPrice = Math.round((c.price + lv * upgradeCostOf(pos)) * 1.6);
+              if (!isMaxHotel && me.cash + this.liquidValue(me) >= buyoutPrice) {
+                this.buyoutOffer = { cell: pos, ownerId: o.id, price: buyoutPrice };
+                this.pendingBuy = pos;
+                this.step = 'buyout';
+                this.armIdle();
+                this.ctx.changed();
+                return;
+              }
+            }
             this.afterLanding();
           });
         }
@@ -579,7 +652,20 @@ export class TyPhuGame implements GameEngine {
           this.afterLanding();
         });
       case 'start':
-        // dừng đúng ô Xuất phát: không được đồng nào (chỉ đi vượt qua mới được thưởng)
+        if (this.mode === 'chaos_festival' && this.jackpotPool > 0) {
+          const pot = this.jackpotPool;
+          me.cash += pot;
+          this.jackpotPool = 100;
+          this.addLog('start', `🎰 NỔ HŨ ĐỘC ĐẮC! ${me.name} dừng đúng Xuất phát, ẵm trọn ${fmt(pot)}$ quỹ lễ hội!`);
+        }
+        break;
+      case 'jail':
+        if (this.mode === 'chaos_festival' && me.jail === null && this.jackpotPool >= 200) {
+          const bonus = Math.floor(this.jackpotPool / 2);
+          me.cash += bonus;
+          this.jackpotPool -= bonus;
+          this.addLog('info', `🎁 ${me.name} ghé Thăm Tù nhặt được nửa Hũ Lộc ${fmt(bonus)}$!`);
+        }
         break;
       case 'airport': {
         const dest = this.pickFlight();
@@ -686,6 +772,13 @@ export class TyPhuGame implements GameEngine {
     this.afterLanding();
   }
 
+  private skipBuyout(): void {
+    if (this.step !== 'buyout') return;
+    this.buyoutOffer = null;
+    this.pendingBuy = null;
+    this.afterLanding();
+  }
+
   /** Sau khi xử lý xong ô đứng: đổ tiếp (nếu đổ đôi), hoặc sang lượt sau */
   private afterLanding(): void {
     if (this.over) return;
@@ -738,6 +831,7 @@ export class TyPhuGame implements GameEngine {
   private transfer(payer: TPlayer, amount: number, to: TPlayer | null): void {
     payer.cash -= amount;
     if (to) to.cash += amount;
+    else if (this.mode === 'chaos_festival') this.jackpotPool += amount;
   }
 
   /** Sau mỗi lần bán ở bước "debt": đủ tiền thì trả rồi chơi tiếp; hết nhà đất mà vẫn thiếu thì phá sản. */
@@ -777,6 +871,7 @@ export class TyPhuGame implements GameEngine {
   private goBroke(p: TPlayer, to: TPlayer | null, why: string): void {
     const paid = Math.max(0, p.cash);
     if (to) to.cash += paid;
+    else if (this.mode === 'chaos_festival') this.jackpotPool += paid;
     p.cash = 0;
     this.bankrupt(p, to, `không đủ tiền ${why}`);
   }
@@ -824,6 +919,7 @@ export class TyPhuGame implements GameEngine {
 
   private nextPlayer(): void {
     if (this.over) return;
+    const prevIdx = this.current;
     const me = this.players[this.current];
     if (me) me.doubles = 0;
     const n = this.players.length;
@@ -834,6 +930,9 @@ export class TyPhuGame implements GameEngine {
         break;
       }
     }
+    if (this.mode === 'chaos_festival' && this.current <= prevIdx) {
+      this.rotateFestival();
+    }
     this.beginRoll();
   }
 
@@ -841,6 +940,7 @@ export class TyPhuGame implements GameEngine {
     this.movement = null;
     this.throwView = null;
     this.pendingBuy = null;
+    this.buyoutOffer = null;
     this.debt = null;
     const me = this.players[this.current];
     // ngồi tù đủ lượt tối đa: bắt buộc ra (có vé thì dùng vé, không thì trả tiền; thiếu thì tự chọn bán tài sản)
@@ -885,6 +985,7 @@ export class TyPhuGame implements GameEngine {
     } else if (this.step === 'ticket') this.armTimer(() => this.skipTicket(), ROLL_IDLE_MS);
     else if (this.step === 'buy') this.armTimer(() => this.skipBuy(), ROLL_IDLE_MS);
     else if (this.step === 'upgrade') this.armTimer(() => this.skipUpgrade(), ROLL_IDLE_MS);
+    else if (this.step === 'buyout') this.armTimer(() => this.skipBuyout(), ROLL_IDLE_MS);
     else if (this.step === 'debt') this.armTimer(() => this.autoSettle(), ROLL_IDLE_MS);
   }
 
@@ -909,6 +1010,7 @@ export class TyPhuGame implements GameEngine {
     if (this.over) return;
     this.over = true;
     this.movement = null;
+    this.buyoutOffer = null;
     this.debt = null;
     this.step = 'wait';
     this.timer.clear();

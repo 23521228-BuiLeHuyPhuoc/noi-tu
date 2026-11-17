@@ -9,6 +9,9 @@ import {
   type CharacterConfig, type CharacterLook, type GameType, type RoomState,
 } from '../../../shared/src/types';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
+import { DO_VUI_TOPICS } from '../../../shared/src/dovui';
+import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES, type WordChainDifficulty, type WordChainRule } from '../../../shared/src/pos';
+import { CROAK_STAGES } from '../../../shared/src/croaksquad';
 import type { Game } from '../useGame';
 import {
   ACCESSORY_OPTIONS, AGE_OPTIONS, BROW_OPTIONS, BUILD_OPTIONS, DETAIL_OPTIONS,
@@ -23,7 +26,11 @@ import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji } from '../components/Icons';
 
-const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
+const GAMES: GameType[] = [
+  'croaksquad', 'cah', 'cashnguns', 'loto', 'caro',
+  'masoi', 'do_vui', 'giandiep', 've_doan', 'bom_tu',
+  'wordchain', 'wordchain_en', 'baucua', 'typhu',
+];
 
 const PRESET_ORDER: number[] = [
   26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
@@ -137,8 +144,18 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       <RoomManageCard game={game} room={room} />
 
-      {/* máy chơi cùng: máy chơi hết sức (Nối từ: dồn vào ngõ cụt) */}
-      {(isHost || room.players.some((p) => p.bot)) && (
+      {/* Đầm Lầy Quái Chiêu: Co-op người thật 100% không dùng máy; các game khác cho thêm máy */}
+      {room.gameType === 'croaksquad' ? (
+        <Card style={{ gap: 6, backgroundColor: '#ECFDF5', borderColor: '#10B981' }}>
+          <View testID="croak-coop-notice" style={styles.headIconRow}>
+            <EmojiIcon emoji="🐸" size={20} />
+            <T style={[styles.h3, { color: '#065F46' }]}>Co-op Người Thật 2–6 Người</T>
+          </View>
+          <T style={{ fontSize: 12.5, fontWeight: '700', color: '#047857', lineHeight: 18 }}>
+            Đầm Lầy Quái Chiêu không dùng máy giả — hãy gửi mã phòng <T style={{ fontWeight: '900' }}>{room.code}</T> cho bạn bè cùng vào phối hợp nuốt & bắn nhau qua vực!
+          </T>
+        </Card>
+      ) : (isHost || room.players.some((p) => p.bot)) && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
             <UiIcon name="Bot" size={18} color={C.ink} />
@@ -164,7 +181,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <T style={[styles.section, { color: theme.onBg }]}>{isHost ? 'Chọn game (9 trò chơi)' : 'Game của phòng'}</T>
+      <T style={[styles.section, { color: theme.onBg }]}>{isHost ? 'Chọn game (14 trò chơi)' : 'Game của phòng'}</T>
       {isHost ? (
         <View style={styles.games}>
           {GAMES.map((g) => {
@@ -236,9 +253,71 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
+      {(room.gameType === 'wordchain' || room.gameType === 'wordchain_en') && (
+        <Card style={{ gap: 10 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="⚡" size={18} />
+            <T style={styles.h3}>Độ khó thời gian & Luật từ loại</T>
+          </View>
+          <View style={styles.roundRow}>
+            {(['easy', 'normal', 'hard', 'hell'] as WordChainDifficulty[]).map((diff) => {
+              const m = WORDCHAIN_DIFFICULTIES[diff];
+              const active = (room.settings.wordchainDifficulty ?? 'normal') === diff;
+              return (
+                <Button
+                  key={diff}
+                  testID={`wc-diff-${diff}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={`${m.emoji} ${m.name}`}
+                  disabled={!isHost}
+                  style={{ flex: 1, minWidth: 96 }}
+                  onPress={() => game.configure({ settings: { wordchainDifficulty: diff } })}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.roundRow}>
+            {(['free', 'noun', 'verb', 'adj', 'no_repeat'] as WordChainRule[]).map((r) => {
+              const m = WORDCHAIN_RULES[r];
+              const active = (room.settings.wordchainRule ?? 'free') === r;
+              return (
+                <Button
+                  key={r}
+                  testID={`wc-rule-${r}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={`${m.emoji} ${m.name}`}
+                  disabled={!isHost}
+                  style={{ flexGrow: 1, minWidth: 96 }}
+                  onPress={() => game.configure({ settings: { wordchainRule: r } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
       {room.gameType === 'baucua' && (
         <Card style={{ gap: 10 }}>
-          <T style={styles.h3}>Số ván chơi (ai nhiều xu nhất thắng)</T>
+          <T style={styles.h3}>Chế độ Bầu Cua & Số ván</T>
+          <View style={styles.roundRow}>
+            {(['classic', 'jackpot'] as const).map((m) => {
+              const active = (room.settings.baucuaMode ?? 'classic') === m;
+              return (
+                <Button
+                  key={m}
+                  testID={`baucua-mode-${m}`}
+                  small
+                  variant={active ? 'gold' : 'paper'}
+                  title={m === 'classic' ? '🎲 Cổ điển' : '🎰 Lộc Trời ×2/×3 & Tam Hoa'}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { baucuaMode: m } })}
+                />
+              );
+            })}
+          </View>
           <View style={styles.roundRow}>
             {BAUCUA_ROUND_OPTIONS.map((k) => {
               const active = (room.settings.baucuaRounds ?? BAUCUA_DEFAULT_ROUNDS) === k;
@@ -259,11 +338,37 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
+      {room.gameType === 'typhu' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🏦" size={18} />
+            <T style={styles.h3}>Chế độ Cờ Tỷ Phú</T>
+          </View>
+          <View style={styles.roundRow}>
+            {(['classic', 'chaos_festival'] as const).map((m) => {
+              const active = (room.settings.typhuMode ?? 'classic') === m;
+              return (
+                <Button
+                  key={m}
+                  testID={`typhu-mode-${m}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={m === 'classic' ? '🏛️ Cổ điển truyền thống' : '🔥 Lễ Hội x2, Nổ Hũ & Mua Đứt 160%'}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { typhuMode: m } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
       {room.gameType === 'masoi' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
             <EmojiIcon emoji="🐺" size={18} />
-            <T style={styles.h3}>Bộ vai trò Ma Sói</T>
+            <T style={styles.h3}>Bộ vai trò & Nhịp độ Ma Sói 2.0</T>
           </View>
           <View style={styles.roundRow}>
             {(['classic', 'chaos'] as const).map((preset) => {
@@ -278,6 +383,27 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                   disabled={!isHost}
                   style={{ flex: 1 }}
                   onPress={() => game.configure({ settings: { masoiPreset: preset } })}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.roundRow}>
+            {([
+              { id: 'slow', label: '🐢 Thong thả (90s)' },
+              { id: 'normal', label: '⚖️ Chuẩn (65s)' },
+              { id: 'fast', label: '⚡ Nhanh (40s)' },
+            ] as const).map((sp) => {
+              const active = (room.settings.masoiSpeed ?? 'normal') === sp.id;
+              return (
+                <Button
+                  key={sp.id}
+                  testID={`masoi-speed-${sp.id}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={sp.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { masoiSpeed: sp.id } })}
                 />
               );
             })}
@@ -340,10 +466,27 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       )}
 
       {room.gameType === 'do_vui' && (
-        <Card style={{ gap: 8 }}>
+        <Card style={{ gap: 10 }}>
           <View style={styles.headIconRow}>
             <EmojiIcon emoji="🧠" size={18} />
-            <T style={styles.h3}>Số câu hỏi Đố Vui</T>
+            <T style={styles.h3}>Chuyên đề CNTT / Tiếng Anh C1–C2 & Số câu</T>
+          </View>
+          <View style={styles.roundRow}>
+            {DO_VUI_TOPICS.map((tp) => {
+              const active = (room.settings.doVuiTopic ?? 'all') === tp.id;
+              return (
+                <Button
+                  key={tp.id}
+                  testID={`dv-topic-${tp.id}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={`${tp.emoji} ${tp.shortName}`}
+                  disabled={!isHost}
+                  style={{ flexGrow: 1, minWidth: 108 }}
+                  onPress={() => game.configure({ settings: { doVuiTopic: tp.id } })}
+                />
+              );
+            })}
           </View>
           <View style={styles.roundRow}>
             {([5, 10, 15] as const).map((q) => (
@@ -358,6 +501,114 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                 onPress={() => game.configure({ settings: { doVuiQuestions: q } })}
               />
             ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'cah' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🃏" size={18} />
+            <T style={styles.h3}>Số vòng Hội Bàn Tròn Vô Tri</T>
+          </View>
+          <View style={styles.roundRow}>
+            {([5, 8, 12] as const).map((r) => (
+              <Button
+                key={r}
+                testID={`cah-rounds-${r}`}
+                small
+                variant={(room.settings.cahRounds ?? 8) === r ? 'ink' : 'paper'}
+                title={`${r} vòng`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { cahRounds: r } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'loto' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🎱" size={18} />
+            <T style={styles.h3}>Kiểu dò vé Lô Tô Hội Chợ</T>
+          </View>
+          <View style={styles.roundRow}>
+            {[
+              { auto: false, label: '✍️ Tự tay chấm số (Kịch tính!)' },
+              { auto: true, label: '⚡ Máy tự chấm hộ' },
+            ].map((opt) => {
+              const active = (room.settings.lotoAutoMark ?? false) === opt.auto;
+              return (
+                <Button
+                  key={String(opt.auto)}
+                  testID={`loto-auto-${opt.auto ? 'on' : 'off'}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={opt.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { lotoAutoMark: opt.auto } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'caro' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="⭕" size={18} />
+            <T style={styles.h3}>Luật Cờ Caro 15×15</T>
+          </View>
+          <View style={styles.roundRow}>
+            {[
+              { block: true, label: '🛡️ Chặn 2 đầu: BẬT' },
+              { block: false, label: '⚔️ Tự do (đủ 5 là thắng)' },
+            ].map((opt) => {
+              const active = (room.settings.caroBlockTwoEnds ?? true) === opt.block;
+              return (
+                <Button
+                  key={String(opt.block)}
+                  testID={`caro-block-${opt.block ? 'on' : 'off'}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={opt.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { caroBlockTwoEnds: opt.block } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'croaksquad' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🪷" size={18} />
+            <T style={styles.h3}>Màn xuất phát Đầm Lầy Quái Chiêu</T>
+          </View>
+          <View style={styles.roundRow}>
+            {CROAK_STAGES.map((st) => {
+              const idx = st.index as 0 | 1 | 2;
+              const active = (room.settings.croakStage ?? 0) === idx;
+              return (
+                <Button
+                  key={st.id}
+                  testID={`croak-stage-${idx}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={st.name}
+                  disabled={!isHost}
+                  style={{ flex: 1, minWidth: 120 }}
+                  onPress={() => game.configure({ settings: { croakStage: idx } })}
+                />
+              );
+            })}
           </View>
         </Card>
       )}

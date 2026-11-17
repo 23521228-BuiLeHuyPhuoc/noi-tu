@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import type { DoVuiView } from '../../../shared/src/dovui';
+import { DO_VUI_TOPICS, type DoVuiView } from '../../../shared/src/dovui';
 import { themeById } from '../../../shared/src/themes';
 import type { PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
@@ -92,8 +92,15 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
           <EmojiIcon emoji="🧠" size={18} />
           <T style={styles.qIndex}>Câu {view.index}/{view.total}</T>
           <View style={styles.catChip}>
-            <T style={styles.catTxt}>{view.category}</T>
+            <T style={styles.catTxt}>
+              {DO_VUI_TOPICS.find((t) => t.id === view.selectedTopic)?.shortName ?? view.category}
+            </T>
           </View>
+          {view.difficulty && (
+            <View style={[styles.diffChip, view.difficulty === 'extreme' ? styles.diffExtreme : styles.diffHard]}>
+              <T style={styles.diffTxt}>{view.difficulty === 'extreme' ? '💀 CỰC KHÓ' : '🔥 KHÓ'}</T>
+            </View>
+          )}
           {view.doublePoints && (
             <View style={styles.x2Chip}>
               <UiIcon name="Zap" size={12} color="#FEF08A" />
@@ -203,6 +210,10 @@ const styles = StyleSheet.create({
   qIndex: { fontSize: 14, fontWeight: '900', color: C.ink },
   catChip: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#E0E7FF', borderWidth: 1, borderColor: 'rgba(67,56,202,0.2)' },
   catTxt: { fontSize: 11, fontWeight: '800', color: '#1E1B4B' },
+  diffChip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
+  diffHard: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#D97706' },
+  diffExtreme: { backgroundColor: '#450A0A', borderWidth: 1, borderColor: '#EF4444' },
+  diffTxt: { fontSize: 10.5, fontWeight: '900', color: '#F59E0B' },
   x2Chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#DC2626' },
   x2Txt: { fontSize: 11, fontWeight: '900', color: '#FEF08A' },
   qText: { fontSize: 18, fontWeight: '900', color: C.ink, lineHeight: 25, fontFamily: FONT },

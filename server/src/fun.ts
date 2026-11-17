@@ -47,7 +47,7 @@ export function cleanFun(raw: unknown): FunSend | null {
   }
   if (f.kind === 'charm') return { kind: 'charm' };
   if ((SKILL_IDS as readonly string[]).includes(f.kind as string) && typeof f.to === 'string') {
-    return { kind: f.kind as SkillId, to: f.to };
+    return { kind: f.kind as SkillId, to: f.to } as Extract<FunSend, { kind: SkillId }>;
   }
   if (f.kind === 'gift' && typeof f.to === 'string' && (GIFT_IDS as readonly string[]).includes(f.gift as string)) {
     return { kind: 'gift', to: f.to, gift: f.gift as GiftId };

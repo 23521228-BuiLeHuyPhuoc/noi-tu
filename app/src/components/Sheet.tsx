@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
@@ -30,50 +30,52 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const titleEmoji = parsed.leading ?? parsed.trailing;
 
   return (
-    <View style={styles.root}>
-      <Pressable
-        accessibilityLabel="Đóng"
-        style={[
-          styles.backdrop,
-          Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as object) : null,
-        ]}
-        onPress={onClose}
-      />
-      <View
-        style={[
-          styles.panel,
-          sticker(0),
-          { maxHeight },
-          short && styles.panelShort,
-          kb > 0 && Platform.OS === 'web' && { marginBottom: kb },
-          Platform.OS === 'web' ? ({ animation: 'xl-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1)', boxShadow: '0 -10px 40px rgba(15,23,42,0.35)' } as object) : null,
-        ]}
-      >
-        <View style={styles.grip} />
-        <View style={styles.head}>
-          <View style={styles.titleRow}>
-            {titleEmoji && (
-              <View style={styles.titleIconWrap}>
-                <EmojiIcon emoji={titleEmoji} size={22} />
-              </View>
-            )}
-            <T style={styles.title}>{parsed.text || title}</T>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <View style={styles.root}>
+        <Pressable
+          accessibilityLabel="Đóng"
+          style={[
+            styles.backdrop,
+            Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as object) : null,
+          ]}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.panel,
+            sticker(0),
+            { maxHeight },
+            short && styles.panelShort,
+            kb > 0 && Platform.OS === 'web' && { marginBottom: kb },
+            Platform.OS === 'web' ? ({ animation: 'xl-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1)', boxShadow: '0 -10px 40px rgba(15,23,42,0.35)' } as object) : null,
+          ]}
+        >
+          <View style={styles.grip} />
+          <View style={styles.head}>
+            <View style={styles.titleRow}>
+              {titleEmoji && (
+                <View style={styles.titleIconWrap}>
+                  <EmojiIcon emoji={titleEmoji} size={22} />
+                </View>
+              )}
+              <T style={styles.title}>{parsed.text || title}</T>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Đóng bảng"
+              onPress={onClose}
+              hitSlop={10}
+              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
+            >
+              <UiIcon name="X" size={18} color={C.ink} strokeWidth={2.5} />
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Đóng bảng"
-            onPress={onClose}
-            hitSlop={10}
-            style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
-          >
-            <UiIcon name="X" size={18} color={C.ink} strokeWidth={2.5} />
-          </Pressable>
+          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {children}
-        </ScrollView>
       </View>
-    </View>
+    </Modal>
   );
 }
 

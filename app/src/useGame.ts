@@ -6,6 +6,7 @@ import type {
   WalletError, WalletInfo,
 } from '../../shared/src/types';
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
+import type { CroakTickPayload } from '../../shared/src/croaksquad';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
 import { authText, errorText, shopText, walletText } from './messages';
@@ -70,6 +71,8 @@ export interface Game {
   sendChaos(): Promise<ChaosAck>;
   /** đăng ký nghe sự kiện ném/khịa/hối; trả về hàm hủy */
   onFun(cb: (e: FunEvent) => void): () => void;
+  /** đăng ký nghe khung vật lý 30Hz của Đầm Lầy Quái Chiêu */
+  onCroakTick(cb: (p: CroakTickPayload) => void): () => void;
   /** tài khoản đang đăng nhập (null = chơi khách) */
   user: PublicUser | null;
   /** đã thử khôi phục phiên đăng nhập xong chưa */
@@ -137,6 +140,7 @@ export function useGame(): Game {
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
+  const croakListeners = useRef(new Set<(p: CroakTickPayload) => void>());
   const walletListeners = useRef(new Set<(n: WalletNotice) => void>());
   // ví gắn với tài khoản đang đăng nhập: đổi tài khoản thì ví cũ tự bỏ
   const [walletState, setWalletState] = useState<{ uid: string; info: WalletInfo } | null>(null);
@@ -222,6 +226,9 @@ export function useGame(): Game {
     });
     socket.on('fun:event', (e) => {
       for (const cb of funListeners.current) cb(e);
+    });
+    socket.on('croak:tick', (p) => {
+      for (const cb of croakListeners.current) cb(p);
     });
     socket.on('chat:history', (ms) => setChat(ms));
     // bị chủ phòng mời ra: về trang chủ, không tự vào lại phòng đó nữa
@@ -527,6 +534,12 @@ export function useGame(): Game {
       funListeners.current.add(cb);
       return () => {
         funListeners.current.delete(cb);
+      };
+    },
+    onCroakTick: (cb) => {
+      croakListeners.current.add(cb);
+      return () => {
+        croakListeners.current.delete(cb);
       };
     },
     user,

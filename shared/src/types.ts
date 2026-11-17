@@ -5,6 +5,12 @@ import type { GianDiepView } from './giandiep';
 import type { VeDoanStroke, VeDoanView } from './vedoan';
 import type { BomTuView } from './bomtu';
 import type { DoVuiView } from './dovui';
+import type { CahView } from './cah';
+import type { CashGunsView } from './cashnguns';
+import type { LotoView } from './loto';
+import type { CaroView } from './caro';
+import type { CroakInput, CroakSquadView, CroakTickPayload } from './croaksquad';
+import type { WordChainDifficulty, WordChainRule } from './pos';
 import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
 
@@ -22,7 +28,12 @@ export type GameType =
   | 'giandiep'
   | 've_doan'
   | 'bom_tu'
-  | 'do_vui';
+  | 'do_vui'
+  | 'cah'
+  | 'cashnguns'
+  | 'loto'
+  | 'caro'
+  | 'croaksquad';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
@@ -35,15 +46,30 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
   ve_doan: { name: 'Vẽ & Đoán', min: 2, max: 12 },
   bom_tu: { name: 'Bom chữ', min: 2, max: 12 },
   do_vui: { name: 'Đố vui', min: 1, max: 12 },
+  cah: { name: 'Hội bàn tròn', min: 3, max: 12 },
+  cashnguns: { name: 'Chia chác giang hồ', min: 3, max: 12 },
+  loto: { name: 'Lô tô hội chợ', min: 2, max: 12 },
+  caro: { name: 'Cờ caro', min: 2, max: 4 },
+  croaksquad: { name: 'Đầm lầy quái chiêu', min: 2, max: 6 },
 };
 
 export interface RoomSettings {
   /** số ván chơi bầu cua tới khi tự tổng kết */
   baucuaRounds?: number;
+  /** chế độ Bầu cua: cổ điển hoặc Lộc Trời Nổ Hũ x2/x3 */
+  baucuaMode?: 'classic' | 'jackpot';
+  /** Nối từ: mức độ khó theo thời gian */
+  wordchainDifficulty?: WordChainDifficulty;
+  /** Nối từ: thử thách từ loại / cấm điệp âm */
+  wordchainRule?: WordChainRule;
+  /** Cờ tỷ phú: cổ điển hoặc Lễ Hội Sốt Đất & Mua Đứt */
+  typhuMode?: 'classic' | 'chaos_festival';
   /** map / chủ đề màu của phòng */
   roomTheme?: string;
   /** chế độ bộ vai Ma Sói */
   masoiPreset?: 'classic' | 'chaos';
+  /** nhịp độ thời gian Ma Sói */
+  masoiSpeed?: 'slow' | 'normal' | 'fast';
   /** Ai là gián điệp: có bật vai Mr. White không */
   giandiepMrWhite?: boolean;
   /** Ai là gián điệp: số lượng Gián Điệp */
@@ -52,6 +78,16 @@ export interface RoomSettings {
   veDoanRounds?: number;
   /** Đố vui: số lượng câu hỏi */
   doVuiQuestions?: 5 | 10 | 15;
+  /** Đố vui: chủ đề chuyên sâu CNTT / Tiếng Anh */
+  doVuiTopic?: 'all' | 'oop' | 'dsa' | 'js_ts' | 'node_backend' | 'mobile_fe' | 'fullstack_it' | 'english_adv';
+  /** Hội bàn tròn vô tri: số vòng chơi */
+  cahRounds?: 5 | 8 | 12;
+  /** Lô tô: tự động chấm số hay để người chơi tự dò kịch tính */
+  lotoAutoMark?: boolean;
+  /** Cờ caro: luật chặn 2 đầu */
+  caroBlockTwoEnds?: boolean;
+  /** Đầm lầy quái chiêu: màn xuất phát (0..2) */
+  croakStage?: 0 | 1 | 2;
   /** @deprecated tương thích ngược */
   ludoPieces?: 2 | 4;
 }
@@ -286,7 +322,20 @@ export interface LeaderRow {
   played: number;
 }
 
-export type GameView = WordChainView | BauCuaView | TyPhuView | MaSoiView | GianDiepView | VeDoanView | BomTuView | DoVuiView;
+export type GameView =
+  | WordChainView
+  | BauCuaView
+  | TyPhuView
+  | MaSoiView
+  | GianDiepView
+  | VeDoanView
+  | BomTuView
+  | DoVuiView
+  | CahView
+  | CashGunsView
+  | LotoView
+  | CaroView
+  | CroakSquadView;
 
 // ================= Nối từ =================
 
@@ -350,6 +399,13 @@ export interface WordChainView {
   totalWords: number;
   /** đang xin cả phòng duyệt một từ chưa có trong từ điển */
   vote: WordVote | null;
+  /** độ khó thời gian & thử thách từ loại đang áp dụng */
+  difficulty?: WordChainDifficulty;
+  rule?: WordChainRule;
+  /** âm hiện tại quá hiếm từ đúng loại nên lượt này được nới tự do */
+  ruleRelaxed?: boolean;
+  /** chuỗi nối đúng liên tiếp không dùng cứu trợ của mỗi người */
+  streaks?: Record<string, number>;
 }
 
 export const VOTE_SECONDS = 12;
@@ -395,6 +451,13 @@ export interface BauCuaView {
   /** các lần mở bát gần nhất, mới nhất ở cuối */
   recent: BauCuaSymbol[][];
   names: Record<string, string>;
+  /** chế độ chơi: cổ điển hoặc Lộc Trời x2/x3 */
+  mode?: 'classic' | 'jackpot';
+  /** linh vật Lộc Trời nhân thưởng của ván hiện tại (khi mode === 'jackpot') */
+  luckySymbol?: BauCuaSymbol | null;
+  luckyMult?: 2 | 3;
+  /** ván vừa mở ra Bão Tam Hoa (3 hột giống hệt nhau -> thưởng thêm!) */
+  tripleStorm?: boolean;
 }
 
 // ================= Cờ tỷ phú =================
@@ -420,7 +483,7 @@ export interface TyPhuView {
    * ticket: rút được thẻ Cơ hội "vé ra tù", chọn mua hay không.
    * Đang ở tù mà tới lượt (step roll): phải trả tiền / dùng vé ra tù mới được đổ, hoặc chọn ở lại.
    */
-  step: 'roll' | 'buy' | 'upgrade' | 'manage' | 'wait' | 'debt' | 'ticket';
+  step: 'roll' | 'buy' | 'upgrade' | 'buyout' | 'manage' | 'wait' | 'debt' | 'ticket';
   dice: [number, number] | null;
   rollId: number;
   /** ô đang chờ quyết định mua (step buy) hoặc nâng cấp (step upgrade) */
@@ -441,6 +504,14 @@ export interface TyPhuView {
   speed?: number;
   /** người đang tới lượt vừa đổ đôi nên được tung tiếp */
   extraRoll?: boolean;
+  /** chế độ Lễ Hội Sốt Đất */
+  mode?: 'classic' | 'chaos_festival';
+  /** ô thành phố đang mở Lễ Hội Du Lịch (tiền thuê x2!) */
+  festivalCell?: number | null;
+  /** quỹ Độc Đắc gom từ tiền Thuế/Phạt giữa bàn (dẫm ô Đỗ Xe Miễn Phí 20 ăn trọn!) */
+  jackpotPool?: number;
+  /** đề nghị Mua Đứt đất đối thủ với giá 160% khi vừa trả xong tiền thuê */
+  buyoutOffer?: { cell: number; ownerId: string; price: number } | null;
 }
 
 // ================= Hành động trong game =================
@@ -453,9 +524,13 @@ export type GameAction =
   | { type: 'roll'; impulse?: ThrowImpulse }
   | { type: 'move'; piece: number }
   | { type: 'bet'; symbol: BauCuaSymbol; amount: number }
+  | { type: 'bc_allin'; symbol: BauCuaSymbol }
+  | { type: 'bc_rebet' }
+  | { type: 'bc_double' }
   | { type: 'clearBets' }
   | { type: 'loan' }
   | { type: 'buy' }
+  | { type: 'buyout' }
   | { type: 'skip' }
   | { type: 'build'; cell: number; levels?: number }
   /** bán ở ô `cell`: `levels` = bán bớt chừng này cấp nhà/sao; `land` = bán cả lô (đất + nhà); không có gì = bán 1 lần (1 cấp, hết nhà thì bán đất) */
@@ -481,6 +556,17 @@ export type GameAction =
   | { type: 'vd_guess'; text: string }
   | { type: 'bt_submit'; word: string }
   | { type: 'dv_answer'; choice: 0 | 1 | 2 | 3 }
+  | { type: 'cah_pick'; card: string }
+  | { type: 'cah_mulligan' }
+  | { type: 'cah_vote'; slotId: string }
+  | { type: 'cg_plan'; bulletIndex: number; targetId: string }
+  | { type: 'cg_standoff'; decision: 'stand' | 'surrender' }
+  | { type: 'cg_godfather'; targetId: string; newAimId: string }
+  | { type: 'loto_mark'; num: number }
+  | { type: 'loto_kinh'; row: 0 | 1 | 2 }
+  | { type: 'caro_move'; row: number; col: number }
+  | { type: 'cs_input'; input: CroakInput }
+  | { type: 'cs_reset_stage' }
   | { type: 'end' };
 
 export type ActionError =
@@ -513,7 +599,12 @@ export type ActionError =
   | 'cannot_build'
   | 'no_money'
   // ai là gián điệp
-  | 'word_leaked';
+  | 'word_leaked'
+  // nối từ mở rộng / lô tô / caro
+  | 'wrong_pos'
+  | 'kinh_false'
+  | 'kinh_locked'
+  | 'cell_occupied';
 
 /** `word`: từ server đã hiểu (sau khi chuẩn hóa / dịch ngược bộ gõ) — app dùng để hiện và xin duyệt đúng từ */
 export type ActionResult = { ok: true; hint?: string; word?: string } | { ok: false; reason: ActionError; word?: string };
@@ -584,6 +675,15 @@ export type FunSend =
   | { kind: 'meteor'; to: string }
   | { kind: 'blackhole'; to: string }
   | { kind: 'dragon_roar'; to: string }
+  | { kind: 'clown_honk'; to: string }
+  | { kind: 'bsod_crash'; to: string }
+  | { kind: 'gold_slipper_storm'; to: string }
+  | { kind: 'police_siren'; to: string }
+  | { kind: 'coffin_meme'; to: string }
+  | { kind: 'ban_hammer'; to: string }
+  | { kind: 'rainbow_overload'; to: string }
+  | { kind: 'jackpot_rain'; to: string }
+  | { kind: 'supreme_judgement'; to: string }
   /** tặng quà: người tặng trả Ruby, người nhận được điểm quà */
   | { kind: 'gift'; to: string; gift: GiftId }
   /** chỉ server phát: người có hiệu ứng vào phòng vừa vào (from = người đó) */
@@ -613,6 +713,7 @@ export const DISRUPT_WINDOW_MS = 15_000;
 export const HARD_DISRUPT_KINDS = [
   'quake', 'spin', 'blackout', 'roach', 'ink', 'poke', 'lightning', 'freeze', 'cake', 'water', 'dog',
   'duck', 'ufo', 'disco', 'money', 'mirror', 'paparazzi', 'ghost_scare', 'royal_seal', 'meteor', 'blackhole', 'dragon_roar',
+  'clown_honk', 'bsod_crash', 'gold_slipper_storm', 'police_siren', 'coffin_meme', 'ban_hammer', 'rainbow_overload', 'jackpot_rain', 'supreme_judgement',
 ] as const;
 /** thời gian (ms) được bù vào lượt Nối từ khi người đang tới lượt dính chiêu */
 export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
@@ -620,6 +721,8 @@ export const DISRUPT_PAUSE_MS: Partial<Record<FunSend['kind'], number>> = {
   lightning: 2000, freeze: 3000, cake: 2000, water: 2000, dog: 2500,
   duck: 3500, ufo: 3500, disco: 4000, money: 3000, mirror: 2500,
   paparazzi: 2500, ghost_scare: 3000, royal_seal: 2500, meteor: 3000, blackhole: 4000, dragon_roar: 4000,
+  clown_honk: 2500, bsod_crash: 4000, gold_slipper_storm: 3000, police_siren: 3000, coffin_meme: 3000,
+  ban_hammer: 3500, rainbow_overload: 3500, jackpot_rain: 3500, supreme_judgement: 4500,
 };
 /** tổng thời gian bù tối đa trong một lượt */
 export const DISRUPT_MAX_BONUS_MS = 15_000;
@@ -805,6 +908,8 @@ export interface ClientToServerEvents {
 
 export interface ServerToClientEvents {
   'room:state': (s: RoomState) => void;
+  /** đồng bộ vật lý 30Hz nhẹ cho Đầm Lầy Quái Chiêu (`croaksquad`) */
+  'croak:tick': (p: CroakTickPayload) => void;
   'fun:event': (e: FunEvent) => void;
   'chat:msg': (m: ChatMsg) => void;
   'chat:history': (ms: ChatMsg[]) => void;

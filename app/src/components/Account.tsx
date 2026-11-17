@@ -522,7 +522,11 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
   );
 }
 
-const ORDER: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
+const ORDER: GameType[] = [
+  'wordchain', 'wordchain_en', 'baucua', 'typhu',
+  'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
+  'cah', 'cashnguns', 'loto', 'caro', 'croaksquad',
+];
 
 export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void; onShop?: () => void }) {
   const played = Object.values(user.stats).reduce((s, x) => s + (x?.played ?? 0), 0);

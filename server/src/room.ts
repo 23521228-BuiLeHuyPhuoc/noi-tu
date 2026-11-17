@@ -22,6 +22,12 @@ import { GianDiepGame } from './games/giandiep';
 import { VeDoanGame } from './games/vedoan';
 import { BomTuGame } from './games/bomtu';
 import { DoVuiGame } from './games/dovui';
+import { CahGame } from './games/cah';
+import { CashGunsGame } from './games/cashnguns';
+import { LotoGame } from './games/loto';
+import { CaroGame } from './games/caro';
+import { CroakSquadGame } from './games/croaksquad';
+import type { CroakTickPayload } from '../../shared/src/croaksquad';
 
 export interface RoomOptions {
   /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
@@ -29,6 +35,8 @@ export interface RoomOptions {
   disconnectGraceMs?: number;
   rng?: Rng;
   onChange?: (room: Room) => void;
+  /** phát khung vật lý 30Hz cho Đầm Lầy Quái Chiêu */
+  onCroakTick?: (room: Room, payload: CroakTickPayload) => void;
   /** ván vừa kết thúc (để cộng thành tích cho tài khoản) */
   onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null; winnerIds?: string[] }) => void;
   /** cả phòng duyệt một từ mới */
@@ -72,6 +80,7 @@ const BOT_THINK_MS: Record<GameType, [number, number]> = {
   wordchain: [1500, 3200], wordchain_en: [1500, 3200], baucua: [700, 2200], typhu: [900, 1700],
   masoi: [300, 700], giandiep: [350, 750],
   ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
+  cah: [400, 950], cashnguns: [450, 1000], loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -128,10 +137,11 @@ export class Room {
 
   // ---------- máy chơi ----------
 
-  /** Chủ phòng thêm một người chơi máy (chỉ ở phòng chờ). */
+  /** Chủ phòng thêm một người chơi máy (chỉ ở phòng chờ; Đầm lầy quái chiêu chỉ cho người thật co-op). */
   addBot(byId: string): Result<{ playerId: string }> {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
     if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    if (this.gameType === 'croaksquad') return { ok: false, error: 'bad_request' };
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
     if (this.phase === 'finished') this.backToLobby();
     const used = new Set(this.players.map((p) => p.name.toLowerCase()));
@@ -495,13 +505,7 @@ export class Room {
       gameType === undefined &&
       settings !== undefined &&
       settings.roomTheme !== undefined &&
-      settings.ludoPieces === undefined &&
-      settings.baucuaRounds === undefined &&
-      settings.masoiPreset === undefined &&
-      settings.giandiepMrWhite === undefined &&
-      settings.giandiepSpies === undefined &&
-      settings.veDoanRounds === undefined &&
-      settings.doVuiQuestions === undefined;
+      Object.entries(settings).every(([k, v]) => v === undefined || k === 'roomTheme');
     if (!themeOnly && this.phase === 'playing') return { ok: false, error: 'room_playing' };
     if (gameType !== undefined) {
       if (!GAME_TYPES.includes(gameType as GameType)) return { ok: false, error: 'bad_request' };
@@ -515,9 +519,29 @@ export class Room {
       if (!BAUCUA_ROUND_OPTIONS.includes(settings.baucuaRounds as BauCuaRounds)) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, baucuaRounds: settings.baucuaRounds };
     }
+    if (settings?.baucuaMode !== undefined) {
+      if (settings.baucuaMode !== 'classic' && settings.baucuaMode !== 'jackpot') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, baucuaMode: settings.baucuaMode };
+    }
+    if (settings?.wordchainDifficulty !== undefined) {
+      if (!['easy', 'normal', 'hard', 'hell'].includes(settings.wordchainDifficulty)) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, wordchainDifficulty: settings.wordchainDifficulty };
+    }
+    if (settings?.wordchainRule !== undefined) {
+      if (!['free', 'noun', 'verb', 'adj', 'no_repeat'].includes(settings.wordchainRule)) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, wordchainRule: settings.wordchainRule };
+    }
+    if (settings?.typhuMode !== undefined) {
+      if (settings.typhuMode !== 'classic' && settings.typhuMode !== 'chaos_festival') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, typhuMode: settings.typhuMode };
+    }
     if (settings?.masoiPreset !== undefined) {
       if (settings.masoiPreset !== 'classic' && settings.masoiPreset !== 'chaos') return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, masoiPreset: settings.masoiPreset };
+    }
+    if (settings?.masoiSpeed !== undefined) {
+      if (!['slow', 'normal', 'fast'].includes(settings.masoiSpeed)) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, masoiSpeed: settings.masoiSpeed };
     }
     if (settings?.giandiepMrWhite !== undefined) {
       if (typeof settings.giandiepMrWhite !== 'boolean') return { ok: false, error: 'bad_request' };
@@ -535,11 +559,38 @@ export class Room {
       if (settings.doVuiQuestions !== 5 && settings.doVuiQuestions !== 10 && settings.doVuiQuestions !== 15) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, doVuiQuestions: settings.doVuiQuestions };
     }
+    if (settings?.doVuiTopic !== undefined) {
+      if (!['all', 'oop', 'dsa', 'js_ts', 'node_backend', 'mobile_fe', 'fullstack_it', 'english_adv'].includes(settings.doVuiTopic)) {
+        return { ok: false, error: 'bad_request' };
+      }
+      this.settings = { ...this.settings, doVuiTopic: settings.doVuiTopic };
+    }
+    if (settings?.cahRounds !== undefined) {
+      if (settings.cahRounds !== 5 && settings.cahRounds !== 8 && settings.cahRounds !== 12) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, cahRounds: settings.cahRounds };
+    }
+    if (settings?.lotoAutoMark !== undefined) {
+      if (typeof settings.lotoAutoMark !== 'boolean') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, lotoAutoMark: settings.lotoAutoMark };
+    }
+    if (settings?.caroBlockTwoEnds !== undefined) {
+      if (typeof settings.caroBlockTwoEnds !== 'boolean') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, caroBlockTwoEnds: settings.caroBlockTwoEnds };
+    }
+    if (settings?.croakStage !== undefined) {
+      if (settings.croakStage !== 0 && settings.croakStage !== 1 && settings.croakStage !== 2) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, croakStage: settings.croakStage };
+    }
     if (settings?.roomTheme !== undefined) {
       if (typeof settings.roomTheme !== 'string' || !ROOM_THEMES.some((t) => t.id === settings.roomTheme)) {
         return { ok: false, error: 'bad_request' };
       }
       this.settings = { ...this.settings, roomTheme: settings.roomTheme };
+    }
+    // đổi sang Đầm lầy quái chiêu: tự dọn các máy chơi để chỉ giữ người thật co-op
+    if (this.gameType === 'croaksquad' && this.phase !== 'playing') {
+      const botIds = this.players.filter((p) => p.bot).map((p) => p.id);
+      for (const bid of botIds) this.players = this.players.filter((x) => x.id !== bid);
     }
     // đổi game sau khi kết thúc thì quay về phòng chờ (riêng đổi map thì giữ nguyên màn hiện tại)
     if (!themeOnly && this.phase === 'finished') this.backToLobby();
@@ -550,6 +601,9 @@ export class Room {
   start(byId: string): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
     if (this.phase !== 'lobby') return { ok: false, error: 'bad_request' };
+    if (this.gameType === 'croaksquad' && this.players.some((p) => p.bot)) {
+      this.players = this.players.filter((p) => !p.bot);
+    }
     const info = GAME_INFO[this.gameType];
     if (this.players.length < info.min) return { ok: false, error: 'too_few_players' };
     if (this.players.length > info.max) return { ok: false, error: 'too_many_players' };
@@ -648,6 +702,7 @@ export class Room {
       },
       finish: (result: GameResult) => this.finish(result),
       learnWord: (word: string, byName: string) => this.opts.learnWord?.(word, byName),
+      emitCroakTick: (payload: CroakTickPayload) => this.opts.onCroakTick?.(this, payload),
     };
     switch (this.gameType) {
       case 'wordchain_en':
@@ -666,6 +721,16 @@ export class Room {
         return new BomTuGame(ctx);
       case 'do_vui':
         return new DoVuiGame(ctx);
+      case 'cah':
+        return new CahGame(ctx);
+      case 'cashnguns':
+        return new CashGunsGame(ctx);
+      case 'loto':
+        return new LotoGame(ctx);
+      case 'caro':
+        return new CaroGame(ctx);
+      case 'croaksquad':
+        return new CroakSquadGame(ctx);
       default:
         return new WordChainGame(ctx, 'vi');
     }

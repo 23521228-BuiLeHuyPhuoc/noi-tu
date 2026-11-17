@@ -444,6 +444,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
   const sellNeed = g.step === 'debt' && g.debt ? g.debt.amount - myCash
     : g.step === 'buy' && pending && isTyPhuProperty(pending) ? pending.price - myCash
     : g.step === 'upgrade' && g.pendingBuy !== null ? upgradeCostOf(g.pendingBuy) - myCash
+    : g.step === 'buyout' && g.buyoutOffer ? g.buyoutOffer.price - myCash
     : g.step === 'roll' && inJail ? TYPHU_JAIL_FINE - myCash
     : null;
   const curName = g.currentPlayerId ? nameOf(g.currentPlayerId) : '';
@@ -459,10 +460,13 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)}$?` : 'Mua miếng đất này không?'
         : g.step === 'upgrade'
           ? pending?.kind === 'station' ? 'Nâng sao cho nhà ga của bạn?' : 'Nâng cấp nhà ở đất của bạn?'
+          : g.step === 'buyout' && g.buyoutOffer
+            ? `Thâu tóm ${TYPHU_BOARD[g.buyoutOffer.cell].name} với giá ${fmt(g.buyoutOffer.price)}$?`
           : g.step === 'debt' && g.debt
             ? `Thiếu ${fmt(Math.max(0, g.debt.amount - (g.cash[me] ?? 0)))}$: chọn lô để bán`
             : 'Chờ chút…'
     : g.step === 'debt' ? `${curName} thiếu tiền, đang bán nhà đất…`
+    : g.step === 'buyout' ? `${curName} đang cân nhắc Thâu Tóm đất!`
     : g.step === 'ticket' ? `${curName} đang tính mua vé ra tù`
     : g.step === 'roll' && g.currentPlayerId && g.currentPlayerId in g.jail ? `${curName} đang ở tù`
     : g.step === 'roll' && g.extraRoll ? `${curName} đổ đôi, được tung tiếp 🎲` : `Lượt của ${curName}`;
@@ -571,6 +575,32 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
             );
           })}
 
+          {/* Đánh dấu ô thành phố đang mở Lễ Hội Du Lịch x2 */}
+          {g.mode === 'chaos_festival' && g.festivalCell !== null && g.festivalCell !== undefined && geo.rect[g.festivalCell] && (
+            <View
+              pointerEvents="none"
+              testID="typhu-festival-marker"
+              style={{
+                position: 'absolute',
+                left: geo.rect[g.festivalCell].x - 2,
+                top: geo.rect[g.festivalCell].y - 2,
+                width: geo.rect[g.festivalCell].w + 4,
+                height: geo.rect[g.festivalCell].h + 4,
+                borderRadius: 6,
+                borderWidth: 2.5,
+                borderColor: '#EC4899',
+                backgroundColor: 'rgba(236,72,153,0.14)',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                zIndex: 18,
+              }}
+            >
+              <View style={{ backgroundColor: '#DB2777', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 0.5, marginBottom: 1 }}>
+                <T style={{ fontSize: 8.5, fontWeight: '900', color: '#FEF08A' }}>🎉 x2</T>
+              </View>
+            </View>
+          )}
+
           {/* TRUNG TÂM: người đang chơi, xúc xắc, nút, tài sản, đất của tôi, diễn biến */}
           <View style={[styles.center, { left: geo.center.x + 1.5, top: geo.center.y + 1.5, width: geo.center.w - 3, height: geo.center.h - 3 }]}>
             <View style={{ position: 'absolute', left: 3, top: 3, width: (geo.center.w - 9) / k, height: (geo.center.h - 9) / k, transform: [{ scale: k }], transformOrigin: '0px 0px' }}>
@@ -663,7 +693,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
             onSell={(opt) => { setSellFocus(focusCell); void act({ type: 'sell', cell: focusCell, ...opt }); }}
             onClose={g.step === 'debt' ? undefined : () => setSellOpen(false)}
           />
-        ) : myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade' || g.step === 'ticket' || (g.step === 'roll' && inJail)) && (
+        ) : myTurn && !moving && !activeAnn && detail === null && (g.step === 'buy' || g.step === 'upgrade' || g.step === 'buyout' || g.step === 'ticket' || (g.step === 'roll' && inJail)) && (
           /* bảng thông tin nổi khi tới ô mua được, được nâng cấp, đang ở tù, rút được vé ra tù (không nghiêng theo bàn) */
           <DecisionCard
             onPoke={g.order.filter((id) => id !== me && room.players.some((x) => x.id === id)).length > 0 ? () => setPokeOpen(true) : undefined}
@@ -1180,6 +1210,50 @@ function DecisionBody(p: {
                 title={`${station ? 'Nâng sao' : 'Nâng cấp'} -${money(cost)}$`}
                 style={{ flex: 1.4 }}
                 onPress={() => p.onAct({ type: 'build', cell: i })}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+  if (g.step === 'buyout' && g.buyoutOffer) {
+    const { cell: i, ownerId, price } = g.buyoutOffer;
+    const c = TYPHU_BOARD[i];
+    if (!isTyPhuProperty(c)) return null;
+    const lv = g.houses[i] ?? 0;
+    const afford = cash >= price;
+    const prevName = g.names[ownerId] ?? 'đối thủ';
+    return (
+      <View style={dc.wrap} pointerEvents="box-none">
+        <View testID="buyout-card" style={dc.card}>
+          <View style={[dc.head, { backgroundColor: '#B91C1C' }]}>
+            <T style={dc.headSub}>🔥 THÂU TÓM ĐỊA BÀN (GIÁ 160%)</T>
+            <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
+          </View>
+          <View style={dc.body}>
+            <T style={dc.note}>
+              Cơ hội cướp trắng sổ đỏ {c.name}{lv > 0 ? ` (kèm ${lv} cấp đã xây!)` : ''} từ tay <T style={{ fontWeight: '900' }}>{prevName}</T>!
+            </T>
+            <View testID="decision-cash" style={dc.cashBox}>
+              <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
+              <View style={dc.rentRow}>
+                <T style={dc.cashK}>{afford ? 'Mua đứt xong còn' : `Giá thâu tóm ${money(price)}$ · Thiếu`}</T>
+                <T style={[dc.cashV, !afford && { color: C.danger }]}>{money(Math.abs(cash - price))}$</T>
+              </View>
+            </View>
+            {!afford && sellBtn(price - cash)}
+            <View style={dc.btns}>
+              <Button testID="skip-btn" small variant="paper" title="Tha cho" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
+              <Button
+                testID="buyout-btn"
+                small
+                variant="ink"
+                icon="🔥"
+                disabled={!afford}
+                title={`Mua đứt -${money(price)}$`}
+                style={{ flex: 1.5 }}
+                onPress={() => p.onAct({ type: 'buyout' })}
               />
             </View>
           </View>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
 import { themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
@@ -14,7 +14,11 @@ import { NameText, TitleBadge } from '../components/Cosmetics';
 import { EmojiIcon, RankMedal, UiIcon } from '../components/Icons';
 import { MotionSurface } from '../components/MotionPrimitives';
 
-const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
+const GAMES: GameType[] = [
+  'wordchain', 'wordchain_en', 'baucua', 'typhu',
+  'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
+  'cah', 'cashnguns', 'loto', 'caro', 'croaksquad',
+];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const r = room.result!;
@@ -24,8 +28,6 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const iWon = !!game.me && winIds.includes(game.me);
   const [error, setError] = useState<string | null>(null);
   const playerById = new Map(room.players.map((p) => [p.id, p]));
-  const { width, height } = useWindowDimensions();
-  const wide = width > height;
   const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
 
   useEffect(() => {
@@ -40,30 +42,12 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
         isHost ? (
           <>
             {error && <T style={styles.error}>{error}</T>}
-            <View style={wide ? styles.rowWide : undefined}>
-              <Button
-                testID="restart-btn"
-                iconNode={<UiIcon name="RotateCcw" size={16} color="#271400" />}
-                small={wide}
-                style={wide ? { flexGrow: 1.4, flexBasis: '26%' } : undefined}
-                title={`Chơi lại ${GAME_INFO[room.gameType].name}`}
-                onPress={async () => setError(await game.restart())}
-              />
-              <View style={[styles.row, wide && { flex: 3 }]}>
-                {GAMES.filter((g) => g !== room.gameType).map((g) => (
-                  <Button
-                    key={g}
-                    testID={`switch-${g}`}
-                    small
-                    variant="paper"
-                    icon={GAME_META[g].emoji}
-                    title={GAME_INFO[g].name}
-                    style={{ flexGrow: 1, minWidth: 102 }}
-                    onPress={async () => setError(await game.configure({ gameType: g }))}
-                  />
-                ))}
-              </View>
-            </View>
+            <Button
+              testID="restart-btn"
+              iconNode={<UiIcon name="RotateCcw" size={16} color="#271400" />}
+              title={`Chơi lại ${GAME_INFO[room.gameType].name}`}
+              onPress={async () => setError(await game.restart())}
+            />
           </>
         ) : (
           <T style={[styles.wait, { color: theme.onBg }]}>Chờ chủ phòng chọn ván tiếp theo…</T>
@@ -106,7 +90,11 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                   <NameText fx={pl?.cosmetics?.nameFx} style={styles.name}>
                     {e.playerId === game.me ? `${e.name} (bạn)` : e.name}
                   </NameText>
-                  {pl?.cosmetics?.title && <TitleBadge title={pl.cosmetics.title} />}
+                  {pl?.cosmetics?.title && (
+                    <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+                      <TitleBadge title={pl.cosmetics.title} />
+                    </View>
+                  )}
                 </View>
                 <T style={styles.detail}>{e.detail}</T>
               </View>
@@ -114,6 +102,29 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
           );
         })}
       </Card>
+
+      {isHost && (
+        <Card style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <EmojiIcon emoji="🎮" size={18} />
+            <T style={{ fontSize: 14.5, fontWeight: '900', color: C.ink }}>Đổi nhanh sang trò chơi khác (13 game)</T>
+          </View>
+          <View style={styles.row}>
+            {GAMES.filter((g) => g !== room.gameType).map((g) => (
+              <Button
+                key={g}
+                testID={`switch-${g}`}
+                small
+                variant="paper"
+                icon={GAME_META[g].emoji}
+                title={GAME_INFO[g].name}
+                style={{ flexGrow: 1, minWidth: 112 }}
+                onPress={async () => setError(await game.configure({ gameType: g }))}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
     </Shell>
   );
 }

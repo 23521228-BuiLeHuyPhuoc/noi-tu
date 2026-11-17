@@ -296,6 +296,7 @@ export function TyPhuCenter(p: CenterProps) {
   const showJail = idle && p.myTurn && g.step === 'roll' && p.inJail;
   const showTicket = idle && p.myTurn && g.step === 'ticket';
   const showBuy = idle && p.myTurn && g.step === 'buy' && p.buyable;
+  const showBuyout = idle && p.myTurn && g.step === 'buyout' && !!g.buyoutOffer;
   const showEnd = idle && p.myTurn && (g.step === 'manage' || g.step === 'upgrade');
   const showDebt = idle && p.myTurn && g.step === 'debt';
   const timeTotal = Math.max(1, g.turnSeconds);
@@ -336,6 +337,16 @@ export function TyPhuCenter(p: CenterProps) {
       {L.header.h > 0 && <View style={[abs(L.header), styles.head]}>
         <Image source={{ uri: FX_ICON.bag }} style={{ width: 18, height: 18 }} />
         <T numberOfLines={1} style={styles.logo}>{L.wide ? 'TỶ PHÚ' : 'TỶ PHÚ XÓM LẦY'}</T>
+        {g.mode === 'chaos_festival' && (
+          <View testID="typhu-jackpot" style={styles.jackpotPill}>
+            <T style={styles.jackpotTxt}>🎰 Hũ {fmt(g.jackpotPool ?? 0)}$</T>
+          </View>
+        )}
+        {g.mode === 'chaos_festival' && g.festivalCell !== null && g.festivalCell !== undefined && (
+          <View testID="typhu-festival" style={styles.festPill}>
+            <T numberOfLines={1} style={styles.festTxt}>🎉 x2 {shortCellName(TYPHU_BOARD[g.festivalCell].name)}</T>
+          </View>
+        )}
         <View style={{ flex: 1 }} />
         {p.isHost && (
           <Pressable testID="end-open" accessibilityRole="button" onPress={p.onEnd} hitSlop={8} style={[styles.miniBtn, { backgroundColor: C.paper }]}>
@@ -368,6 +379,16 @@ export function TyPhuCenter(p: CenterProps) {
           <View style={[styles.statusRow, { height: statusH - 4 }]}>
             {/* trạng thái có tên người chơi: dài thì xuống 2 dòng chữ nhỏ hơn, không cắt tên */}
             <T testID="typhu-status" numberOfLines={2} style={[styles.status, { flex: 1 }, p.status.length * 6.4 > L.action.w - 12 && { fontSize: 10.5, lineHeight: 12 }, p.myTurn && { color: '#C2410C' }, WRAP]}>{p.status}</T>
+            {L.header.h <= 0 && g.mode === 'chaos_festival' && (
+              <View testID="typhu-jackpot" style={styles.jackpotPill}>
+                <T style={styles.jackpotTxt}>🎰 Hũ {fmt(g.jackpotPool ?? 0)}$</T>
+              </View>
+            )}
+            {L.header.h <= 0 && g.mode === 'chaos_festival' && g.festivalCell !== null && g.festivalCell !== undefined && (
+              <View testID="typhu-festival" style={styles.festPill}>
+                <T numberOfLines={1} style={styles.festTxt}>🎉 x2 {shortCellName(TYPHU_BOARD[g.festivalCell].name)}</T>
+              </View>
+            )}
           </View>
         )}
         <View
@@ -384,15 +405,27 @@ export function TyPhuCenter(p: CenterProps) {
             canThrow={canThrow}
             onThrow={p.onThrow}
           />
+          {!L.wide && L.header.h <= 0 && g.mode === 'chaos_festival' && (
+            <View pointerEvents="none" style={{ position: 'absolute', top: 4, left: 6, flexDirection: 'row', gap: 4 }}>
+              <View testID="typhu-jackpot" style={styles.jackpotPill}>
+                <T style={styles.jackpotTxt}>🎰 Hũ {fmt(g.jackpotPool ?? 0)}$</T>
+              </View>
+              {g.festivalCell !== null && g.festivalCell !== undefined && (
+                <View testID="typhu-festival" style={styles.festPill}>
+                  <T numberOfLines={1} style={styles.festTxt}>🎉 x2 {shortCellName(TYPHU_BOARD[g.festivalCell].name)}</T>
+                </View>
+              )}
+            </View>
+          )}
           {canThrow && <T style={styles.trayHint}>Vuốt để tung, hoặc chạm</T>}
           {g.dice && !p.dice.animating && !p.moving && <View style={styles.sumPill}><T style={styles.sumTxt}>{g.dice[0] + g.dice[1]}</T></View>}
         </View>
         <View style={styles.btnRow}>
           {showRoll ? (
             <Button testID="roll-btn" small title="Đổ xúc xắc" icon="🎲" style={styles.fillBtn} onPress={() => p.onAct('roll')} />
-          ) : showBuy || showEnd || showDebt || showJail || showTicket ? (
+          ) : showBuy || showBuyout || showEnd || showDebt || showJail || showTicket ? (
             <T style={[styles.hint, { flex: 1 }]}>
-              {showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : showDebt ? 'Thiếu tiền: chọn nhà đất để bán ở bảng giữa'
+              {showBuy ? 'Chọn mua hay bỏ qua ở bảng thông tin' : showBuyout ? 'Cơ hội Thâu Tóm 160% ở bảng giữa!' : showDebt ? 'Thiếu tiền: chọn nhà đất để bán ở bảng giữa'
                 : showJail ? 'Đang ở tù: trả tiền / dùng vé để đổ, hoặc ở lại' : showTicket ? 'Mua vé ra tù không?' : 'Chọn nâng cấp ở bảng thông tin'}
             </T>
           ) : (
@@ -435,6 +468,10 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   logo: { fontWeight: '900', fontSize: 14, color: C.son, letterSpacing: 0.6 },
+  jackpotPill: { backgroundColor: '#FEF08A', borderWidth: 1.5, borderColor: '#CA8A04', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
+  jackpotTxt: { fontSize: 10, fontWeight: '900', color: '#78350F' },
+  festPill: { backgroundColor: '#FCE7F3', borderWidth: 1.5, borderColor: '#DB2777', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 110 },
+  festTxt: { fontSize: 10, fontWeight: '900', color: '#9D174D' },
   miniBtn: {
     backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink, borderRadius: 9, paddingHorizontal: 8, height: 24, justifyContent: 'center',
   },

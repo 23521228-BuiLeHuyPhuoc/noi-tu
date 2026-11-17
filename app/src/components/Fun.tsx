@@ -987,7 +987,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
                   small
                   variant={mythic ? 'gold' : 'ink'}
                   style={styles.troll}
-                  onPress={() => send({ kind: id, to: target.id })}
+                  onPress={() => send({ kind: id, to: target.id } as Parameters<typeof send>[0])}
                 />
               );
             })}

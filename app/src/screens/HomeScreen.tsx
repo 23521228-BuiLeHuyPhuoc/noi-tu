@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GAME_INFO, type GameType } from '../../../shared/src/types';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
+import { useStableWindow } from '../hooks';
 import { storage } from '../storage';
 import { getInviteCode } from '../web';
 import { GAME_META } from '../messages';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
+import { Portrait } from '../components/Avatar';
+import { NameText, TitleBadge, VipBadge } from '../components/Cosmetics';
 import { WalletSheet } from '../components/Wallet';
 import { AdminSheet } from '../components/Admin';
-import { CheckinSheet, ShopSheet } from '../components/Shop';
+import { CheckinSheet, ShopBody, ShopSheet } from '../components/Shop';
 import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 import { MapBackdrop } from '../components/MapBackdrop';
 import { Sheet } from '../components/Sheet';
@@ -20,40 +23,75 @@ import { useLocalTheme, useSmoothMode } from '../smoothMode';
 import { EmojiIcon, RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
 import { MotionSurface } from '../components/MotionPrimitives';
 
-const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
+const GAMES: GameType[] = [
+  'croaksquad',
+  'cah',
+  'cashnguns',
+  'loto',
+  'caro',
+  'masoi',
+  'do_vui',
+  'giandiep',
+  've_doan',
+  'bom_tu',
+  'wordchain',
+  'wordchain_en',
+  'baucua',
+  'typhu',
+];
 
-type Category = 'all' | 'hidden' | 'party' | 'word' | 'classic';
+type HomeFragment = 'games' | 'rooms' | 'shop' | 'profile';
+
+const FRAGMENTS: { id: HomeFragment; label: string; emoji: string }[] = [
+  { id: 'games', label: 'Chơi ngay', emoji: '🎮' },
+  { id: 'rooms', label: 'Phòng mở', emoji: '🚪' },
+  { id: 'shop', label: 'Phú Hào', emoji: '💎' },
+  { id: 'profile', label: 'Cá nhân', emoji: '👑' },
+];
+
+type Category = 'all' | 'party' | 'hidden' | 'coop' | 'word' | 'classic';
 const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[] }[] = [
-  { id: 'all', label: 'Tất cả (9)', icon: 'LayoutGrid' },
-  { id: 'hidden', label: 'Ẩn vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
-  { id: 'party', label: 'Party', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui'] },
-  { id: 'word', label: 'Từ vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
-  { id: 'classic', label: 'Dân gian', icon: 'Dices', games: ['baucua', 'typhu'] },
+  { id: 'all', label: 'Tất cả (14)', icon: 'LayoutGrid' },
+  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['cah', 'cashnguns', 've_doan', 'bom_tu', 'do_vui'] },
+  { id: 'hidden', label: 'Ẩn Vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
+  { id: 'coop', label: 'Co-op & Cờ', icon: 'Swords', games: ['croaksquad', 'caro'] },
+  { id: 'classic', label: 'Hội Chợ', icon: 'Dices', games: ['loto', 'baucua', 'typhu'] },
+  { id: 'word', label: 'Từ Vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
 ];
 
 const BADGE_FOR: Partial<Record<GameType, { text: string; grad: readonly [string, string] }>> = {
-  masoi: { text: 'HOT', grad: ['#EF4444', '#B91C1C'] },
-  giandiep: { text: 'MỚI', grad: ['#F59E0B', '#B45309'] },
-  ve_doan: { text: 'MỚI', grad: ['#8B5CF6', '#5B21B6'] },
-  bom_tu: { text: 'MỚI', grad: ['#F97316', '#C2410C'] },
-  do_vui: { text: 'MỚI', grad: ['#10B981', '#047857'] },
+  croaksquad: { text: 'CO-OP 2D', grad: ['#10B981', '#047857'] },
+  cah: { text: 'SIÊU BỰA', grad: ['#EC4899', '#9D174D'] },
+  cashnguns: { text: 'ĐẤU SÚNG', grad: ['#EF4444', '#991B1B'] },
+  loto: { text: 'HỘI CHỢ', grad: ['#F59E0B', '#B45309'] },
+  caro: { text: '2–4 PHE', grad: ['#06B6D4', '#0E7490'] },
+  masoi: { text: 'BẢN 2.0', grad: ['#7C3AED', '#4C1D95'] },
+  do_vui: { text: 'IT & C2', grad: ['#2563EB', '#1E3A8A'] },
+  baucua: { text: 'LỘC x3', grad: ['#EA580C', '#9A3412'] },
+  typhu: { text: 'MUA ĐỨT', grad: ['#16A34A', '#14532D'] },
 };
 
 const GAME_TILE_GRAD: Record<GameType, readonly [string, string]> = {
-  wordchain: ['#FEF3C7', '#FDE68A'],
-  wordchain_en: ['#DBEAFE', '#BFDBFE'],
-  baucua: ['#FFE4E6', '#FECDD3'],
-  typhu: ['#D1FAE5', '#A7F3D0'],
-  masoi: ['#EDE9FE', '#DDD6FE'],
-  giandiep: ['#E0E7FF', '#C7D2FE'],
-  ve_doan: ['#FCE7F3', '#FBCFE8'],
-  bom_tu: ['#FFEDD5', '#FED7AA'],
-  do_vui: ['#CCFBF1', '#99F6E4'],
+  croaksquad: ['#A7F3D0', '#34D399'],
+  cah: ['#FBCFE8', '#F472B6'],
+  cashnguns: ['#FECACA', '#F87171'],
+  loto: ['#FDE68A', '#FBBF24'],
+  caro: ['#BAE6FD', '#38BDF8'],
+  masoi: ['#DDD6FE', '#A78BFA'],
+  giandiep: ['#C7D2FE', '#818CF8'],
+  ve_doan: ['#F5D0FE', '#E879F9'],
+  bom_tu: ['#FED7AA', '#FB923C'],
+  do_vui: ['#99F6E4', '#2DD4BF'],
+  wordchain: ['#FEF08A', '#FACC15'],
+  wordchain_en: ['#BFDBFE', '#60A5FA'],
+  baucua: ['#FECDD3', '#FB7185'],
+  typhu: ['#BBF7D0', '#4ADE80'],
 };
 
 export function HomeScreen({ game }: { game: Game }) {
   const [name, setName] = useState('');
   const invite = useState(getInviteCode)[0];
+  const [fragment, setFragment] = useState<HomeFragment>(() => (invite ? 'rooms' : 'games'));
   const [code, setCode] = useState(invite ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,8 +108,8 @@ export function HomeScreen({ game }: { game: Game }) {
 
   const [smooth, setSmooth] = useSmoothMode();
   const [localTheme, setLocalTheme] = useLocalTheme();
-  const { width } = useWindowDimensions();
-  const twoCols = width >= 600;
+  const { width } = useStableWindow();
+  const twoCols = width >= 620;
 
   const user = game.user;
   const activeThemeId = localTheme ?? user?.equipped?.roomTheme ?? 'son_mac_dinh';
@@ -97,7 +135,10 @@ export function HomeScreen({ game }: { game: Game }) {
   const trimmed = user ? user.displayName : name.trim();
 
   const run = async (fn: () => Promise<string | null>) => {
-    if (!trimmed) return setError('Nhập tên của bạn trước đã nhé.');
+    if (!trimmed) {
+      setError('Nhập tên của bạn trước đã nhé.');
+      return;
+    }
     setBusy(true);
     setError(await fn());
     setBusy(false);
@@ -105,38 +146,114 @@ export function HomeScreen({ game }: { game: Game }) {
 
   const visibleGames = cat === 'all' ? GAMES : (CATS.find((c) => c.id === cat)?.games ?? GAMES);
   const ownedSet = new Set(user?.owned ?? []);
+  const eq = user?.equipped ?? {};
 
-  const join = (
-    <Card style={styles.joinCard}>
-      <View style={styles.cardHeaderRow}>
-        <View style={[styles.badgeCircle, { backgroundColor: '#FEF3C7' }]}>
-          <UiIcon name="KeyRound" size={16} color="#B45309" />
+  const guestNameBar = !user && (
+    <Card style={styles.compactIdentity}>
+      <View style={styles.nameRow}>
+        <GuestAvatarButton game={game} onPress={() => setProfile(true)} />
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <TextInput
+            testID="name-input"
+            style={styles.input}
+            value={name}
+            onChangeText={(t) => {
+              setName(t);
+              setError(null);
+              void storage.setName(t.trim());
+            }}
+            placeholder="Nhập tên của bạn (vd: Phước)…"
+            placeholderTextColor={C.muted}
+            maxLength={24}
+            autoCorrect={false}
+          />
+          <View testID="auth-buttons" style={styles.guestAuthRow}>
+            <Pressable
+              testID="auth-open"
+              disabled={!online}
+              onPress={() => setAuth('login')}
+              style={styles.miniAuthPill}
+            >
+              <UiIcon name="LogIn" size={13} color={C.ink} />
+              <T style={styles.miniAuthTxt}>Đăng nhập</T>
+            </Pressable>
+            <Pressable
+              testID="register-open"
+              disabled={!online}
+              onPress={() => setAuth('register')}
+              style={[styles.miniAuthPill, styles.miniRegisterPill]}
+            >
+              <RubyIcon size={13} />
+              <T style={[styles.miniAuthTxt, { color: '#271400' }]}>Đăng ký VIP</T>
+            </Pressable>
+          </View>
         </View>
-        <T testID={invite ? 'invite-hint' : undefined} style={styles.h2}>
-          {invite ? `Bạn được mời vào phòng ${invite}` : 'Vào phòng nhanh'}
-        </T>
       </View>
-      <View style={styles.joinRow}>
-        <TextInput
-          testID="code-input"
-          style={[styles.input, styles.codeInput]}
-          value={code}
-          onChangeText={(t) => setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-          placeholder="MÃ 6 KÝ TỰ"
-          placeholderTextColor={C.muted}
-          maxLength={6}
-          autoCapitalize="characters"
-          autoCorrect={false}
-        />
-        <Button
-          testID="join-btn"
-          title="Vào"
-          iconNode={<UiIcon name="LogIn" size={16} color={invite ? '#271400' : C.gold} />}
-          variant={invite ? 'gold' : 'ink'}
-          disabled={!online || busy || code.length !== 6}
-          style={{ minWidth: 96 }}
-          onPress={() => run(() => game.joinRoom(code, trimmed))}
-        />
+    </Card>
+  );
+
+  const userMiniHud = user && (
+    <Card style={styles.compactIdentity}>
+      <View testID="profile-card" style={styles.userMiniRow}>
+        <Pressable onPress={() => setProfile(true)}>
+          <Portrait
+            p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }}
+            size={50}
+            frame={eq.frame}
+            aura={eq.aura}
+            pet={eq.pet}
+            active={!!eq.aura}
+          />
+        </Pressable>
+        <View style={{ flex: 1, minWidth: 155, gap: 3 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            {(user.vipTier ?? 0) > 0 && <VipBadge tier={user.vipTier} compact />}
+            <NameText fx={eq.nameFx} numberOfLines={1} style={styles.userMiniName}>
+              {user.displayName}
+            </NameText>
+          </View>
+          {eq.title && (
+            <View style={{ alignSelf: 'flex-start', maxWidth: '100%' }}>
+              <TitleBadge title={eq.title} />
+            </View>
+          )}
+          <Pressable onPress={() => setWalletOpen(true)} style={styles.rubyInlinePill}>
+            <RubyIcon size={14} />
+            <T testID="home-ruby" style={styles.rubyInlineTxt}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+          </Pressable>
+        </View>
+        <View style={styles.userMiniActions}>
+          <View style={{ position: 'relative' }}>
+            <Button
+              testID="checkin-open"
+              small
+              variant="gold"
+              icon="🎁"
+              title="Quà ngày"
+              disabled={!online}
+              onPress={() => setCheckinOpen(true)}
+            />
+            {canCheckin && <View testID="checkin-dot" style={styles.dot} />}
+          </View>
+          <Button
+            testID="shop-open"
+            small
+            variant="paper"
+            icon="🛍️"
+            title="Shop"
+            onPress={() => setShopOpen(true)}
+          />
+          {user.admin && (
+            <Button
+              testID="admin-open-home"
+              small
+              variant="ink"
+              icon="🛠"
+              title="Admin"
+              onPress={() => setAdminOpen(true)}
+            />
+          )}
+        </View>
       </View>
     </Card>
   );
@@ -144,53 +261,52 @@ export function HomeScreen({ game }: { game: Game }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <MapBackdrop themeId={activeThemeId} smooth={smooth} />
+
       <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
-        {/* Hàng trên cùng: Thương hiệu + Tài khoản */}
+        {/* Thanh Thương Hiệu Gọn Gàng + Nút Đổi Map / Bảng Vàng / Siêu Mượt */}
         <View style={styles.topRow}>
           <View style={styles.brandGroup}>
-            <View style={[styles.brandEmblem, { borderColor: theme.accent }]}>
-              <EmojiIcon emoji={theme.emoji} size={28} />
-            </View>
-            <View style={{ flex: 1, minWidth: 160 }}>
+            <LinearGradient
+              colors={['#FACC15', '#EC4899', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.brandEmblem}
+            >
+              <EmojiIcon emoji={theme.emoji} size={26} />
+            </LinearGradient>
+            <View style={{ flex: 1, minWidth: 120 }}>
               <T style={[styles.logo, { color: theme.accent }]}>Xóm Lầy</T>
-              <T style={[styles.tagline, { color: theme.onBg }]}>
-                9 trò chơi tụ tập 1–12 người · Avatar Studio & VIP Phú Hào
+              <T style={[styles.tagline, { color: theme.onBg }]} numberOfLines={1}>
+                14 đại tiệc trò chơi · Phú Hào Lố Lăng
               </T>
             </View>
           </View>
-          {!user && (
-            <View testID="auth-buttons" style={styles.authTop}>
-              <Button testID="auth-open" small variant="paper" iconNode={<UiIcon name="LogIn" size={15} color={C.ink} />} title="Đăng nhập" disabled={!online} style={styles.authBtn} onPress={() => setAuth('login')} />
-              <Button testID="register-open" small variant="gold" iconNode={<UiIcon name="UserPlus" size={15} color="#271400" />} title="Đăng ký" disabled={!online} style={styles.authBtn} onPress={() => setAuth('register')} />
-            </View>
-          )}
-        </View>
 
-        {/* Thanh công cụ nhanh Frosted Glass */}
-        <View
-          style={[
-            styles.quickBarWrap,
-            Platform.OS === 'web' ? ({ backdropFilter: 'blur(12px)' } as object) : null,
-          ]}
-        >
-          <View style={styles.quickBar}>
-            {user && (
-              <View style={{ position: 'relative', flexGrow: 1 }}>
-                <Button testID="checkin-open" small icon="🎁" title="Điểm danh" variant="gold" disabled={!online} onPress={() => setCheckinOpen(true)} style={{ width: '100%' }} />
-                {canCheckin && <View testID="checkin-dot" style={styles.dot} />}
-              </View>
-            )}
-            <Button testID="leaderboard-open" small icon="🏆" title="Bảng vàng" variant="paper" onPress={() => setBoard(true)} style={styles.quickBtn} />
-            <Button testID="home-map-open" small iconNode={<UiIcon name="Map" size={15} color={C.ink} />} title="Đổi Map" variant="paper" onPress={() => setMapOpen(true)} style={styles.quickBtn} />
-            <Button
+          <View style={styles.topPills}>
+            <Pressable
+              testID="leaderboard-open"
+              accessibilityLabel="Bảng vàng"
+              onPress={() => setBoard(true)}
+              style={styles.iconPill}
+            >
+              <EmojiIcon emoji="🏆" size={17} />
+            </Pressable>
+            <Pressable
+              testID="home-map-open"
+              accessibilityLabel="Đổi Map"
+              onPress={() => setMapOpen(true)}
+              style={styles.iconPill}
+            >
+              <EmojiIcon emoji="🗺️" size={17} />
+            </Pressable>
+            <Pressable
               testID="smooth-toggle"
-              small
-              iconNode={<UiIcon name="Gauge" size={15} color={smooth ? '#FFFFFF' : C.ink} />}
-              title={smooth ? 'Mượt: BẬT' : 'Siêu mượt'}
-              variant={smooth ? 'jade' : 'paper'}
+              accessibilityLabel="Chế độ siêu mượt"
               onPress={() => setSmooth(!smooth)}
-              style={styles.quickBtn}
-            />
+              style={[styles.iconPill, smooth && styles.iconPillActive]}
+            >
+              <UiIcon name="Gauge" size={16} color={smooth ? '#0F172A' : '#F8FAFC'} />
+            </Pressable>
           </View>
         </View>
 
@@ -201,143 +317,237 @@ export function HomeScreen({ game }: { game: Game }) {
           </View>
         )}
         {game.notice && <T style={styles.notice}>{game.notice}</T>}
-
-        {/* Hồ sơ / Tên người chơi + Nhập mã vào phòng */}
-        <View style={twoCols ? styles.identityGrid : styles.identityStack}>
-          <View style={twoCols ? { flex: 1.15 } : undefined}>
-            {user ? (
-              <ProfileCard user={user} onEdit={() => setProfile(true)} onWallet={() => setWalletOpen(true)} onAdmin={() => setAdminOpen(true)} onShop={() => setShopOpen(true)} />
-            ) : (
-              <Card style={{ gap: 10 }}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={[styles.badgeCircle, { backgroundColor: '#FCE7F3' }]}>
-                    <UiIcon name="User" size={16} color="#BE185D" />
-                  </View>
-                  <T style={styles.h2}>Bạn tên gì?</T>
-                </View>
-                <View style={styles.nameRow}>
-                  <GuestAvatarButton game={game} onPress={() => setProfile(true)} />
-                  <TextInput
-                    testID="name-input"
-                    style={[styles.input, { flex: 1, minWidth: 0 }]}
-                    value={name}
-                    onChangeText={(t) => {
-                      setName(t);
-                      setError(null);
-                      void storage.setName(t.trim());
-                    }}
-                    placeholder="Ví dụ: Phước"
-                    placeholderTextColor={C.muted}
-                    maxLength={24}
-                    autoCorrect={false}
-                  />
-                </View>
-                <T style={styles.authHint}>Chạm ảnh để chọn chân dung Studio. Đăng ký để lưu Ruby & VIP.</T>
-                <Button testID="wallet-open-guest" small variant="paper" icon="💎" title="Nạp Ruby (cần tài khoản)" disabled={!online} onPress={() => setAuth('register')} />
-              </Card>
-            )}
-          </View>
-          <View style={twoCols ? { flex: 0.85 } : undefined}>
-            {join}
-          </View>
-        </View>
-
         {error && (
           <T testID="home-error" style={styles.error}>
             {error}
           </T>
         )}
 
-        {/* Bộ lọc thể loại & Lưới 9 Trò Chơi */}
-        <View style={{ gap: 12 }}>
-          <View style={styles.sectionHeader}>
-            <UiIcon name="Sparkles" size={16} color={theme.accent} />
-            <T style={[styles.section, { color: theme.onBg }]}>Chọn trò chơi & Tạo phòng ngay</T>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.catRow}>
-            {CATS.map((c) => {
-              const on = cat === c.id;
-              return (
-                <Pressable
-                  key={c.id}
-                  testID={`cat-${c.id}`}
-                  accessibilityRole="button"
-                  onPress={() => setCat(c.id)}
-                  style={[
-                    styles.catPill,
-                    on && { backgroundColor: theme.accent, borderColor: 'rgba(15,23,42,0.35)' },
-                  ]}
-                >
-                  {c.icon && <UiIcon name={c.icon} size={14} color={on ? theme.accentText : C.ink} />}
-                  <T style={[styles.catTxt, on && { color: theme.accentText }]}>{c.label}</T>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        {/* ============================================================ */}
+        {/* FRAGMENT 1: CHƠI NGAY (14 TRÒ CHƠI PHÂN LOẠI GỌN ĐẸP)        */}
+        {/* ============================================================ */}
+        {fragment === 'games' && (
+          <View style={{ gap: 12 }} testID="fragment-games">
+            {user ? userMiniHud : guestNameBar}
 
-          <View style={twoCols ? styles.gameGridWide : styles.gameGridSingle}>
-            {visibleGames.map((g, idx) => {
-              const badge = BADGE_FOR[g];
-              const tileGrad = GAME_TILE_GRAD[g];
-              return (
-                <MotionSurface
-                  key={g}
-                  delay={Math.min(idx * 0.03, 0.25)}
-                  hoverLift
-                  style={twoCols ? styles.gameSlotWide : undefined}
-                >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.catRow}>
+              {CATS.map((c) => {
+                const on = cat === c.id;
+                return (
                   <Pressable
-                    testID={`create-${g}`}
+                    key={c.id}
+                    testID={`cat-${c.id}`}
                     accessibilityRole="button"
-                    disabled={!online || busy}
-                    onPress={() => run(() => game.createRoom(trimmed, g))}
-                    style={({ pressed }) => [
-                      styles.gameCard,
-                      sticker(pressed ? 1 : 3),
-                      pressed && { transform: [{ translateY: 2 }] },
-                      (!online || busy) && { opacity: 0.5 },
+                    onPress={() => setCat(c.id)}
+                    style={[
+                      styles.catPill,
+                      on && { backgroundColor: theme.accent, borderColor: '#0F172A' },
                     ]}
                   >
-                    <LinearGradient colors={[...tileGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gameMedallion}>
-                      <EmojiIcon emoji={GAME_META[g].emoji} size={32} />
-                    </LinearGradient>
-                    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                      <View style={styles.gameTitleRow}>
-                        <T style={styles.gameTitle}>{GAME_INFO[g].name}</T>
-                        {badge && (
-                          <LinearGradient colors={[...badge.grad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.newBadge}>
-                            <T style={styles.newBadgeTxt}>{badge.text}</T>
-                          </LinearGradient>
-                        )}
-                      </View>
-                      <T style={styles.gameTag}>{GAME_META[g].tagline}</T>
-                      <View style={styles.playerChip}>
-                        <UiIcon name="Users" size={12} color={C.jadeDeep} />
-                        <T style={styles.gamePlayers}>{GAME_META[g].players}</T>
-                      </View>
-                    </View>
-                    <View style={styles.goPill}>
-                      <UiIcon name="ChevronRight" size={18} color={C.son} strokeWidth={2.6} />
-                    </View>
+                    {c.icon && <UiIcon name={c.icon} size={14} color={on ? theme.accentText : C.ink} />}
+                    <T style={[styles.catTxt, on && { color: theme.accentText }]}>{c.label}</T>
                   </Pressable>
-                </MotionSurface>
-              );
-            })}
-          </View>
-        </View>
+                );
+              })}
+            </ScrollView>
 
-        <View style={styles.sectionHeader}>
-          <UiIcon name="Globe" size={16} color={theme.accent} />
-          <T style={[styles.section, { color: theme.onBg }]}>Phòng đang mở</T>
-        </View>
-        <OpenRooms game={game} disabled={!online || busy} onJoin={(c) => run(() => game.joinRoom(c, trimmed))} />
+            <View style={twoCols ? styles.gameGridWide : styles.gameGridSingle}>
+              {visibleGames.map((g, idx) => {
+                const badge = BADGE_FOR[g];
+                const tileGrad = GAME_TILE_GRAD[g];
+                return (
+                  <MotionSurface
+                    key={g}
+                    delay={Math.min(idx * 0.025, 0.22)}
+                    hoverLift
+                    style={twoCols ? styles.gameSlotWide : undefined}
+                  >
+                    <Pressable
+                      testID={`create-${g}`}
+                      accessibilityRole="button"
+                      disabled={!online || busy}
+                      onPress={() => void run(() => game.createRoom(trimmed, g))}
+                      style={({ pressed }) => [
+                        styles.gameCard,
+                        sticker(pressed ? 1 : 3),
+                        pressed && { transform: [{ translateY: 2 }] },
+                        (!online || busy) && { opacity: 0.5 },
+                      ]}
+                    >
+                      <LinearGradient colors={[...tileGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gameMedallion}>
+                        <EmojiIcon emoji={GAME_META[g].emoji} size={32} />
+                      </LinearGradient>
+                      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                        <View style={styles.gameTitleRow}>
+                          <T style={styles.gameTitle} numberOfLines={1}>{GAME_INFO[g].name}</T>
+                          {badge && (
+                            <LinearGradient colors={[...badge.grad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.newBadge}>
+                              <T style={styles.newBadgeTxt}>{badge.text}</T>
+                            </LinearGradient>
+                          )}
+                        </View>
+                        <T style={styles.gameTag} numberOfLines={2}>{GAME_META[g].tagline}</T>
+                        <View style={styles.playerChip}>
+                          <UiIcon name="Users" size={12} color={C.jadeDeep} />
+                          <T style={styles.gamePlayers}>{GAME_META[g].players}</T>
+                        </View>
+                      </View>
+                      <View style={styles.goPill}>
+                        <UiIcon name="ChevronRight" size={18} color={C.son} strokeWidth={2.6} />
+                      </View>
+                    </Pressable>
+                  </MotionSurface>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* FRAGMENT 2: PHÒNG MỞ & VÀO BẰNG MÃ 6 KÝ TỰ                   */}
+        {/* ============================================================ */}
+        {fragment === 'rooms' && (
+          <View style={{ gap: 12 }} testID="fragment-rooms">
+            {!user && guestNameBar}
+            <Card style={styles.joinCard}>
+              <View style={styles.cardHeaderRow}>
+                <View style={[styles.badgeCircle, { backgroundColor: '#FEF3C7' }]}>
+                  <UiIcon name="KeyRound" size={16} color="#B45309" />
+                </View>
+                <T testID={invite ? 'invite-hint' : undefined} style={styles.h2}>
+                  {invite ? `Lời mời vào phòng ${invite}` : 'Nhập mã 6 ký tự vào phòng'}
+                </T>
+              </View>
+              <View style={styles.joinRow}>
+                <TextInput
+                  testID="code-input"
+                  style={[styles.input, styles.codeInput]}
+                  value={code}
+                  onChangeText={(t) => setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  placeholder="MÃ PHÒNG"
+                  placeholderTextColor={C.muted}
+                  maxLength={6}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <Button
+                  testID="join-btn"
+                  title="Vào ngay"
+                  iconNode={<UiIcon name="LogIn" size={16} color={invite ? '#271400' : C.gold} />}
+                  variant={invite ? 'gold' : 'ink'}
+                  disabled={!online || busy || code.length !== 6}
+                  style={{ minWidth: 108 }}
+                  onPress={() => void run(() => game.joinRoom(code, trimmed))}
+                />
+              </View>
+            </Card>
+
+            <View style={styles.sectionHeader}>
+              <UiIcon name="Globe" size={16} color={theme.accent} />
+              <T style={[styles.section, { color: theme.onBg }]}>Sảnh phòng công khai đang mở</T>
+            </View>
+            <OpenRooms game={game} disabled={!online || busy} onJoin={(c) => void run(() => game.joinRoom(c, trimmed))} />
+          </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* FRAGMENT 3: CỬA HÀNG PHÚ HÀO & SÂN KHẤU HÓA TRANG ĐẠI GIA    */}
+        {/* ============================================================ */}
+        {fragment === 'shop' && (
+          <View style={{ gap: 12 }} testID="fragment-shop">
+            <Card style={{ gap: 10 }}>
+              <ShopBody
+                game={game}
+                initialTab="deco"
+                onRequestAuth={() => setAuth('register')}
+                onOpenWallet={() => setWalletOpen(true)}
+              />
+            </Card>
+          </View>
+        )}
+
+        {/* ============================================================ */}
+        {/* FRAGMENT 4: HỒ SƠ CÁ NHÂN, THÀNH TÍCH 14 GAME & KHO MAP      */}
+        {/* ============================================================ */}
+        {fragment === 'profile' && (
+          <View style={{ gap: 12 }} testID="fragment-profile">
+            {user ? (
+              <ProfileCard
+                user={user}
+                onEdit={() => setProfile(true)}
+                onWallet={() => setWalletOpen(true)}
+                onAdmin={() => setAdminOpen(true)}
+                onShop={() => setFragment('shop')}
+              />
+            ) : (
+              <>
+                {guestNameBar}
+                <Card style={{ gap: 8 }}>
+                  <T style={styles.h2}>🌟 Tạo tài khoản Phú Hào Xóm Lầy</T>
+                  <T style={{ color: C.muted, fontSize: 13, lineHeight: 19 }}>
+                    Lưu thành tích 14 trò chơi, điểm danh nhận Ruby miễn phí mỗi ngày, mở khóa 146 vật phẩm Hóa Trang Lố Lăng & danh hiệu Thiên Đế Chí Tôn!
+                  </T>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Button style={{ flex: 1 }} variant="gold" title="Đăng ký miễn phí" onPress={() => setAuth('register')} />
+                    <Button style={{ flex: 1 }} variant="paper" title="Đăng nhập" onPress={() => setAuth('login')} />
+                  </View>
+                </Card>
+              </>
+            )}
+
+            <Card style={{ gap: 8 }}>
+              <T style={styles.h2}>⚙️ Tiện Ích & Kho Map Nền ({ROOM_THEMES.length} Map)</T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Button small variant="gold" icon="🏆" title="Bảng Vàng Cao Thủ" onPress={() => setBoard(true)} />
+                <Button small variant="paper" icon="🗺️" title="Đổi Map & Bảng Màu" onPress={() => setMapOpen(true)} />
+                <Button
+                  small
+                  variant={smooth ? 'jade' : 'paper'}
+                  title={smooth ? '⚡ Siêu mượt: ĐANG BẬT' : '⚡ Bật chế độ Siêu mượt'}
+                  onPress={() => setSmooth(!smooth)}
+                />
+              </View>
+            </Card>
+          </View>
+        )}
       </ScrollView>
+
+      {/* Thanh Điều Hướng 4 Mảnh (Bottom Navigation Bar) Chuẩn Điện Thoại */}
+      <View
+        testID="home-bottom-nav"
+        style={[
+          styles.bottomNavWrap,
+          Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)' } as object) : null,
+        ]}
+      >
+        <View style={styles.bottomNavInner}>
+          {FRAGMENTS.map((f) => {
+            const active = fragment === f.id;
+            return (
+              <Pressable
+                key={f.id}
+                testID={`home-tab-${f.id}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => setFragment(f.id)}
+                style={[styles.navItem, active && styles.navItemActive]}
+              >
+                <EmojiIcon emoji={f.emoji} size={active ? 22 : 19} glow={active} />
+                <T style={[styles.navLabel, active && styles.navLabelActive]} numberOfLines={1}>
+                  {f.label}
+                </T>
+                {f.id === 'profile' && canCheckin && <View style={styles.navDot} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       {/* Hộp thoại Chọn Map Nhanh Trang Chủ */}
       {mapOpen && (
-        <Sheet title="🎨 Chọn Map & Bảng Màu" onClose={() => setMapOpen(false)}>
+        <Sheet title="🎨 Chọn Map & Bảng Màu (15 Map)" onClose={() => setMapOpen(false)}>
           <T style={styles.mapNote}>
-            5 Map miễn phí ai cũng dùng được ngay. Map Ruby tạo hiệu ứng hạt bay riêng & tăng điểm VIP!
+            5 Map miễn phí ai cũng dùng được ngay. 10 Map Đại Gia Ruby tạo bầu trời hiệu ứng riêng cực cháy!
           </T>
           <View style={{ gap: 8 }}>
             {ROOM_THEMES.map((t) => {
@@ -422,91 +632,221 @@ export function HomeScreen({ game }: { game: Game }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flexGrow: 1, padding: 16, gap: 14, width: '100%', maxWidth: 840, alignSelf: 'center' },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 4 },
-  brandGroup: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 220 },
+  screen: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 98,
+    gap: 12,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  brandGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
   brandEmblem: {
-    width: 52, height: 52, borderRadius: 16, backgroundColor: 'rgba(15,23,42,0.34)', borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#FEF08A',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  logo: { fontSize: 34, fontWeight: '900', color: C.gold, letterSpacing: -1, lineHeight: 38 },
-  tagline: { fontSize: 12.5, color: C.onSon, lineHeight: 17, fontWeight: '600', opacity: 0.92 },
-  quickBarWrap: {
-    backgroundColor: 'rgba(15, 23, 42, 0.28)',
-    borderRadius: 18,
-    padding: 8,
+  logo: { fontSize: 25, fontWeight: '900', letterSpacing: -0.6, lineHeight: 30, fontFamily: FONT },
+  tagline: { fontSize: 12, fontWeight: '800', opacity: 0.92 },
+
+  topPills: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconPill: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: 'rgba(15, 23, 42, 0.52)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPillActive: { backgroundColor: '#4ADE80', borderColor: '#FEF08A' },
+
+  compactIdentity: { padding: 11, gap: 8 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  guestAuthRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  miniAuthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: C.mist,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.14)',
+  },
+  miniRegisterPill: { backgroundColor: '#FACC15', borderColor: '#CA8A04' },
+  miniAuthTxt: { fontSize: 11.5, fontWeight: '900', color: C.ink },
+
+  userMiniRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  userMiniName: { fontSize: 16, fontWeight: '900', color: C.ink },
+  rubyInlinePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFF1F2',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: '#FECDD3',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 999,
   },
-  quickBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  quickBtn: { flexGrow: 1, minWidth: 94 },
-  status: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: 'rgba(15,23,42,0.65)', padding: 12, borderRadius: 14 },
-  statusText: { color: C.onSon, flex: 1, fontSize: 14 },
-  notice: { color: C.ink, backgroundColor: C.gold, padding: 10, borderRadius: 12, fontWeight: '700' },
-  identityGrid: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
-  identityStack: { gap: 12 },
+  rubyInlineTxt: { fontSize: 12, fontWeight: '900', color: C.son },
+  userMiniActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  dot: { position: 'absolute', top: -3, right: -3, width: 11, height: 11, borderRadius: 6, backgroundColor: C.danger, borderWidth: 2, borderColor: '#FFFFFF' },
+
+  status: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: 'rgba(15,23,42,0.72)', padding: 12, borderRadius: 14 },
+  statusText: { color: '#FFFFFF', flex: 1, fontSize: 13, fontWeight: '700' },
+  notice: { backgroundColor: C.gold, color: C.ink, padding: 12, borderRadius: 14, fontWeight: '800' },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 10, borderRadius: 12, fontWeight: '800', textAlign: 'center' },
+
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badgeCircle: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  h2: { fontSize: 17, fontWeight: '800', flex: 1 },
+  h2: { fontSize: 16, fontWeight: '900', color: C.ink, flex: 1 },
   input: {
     fontFamily: FONT,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 48,
-    fontSize: 16,
-    color: C.ink,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(28,32,36,0.18)',
-    fontWeight: '600',
+    borderColor: 'rgba(15, 23, 42, 0.2)',
+    paddingHorizontal: 12,
+    height: 44,
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.ink,
   },
-  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 11, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  section: { color: C.onSon, fontWeight: '900', fontSize: 15 },
-  catRow: { gap: 8, paddingBottom: 2 },
+  joinCard: { gap: 10 },
+  joinRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  codeInput: { flex: 1, minWidth: 0, letterSpacing: 4, fontWeight: '900', textAlign: 'center', height: 48, fontSize: 17 },
+
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  section: { fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
+  catRow: { gap: 7, paddingVertical: 2 },
   catPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.16)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.16)',
   },
-  catTxt: { fontSize: 13, fontWeight: '800', color: C.ink },
-  gameGridWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
+  catTxt: { fontSize: 12.5, fontWeight: '900', color: C.ink },
+
   gameGridSingle: { gap: 10 },
-  gameSlotWide: { width: '48.8%' },
+  gameGridWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
+  gameSlotWide: { flexBasis: '48.8%', flexGrow: 0 },
   gameCard: {
-    backgroundColor: C.paper,
-    borderRadius: 20,
-    padding: 13,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 13,
   },
   gameMedallion: {
-    width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(15,23,42,0.08)',
+    width: 58,
+    height: 58,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gameTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  gameTitle: { fontSize: 17, fontWeight: '900', color: C.ink },
-  newBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99 },
-  newBadgeTxt: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
-  gameTag: { fontSize: 12, color: C.muted, lineHeight: 16.5 },
-  playerChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  gamePlayers: { fontSize: 11.5, fontWeight: '800', color: C.jadeDeep },
-  goPill: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#F4F4F6', alignItems: 'center', justifyContent: 'center',
+  gameTitle: { fontSize: 16.5, fontWeight: '900', color: C.ink, fontFamily: FONT },
+  newBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  newBadgeTxt: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '900', letterSpacing: 0.4 },
+  gameTag: { color: C.muted, fontSize: 12.5, lineHeight: 17, fontWeight: '600' },
+  playerChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 1,
   },
-  joinCard: { gap: 10, justifyContent: 'center', height: '100%' },
-  dot: { position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: 7, backgroundColor: '#EF4444', borderWidth: 2, borderColor: '#FFFFFF' },
-  authTop: { flexDirection: 'row', gap: 8 },
-  authBtn: { minWidth: 96 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  authHint: { fontSize: 12, color: C.muted },
-  joinRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  codeInput: { flex: 1, minWidth: 0, letterSpacing: 3, textAlign: 'center', fontWeight: '900', textTransform: 'uppercase' },
-  mapNote: { fontSize: 13, color: C.muted, lineHeight: 18 },
-  mapRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 16, backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.08)' },
+  gamePlayers: { color: C.jadeDeep, fontSize: 11, fontWeight: '800' },
+  goPill: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#FFF1F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  bottomNavWrap: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 8,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(250, 204, 21, 0.45)',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  bottomNavInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+    gap: 6,
+  },
+  navItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    borderRadius: 15,
+    gap: 2,
+    position: 'relative',
+  },
+  navItemActive: {
+    backgroundColor: 'rgba(250, 204, 21, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FACC15',
+  },
+  navLabel: { fontSize: 11, fontWeight: '800', color: '#CBD5E1' },
+  navLabelActive: { color: '#FEF08A', fontWeight: '900' },
+  navDot: { position: 'absolute', top: 4, right: '26%', width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444' },
+
+  mapNote: { fontSize: 12.5, color: C.muted, lineHeight: 18, marginBottom: 4 },
+  mapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: C.mist,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
   mapRowOn: { borderColor: C.jade, backgroundColor: '#ECFDF5' },
-  mapSwatch: { width: 46, height: 46, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  mapSwatch: { width: 44, height: 44, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   mapName: { fontSize: 14, fontWeight: '900', color: C.ink },
   mapDesc: { fontSize: 12, color: C.muted },
   mapActionWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },

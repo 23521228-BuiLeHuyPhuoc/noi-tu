@@ -17,6 +17,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Copy,
@@ -43,8 +44,10 @@ import {
   LogIn,
   LogOut,
   Map,
+  Maximize2,
   Megaphone,
   MessageCircle,
+  Minimize2,
   Moon,
   Palette,
   PartyPopper,
@@ -97,6 +100,7 @@ const LUCIDE_MAP = {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Copy,
@@ -124,8 +128,10 @@ const LUCIDE_MAP = {
   LogIn,
   LogOut,
   Map,
+  Maximize2,
   Megaphone,
   MessageCircle,
+  Minimize2,
   Moon,
   Palette,
   PartyPopper,
@@ -181,20 +187,51 @@ export const UiIcon = memo(function UiIcon({
   return <Comp size={size} color={color} strokeWidth={strokeWidth} />;
 });
 
-/** Render một định nghĩa SVG từ iconPack trên cả Web (DOM <svg> nhẹ 0ms) & Native (SvgXml) */
+const SVG_URI_CACHE = new globalThis.Map<VectorDef, string>();
+function svgDataUriOf(def: VectorDef): string {
+  let u = SVG_URI_CACHE.get(def);
+  if (!u) {
+    const raw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${def.v}">${def.b}</svg>`;
+    u = `data:image/svg+xml;utf8,${encodeURIComponent(raw)}`;
+    SVG_URI_CACHE.set(def, u);
+  }
+  return u;
+}
+
+/** Render một định nghĩa SVG 3D-shaded từ iconPack: trên Web dùng <img> data-URI cô lập hoàn toàn gradient ID & nhẹ DOM gấp 10 lần; có màu động thì dùng <svg> */
 export const PackSvg = memo(function PackSvg({
   def,
   size = 20,
   color,
+  glow,
   style,
 }: {
   def: VectorDef;
   size?: number;
   color?: string;
+  glow?: string | boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const body = color ? def.b.replace(/currentColor/gi, color) : def.b;
+  const glowColor = typeof glow === 'string' ? glow : glow ? 'rgba(250,204,21,0.85)' : undefined;
   if (Platform.OS === 'web') {
+    const filter = glowColor ? `drop-shadow(0 0 ${Math.max(4, Math.round(size * 0.28))}px ${glowColor})` : 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.22))';
+    if (!color) {
+      return (
+        <View pointerEvents="none" style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, style]}>
+          {createElement('img', {
+            src: svgDataUriOf(def),
+            alt: '',
+            draggable: false,
+            decoding: 'async',
+            width: size,
+            height: size,
+            'aria-hidden': true,
+            style: { display: 'block', width: size, height: size, objectFit: 'contain', filter, userSelect: 'none' },
+          })}
+        </View>
+      );
+    }
+    const body = def.b.replace(/currentColor/gi, color);
     return (
       <View pointerEvents="none" style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, style]}>
         {createElement('svg', {
@@ -202,12 +239,13 @@ export const PackSvg = memo(function PackSvg({
           width: size,
           height: size,
           'aria-hidden': true,
-          style: { display: 'block', width: size, height: size, overflow: 'visible' },
+          style: { display: 'block', width: size, height: size, overflow: 'visible', filter },
           dangerouslySetInnerHTML: { __html: body },
         })}
       </View>
     );
   }
+  const body = color ? def.b.replace(/currentColor/gi, color) : def.b;
   const xml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${def.v}">${body}</svg>`;
   return (
     <View pointerEvents="none" style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, style]}>
@@ -225,46 +263,52 @@ export function fluentKeyOf(emoji: string): string | undefined {
 export const FluentIcon = memo(function FluentIcon({
   name,
   size = 20,
+  glow,
   style,
 }: {
   name: string;
   size?: number;
+  glow?: string | boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const def = FLUENT_ICONS[name] ?? FLUENT_ICONS.sparkles;
-  return <PackSvg def={def} size={size} style={style} />;
+  return <PackSvg def={def} size={size} glow={glow} style={style} />;
 });
 
 export const GameIcon = memo(function GameIcon({
   name,
   size = 22,
   color = '#F8FAFC',
+  glow,
   style,
 }: {
   name: string;
   size?: number;
   color?: string;
+  glow?: string | boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const def = GAME_ICONS[name];
   if (!def) return <UiIcon name="Sparkles" size={size} color={color} />;
-  return <PackSvg def={def} size={size} color={color} style={style} />;
+  return <PackSvg def={def} size={size} color={color} glow={glow} style={style} />;
 });
 
 export const EmojiIcon = memo(function EmojiIcon({
   emoji,
   size = 20,
   color,
+  glow,
   style,
 }: {
   emoji: string;
   size?: number;
   color?: string;
+  glow?: string | boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const key = fluentKeyOf(emoji);
   if (key && FLUENT_ICONS[key]) {
-    return <PackSvg def={FLUENT_ICONS[key]} size={size} color={color} style={style} />;
+    return <PackSvg def={FLUENT_ICONS[key]} size={size} color={color} glow={glow} style={style} />;
   }
   return <UiIcon name="Sparkles" size={Math.round(size * 0.85)} color={color ?? '#F59E0B'} />;
 });

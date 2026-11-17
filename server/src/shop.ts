@@ -74,7 +74,7 @@ export function cosmeticsOf(eq: Equipped | undefined): PlayerCosmetics | undefin
 /** Gắn lệnh cửa hàng + điểm danh cho một socket. `onEquipped`: báo để cập nhật hồ sơ trong phòng. */
 export function attachShopHandlers(socket: Sock, ctx: ShopContext, getUser: () => UserRecord | null, onEquipped: (u: UserRecord) => void): void {
   const { wallet, store, events } = ctx;
-  const limiter = new RateLimiter(24, 300);
+  const limiter = new RateLimiter(40, 200);
   type Fail = { ok: false; error: 'need_account' | 'bad_request' | 'not_found' | 'insufficient' | 'already_owned' | 'not_owned' | 'already_claimed' | 'rate_limited' };
   type Reply = (r: Fail | ({ ok: true } & Record<string, unknown>)) => void;
 

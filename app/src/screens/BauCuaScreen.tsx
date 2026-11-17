@@ -373,9 +373,10 @@ function Reveal({ dice, myBets, delta, onDone }: {
 
 // ---------------- Ô con vật ----------------
 
-function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disabled, onPress }: {
+function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disabled, luckyMult, freq, onPress }: {
   s: BauCuaSymbol; chip: number; step: BauCuaView['step']; hits: number; mine: number;
-  stakes: Stake[]; total: number; glow: boolean; compact: boolean; disabled?: boolean; onPress: () => void;
+  stakes: Stake[]; total: number; glow: boolean; compact: boolean; disabled?: boolean;
+  luckyMult?: 2 | 3 | null; freq?: number; onPress: () => void;
 }) {
   const pulse = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -410,15 +411,26 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disable
         pressed && { transform: [{ translateY: 3 }] },
         result && hits === 0 && { opacity: 0.4 },
         result && hits > 0 && !glow && { borderColor: C.jade, borderWidth: 4 },
+        !!luckyMult && { borderColor: '#FACC15', borderWidth: 3.5, backgroundColor: '#FEF9C3' },
       ]}
     >
       {glow && <Animated.View pointerEvents="none" style={[styles.tileGlow, { opacity: pulse }]} />}
       <View style={styles.tileInner}>
         <Image source={{ uri: ART[s] }} style={[styles.tileArt, compact && { width: '62%' }]} resizeMode="contain" />
-        <View style={styles.banner}>
+        <View style={[styles.banner, !!luckyMult && { backgroundColor: '#B45309' }]}>
           <T style={styles.bannerText}>{SYMBOL[s].name}</T>
         </View>
       </View>
+      {!!luckyMult && (
+        <View testID={`bc-lucky-${s}`} style={styles.luckyTag}>
+          <T style={styles.luckyTagTxt}>LỘC ×{luckyMult}</T>
+        </View>
+      )}
+      {freq !== undefined && freq > 0 && !mine && step === 'betting' && (
+        <View style={styles.freqTag}>
+          <T style={styles.freqTagTxt}>{freq} lần</T>
+        </View>
+      )}
       {stakes.length > 0 && (
         <View testID={`pile-${s}`} pointerEvents="none" style={styles.pileAnchor}>
           <CoinPile stakes={stakes} total={total} small={compact} />
@@ -557,6 +569,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const myDelta = g.lastDeltas?.[me];
   const roundBets = resultBets.round === g.round ? resultBets.bets : {};
   const wonOn = (s: BauCuaSymbol) => g.step === 'result' && hits(s) > 0 && (roundBets[s] ?? 0) > 0;
+  const freqMap: Record<BauCuaSymbol, number> = { nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 };
+  for (const row of g.recent) for (const sym of row) freqMap[sym] = (freqMap[sym] ?? 0) + 1;
+  const favSymbol: BauCuaSymbol = g.luckySymbol
+    ?? (BAUCUA_SYMBOLS.find((sym) => (myBets[sym] ?? 0) > 0) ?? 'bau');
 
   const stepText =
     g.step === 'betting' ? `Đặt cược đi! Máy lắc sau ${left}s` : g.step === 'rolling' ? 'Máy đang lắc bát…' : 'Mở bát!';
@@ -605,15 +621,50 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
               {available < 10 && staked === 0 ? (
                 <Button testID="loan-btn" small icon="💸" title="Vay nóng 500 xu" variant="ink" style={{ flex: 1 }} onPress={() => act({ type: 'loan' })} />
               ) : (
-                <Button
-                  testID="clear-bets"
-                  small
-                  title={staked > 0 ? `Rút cược (${fmt(staked)})` : 'Chưa cược'}
-                  variant="paper"
-                  disabled={staked === 0 || g.step !== 'betting'}
-                  style={{ flex: 1 }}
-                  onPress={() => act({ type: 'clearBets' })}
-                />
+                <>
+                  <Button
+                    testID="clear-bets"
+                    small
+                    title={staked > 0 ? `Rút (${shortFmt(staked)})` : 'Chưa cược'}
+                    variant="paper"
+                    disabled={staked === 0 || g.step !== 'betting'}
+                    style={{ flex: 1 }}
+                    onPress={() => act({ type: 'clearBets' })}
+                  />
+                  {staked === 0 ? (
+                    <Button
+                      testID="bc-rebet"
+                      small
+                      icon="🔁"
+                      title="Đặt lại"
+                      variant="ghost"
+                      disabled={g.step !== 'betting'}
+                      style={{ flex: 1 }}
+                      onPress={() => act({ type: 'bc_rebet' })}
+                    />
+                  ) : (
+                    <Button
+                      testID="bc-double"
+                      small
+                      icon="⚡"
+                      title="Gấp x2"
+                      variant="ghost"
+                      disabled={g.step !== 'betting' || available < staked}
+                      style={{ flex: 1 }}
+                      onPress={() => act({ type: 'bc_double' })}
+                    />
+                  )}
+                  <Button
+                    testID="bc-allin"
+                    small
+                    icon="🔥"
+                    title="Tất tay"
+                    variant="ink"
+                    disabled={g.step !== 'betting' || available <= 0}
+                    style={{ flex: 1 }}
+                    onPress={() => act({ type: 'bc_allin', symbol: favSymbol })}
+                  />
+                </>
               )}
             </View>
             {error && <T style={styles.error}>{error}</T>}
@@ -631,6 +682,18 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
             </Pressable>
           )}
         </View>
+        {g.mode === 'jackpot' && (
+          <View style={styles.jackpotBanner} testID="bc-jackpot-banner">
+            <EmojiIcon emoji="🎰" size={16} />
+            <T style={styles.jackpotTxt}>
+              {g.tripleStorm
+                ? `🌪️ BÃO TAM HOA NỔ HŨ (+1x THƯỞNG)!`
+                : g.luckySymbol
+                  ? `Ô Lộc Trời ván này: ${SYMBOL[g.luckySymbol].name.toUpperCase()} nhân ×${g.luckyMult}!`
+                  : 'Chế độ Lộc Trời Nổ Hũ ×2/×3'}
+            </T>
+          </View>
+        )}
         {g.step === 'betting' && (
           <View style={styles.timeTrack}>
             <View style={[styles.timeFill, { width: `${Math.min(100, (left / 20) * 100)}%` }, left <= 5 && { backgroundColor: C.danger }]} />
@@ -689,6 +752,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
               glow={wonOn(s)}
               compact={compact}
               disabled={isSpectator}
+              luckyMult={g.mode === 'jackpot' && g.luckySymbol === s ? (g.luckyMult ?? 2) : null}
+              freq={freqMap[s]}
               onPress={() => bet(s)}
             />
           );
@@ -867,4 +932,18 @@ const styles = StyleSheet.create({
   winText: { fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center' },
   sadText: { fontSize: 22, fontWeight: '900', color: '#C9D1E0', textAlign: 'center' },
   meh: { fontSize: 20, fontWeight: '800', color: C.onSon, textAlign: 'center' },
+  jackpotBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'stretch',
+    backgroundColor: '#FEF08A', borderWidth: 2, borderColor: '#CA8A04', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 8,
+  },
+  jackpotTxt: { fontSize: 12.5, fontWeight: '900', color: '#78350F' },
+  luckyTag: {
+    position: 'absolute', top: -10, left: 4, backgroundColor: '#DC2626', borderWidth: 1.5, borderColor: '#FEF08A',
+    borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1,
+  },
+  luckyTagTxt: { fontSize: 10, fontWeight: '900', color: '#FEF08A' },
+  freqTag: {
+    position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(15,23,42,0.68)', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1,
+  },
+  freqTagTxt: { fontSize: 9.5, fontWeight: '800', color: '#F8FAFC' },
 });
