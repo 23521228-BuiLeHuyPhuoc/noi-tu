@@ -7,6 +7,18 @@
 /** mẫu hiệu ứng */
 export const POKE_TEMPLATES = ['throw', 'volley', 'rain', 'stick', 'orbit', 'explode', 'giant', 'swarm', 'stamp', 'beam'] as const;
 export type PokeTemplate = (typeof POKE_TEMPLATES)[number];
+/**
+ * Hiệu ứng phụ server bốc ngẫu nhiên kèm mỗi món chọc (trừ món dễ thương).
+ * Màn hình: chỉ người bị chọc thấy. Avatar: cả phòng thấy trên avatar người bị chọc.
+ */
+export const SCREEN_SIDES = ['drunk', 'crack', 'fog', 'flicker', 'gray', 'dodge', 'freeze', 'ring'] as const;
+export const AVATAR_SIDES = ['pig', 'stone', 'baby', 'cage', 'bomb', 'flipname'] as const;
+export const POKE_SIDES = [...SCREEN_SIDES, ...AVATAR_SIDES] as const;
+export type ScreenSide = (typeof SCREEN_SIDES)[number];
+export type AvatarSide = (typeof AVATAR_SIDES)[number];
+export type PokeSide = ScreenSide | AvatarSide;
+export const isAvatarSide = (s: PokeSide): s is AvatarSide => (AVATAR_SIDES as readonly string[]).includes(s);
+
 /** mẫu phủ lên cả màn hình người bị chọc (chặn cứng khi quá giới hạn 3 lần / 15 giây) */
 export const HARD_POKE_TEMPLATES: readonly PokeTemplate[] = ['rain', 'stick', 'giant', 'swarm'];
 

@@ -526,6 +526,8 @@ export type FunEvent = FunSend & {
   pausedMs?: number;
   /** món này thuộc một lần admin "chọc loạn xạ" cả phòng */
   chaos?: true;
+  /** hiệu ứng phụ ngẫu nhiên kèm món chọc (say xỉn, kính nứt, hóa heo...) */
+  side?: import('./pokes').PokeSide;
 };
 
 /** Các chiêu làm rung/lắc/xoay/che màn hình người bị chọc: mỗi người chỉ nhận tối đa DISRUPT_LIMIT lần mỗi DISRUPT_WINDOW_MS */

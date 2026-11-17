@@ -3,10 +3,10 @@ import type { AddressInfo } from 'node:net';
 import { io as connect, type Socket } from 'socket.io-client';
 import { createGameServer, type GameServer } from '../src/app';
 import { MemoryStore } from '../src/store';
-import { cleanFun, isDisruptive, isHardFx, pauseMsOf, pickChaosPoke } from '../src/fun';
+import { cleanFun, isDisruptive, isHardFx, pauseMsOf, pickChaosPoke, pickPokeSide } from '../src/fun';
 import { smallDict } from './helpers';
 import {
-  HARD_POKE_TEMPLATES, POKES, POKE_CATEGORIES, POKE_TEMPLATES, isHardPoke, pokeImageUrl, pokeItem,
+  AVATAR_SIDES, HARD_POKE_TEMPLATES, POKES, POKE_CATEGORIES, POKE_SIDES, POKE_TEMPLATES, isHardPoke, pokeImageUrl, pokeItem,
 } from '../../shared/src/pokes';
 import type { ChatMsg, ClientToServerEvents, FunEvent, ServerToClientEvents } from '../../shared/src/types';
 
@@ -236,5 +236,35 @@ describe('pickChaosPoke (chọc loạn xạ)', () => {
 
   it('đã chạm giới hạn: không bao giờ ra món phủ màn hình', () => {
     for (let i = 0; i < 200; i++) expect(isHardPoke(pickChaosPoke(true, () => i / 200))).toBe(false);
+  });
+});
+
+describe('hiệu ứng phụ ngẫu nhiên khi chọc', () => {
+  it('bốc đều trên mọi hiệu ứng phụ (rng 0 → đầu, gần 1 → cuối)', () => {
+    expect(pickPokeSide(FREE, false, () => 0)).toBe(POKE_SIDES[0]);
+    expect(pickPokeSide(FREE, false, () => 0.999999)).toBe(POKE_SIDES[POKE_SIDES.length - 1]);
+  });
+
+  it('món dễ thương không kèm hiệu ứng phụ', () => {
+    expect(pickPokeSide(NICE, false, () => 0.5)).toBeUndefined();
+  });
+
+  it('người đã bị chọc đủ giới hạn chỉ dính hiệu ứng trên avatar, không đụng màn hình', () => {
+    for (let i = 0; i < 100; i++) expect(AVATAR_SIDES).toContain(pickPokeSide(FREE, true, () => i / 100));
+  });
+
+  it('món trong kho gửi qua mạng mang theo một hiệu ứng phụ, cả phòng thấy giống nhau', async () => {
+    const an = await account('anvui');
+    const bi = await account('binh');
+    await pair(an, bi);
+    const got = new Promise<FunEvent>((resolve) => bi.once('fun:event', resolve));
+    expect(await an.emitWithAck('fun:send', { kind: 'poke', to: bi.pid, poke: FREE.id } as never)).toEqual({ ok: true });
+    const e = await got;
+    expect(POKE_SIDES).toContain(e.side);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(an.funs[0].side).toBe(e.side);
+    const nice = new Promise<FunEvent>((resolve) => bi.once('fun:event', resolve));
+    expect(await an.emitWithAck('fun:send', { kind: 'poke', to: bi.pid, poke: NICE.id } as never)).toEqual({ ok: true });
+    expect((await nice).side).toBeUndefined();
   });
 });

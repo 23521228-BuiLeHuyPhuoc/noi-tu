@@ -32,7 +32,7 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 // ---------- Lắc & Xoay màn hình ----------
 
-export type ShakeMode = 'normal' | 'quake' | 'spin' | 'mirror';
+export type ShakeMode = 'normal' | 'quake' | 'spin' | 'mirror' | 'drunk' | 'dodge';
 const ShakeCtx = createContext<(mode?: ShakeMode) => void>(() => {});
 export const useShake = () => useContext(ShakeCtx);
 
@@ -56,6 +56,32 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
     x.stopAnimation();
     y.stopAnimation();
     rot.stopAnimation();
+    if (mode === 'drunk') {
+      // say xỉn: cả màn hình chao qua chao lại chậm rãi khoảng 4 giây
+      const steps: [number, number][] = [[-22, -6], [26, 7], [-28, -7.5], [24, 6.5], [-20, -5.5], [18, 4.5], [-10, -2.5], [0, 0]];
+      Animated.sequence(steps.map(([dx, dr]) => Animated.parallel([
+        Animated.timing(x, { toValue: dx, duration: 500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(rot, { toValue: dr, duration: 500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      ]))).start();
+      return;
+    }
+    if (mode === 'dodge') {
+      // né tay: màn hình nhảy vụt sang một chỗ ngẫu nhiên rồi trôi về
+      const dx = (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 60);
+      const dy = (Math.random() < 0.5 ? -1 : 1) * (30 + Math.random() * 50);
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(x, { toValue: dx, duration: 90, useNativeDriver: false }),
+          Animated.timing(y, { toValue: dy, duration: 90, useNativeDriver: false }),
+        ]),
+        Animated.delay(260),
+        Animated.parallel([
+          Animated.timing(x, { toValue: 0, duration: 320, easing: Easing.out(Easing.back(2)), useNativeDriver: false }),
+          Animated.timing(y, { toValue: 0, duration: 320, easing: Easing.out(Easing.back(2)), useNativeDriver: false }),
+        ]),
+      ]).start();
+      return;
+    }
     if (mode === 'spin') {
       // Xoay qua xoay lại lắc lư rồi lộn vòng 180° -> 360° cực ức chế
       Animated.sequence([

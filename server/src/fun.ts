@@ -1,4 +1,4 @@
-import { POKES, isHardPoke, pokeItem, type PokeItem } from '../../shared/src/pokes';
+import { AVATAR_SIDES, POKES, POKE_SIDES, isHardPoke, pokeItem, type PokeItem, type PokeSide } from '../../shared/src/pokes';
 import { GIFT_IDS, SKILL_IDS, type GiftId, type SkillId } from '../../shared/src/shop';
 import {
   DISRUPT_LIMIT, DISRUPT_PAUSE_MS, DISRUPT_WINDOW_MS, DOODLES, EMOJIS, HARD_DISRUPT_KINDS, MAX_HP, NICKNAMES,
@@ -83,6 +83,13 @@ const SOFT_POKES = POKES.filter((p) => !isHardPoke(p));
 /** món ngẫu nhiên cho một người khi admin "chọc loạn xạ"; người đã bị chọc đủ giới hạn chỉ nhận món không phủ màn hình */
 export function pickChaosPoke(limited: boolean, rng: () => number = Math.random): PokeItem {
   const pool = limited ? SOFT_POKES : POKES;
+  return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+}
+
+/** hiệu ứng phụ kèm một món chọc; món dễ thương thì không có; người đã bị chọc đủ giới hạn (soft) chỉ dính hiệu ứng trên avatar */
+export function pickPokeSide(item: PokeItem, soft: boolean, rng: () => number = Math.random): PokeSide | undefined {
+  if (item.nice) return undefined;
+  const pool: readonly PokeSide[] = soft ? AVATAR_SIDES : POKE_SIDES;
   return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
 }
 

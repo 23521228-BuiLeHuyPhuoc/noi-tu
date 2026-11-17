@@ -16,6 +16,29 @@ const TINTS = {
   blush: { bg: 'rgba(255,70,110,0.38)', emoji: '😘' },
 } as const;
 
+/** biến hình do hiệu ứng phụ của món chọc: nền phủ + emoji to giữa mặt */
+const MORPHS = {
+  pig: { bg: 'rgba(255,170,200,0.86)', emoji: '🐷' },
+  baby: { bg: 'rgba(255,236,200,0.86)', emoji: '👶' },
+  stone: { bg: 'rgba(110,110,116,0.88)', emoji: '🗿' },
+} as const;
+
+/** bom trên đầu đếm ngược 5 → 1 (tự đếm theo thời gian thật) */
+function BombBadge() {
+  const [left, setLeft] = useState(5);
+  useEffect(() => {
+    if (left <= 0) return;
+    const t = setTimeout(() => setLeft((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
+  return (
+    <View pointerEvents="none" style={styles.bomb}>
+      <Text style={{ fontSize: 20 }}>💣</Text>
+      <Text style={styles.bombCount}>{Math.max(1, left)}</Text>
+    </View>
+  );
+}
+
 function PortraitImage({ p, mood = 'normal', size }: { p: PortraitSource; mood?: Mood; size: number }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const portrait = portraitOf(p, mood);
@@ -167,6 +190,17 @@ export function Avatar({
             <Text style={{ fontSize: Math.max(14, size * 0.4) }}>{TINTS[face.tint].emoji}</Text>
           </View>
         )}
+        {face.morph && face.morph in MORPHS && (
+          <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: MORPHS[face.morph as keyof typeof MORPHS].bg }]}>
+            <Text style={{ fontSize: Math.max(18, size * 0.62) }}>{MORPHS[face.morph as keyof typeof MORPHS].emoji}</Text>
+          </View>
+        )}
+        {face.morph === 'cage' && (
+          <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.cage, { borderRadius: size / 2 }]}>
+            {[0, 1, 2, 3, 4].map((i) => <View key={i} style={styles.cageBar} />)}
+            <Text style={styles.cageLock}>🔒</Text>
+          </View>
+        )}
         {face.wobble === 'blackout' && (
           <View pointerEvents="none" style={[styles.blackoutMask, { borderRadius: size / 2 }]}>
             <Text style={{ fontSize: 16 }}>🔌</Text>
@@ -174,6 +208,7 @@ export function Avatar({
         )}
         {player.avatarUrl && face.mood !== 'normal' && <Text style={styles.moodBadge}>{MOOD_EMOJI[face.mood]}</Text>}
         {face.charm && <Text testID={`charm-${player.id}`} style={styles.charm}>✨</Text>}
+        {face.morph === 'bomb' && <BombBadge />}
         {host && <Text style={styles.crown}>👑</Text>}
         {!player.connected && <Text style={styles.off}>💤</Text>}
         {editable && player.connected && <Text testID="avatar-edit-badge" style={styles.edit}>✏️</Text>}
@@ -186,7 +221,7 @@ export function Avatar({
       </FrameWrap>
       {/* tên đầy đủ, xuống dòng khi dài (không cắt bớt) */}
       <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: 7 }]}>
-        {player.name}{me ? ' (bạn)' : ''}
+        {face.morph === 'flipname' ? Array.from(player.name).reverse().join('') : player.name}{me ? ' (bạn)' : ''}
       </NameText>
       {face.nick && (
         <Text testID={`nick-${player.id}`} numberOfLines={2} style={styles.nick}>{nickText(face.nick).replace(/\s*\p{Extended_Pictographic}\uFE0F?$/u, '')}</Text>
@@ -212,6 +247,17 @@ const styles = StyleSheet.create({
   },
   moodBadge: { position: 'absolute', bottom: -4, left: -4, fontSize: 16 },
   charm: { position: 'absolute', top: -8, right: -8, fontSize: 18 },
+  cage: {
+    position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'hidden',
+    flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'rgba(20,20,30,0.25)',
+  },
+  cageBar: { width: 3, height: '100%', backgroundColor: '#2B2B33', borderRadius: 2 },
+  cageLock: { position: 'absolute', bottom: -2, alignSelf: 'center', fontSize: 14 },
+  bomb: { position: 'absolute', top: -14, alignSelf: 'center', alignItems: 'center' },
+  bombCount: {
+    position: 'absolute', top: 4, fontSize: 10, fontWeight: '900', color: '#FFF',
+    textShadowColor: '#000', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 },
+  },
   nick: {
     fontFamily: FONT, fontSize: 10, lineHeight: 12, textAlign: 'center', fontWeight: '900', color: C.ink, backgroundColor: C.gold, borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', maxWidth: '100%',

@@ -4,7 +4,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { createGameServer, type GameServer } from '../src/app';
 import { MemoryStore } from '../src/store';
 import { smallDict } from './helpers';
-import { isHardPoke, pokeItem } from '../../shared/src/pokes';
+import { AVATAR_SIDES, POKE_SIDES, isHardPoke, pokeItem } from '../../shared/src/pokes';
 import type { ClientToServerEvents, FunEvent, ServerToClientEvents } from '../../shared/src/types';
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents> & { funs: FunEvent[]; pid: string; code: string };
@@ -104,6 +104,8 @@ describe('Chọc loạn xạ (chỉ admin)', () => {
     for (const e of seen) {
       expect(e).toMatchObject({ kind: 'poke', from: boss.pid, chaos: true });
       expect(pokeItem(e.poke)).toBeDefined();
+      // món không dễ thương luôn kèm một hiệu ứng phụ
+      if (!pokeItem(e.poke)!.nice) expect(POKE_SIDES).toContain(e.side);
     }
     expect(chaosOf(boss).length).toBe(2);
     expect(await balance(boss)).toBe(80);
@@ -148,6 +150,7 @@ describe('Chọc loạn xạ (chỉ admin)', () => {
     const mine = chaosOf(an).find((e) => e.to === an.pid)!;
     expect(isHardPoke(pokeItem(mine.poke)!)).toBe(false);
     expect(mine.pausedMs).toBeUndefined();
+    if (mine.side) expect(AVATAR_SIDES).toContain(mine.side);
   });
 
   it('bấm dồn 5 lần: 3 lần qua rồi busy, chỉ trừ cho lần qua', async () => {

@@ -2,7 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import type { AuthAck, ChaosAck, ClientToServerEvents, FunAck, FunSend, GameType, ServerToClientEvents } from '../../shared/src/types';
 import type { RoomManager } from './roomManager';
 import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
-import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, pickChaosPoke, RateLimiter, trollExtras, WindowLimiter } from './fun';
+import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, pickChaosPoke, pickPokeSide, RateLimiter, trollExtras, WindowLimiter } from './fun';
 import { isAdmin } from './admin';
 import { pokeItem } from '../../shared/src/pokes';
 import type { Auth } from './auth';
@@ -300,10 +300,13 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
         if (balance === null) return reply({ ok: false, reason: noRuby });
       }
       const extra = f.kind === 'hit' ? room.hp.hit(f.to, f.move) : trollExtras(f);
+      const pokeIt = f.kind === 'poke' && f.poke ? pokeItem(f.poke) : undefined;
+      // người đã bị chọc đủ giới hạn chỉ dính hiệu ứng phụ trên avatar, không đụng màn hình
+      const side = pokeIt ? pickPokeSide(pokeIt, soft || (target !== null && !disruptive && room.disruptLimiter.wait(target) > 0)) : undefined;
       // người đang tới lượt Nối từ được bù lại thời gian bị phá
       const pausedMs = disruptive && !soft ? room.disrupt(target, pauseMsOf(f, extra)) : 0;
       io.to(room.code).emit('fun:event', {
-        ...f, ...extra, ...(soft ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}), id: ++funSeq, from,
+        ...f, ...extra, ...(soft ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}), ...(side ? { side } : {}), id: ++funSeq, from,
       });
       // người nhận quà có tài khoản được cộng điểm quà (không nhận Ruby)
       if (f.kind === 'gift' && price !== undefined && f.to.startsWith(ACCOUNT_PREFIX)) {
@@ -338,13 +341,15 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       if (!targets.length) return { ok: false, reason: 'empty' };
       const events = targets.map((to) => {
         const limited = room.disruptLimiter.wait(to) > 0;
-        const f: FunSend = { kind: 'poke', to, poke: pickChaosPoke(limited).id };
+        const item = pickChaosPoke(limited);
+        const f: FunSend = { kind: 'poke', to, poke: item.id };
+        const side = pickPokeSide(item, limited);
         let pausedMs = 0;
         if (isDisruptive(f) && !limited) {
           room.disruptLimiter.take(to);
           pausedMs = room.disrupt(to, pauseMsOf(f));
         }
-        return { ...f, ...trollExtras(f), ...(limited && isDisruptive(f) ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}) };
+        return { ...f, ...trollExtras(f), ...(limited && isDisruptive(f) ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}), ...(side ? { side } : {}) };
       });
       const balance = await chargeRuby(walletCtx, user.id, CHAOS_POKE_RUBY, 'skill', 'chaos');
       if (balance === null) return { ok: false, reason: 'need_ruby' };

@@ -4,6 +4,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { DoodleKind, Mood, NicknameId } from '../../shared/src/types';
+import type { AvatarSide } from '../../shared/src/pokes';
 
 type Entry<T> = { value: T; until: number };
 
@@ -17,6 +18,8 @@ const nick = new Map<string, Entry<NicknameId>>();
 const charm = new Map<string, Entry<true>>();
 const wobble = new Map<string, Entry<WobbleKind>>();
 const tint = new Map<string, Entry<TintKind>>();
+/** biến hình avatar do hiệu ứng phụ của món chọc (hóa heo, hóa đá, em bé, nhốt lồng, bom, tên ngược) */
+const morph = new Map<string, Entry<AvatarSide>>();
 
 let version = 0;
 const listeners = new Set<() => void>();
@@ -44,6 +47,7 @@ export const setNick = (id: string, n: NicknameId, ms: number) => put(nick, id, 
 export const setCharm = (id: string, ms: number) => put(charm, id, true, ms);
 export const setWobble = (id: string, w: WobbleKind, ms = 3000) => put(wobble, id, w, ms);
 export const setTint = (id: string, t: TintKind, ms: number) => put(tint, id, t, ms);
+export const setMorph = (id: string, m: AvatarSide, ms: number) => put(morph, id, m, ms);
 
 const live = <T,>(map: Map<string, Entry<T>>, id: string): T | undefined => {
   const e = map.get(id);
@@ -58,7 +62,7 @@ function subscribe(cb: () => void) {
 }
 const snapshot = () => version;
 
-export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean; wobble?: WobbleKind; tint?: TintKind };
+export type Face = { mood: Mood; doodle?: DoodleKind; nick?: NicknameId; charm: boolean; wobble?: WobbleKind; tint?: TintKind; morph?: AvatarSide };
 
 /** Tâm trạng/hình vẽ/biệt danh/bùa/rung xoay còn hiệu lực của một người; component tự vẽ lại khi có đổi hoặc hết hạn */
 export function useFace(id: string): Face {
@@ -70,5 +74,6 @@ export function useFace(id: string): Face {
     charm: !!live(charm, id),
     wobble: live(wobble, id),
     tint: live(tint, id),
+    morph: live(morph, id),
   };
 }
