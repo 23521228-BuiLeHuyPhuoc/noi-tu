@@ -7,13 +7,14 @@ import {
 import { themeById } from '../../../shared/src/themes';
 import type { PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { C, FONT } from '../theme';
+import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { Button, Card, T } from '../ui';
 import { Shell, type StripOptions } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
 import { Image } from '../components/Image';
 import { KeyboardLift } from '../components/KeyboardLift';
+import { EmojiIcon, UiIcon } from '../components/Icons';
 
 function strokesToSvgUri(strokes: VeDoanStroke[]): string {
   const parts: string[] = [];
@@ -64,7 +65,6 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const canDraw = isDrawer && view.phase === 'drawing';
 
-  // Pointer Events trên Web: đọc tọa độ trực tiếp từ DOM bounding rect (chính xác 100% cả desktop & touch)
   const webNorm = (e: WebPointerEvt): [number, number] => {
     const r = e.currentTarget.getBoundingClientRect();
     const nx = Math.max(0, Math.min(1000, Math.round(((e.clientX - r.left) / Math.max(1, r.width)) * 1000)));
@@ -78,7 +78,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     try {
       if (e.pointerId !== undefined) e.currentTarget.setPointerCapture?.(e.pointerId);
     } catch {
-      // bỏ qua trên thiết bị không hỗ trợ capture
+      // bỏ qua
     }
     const pt = webNorm(e);
     draftPtsRef.current = [pt];
@@ -110,7 +110,6 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     }
   };
 
-  // Fallback Native Responder (Android/iOS)
   const toNorm = (evt: GestureResponderEvent): [number, number] => {
     const { w, h } = sizeRef.current;
     const { locationX, locationY, pageX, pageY } = evt.nativeEvent;
@@ -194,9 +193,9 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
       ring: (p: PublicPlayer) => (guessedSet.has(p.id) ? C.jade : p.id === view.drawerId ? C.gold : undefined),
       sub: (p: PublicPlayer) => {
         const sc = view.scores[p.id] ?? 0;
-        if (p.id === view.drawerId) return `🖌️ · ${sc}đ`;
-        if (guessedSet.has(p.id)) return `✅ · ${sc}đ`;
-        return `${sc} điểm`;
+        if (p.id === view.drawerId) return `Vẽ · ${sc}đ`;
+        if (guessedSet.has(p.id)) return `Trúng · ${sc}đ`;
+        return `${sc}đ`;
       },
     }),
     [view.order, view.drawerId, view.scores, guessedSet],
@@ -205,19 +204,19 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const renderBottom = () => {
     if (view.phase === 'pick_word') {
       return isDrawer ? (
-        <T style={[styles.waitNote, { color: theme.onBg }]}>🎨 Chọn 1 trong 3 từ trên màn hình để bắt đầu trổ tài họa sĩ!</T>
+        <T style={[styles.waitNote, { color: theme.onBg }]}>Chọn 1 trong 3 từ trên màn hình để bắt đầu trổ tài họa sĩ!</T>
       ) : (
-        <T style={[styles.waitNote, { color: theme.onBg }]}>⏳ {view.names[view.drawerId] ?? 'Họa sĩ'} đang chọn từ khóa…</T>
+        <T style={[styles.waitNote, { color: theme.onBg }]}>{view.names[view.drawerId] ?? 'Họa sĩ'} đang chọn từ khóa…</T>
       );
     }
     if (view.phase === 'round_end') {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>✨ Đáp án lượt này là «{view.secretWord ?? '...'}» — Chuẩn bị sang lượt mới!</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đáp án lượt này là «{view.secretWord ?? '...'}» — Chuẩn bị sang lượt mới!</T>;
     }
     if (isDrawer) {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>🖌️ Bạn đang vẽ «{view.secretWord ?? '...'}» — Vẽ thật dễ hiểu nhé!</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Bạn đang vẽ «{view.secretWord ?? '...'}» — Vẽ thật dễ hiểu nhé!</T>;
     }
     if (guessedSet.has(me)) {
-      return <T style={[styles.waitNote, { color: '#4ADE80' }]}>🎉 Bạn đã đoán trúng! Chờ mọi người cùng đoán nhé.</T>;
+      return <T style={[styles.waitNote, { color: '#4ADE80' }]}>Bạn đã đoán trúng! Chờ mọi người cùng đoán nhé.</T>;
     }
     return (
       <KeyboardLift>
@@ -234,7 +233,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
               maxLength={60}
               style={styles.input}
             />
-            <Button testID="vd-guess-submit" disabled={busy || !guess.trim()} title="Đoán" onPress={sendGuess} />
+            <Button testID="vd-guess-submit" disabled={busy || !guess.trim()} iconNode={<UiIcon name="Send" size={15} color="#271400" />} title="Đoán" onPress={sendGuess} />
           </View>
         </View>
       </KeyboardLift>
@@ -263,10 +262,16 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
   return (
     <Shell game={game} room={room} strip={strip} bottom={renderBottom()}>
-      <View style={styles.topCard}>
+      <View style={[styles.topCard, sticker(3)]}>
         <View style={styles.topRow}>
-          <T style={styles.turnLabel}>🎨 Lượt {view.turnIndex + 1}/{view.totalTurns}</T>
-          <T style={styles.drawerBadge}>🖌️ Họa sĩ: {view.names[view.drawerId] ?? '...'}</T>
+          <View style={styles.rowCenter}>
+            <EmojiIcon emoji="🎨" size={18} />
+            <T style={styles.turnLabel}>Lượt {view.turnIndex + 1}/{view.totalTurns}</T>
+          </View>
+          <View style={styles.drawerPill}>
+            <UiIcon name="Brush" size={13} color={C.sonDark} />
+            <T style={styles.drawerBadge}>Họa sĩ: {view.names[view.drawerId] ?? '...'}</T>
+          </View>
         </View>
         <View style={styles.wordBox}>
           {view.secretWord ? (
@@ -282,7 +287,10 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {view.phase === 'pick_word' && isDrawer && view.wordOptions && (
         <Card style={{ gap: 10 }}>
-          <T style={styles.secTitle}>✨ Chọn 1 từ khóa bạn muốn vẽ:</T>
+          <View style={styles.rowCenter}>
+            <UiIcon name="Sparkles" size={16} color={C.goldDeep} />
+            <T style={styles.secTitle}>Chọn 1 từ khóa bạn muốn vẽ:</T>
+          </View>
           <View style={styles.pickRow}>
             {view.wordOptions.map((w, idx) => (
               <Button
@@ -297,7 +305,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <View style={styles.canvasCard}>
+      <View style={[styles.canvasCard, sticker(3)]}>
         <View
           ref={canvasRef}
           testID="vd-canvas"
@@ -339,8 +347,9 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
           )}
           {allStrokes.length === 0 && (
             <View style={styles.emptyCanvas} pointerEvents="none">
+              <UiIcon name={canDraw ? 'Brush' : 'Eye'} size={24} color="#94A3B8" />
               <T style={styles.emptyHint}>
-                {canDraw ? '✏️ Chạm và kéo để vẽ tại đây!' : '👀 Bảng vẽ đang trống...'}
+                {canDraw ? 'Chạm và kéo để vẽ tại đây!' : 'Bảng vẽ đang trống...'}
               </T>
             </View>
           )}
@@ -349,14 +358,19 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
         {canDraw && (
           <View style={styles.tools}>
             <View style={styles.palette}>
-              {VE_DOAN_COLORS.map((col) => (
-                <Pressable
-                  key={col}
-                  testID={`vd-color-${col}`}
-                  onPress={() => setColor(col)}
-                  style={[styles.swatch, { backgroundColor: col }, color === col && styles.swatchActive]}
-                />
-              ))}
+              {VE_DOAN_COLORS.map((col) => {
+                const isLight = col.toUpperCase() === '#FFFFFF' || col.toUpperCase() === '#FCC419';
+                return (
+                  <Pressable
+                    key={col}
+                    testID={`vd-color-${col}`}
+                    onPress={() => setColor(col)}
+                    style={[styles.swatch, { backgroundColor: col }, color === col && styles.swatchActive]}
+                  >
+                    {color === col && <UiIcon name="Check" size={14} color={isLight ? '#1C2024' : '#FFFFFF'} strokeWidth={3} />}
+                  </Pressable>
+                );
+              })}
             </View>
             <View style={styles.toolActions}>
               <View style={styles.brushes}>
@@ -371,15 +385,18 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                   </Pressable>
                 ))}
               </View>
-              <Button testID="vd-undo" small variant="paper" title="↩️ Hoàn tác" onPress={() => act({ type: 'vd_undo' })} />
-              <Button testID="vd-clear" small variant="paper" title="🗑️ Xóa" onPress={() => act({ type: 'vd_clear' })} />
+              <Button testID="vd-undo" small variant="paper" iconNode={<UiIcon name="Undo2" size={15} color={C.ink} />} title="Hoàn tác" onPress={() => act({ type: 'vd_undo' })} />
+              <Button testID="vd-clear" small variant="paper" iconNode={<UiIcon name="Trash2" size={15} color={C.danger} />} title="Xóa" onPress={() => act({ type: 'vd_clear' })} />
             </View>
           </View>
         )}
       </View>
 
       <Card>
-        <T style={styles.secTitle}>💬 Luồng Đoán Từ</T>
+        <View style={[styles.rowCenter, { marginBottom: 4 }]}>
+          <UiIcon name="MessageCircle" size={16} color={C.ink} />
+          <T style={styles.secTitle}>Luồng Đoán Từ</T>
+        </View>
         {view.feed.length === 0 ? (
           <T style={{ color: C.muted, fontSize: 12 }}>Chưa có ai đoán… Hãy thử gõ từ đầu tiên!</T>
         ) : (
@@ -400,35 +417,40 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  topCard: { backgroundColor: '#FFFDF8', borderRadius: 16, borderWidth: 2.5, borderColor: C.ink, padding: 12, gap: 6 },
+  rowCenter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  topCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12, gap: 8 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   turnLabel: { fontSize: 14, fontWeight: '900', color: C.ink, fontFamily: FONT },
-  drawerBadge: { fontSize: 12, fontWeight: '800', color: C.sonDark, backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
-  wordBox: { backgroundColor: '#1E293B', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center' },
+  drawerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
+  },
+  drawerBadge: { fontSize: 12, fontWeight: '800', color: C.sonDark },
+  wordBox: { backgroundColor: '#1E293B', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center' },
   wordSecret: { color: '#FDE047', fontSize: 18, fontWeight: '900', letterSpacing: 1.2 },
   wordMasked: { color: '#F8FAFC', fontSize: 17, fontWeight: '900', letterSpacing: 2 },
 
-  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink, marginBottom: 4 },
+  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
   pickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
-  canvasCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 2.5, borderColor: C.ink, padding: 8, gap: 8 },
+  canvasCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 10, gap: 10 },
   canvasSurface: {
     width: '100%', aspectRatio: 1.25, maxHeight: 360, backgroundColor: '#FFFFFF',
-    borderRadius: 12, borderWidth: 2, borderColor: '#E2E8F0', overflow: 'hidden', position: 'relative',
+    borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0', overflow: 'hidden', position: 'relative',
   },
-  emptyCanvas: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  emptyCanvas: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 6 },
   emptyHint: { fontSize: 14, fontWeight: '800', color: '#94A3B8' },
 
-  tools: { gap: 8, paddingTop: 4 },
-  palette: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#CBD5E1' },
-  swatchActive: { borderColor: C.ink, borderWidth: 3.5, transform: [{ scale: 1.12 }] },
+  tools: { gap: 8, paddingTop: 2 },
+  palette: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center' },
+  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.18)', alignItems: 'center', justifyContent: 'center' },
+  swatchActive: { borderColor: C.ink, borderWidth: 2.5, transform: [{ scale: 1.12 }] },
   toolActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center' },
   brushes: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  brushBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  brushBtn: { width: 34, height: 34, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.14)', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
   brushActive: { borderColor: C.ink, backgroundColor: '#FEF3C7' },
 
-  feedRow: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#F8FAFC' },
+  feedRow: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F8FAFC' },
   feedHit: { backgroundColor: '#DCFCE7' },
   feedClose: { backgroundColor: '#FFEDD5' },
   feedTxt: { fontSize: 13, color: C.ink },
@@ -436,8 +458,8 @@ const styles = StyleSheet.create({
   dock: { gap: 6 },
   guessRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: {
-    flex: 1, backgroundColor: '#FFFFFF', borderColor: C.ink, borderWidth: 2,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, color: C.ink, fontSize: 14, fontWeight: '700',
+    flex: 1, backgroundColor: '#FFFFFF', borderColor: 'rgba(28,32,36,0.22)', borderWidth: 1.5,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, color: C.ink, fontSize: 14, fontWeight: '700',
   },
   waitNote: { fontSize: 13, fontWeight: '800', textAlign: 'center', color: '#F8FAFC', paddingVertical: 6 },
   err: { fontSize: 12, fontWeight: '800', color: C.danger, textAlign: 'center' },

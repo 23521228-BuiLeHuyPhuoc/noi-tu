@@ -7,10 +7,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { RubyLedgerRow } from '../../../shared/src/types';
 import type { Game, WalletNotice } from '../useGame';
 import { play } from '../sound';
-import { C } from '../theme';
+import { C, sticker } from '../theme';
 import { Button, T } from '../ui';
 import { Sheet } from './Sheet';
 import { Confetti } from './Fun';
+import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
 
 export const fmtVnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 export const fmtRuby = (n: number) => n.toLocaleString('vi-VN');
@@ -38,8 +39,11 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
   return (
     <Sheet title="Nạp Ruby 💎" onClose={onClose}>
       <View style={styles.balanceRow}>
-        <T style={styles.balanceLabel}>Số dư</T>
-        <T testID="ruby-balance" style={styles.balance}>💎 {fmtRuby(w?.ruby ?? game.user?.ruby ?? 0)}</T>
+        <T style={styles.balanceLabel}>Số dư khả dụng</T>
+        <View style={styles.rubyInline}>
+          <RubyIcon size={22} />
+          <T testID="ruby-balance" style={styles.balance}>{fmtRuby(w?.ruby ?? game.user?.ruby ?? 0)}</T>
+        </View>
       </View>
 
       {!w ? (
@@ -47,12 +51,18 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
       ) : (
         <>
           <View testID="topup-paused" style={styles.pendingBox}>
-            <T style={styles.pendingTitle}>Nạp Ruby đang tạm ngưng</T>
-            <T style={styles.pendingItem}>Bạn vẫn nhận Ruby miễn phí qua 🎁 Điểm danh mỗi ngày.</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <UiIcon name="Info" size={16} color="#92400E" />
+              <T style={styles.pendingTitle}>Nạp Ruby đang tạm ngưng</T>
+            </View>
+            <T style={styles.pendingItem}>Bạn vẫn nhận Ruby miễn phí qua Điểm danh mỗi ngày.</T>
           </View>
           {w.pending.length > 0 && (
             <View testID="topup-pending" style={styles.pendingBox}>
-              <T style={styles.pendingTitle}>⏳ Đang chờ duyệt (thường trong ngày)</T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <UiIcon name="Timer" size={16} color="#92400E" />
+                <T style={styles.pendingTitle}>Đang chờ duyệt (thường trong ngày)</T>
+              </View>
               {w.pending.map((r) => (
                 <T key={r.id} style={styles.pendingItem}>
                   {fmtVnd(r.amount)} · {new Date(r.createdAt).toLocaleString('vi-VN')}
@@ -61,12 +71,12 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
             </View>
           )}
           {history ? (
-            <View style={{ gap: 4 }}>
+            <View style={{ gap: 6 }}>
               <T style={styles.h3}>Lịch sử Ruby</T>
               {history.length === 0 && <T style={styles.muted}>Chưa có giao dịch nào.</T>}
               {history.map((h, i) => (
                 <View key={i} style={styles.histRow}>
-                  <T style={[styles.histDelta, { color: h.delta >= 0 ? C.jade : C.danger }]}>
+                  <T style={[styles.histDelta, { color: h.delta >= 0 ? C.jadeDeep : C.danger }]}>
                     {h.delta >= 0 ? '+' : ''}{fmtRuby(h.delta)}
                   </T>
                   <T style={{ flex: 1 }}>{REASON_TEXT[h.reason] ?? h.reason}{h.reason === 'admin_adjust' && h.ref ? `: ${h.ref}` : ''}</T>
@@ -75,7 +85,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
               ))}
             </View>
           ) : (
-            <Button testID="ruby-history" small variant="paper" icon="🧾" title="Lịch sử Ruby" onPress={showHistory} />
+            <Button testID="ruby-history" small variant="paper" iconNode={<UiIcon name="History" size={16} color={C.ink} />} title="Lịch sử Ruby" onPress={showHistory} />
           )}
         </>
       )}
@@ -85,7 +95,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
   );
 }
 
-/** Thông báo "+N 💎" kèm pháo giấy, hoặc báo bị từ chối — hiện ở mọi màn */
+/** Thông báo "+N Ruby" kèm pháo giấy, hoặc báo bị từ chối — hiện ở mọi màn */
 export function WalletNoticeLayer({ game }: { game: Game }) {
   const [notice, setNotice] = useState<(WalletNotice & { id: number }) | null>(null);
   const { onWallet } = game;
@@ -106,10 +116,13 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
   return (
     <View pointerEvents="box-none" style={styles.noticeLayer}>
       {notice.kind === 'update' && <Confetti key={notice.id} />}
-      <Pressable testID="ruby-toast" onPress={() => setNotice(null)} style={[styles.toast, notice.kind === 'rejected' && { backgroundColor: C.ink }]}>
+      <Pressable testID="ruby-toast" onPress={() => setNotice(null)} style={[styles.toast, sticker(4), notice.kind === 'rejected' && { backgroundColor: C.ink }]}>
         {notice.kind === 'update' ? (
           <>
-            <T style={styles.toastBig}>+{fmtRuby(notice.delta)} 💎</T>
+            <View style={styles.rubyInline}>
+              <T style={styles.toastBig}>+{fmtRuby(notice.delta)}</T>
+              <EmojiIcon emoji="💎" size={26} />
+            </View>
             <T style={styles.toastSmall}>{notice.reason === 'topup' ? 'Đã nhận tiền nạp, cảm ơn bạn!' : 'Quản trị vừa cộng Ruby cho bạn'} · Số dư {fmtRuby(notice.ruby)}</T>
           </>
         ) : (
@@ -123,41 +136,22 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
 }
 
 const styles = StyleSheet.create({
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.mist, padding: 12, borderRadius: 14 },
   balanceLabel: { color: C.muted, fontWeight: '800' },
+  rubyInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   balance: { fontSize: 24, fontWeight: '900', color: C.son },
   h3: { fontSize: 16, fontWeight: '900' },
   muted: { color: C.muted, fontSize: 13 },
-  packs: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  pack: {
-    width: '47%', flexGrow: 1, backgroundColor: C.mist, borderRadius: 16, borderWidth: 2.5, borderColor: C.ink,
-    paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', gap: 2,
-  },
-  packRuby: { fontSize: 20, fontWeight: '900', color: C.son },
-  packOld: { fontSize: 12, color: C.muted, textDecorationLine: 'line-through' },
-  packPrice: { fontSize: 15, fontWeight: '800' },
-  bonus: { fontSize: 12, fontWeight: '900', color: C.jade },
-  x2: {
-    position: 'absolute', top: -10, right: 6, backgroundColor: C.gold, borderRadius: 8, borderWidth: 2, borderColor: C.ink,
-    paddingHorizontal: 6, fontSize: 11, fontWeight: '900', overflow: 'hidden',
-  },
-  pendingBox: { backgroundColor: '#FFF3BF', borderRadius: 12, padding: 10, gap: 2 },
-  pendingTitle: { fontWeight: '900' },
-  pendingItem: { fontSize: 13 },
-  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pendingBox: { backgroundColor: '#FEF3C7', borderRadius: 14, padding: 12, gap: 4, borderWidth: 1, borderColor: 'rgba(217,119,6,0.25)' },
+  pendingTitle: { fontWeight: '900', color: '#92400E' },
+  pendingItem: { fontSize: 13, color: '#78350F' },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(15,23,42,0.06)' },
   histDelta: { width: 70, fontWeight: '900' },
-  qr: { width: '100%', maxWidth: 300, aspectRatio: 0.84, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 12 },
-  info: { backgroundColor: C.mist, borderRadius: 12, padding: 10, gap: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowLabel: { width: 108, color: C.muted, fontSize: 13, fontWeight: '700' },
-  rowValue: { flex: 1, fontWeight: '900', fontSize: 15 },
-  copy: { fontSize: 18 },
-  warn: { color: C.danger, fontWeight: '800', fontSize: 13 },
-  error: { color: C.ink, backgroundColor: '#FFD6D6', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
-  note: { fontSize: 11, color: C.muted, textAlign: 'center' },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  note: { fontSize: 11.5, color: C.muted, textAlign: 'center' },
   noticeLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 95, alignItems: 'center', paddingTop: 70 },
   toast: {
-    backgroundColor: C.paper, borderRadius: 18, borderWidth: 3, borderColor: C.ink, paddingVertical: 12, paddingHorizontal: 18,
+    backgroundColor: C.paper, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 22,
     alignItems: 'center', gap: 4, maxWidth: 360, marginHorizontal: 16,
   },
   toastBig: { fontSize: 30, fontWeight: '900', color: C.son },

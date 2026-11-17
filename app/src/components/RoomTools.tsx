@@ -10,12 +10,12 @@ import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Portrait } from './Avatar';
 import { Sheet } from './Sheet';
+import { EmojiIcon, RankMedal, UiIcon } from './Icons';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
-const MEDALS = ['🥇', '🥈', '🥉'];
 const PHASE: Record<RoomSummary['phase'], { text: string; color: string }> = {
-  lobby: { text: 'Đang chờ người', color: C.jade },
-  playing: { text: 'Đang chơi · vào xem', color: '#E67700' },
+  lobby: { text: 'Đang chờ người', color: C.jadeDeep },
+  playing: { text: 'Đang chơi · vào xem', color: '#D97706' },
   finished: { text: 'Vừa xong ván', color: C.muted },
 };
 
@@ -42,7 +42,8 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
     <Card style={{ gap: 10 }}>
       <View style={styles.headRow}>
         <T style={styles.h2}>Phòng đang mở</T>
-        <Pressable testID="rooms-refresh" accessibilityRole="button" onPress={refresh} hitSlop={8}>
+        <Pressable testID="rooms-refresh" accessibilityRole="button" onPress={refresh} hitSlop={8} style={styles.refreshBtn}>
+          <UiIcon name="RefreshCw" size={14} color={C.son} />
           <T style={styles.link}>Làm mới</T>
         </Pressable>
       </View>
@@ -57,10 +58,13 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
           return (
             <View key={r.code} testID={`open-room-${r.code}`} style={styles.roomRow}>
               <Portrait p={{ avatar: r.hostAvatar, avatarUrl: r.hostAvatarUrl }} size={44} />
-              <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                <T numberOfLines={1} style={styles.roomTitle}>
-                  {GAME_META[r.gameType].emoji} {GAME_INFO[r.gameType].name} · {r.hostName}
-                </T>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <EmojiIcon emoji={GAME_META[r.gameType].emoji} size={16} />
+                  <T numberOfLines={1} style={styles.roomTitle}>
+                    {GAME_INFO[r.gameType].name} · {r.hostName}
+                  </T>
+                </View>
                 <T numberOfLines={1} style={styles.muted}>{r.names.join(', ')}</T>
                 <T style={[styles.badge, { color: ph.color }]}>
                   {ph.text} · {r.players}/{r.maxPlayers} người
@@ -86,7 +90,6 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
 export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClose: () => void; initial?: GameType }) {
   const tabs: (GameType | 'all')[] = GAME_TYPES.length > 1 ? ['all', ...GAME_TYPES] : GAME_TYPES;
   const [tab, setTab] = useState<GameType | 'all'>(initial ?? tabs[0]);
-  // kết quả gắn với tab đã tải: đổi tab thì coi như đang tải cho tới khi có kết quả mới
   const [data, setData] = useState<{ tab: GameType | 'all'; rows: LeaderRow[] | null } | null>(null);
   const { leaderboard } = game;
   useEffect(() => {
@@ -113,7 +116,8 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
               testID={`lb-tab-${t}`}
               small
               variant={t === tab ? 'ink' : 'paper'}
-              title={t === 'all' ? 'Tất cả' : `${GAME_META[t].emoji} ${GAME_INFO[t].name}`}
+              icon={t === 'all' ? undefined : GAME_META[t].emoji}
+              title={t === 'all' ? 'Tất cả' : GAME_INFO[t].name}
               style={styles.tab}
               onPress={() => setTab(t)}
             />
@@ -131,7 +135,9 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
         <View testID="lb-list" style={{ gap: 6 }}>
           {rows.map((r) => (
             <View key={r.id} testID={`lb-row-${r.rank}`} style={[styles.lbRow, r.id === myId && styles.lbMe]}>
-              <T style={styles.rank}>{MEDALS[r.rank - 1] ?? `${r.rank}.`}</T>
+              <View style={styles.rankBox}>
+                <RankMedal rank={r.rank} size={22} />
+              </View>
               <Portrait p={{ avatar: r.avatar, avatarUrl: r.avatarUrl }} size={38} />
               <T numberOfLines={1} style={styles.lbName}>{r.displayName}{r.id === myId ? ' (bạn)' : ''}</T>
               <View style={{ alignItems: 'flex-end' }}>
@@ -159,7 +165,10 @@ export function RoomManageCard({ game, room }: { game: Game; room: RoomState }) 
   return (
     <Card style={{ gap: 10 }}>
       <View style={styles.headRow}>
-        <T style={styles.h2}>{room.isPublic ? '🌐 Phòng công khai' : '🔒 Phòng riêng tư'}</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <UiIcon name={room.isPublic ? 'Globe' : 'Lock'} size={18} color={room.isPublic ? C.jadeDeep : C.son} />
+          <T style={styles.h2}>{room.isPublic ? 'Phòng công khai' : 'Phòng riêng tư'}</T>
+        </View>
       </View>
       <T style={styles.muted}>
         {room.isPublic
@@ -168,8 +177,24 @@ export function RoomManageCard({ game, room }: { game: Game; room: RoomState }) 
       </T>
       {isHost && (
         <View style={styles.tabs}>
-          <Button testID="visibility-public" small variant={room.isPublic ? 'ink' : 'paper'} title="🌐 Công khai" style={styles.tab} onPress={() => void setPublic(true)} />
-          <Button testID="visibility-private" small variant={!room.isPublic ? 'ink' : 'paper'} title="🔒 Riêng tư" style={styles.tab} onPress={() => void setPublic(false)} />
+          <Button
+            testID="visibility-public"
+            small
+            variant={room.isPublic ? 'ink' : 'paper'}
+            iconNode={<UiIcon name="Globe" size={15} color={room.isPublic ? C.gold : C.ink} />}
+            title="Công khai"
+            style={styles.tab}
+            onPress={() => void setPublic(true)}
+          />
+          <Button
+            testID="visibility-private"
+            small
+            variant={!room.isPublic ? 'ink' : 'paper'}
+            iconNode={<UiIcon name="Lock" size={15} color={!room.isPublic ? C.gold : C.ink} />}
+            title="Riêng tư"
+            style={styles.tab}
+            onPress={() => void setPublic(false)}
+          />
         </View>
       )}
       {isHost && others.length > 0 && (
@@ -199,20 +224,18 @@ function MemberRow({ game, player }: { game: Game; player: PublicPlayer }) {
           <Button small variant="paper" title="Thôi" onPress={() => setConfirm(false)} />
         </>
       ) : (
-        <Button testID={`kick-${player.id}`} small variant="paper" title="🚪 Mời ra" onPress={() => setConfirm(true)} />
+        <Button testID={`kick-${player.id}`} small variant="paper" iconNode={<UiIcon name="LogOut" size={14} color={C.ink} />} title="Mời ra" onPress={() => setConfirm(true)} />
       )}
     </View>
   );
 }
 
-/** Mời một người ra khỏi phòng (dùng ở phòng chờ và trong bảng chọc bạn bè giữa ván) */
 export async function kickPlayer(game: Game, player: PublicPlayer, done?: () => void, feed?: (t: string, k: 'good' | 'bad' | 'info') => void) {
   const err = await game.kick(player.id);
   done?.();
   if (feed) feed(err ?? `Đã mời ${player.name} ra khỏi phòng`, err ? 'bad' : 'info');
 }
 
-/** Nút mời ra có bước xác nhận, đặt trong bảng chọc bạn bè (chỉ chủ phòng thấy) */
 export function KickInline({ game, player, onDone }: { game: Game; player: PublicPlayer; onDone: () => void }) {
   const [confirm, setConfirm] = useState(false);
   const feed = useFeed();
@@ -223,7 +246,7 @@ export function KickInline({ game, player, onDone }: { game: Game; player: Publi
       <Button small variant="paper" title="Thôi" style={styles.tab} onPress={() => setConfirm(false)} />
     </View>
   ) : (
-    <Button testID="kick-open" small variant="paper" icon="🚪" title={`Mời ${player.name} ra khỏi phòng`} onPress={() => setConfirm(true)} />
+    <Button testID="kick-open" small variant="paper" iconNode={<UiIcon name="LogOut" size={15} color={C.ink} />} title={`Mời ${player.name} ra khỏi phòng`} onPress={() => setConfirm(true)} />
   );
 }
 
@@ -231,17 +254,18 @@ const styles = StyleSheet.create({
   h2: { fontSize: 17, fontWeight: '800' },
   sub: { fontSize: 14, fontWeight: '800', color: C.ink },
   muted: { fontSize: 13, color: C.muted },
-  link: { fontSize: 13, color: C.son, fontWeight: '800', textDecorationLine: 'underline' },
+  refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  link: { fontSize: 13, color: C.son, fontWeight: '800' },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  roomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 14, padding: 8 },
-  roomTitle: { fontSize: 15, fontWeight: '900', color: C.ink },
+  roomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 16, padding: 10 },
+  roomTitle: { fontSize: 15, fontWeight: '900', color: C.ink, flexShrink: 1 },
   badge: { fontSize: 12, fontWeight: '800' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tab: { flexGrow: 1 },
-  lbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 10 },
-  lbMe: { backgroundColor: '#FFF3BF', ...sticker(2) },
-  rank: { width: 30, fontSize: 18, fontWeight: '900', textAlign: 'center', color: C.ink },
+  lbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10 },
+  lbMe: { backgroundColor: '#FEF9C3', ...sticker(2) },
+  rankBox: { width: 30, alignItems: 'center', justifyContent: 'center' },
   lbName: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '800', color: C.ink },
-  wins: { fontSize: 15, fontWeight: '900', color: C.jade },
+  wins: { fontSize: 15, fontWeight: '900', color: C.jadeDeep },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

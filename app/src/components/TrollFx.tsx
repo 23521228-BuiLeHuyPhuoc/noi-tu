@@ -1,7 +1,7 @@
 import { useMeasuredView, viewRect } from '../viewMeasurements';
 /**
  * Sáu chiêu chọc miễn phí kiểu hoạt hình: bom thối, dép liên hoàn, gà mổ, mặt to, vỏ chuối, lật ngược màn hình.
- * Chỉ để vui, không ảnh hưởng ván chơi. Số liệu ngẫu nhiên (biến thể) do server bốc để mọi máy thấy cùng một cảnh.
+ * Sử dụng vector Fluent Emoji đồng nhất trên mọi hệ điều hành.
  */
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Dimensions, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,6 +15,7 @@ import { vibrate } from '../web';
 import { FONT } from '../theme';
 import { useFeed } from '../ui';
 import { rectOf, useShake, type Rect } from './Fun';
+import { EmojiIcon } from './Icons';
 
 type Size = { w: number; h: number };
 const FART_WORDS = ['PHỤT!', 'PÙ!', 'TÈ TÈ!'];
@@ -28,7 +29,6 @@ type Item = { id: number } & (
 );
 type NewItem = Item extends infer T ? (T extends { id: number } ? Omit<T, 'id'> : never) : never;
 
-/** emoji/chữ nảy lên rồi mờ dần ngay trên avatar */
 function Pop({ at, emoji, text, rise, ms, font, onDone }: { at: Rect; emoji?: string; text?: string; rise: number; ms: number; font: number; onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -49,13 +49,12 @@ function Pop({ at, emoji, text, rise, ms, font, onDone }: { at: Rect; emoji?: st
         ],
       }}
     >
-      {emoji ? <Text style={{ fontSize: font }}>{emoji}</Text> : null}
+      {emoji ? <EmojiIcon emoji={emoji} size={font} /> : null}
       {text ? <Text style={[styles.word, { fontSize: font * (emoji ? 0.55 : 1) }]}>{text}</Text> : null}
     </Animated.View>
   );
 }
 
-/** đám khí xanh phụt ra từ avatar, nở dần rồi tan */
 function Gas({ at, word, onDone }: { at: Rect; word: string; onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
   const [puffs] = useState(() =>
@@ -78,6 +77,7 @@ function Gas({ at, word, onDone }: { at: Rect; word: string; onDone: () => void 
           style={{
             position: 'absolute', left: cx - p.r, top: cy - p.r, width: p.r * 2, height: p.r * 2, borderRadius: p.r,
             backgroundColor: 'rgba(132,204,22,0.55)', borderWidth: 2, borderColor: 'rgba(77,124,15,0.5)',
+            alignItems: 'center', justifyContent: 'center',
             opacity: t.interpolate({ inputRange: [0, p.delay, 0.3, 1], outputRange: [0, 0, 0.9, 0] }),
             transform: [
               { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, p.dx] }) },
@@ -86,7 +86,7 @@ function Gas({ at, word, onDone }: { at: Rect; word: string; onDone: () => void 
             ],
           }}
         >
-          <Text style={{ fontSize: p.r, textAlign: 'center' }}>💨</Text>
+          <EmojiIcon emoji="💨" size={Math.round(p.r)} />
         </Animated.View>
       ))}
       <Animated.Text
@@ -105,7 +105,6 @@ function Gas({ at, word, onDone }: { at: Rect; word: string; onDone: () => void 
   );
 }
 
-/** màn hình người bị thả bom ngả màu xanh khói trong chốc lát */
 function Haze({ onDone }: { onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -118,15 +117,16 @@ function Haze({ onDone }: { onDone: () => void }) {
       pointerEvents="none"
       style={[
         StyleSheet.absoluteFill,
-        { backgroundColor: 'rgb(132,204,22)', opacity: t.interpolate({ inputRange: [0, 0.15, 0.6, 1], outputRange: [0, 0.42, 0.3, 0] }) },
+        { backgroundColor: 'rgb(132,204,22)', alignItems: 'center', justifyContent: 'center', opacity: t.interpolate({ inputRange: [0, 0.15, 0.6, 1], outputRange: [0, 0.42, 0.3, 0] }) },
       ]}
     >
-      <Animated.Text style={[styles.hazeEmoji, { transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.6] }) }] }]}>🤢</Animated.Text>
+      <Animated.View style={{ opacity: 0.85, transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.6] }) }] }}>
+        <EmojiIcon emoji="🤢" size={84} />
+      </Animated.View>
     </Animated.View>
   );
 }
 
-/** năm chiếc dép bay liên tiếp từ người ném tới avatar; mỗi cú trúng làm avatar lắc */
 function Volley({ from, to, onHit, onDone }: { from: Rect; to: Rect; onHit: (i: number) => void; onDone: () => void }) {
   const ts = useState(() => Array.from({ length: 5 }, () => new Animated.Value(0)))[0];
   const hit = useRef(onHit);
@@ -158,10 +158,10 @@ function Volley({ from, to, onHit, onDone }: { from: Rect; to: Rect; onHit: (i: 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {ts.map((t, i) => (
-        <Animated.Text
+        <Animated.View
           key={i}
           style={{
-            position: 'absolute', fontSize: 36, left: fx, top: fy,
+            position: 'absolute', left: fx, top: fy,
             opacity: t.interpolate({ inputRange: [0, 0.02, 0.97, 1], outputRange: [0, 1, 1, 0] }),
             transform: [
               { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, tx - fx + (i - 2) * 9] }) },
@@ -170,14 +170,13 @@ function Volley({ from, to, onHit, onDone }: { from: Rect; to: Rect; onHit: (i: 
             ],
           }}
         >
-          🩴
-        </Animated.Text>
+          <EmojiIcon emoji="🩴" size={36} />
+        </Animated.View>
       ))}
     </View>
   );
 }
 
-/** con gà đi ngang màn hình, cúi xuống mổ liên tục; chạm vào thì nó bỏ chạy */
 function Chicken({ size, rtl, onDone: finish }: { size: Size; rtl: boolean; onDone: () => void }) {
   const doneRef = useRef(finish);
   useEffect(() => { doneRef.current = finish; }, [finish]);
@@ -209,16 +208,14 @@ function Chicken({ size, rtl, onDone: finish }: { size: Size; rtl: boolean; onDo
     x.stopAnimation();
     play('boing');
     vibrate(40);
-    // bỏ chạy cùng chiều đang đi, nhanh gấp bội
     Animated.timing(x, { toValue: end, duration: 520, easing: Easing.in(Easing.quad), useNativeDriver: false }).start(onDone);
   };
   return (
     <Animated.View style={{ position: 'absolute', top: lane, left: x, width: 58, height: 64 }}>
       <Pressable testID="chicken" accessibilityRole="button" accessibilityLabel="Đuổi gà" hitSlop={18} onPress={flee} style={{ width: 58, height: 64, alignItems: 'center' }}>
         <Text style={[styles.fledWord, !fled && { opacity: 0 }]}>CỤC TÁC!</Text>
-        <Animated.Text
+        <Animated.View
           style={{
-            fontSize: 44,
             transform: [
               { scaleX: rtl ? 1 : -1 },
               { translateY: peck.interpolate({ inputRange: [0, 1], outputRange: [0, fled ? 0 : 12] }) },
@@ -226,14 +223,13 @@ function Chicken({ size, rtl, onDone: finish }: { size: Size; rtl: boolean; onDo
             ],
           }}
         >
-          🐔
-        </Animated.Text>
+          <EmojiIcon emoji="🐔" size={44} />
+        </Animated.View>
       </Pressable>
     </Animated.View>
   );
 }
 
-/** Lật ngược cả trang (chỉ trên web); chạm vẫn đúng vì trình duyệt tự xoay theo */
 function flipPage(ms: number, timer: { current: ReturnType<typeof setTimeout> | null }) {
   if (typeof document === 'undefined') return;
   const el = document.getElementById('root') ?? document.body;
@@ -395,6 +391,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT, fontWeight: '900', color: '#fff', textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 3,
   },
-  hazeEmoji: { position: 'absolute', alignSelf: 'center', top: '38%', fontSize: 90, opacity: 0.85 },
   fledWord: { position: 'absolute', top: -16, width: 110, textAlign: 'center', fontFamily: FONT, fontWeight: '900', fontSize: 13, color: '#b45309' },
 });

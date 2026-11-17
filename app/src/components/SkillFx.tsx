@@ -21,7 +21,6 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { shopItem } from "../../../shared/src/shop";
@@ -36,6 +35,7 @@ import { T, useFeed } from "../ui";
 import { Confetti, rectOf, useShake, type Rect } from "./Fun";
 import { ComicSkillFx, type ComicKind } from "./ComicSkillFx";
 import { getSmoothModeSync } from "../smoothMode";
+import { EmojiIcon } from "./Icons";
 
 type Size = { w: number; h: number };
 const ReducedMotion = createContext(false);
@@ -138,9 +138,8 @@ function FlightFx({ f, onDone }: { f: Flight; onDone: () => void }) {
             }}
           />
         ))}
-      <Animated.Text
+      <Animated.View
         style={{
-          fontSize: 44,
           transform: f.arc
             ? [
                 {
@@ -153,8 +152,8 @@ function FlightFx({ f, onDone }: { f: Flight; onDone: () => void }) {
             : [{ rotate: `${ang}deg` }],
         }}
       >
-        {f.emoji}
-      </Animated.Text>
+        <EmojiIcon emoji={f.emoji} size={44} />
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -219,9 +218,8 @@ function Burst({
           </Animated.Text>
         );
       })}
-      <Animated.Text
+      <Animated.View
         style={{
-          fontSize: big ? 65 : 38,
           marginLeft: big ? -32 : -19,
           marginTop: big ? -32 : -19,
           opacity: t.interpolate({
@@ -238,8 +236,8 @@ function Burst({
           ],
         }}
       >
-        {emoji}
-      </Animated.Text>
+        <EmojiIcon emoji={emoji} size={big ? 64 : 38} />
+      </Animated.View>
     </View>
   );
 }
@@ -390,20 +388,19 @@ function GiftFx({
               }),
             }}
           >
-            <Text style={{ fontSize: 110 }}>🎂</Text>
-            <Text style={{ fontSize: 40, marginTop: -150, marginLeft: 6 }}>
-              🕯️
-            </Text>
+            <EmojiIcon emoji="🎂" size={110} />
+            <View style={{ marginTop: -140, marginLeft: 4 }}>
+              <EmojiIcon emoji="🕯️" size={40} />
+            </View>
           </Animated.View>
         </>
       )}
       {(flyAcross || grandStage) && (
         <>
           {(g.gift === "gift_castle" || g.gift === "gift_golden_dragon" || g.gift === "gift_island" || isGalaxy) && <Confetti />}
-          <Animated.Text
+          <Animated.View
             style={{
               position: "absolute",
-              fontSize: isGalaxy ? 156 : grandStage ? 140 : 126,
               top: size.h * 0.33,
               left: grandStage
                 ? size.w * 0.5 - (isGalaxy ? 78 : 70)
@@ -429,14 +426,13 @@ function GiftFx({
                 : [],
             }}
           >
-            {isGalaxy ? "🏰" : emoji}
-          </Animated.Text>
+            <EmojiIcon emoji={isGalaxy ? "🏰" : emoji} size={isGalaxy ? 156 : grandStage ? 140 : 126} />
+          </Animated.View>
           {[0, 1, 2, 3].map((k) => (
-            <Animated.Text
+            <Animated.View
               key={k}
               style={{
                 position: "absolute",
-                fontSize: 28,
                 top: size.h * 0.34 + 20 + (k % 2) * 70,
                 left: t.interpolate({
                   inputRange: [0, 1],
@@ -448,8 +444,8 @@ function GiftFx({
                 }),
               }}
             >
-              {isGalaxy ? "🪐" : "✨"}
-            </Animated.Text>
+              <EmojiIcon emoji={isGalaxy ? "🪐" : "✨"} size={28} />
+            </Animated.View>
           ))}
         </>
       )}
@@ -498,12 +494,11 @@ function EntranceFx({
       style={StyleSheet.absoluteFill}
     >
       {stars.map((s) => (
-        <Animated.Text
+        <Animated.View
           key={s.i}
           style={{
             position: "absolute",
             left: s.x,
-            fontSize: s.s,
             top: t.interpolate({
               inputRange: [s.d, Math.min(1, s.d + 0.55)],
               outputRange: [-40, size.h * 0.72],
@@ -515,8 +510,8 @@ function EntranceFx({
             }),
           }}
         >
-          {s.i % 2 ? cfg.glyphA : cfg.glyphB}
-        </Animated.Text>
+          <EmojiIcon emoji={s.i % 2 ? cfg.glyphA : cfg.glyphB} size={Math.round(s.s)} />
+        </Animated.View>
       ))}
       <Animated.View
         style={[
@@ -587,15 +582,17 @@ function VipSkillScreenFx({
           },
         ]}
       >
-        <Animated.Text
+        <Animated.View
           style={{
-            fontSize: 130,
             transform: [{ scale: t.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.35, 1.1] }) }],
           }}
         >
-          👻
-        </Animated.Text>
-        <T style={[styles.giftText, { marginTop: 12 }]}>HÚ HỒN CHƯA?! 👻</T>
+          <EmojiIcon emoji="👻" size={120} />
+        </Animated.View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+          <T style={styles.giftText}>HÚ HỒN CHƯA?!</T>
+          <EmojiIcon emoji="👻" size={24} />
+        </View>
       </Animated.View>
     );
   }
@@ -614,18 +611,20 @@ function VipSkillScreenFx({
           },
         ]}
       >
-        <Animated.Text
+        <Animated.View
           style={{
-            fontSize: 150,
             transform: [
               { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "720deg"] }) },
               { scale: t.interpolate({ inputRange: [0, 0.3, 0.8, 1], outputRange: [0.2, 1.3, 1.1, 0.2] }) },
             ],
           }}
         >
-          🌀
-        </Animated.Text>
-        <T style={[styles.giftText, { color: "#E879F9", marginTop: 10 }]}>🕳️ HỐ ĐEN VŨ TRỤ HÚT SẠCH!</T>
+          <EmojiIcon emoji="🌀" size={140} />
+        </Animated.View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 }}>
+          <EmojiIcon emoji="🕳️" size={24} />
+          <T style={[styles.giftText, { color: "#E879F9" }]}>HỐ ĐEN VŨ TRỤ HÚT SẠCH!</T>
+        </View>
       </Animated.View>
     );
   }
@@ -651,13 +650,18 @@ function VipSkillScreenFx({
             borderRadius: 18,
             paddingHorizontal: 22,
             paddingVertical: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
             transform: [
               { rotate: "-9deg" },
               { scale: t.interpolate({ inputRange: [0, 0.14, 0.25, 1], outputRange: [2.4, 0.95, 1, 1] }) },
             ],
           }}
         >
-          <T style={{ color: "#FFD43B", fontSize: 24, fontWeight: "900", textAlign: "center" }}>🏮 TRẪM CHỈ ĐỊNH! 🏮</T>
+          <EmojiIcon emoji="🏮" size={28} />
+          <T style={{ color: "#FFD43B", fontSize: 24, fontWeight: "900", textAlign: "center" }}>TRẪM CHỈ ĐỊNH!</T>
+          <EmojiIcon emoji="🏮" size={28} />
         </Animated.View>
       </Animated.View>
     );
@@ -675,18 +679,18 @@ function VipSkillScreenFx({
         },
       ]}
     >
-      <Animated.Text
+      <Animated.View
         style={{
           position: "absolute",
-          fontSize: 120,
           top: isDragon ? size.h * 0.28 : t.interpolate({ inputRange: [0, 1], outputRange: [-60, size.h * 0.65] }),
           left: isDragon ? t.interpolate({ inputRange: [0, 1], outputRange: [-140, size.w + 40] }) : t.interpolate({ inputRange: [0, 1], outputRange: [size.w * 0.8, size.w * 0.15] }),
         }}
       >
-        {isDragon ? "🐉" : "☄️"}
-      </Animated.Text>
-      <View style={[styles.giftBanner, { top: size.h * 0.16 }]}>
-        <T style={styles.giftText}>{isDragon ? "🐉 RỒNG THẦN GẦM THÉT!" : "☄️ THIÊN THẠCH GIÁNG THẾ!"}</T>
+        <EmojiIcon emoji={isDragon ? "🐉" : "☄️"} size={120} />
+      </Animated.View>
+      <View style={[styles.giftBanner, { top: size.h * 0.16, flexDirection: "row", alignItems: "center", gap: 8 }]}>
+        <EmojiIcon emoji={isDragon ? "🐉" : "☄️"} size={24} />
+        <T style={styles.giftText}>{isDragon ? "RỒNG THẦN GẦM THÉT!" : "THIÊN THẠCH GIÁNG THẾ!"}</T>
       </View>
     </Animated.View>
   );

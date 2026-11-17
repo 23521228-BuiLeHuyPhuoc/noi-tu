@@ -1,11 +1,12 @@
 /**
  * Trang trí avatar mua bằng Ruby (8 ô) & Cấp bậc VIP Đại Gia:
  * khung quanh vòng tròn, hiệu ứng chữ cho tên, hào quang tới lượt, thú cưng bay trên vai,
- * danh hiệu dưới tên và kiểu bong bóng chat. Trên Web dùng CSS GPU keyframes 60fps.
+ * danh hiệu dưới tên và kiểu bong bóng chat. Sử dụng icon vector Fluent + CSS GPU keyframes 60fps.
  */
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { shopItem, vipByTier } from '../../../shared/src/shop';
+import { EmojiIcon } from './Icons';
 
 type FrameDef = {
   base: string;
@@ -98,7 +99,7 @@ function AuraGlow({ kind, outer, active }: { kind: string; outer: number; active
     aura_cosmic_orbit: ['🪐', '⭐'],
   };
   const pair = badgePairs[kind];
-  const sz = Math.max(13, outer * 0.28);
+  const sz = Math.max(14, Math.round(outer * 0.28));
 
   return (
     <>
@@ -109,10 +110,10 @@ function AuraGlow({ kind, outer, active }: { kind: string; outer: number; active
       {pair && active && (
         <>
           <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.22 : -12, left: kind === 'aura_holy_wings' ? -14 : outer * 0.08 }, web({ animation: 'xl-wing-flap 1.1s ease-in-out infinite' })]}>
-            <Text style={{ fontSize: sz }}>{pair[0]}</Text>
+            <EmojiIcon emoji={pair[0]} size={sz} />
           </View>
           <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.22 : -12, right: kind === 'aura_holy_wings' ? -14 : outer * 0.08 }, web({ animation: 'xl-wing-flap 1.1s ease-in-out infinite' })]}>
-            <Text style={{ fontSize: sz }}>{pair[1]}</Text>
+            <EmojiIcon emoji={pair[1]} size={sz} />
           </View>
         </>
       )}
@@ -125,17 +126,17 @@ export const PetBadge = memo(function PetBadge({ pet, size }: { pet?: string; si
   if (!pet) return null;
   const it = shopItem(pet);
   if (!it) return null;
-  const fs = Math.max(15, Math.round(size * 0.34));
+  const sz = Math.max(16, Math.round(size * 0.34));
   return (
     <View
       testID={`pet-${pet}`}
       pointerEvents="none"
       style={[
         { position: 'absolute', bottom: -4, left: -8, zIndex: 12 },
-        web({ animation: 'xl-float 2.2s ease-in-out infinite', willChange: 'transform', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.45))' }),
+        web({ animation: 'xl-float 2.2s ease-in-out infinite', willChange: 'transform', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.45))' }),
       ]}
     >
-      <Text style={{ fontSize: fs }}>{it.emoji}</Text>
+      <EmojiIcon emoji={it.emoji} size={sz} />
     </View>
   );
 });
@@ -154,11 +155,12 @@ export const TitleBadge = memo(function TitleBadge({ title }: { title?: string }
     title_phu_hao: { bg: '#78350F', fg: '#FEF08A', bd: '#FACC15' },
     title_chi_ton: { bg: '#4A044E', fg: '#F5D0FE', bd: '#E879F9' },
   };
-  const col = palette[title] ?? { bg: '#2A0A10', fg: '#FFC21A', bd: '#FFC21A' };
+  const col = palette[title] ?? { bg: '#1C2024', fg: '#FFC21A', bd: '#FFC21A' };
   return (
     <View testID={`title-${title}`} style={[styles.titlePill, { backgroundColor: col.bg, borderColor: col.bd }]}>
+      <EmojiIcon emoji={it.emoji} size={10} />
       <Text numberOfLines={1} style={[styles.titleText, { color: col.fg }]}>
-        {it.emoji} {it.name}
+        {it.name}
       </Text>
     </View>
   );
@@ -177,7 +179,8 @@ export const VipBadge = memo(function VipBadge({ tier, compact = false }: { tier
         web(info.glow ? { boxShadow: `0 0 8px ${info.glow}` } : {}),
       ]}
     >
-      <Text style={styles.vipText}>{info.badge}{compact ? ` V${tier}` : ` VIP ${tier} · ${info.name}`}</Text>
+      <EmojiIcon emoji={info.badge} size={11} />
+      <Text style={styles.vipText}>{compact ? `V${tier}` : `VIP ${tier} · ${info.name}`}</Text>
     </View>
   );
 });
@@ -186,17 +189,17 @@ export const VipBadge = memo(function VipBadge({ tier, compact = false }: { tier
 export function chatBubbleStyleOf(id?: string): StyleProp<ViewStyle> {
   switch (id) {
     case 'bubble_sakura':
-      return [{ backgroundColor: '#FFF0F6', borderColor: '#FF85B3', borderWidth: 2 }, web({ boxShadow: '0 2px 10px rgba(255,133,179,0.45)' })];
+      return [{ backgroundColor: '#FFF0F6', borderColor: '#FF85B3', borderWidth: 1.5 }, web({ boxShadow: '0 2px 10px rgba(255,133,179,0.45)' })];
     case 'bubble_neon':
-      return [{ backgroundColor: '#1E103C', borderColor: '#D946EF', borderWidth: 2 }, web({ boxShadow: '0 0 12px rgba(217,70,239,0.6)' })];
+      return [{ backgroundColor: '#1E103C', borderColor: '#D946EF', borderWidth: 1.5 }, web({ boxShadow: '0 0 12px rgba(217,70,239,0.6)' })];
     case 'bubble_cyber':
-      return [{ backgroundColor: '#0A192F', borderColor: '#08F7FE', borderWidth: 2 }, web({ boxShadow: '0 0 12px rgba(8,247,254,0.55)' })];
+      return [{ backgroundColor: '#0A192F', borderColor: '#08F7FE', borderWidth: 1.5 }, web({ boxShadow: '0 0 12px rgba(8,247,254,0.55)' })];
     case 'bubble_gold_vip':
-      return [{ backgroundColor: '#1F1300', borderColor: '#FACC15', borderWidth: 2 }, web({ backgroundImage: 'linear-gradient(135deg, #2B1A00, #452800)', boxShadow: '0 0 12px rgba(250,204,21,0.55)' })];
+      return [{ backgroundColor: '#1F1300', borderColor: '#FACC15', borderWidth: 1.5 }, web({ backgroundImage: 'linear-gradient(135deg, #2B1A00, #452800)', boxShadow: '0 0 12px rgba(250,204,21,0.55)' })];
     case 'bubble_dragon_scroll':
-      return [{ backgroundColor: '#4A080D', borderColor: '#FFD43B', borderWidth: 2 }, web({ backgroundImage: 'linear-gradient(135deg, #5E0B12, #2A0508)', boxShadow: '0 0 14px rgba(255,169,77,0.6)' })];
+      return [{ backgroundColor: '#4A080D', borderColor: '#FFD43B', borderWidth: 1.5 }, web({ backgroundImage: 'linear-gradient(135deg, #5E0B12, #2A0508)', boxShadow: '0 0 14px rgba(255,169,77,0.6)' })];
     case 'bubble_galaxy':
-      return [{ backgroundColor: '#170B3B', borderColor: '#E879F9', borderWidth: 2 }, web({ backgroundImage: 'linear-gradient(135deg, #1E0D4D, #0F172A)', boxShadow: '0 0 16px rgba(232,121,249,0.68)' })];
+      return [{ backgroundColor: '#170B3B', borderColor: '#E879F9', borderWidth: 1.5 }, web({ backgroundImage: 'linear-gradient(135deg, #1E0D4D, #0F172A)', boxShadow: '0 0 16px rgba(232,121,249,0.68)' })];
     default:
       return undefined;
   }
@@ -256,14 +259,18 @@ export function FrameWrap({ size, frame, aura, pet, active, children }: {
             web({ animation: 'xl-spin 4s linear infinite', willChange: 'transform' }),
           ]}
         >
-          <Text style={{ position: 'absolute', top: -7, fontSize: 12 }}>⚔️</Text>
-          <Text style={{ position: 'absolute', bottom: -7, fontSize: 12 }}>🗡️</Text>
-          <Text style={{ position: 'absolute', left: -7, fontSize: 12 }}>🗡️</Text>
-          <Text style={{ position: 'absolute', right: -7, fontSize: 12 }}>⚔️</Text>
+          <View style={{ position: 'absolute', top: -7 }}><EmojiIcon emoji="⚔️" size={12} /></View>
+          <View style={{ position: 'absolute', bottom: -7 }}><EmojiIcon emoji="🗡️" size={12} /></View>
+          <View style={{ position: 'absolute', left: -7 }}><EmojiIcon emoji="🗡️" size={12} /></View>
+          <View style={{ position: 'absolute', right: -7 }}><EmojiIcon emoji="⚔️" size={12} /></View>
         </View>
       )}
       {children}
-      {f?.badge && <Text pointerEvents="none" style={{ position: 'absolute', top: -Math.round(size * 0.22), right: -Math.round(size * 0.12), fontSize: Math.max(13, size * 0.34), zIndex: 10 }}>{f.badge}</Text>}
+      {f?.badge && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: -Math.round(size * 0.22), right: -Math.round(size * 0.12), zIndex: 10 }}>
+          <EmojiIcon emoji={f.badge} size={Math.max(14, Math.round(size * 0.34))} />
+        </View>
+      )}
       <PetBadge pet={pet} size={size} />
     </View>
   );
@@ -271,50 +278,65 @@ export function FrameWrap({ size, frame, aura, pet, active, children }: {
 
 const GRAD_TEXT: Record<string, { fallback: string; bg: string; extra?: Record<string, unknown> }> = {
   name_rainbow: {
-    fallback: '#FFC371',
-    bg: 'linear-gradient(90deg, #ff5f6d, #ffc371, #7bed9f, #70a1ff, #a55eea, #ff5f6d)',
+    fallback: '#FF5F6D',
+    bg: 'linear-gradient(90deg, #ff5f6d, #ffc371, #29a383, #3b82f6, #a55eea, #ff5f6d)',
   },
   name_gold_liquid: {
-    fallback: '#FACC15',
+    fallback: '#D97706',
     bg: 'linear-gradient(90deg, #B45309, #FEF08A, #F59E0B, #FFFBEB, #B45309)',
   },
   name_fire_blaze: {
-    fallback: '#FF6B35',
+    fallback: '#FF5722',
     bg: 'linear-gradient(90deg, #FF2A00, #FF9E00, #FFE066, #FF3B00)',
   },
   name_ice_crystal: {
-    fallback: '#7DD3FC',
+    fallback: '#0284C7',
     bg: 'linear-gradient(90deg, #38BDF8, #FFFFFF, #7DD3FC, #0EA5E9)',
   },
   name_blood_moon: {
-    fallback: '#F87171',
+    fallback: '#DC2626',
     bg: 'linear-gradient(90deg, #DC2626, #FCA5A5, #991B1B, #F87171)',
   },
   name_galaxy_shimmer: {
-    fallback: '#E879F9',
+    fallback: '#C026D3',
     bg: 'linear-gradient(90deg, #38BDF8, #E879F9, #FDE047, #818CF8, #38BDF8)',
   },
 };
 
 /** tên người chơi, kèm hiệu ứng nếu đã trang bị (10 mẫu VIP) */
 export function NameText({ fx, style, children, ...rest }: { fx?: string; style?: StyleProp<TextStyle>; children: ReactNode; testID?: string }) {
-  if (fx && fx in GRAD_TEXT) {
-    const g = GRAD_TEXT[fx];
+  const flat = StyleSheet.flatten(style) ?? {};
+  const grad = fx ? GRAD_TEXT[fx] : undefined;
+
+  if (grad) {
     return (
       <Text
         {...rest}
         style={[
           style,
+          { color: grad.fallback },
           web({
-            color: g.fallback,
-            backgroundImage: g.bg,
+            backgroundImage: grad.bg,
             backgroundSize: '200% auto',
-            animation: 'xl-shimmer 2.8s linear infinite',
             WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 1px 1.2px rgba(20, 10, 26, 0.88))',
+            animation: 'xl-shimmer 2.8s linear infinite',
+            filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.9)) drop-shadow(0 0 1px rgba(0,0,0,0.85))',
           }),
+        ]}
+      >
+        {children}
+      </Text>
+    );
+  }
+  if (fx === 'name_divine_glitch') {
+    return (
+      <Text
+        {...rest}
+        style={[
+          style,
+          { color: '#F0ABFC', fontWeight: '900', textShadowColor: 'rgba(15,23,42,0.92)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
+          web({ animation: 'xl-glitch 2.6s infinite' }),
         ]}
       >
         {children}
@@ -327,8 +349,8 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
         {...rest}
         style={[
           style,
-          { color: '#06B6D4', textShadowColor: '#0F172A', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-          web({ textShadow: '0 1px 2px rgba(10,12,24,0.92), 0 0 8px #08F7FE' }),
+          { color: '#22D3EE', fontWeight: '900', textShadowColor: 'rgba(15,23,42,0.88)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
+          web({ animation: 'xl-pulse 1.6s ease-in-out infinite' }),
         ]}
       >
         {children}
@@ -341,35 +363,19 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
         {...rest}
         style={[
           style,
-          { color: '#F59F00', textShadowColor: '#451A03', textShadowRadius: 0, textShadowOffset: { width: 1.5, height: 1.5 } },
+          { color: '#F59E0B', fontWeight: '900', textShadowColor: '#1C0F00', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 1 },
+          web({ textShadow: '0 1px 0 #78350F, 0 2px 0 #451A03, 0 4px 8px rgba(0,0,0,0.6)' }),
         ]}
       >
-        👑 {children}
+        {children}
       </Text>
     );
   }
-  if (fx === 'name_divine_glitch') {
-    return (
-      <Text
-        {...rest}
-        style={[
-          style,
-          { color: '#C026D3' },
-          web({
-            animation: 'xl-glitch 2.6s infinite',
-            textShadow: '0 1px 2px rgba(12,8,22,0.92), -1px 0 0 #06B6D4, 1px 0 0 #F43F5E, 0 0 10px rgba(217,70,239,0.75)',
-          }),
-        ]}
-      >
-        ⚡{children}⚡
-      </Text>
-    );
-  }
-  if (fx === 'name_sparkle') return <Sparkle style={style} {...rest}>{children}</Sparkle>;
+  if (fx === 'name_sparkle') return <SparkleText {...rest} style={flat}>{children}</SparkleText>;
   return <Text {...rest} style={style}>{children}</Text>;
 }
 
-function Sparkle({ style, children, ...rest }: { style?: StyleProp<TextStyle>; children: ReactNode; testID?: string }) {
+function SparkleText({ style, children, ...rest }: { style?: StyleProp<TextStyle>; children: ReactNode; testID?: string }) {
   const t = useState(() => new Animated.Value(1))[0];
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -384,27 +390,38 @@ function Sparkle({ style, children, ...rest }: { style?: StyleProp<TextStyle>; c
   }, [t]);
   if (Platform.OS === 'web') {
     return (
-      <Text
-        {...rest}
-        style={[style, { textShadowColor: '#FFD84D', textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } }, web({ animation: 'xl-pulse 1.3s ease-in-out infinite' })]}
-      >
-        ✨{children}✨
-      </Text>
+      <View style={styles.sparkRow}>
+        <EmojiIcon emoji="✨" size={11} />
+        <Text
+          {...rest}
+          style={[style, { textShadowColor: '#FFD84D', textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } }, web({ animation: 'xl-pulse 1.3s ease-in-out infinite' })]}
+        >
+          {children}
+        </Text>
+        <EmojiIcon emoji="✨" size={11} />
+      </View>
     );
   }
   return (
-    <Animated.Text {...rest} style={[style, { opacity: t, textShadowColor: '#FFD84D', textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } }]}>
-      ✨{children}✨
-    </Animated.Text>
+    <View style={styles.sparkRow}>
+      <EmojiIcon emoji="✨" size={11} />
+      <Animated.Text {...rest} style={[style, { opacity: t, textShadowColor: '#FFD84D', textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } }]}>
+        {children}
+      </Animated.Text>
+      <EmojiIcon emoji="✨" size={11} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   titlePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     borderWidth: 1.4,
     borderRadius: 99,
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 1.5,
     maxWidth: '100%',
   },
   titleText: {
@@ -413,16 +430,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   vipPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: '#181016',
     borderWidth: 1.5,
     borderRadius: 99,
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 1.5,
     alignSelf: 'flex-start',
   },
   vipText: {
     color: '#FFF9DB',
     fontSize: 10,
     fontWeight: '900',
+  },
+  sparkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
   },
 });

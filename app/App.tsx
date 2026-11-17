@@ -1,6 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  BeVietnamPro_500Medium,
+  BeVietnamPro_600SemiBold,
+  BeVietnamPro_700Bold,
+  BeVietnamPro_800ExtraBold,
+  BeVietnamPro_900Black,
+} from '@expo-google-fonts/be-vietnam-pro';
 import { useGame } from './src/useGame';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
@@ -19,11 +27,19 @@ import { WalletNoticeLayer } from './src/components/Wallet';
 import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
+import { UiIcon } from './src/components/Icons';
 
-// Trên web, vùng tai thỏ/thanh home đã được xử lý bằng CSS env(safe-area-inset-*) trong public/index.html
 const Screen = Platform.OS === 'web' ? View : SafeAreaView;
 
 export default function App() {
+  useFonts({
+    BeVietnamPro_500Medium,
+    BeVietnamPro_600SemiBold,
+    BeVietnamPro_700Bold,
+    BeVietnamPro_800ExtraBold,
+    BeVietnamPro_900Black,
+  });
+
   const game = useGame();
   const { room } = game;
 
@@ -51,6 +67,7 @@ export default function App() {
           <ShakeProvider>
             {room && game.status !== 'online' && (
               <View style={styles.offline}>
+                <UiIcon name="RefreshCw" size={14} color={C.gold} />
                 <T style={styles.offlineText}>Mất kết nối, đang nối lại…</T>
               </View>
             )}
@@ -66,6 +83,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.son },
-  offline: { backgroundColor: C.ink, padding: 6 },
-  offlineText: { color: C.gold, textAlign: 'center', fontWeight: '700', fontSize: 14 },
+  offline: {
+    backgroundColor: C.ink, padding: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  offlineText: { color: C.gold, textAlign: 'center', fontWeight: '700', fontSize: 13 },
 });

@@ -21,6 +21,7 @@ import { RoomManageCard } from '../components/RoomTools';
 import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
+import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji } from '../components/Icons';
 
 const GAMES: GameType[] = ['wordchain', 'wordchain_en', 'baucua', 'typhu', 'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui'];
 
@@ -114,6 +115,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           {isHost ? (
             <Button
               testID="start-btn"
+              iconNode={<UiIcon name="Play" size={18} color={tooFew || tooMany ? C.muted : '#271400'} />}
               title={startLabel}
               disabled={tooFew || tooMany}
               onPress={async () => setError(await game.start())}
@@ -138,7 +140,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {/* máy chơi cùng: máy chơi hết sức (Nối từ: dồn vào ngõ cụt) */}
       {(isHost || room.players.some((p) => p.bot)) && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🤖 Chơi với máy</T>
+          <View style={styles.headIconRow}>
+            <UiIcon name="Bot" size={18} color={C.ink} />
+            <T style={styles.h3}>Chơi với máy</T>
+          </View>
           {room.players.filter((p) => p.bot).map((p) => (
             <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <T style={{ flex: 1, fontWeight: '800' }}>{p.name}</T>
@@ -150,6 +155,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               testID="bot-add"
               small
               variant="gold"
+              iconNode={<UiIcon name="Plus" size={15} color="#271400" />}
               title={n >= room.maxPlayers ? 'Phòng đã đủ người' : 'Thêm máy chơi cùng'}
               disabled={n >= room.maxPlayers}
               onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); }}
@@ -170,9 +176,9 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 onPress={() => game.configure({ gameType: g })}
-                style={[styles.pick, sticker(on ? 4 : 2), on && styles.pickOn]}
+                style={[styles.pick, sticker(on ? 3 : 2), on && styles.pickOn]}
               >
-                <T style={styles.pickEmoji}>{GAME_META[g].emoji}</T>
+                <EmojiIcon emoji={GAME_META[g].emoji} size={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T numberOfLines={1} style={styles.pickName}>{GAME_INFO[g].name}</T>
                   <T style={{ fontSize: 10, fontWeight: '700', color: C.muted }}>{GAME_META[g].players}</T>
@@ -183,7 +189,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </View>
       ) : (
         <Card style={styles.chosen}>
-          <T style={styles.pickEmoji}>{GAME_META[room.gameType].emoji}</T>
+          <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={30} />
           <T style={styles.chosenName}>{info.name}</T>
         </Card>
       )}
@@ -191,7 +197,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {/* Map & Chủ đề màu phòng */}
       {isHost && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🗺️ Map & Chủ Đề Phòng</T>
+          <View style={styles.headIconRow}>
+            <UiIcon name="Map" size={18} color={C.ink} />
+            <T style={styles.h3}>Map & Chủ Đề Phòng</T>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8 }}>
             {ROOM_THEMES.map((t) => {
               const unlocked = t.price === 0 || ownedSet.has(t.id);
@@ -207,14 +216,19 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                   }}
                   style={[
                     styles.mapChip,
-                    { backgroundColor: t.bg, borderColor: selected ? t.accent : C.ink },
-                    selected && { borderWidth: 3.5, transform: [{ scale: 1.04 }] },
+                    { backgroundColor: t.bg, borderColor: selected ? t.accent : 'rgba(255,255,255,0.22)' },
+                    selected && { borderWidth: 3, transform: [{ scale: 1.03 }] },
                     !unlocked && { opacity: 0.45 },
                   ]}
                 >
-                  <T style={{ fontSize: 18 }}>{t.emoji}</T>
+                  <EmojiIcon emoji={t.emoji} size={18} />
                   <T style={{ fontSize: 11, fontWeight: '900', color: t.onBg }}>{t.name}</T>
-                  {!unlocked && <T style={{ fontSize: 10, fontWeight: '800', color: t.accent }}>💎{t.price}</T>}
+                  {!unlocked && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                      <RubyIcon size={11} />
+                      <T style={{ fontSize: 10, fontWeight: '800', color: t.accent }}>{t.price}</T>
+                    </View>
+                  )}
                 </Pressable>
               );
             })}
@@ -247,7 +261,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {room.gameType === 'masoi' && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🐺 Bộ vai trò Ma Sói</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🐺" size={18} />
+            <T style={styles.h3}>Bộ vai trò Ma Sói</T>
+          </View>
           <View style={styles.roundRow}>
             {(['classic', 'chaos'] as const).map((preset) => {
               const active = (room.settings.masoiPreset ?? 'classic') === preset;
@@ -270,7 +287,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {room.gameType === 'giandiep' && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🕵️ Tùy chọn Ai Là Gián Điệp</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🕵️" size={18} />
+            <T style={styles.h3}>Tùy chọn Ai Là Gián Điệp</T>
+          </View>
           <View style={styles.roundRow}>
             <Button
               testID="gd-toggle-mrwhite"
@@ -298,7 +318,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {room.gameType === 've_doan' && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🎨 Số vòng Vẽ & Đoán</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🎨" size={18} />
+            <T style={styles.h3}>Số vòng Vẽ & Đoán</T>
+          </View>
           <View style={styles.roundRow}>
             {[1, 2, 3].map((r) => (
               <Button
@@ -318,7 +341,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {room.gameType === 'do_vui' && (
         <Card style={{ gap: 8 }}>
-          <T style={styles.h3}>🧠 Số câu hỏi Đố Vui</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🧠" size={18} />
+            <T style={styles.h3}>Số câu hỏi Đố Vui</T>
+          </View>
           <View style={styles.roundRow}>
             {([5, 10, 15] as const).map((q) => (
               <Button
@@ -358,7 +384,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </View>
 
         <View style={{ gap: 6 }}>
-          <T style={styles.optLabel}>🎭 36 Nhân vật mẫu (chọn nhanh rồi chỉnh thêm)</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🎭" size={15} />
+            <T style={styles.optLabel}>36 Nhân vật Studio (chọn nhanh rồi chỉnh thêm)</T>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.presetRow}>
             {PRESET_ORDER.map((idx) => {
               const p = AVATAR_PRESETS[idx];
@@ -386,7 +415,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           testID="char-detail-toggle"
           small
           variant="paper"
-          title={showDetail ? '▲ Thu gọn tủ đồ chi tiết' : '🎨 Mở tủ đồ chi tiết (Mặt, Tóc, Áo, Phụ kiện…)'}
+          iconNode={<UiIcon name={showDetail ? 'ChevronUp' : 'SlidersHorizontal'} size={15} color={C.ink} />}
+          title={showDetail ? 'Thu gọn tủ đồ chi tiết' : 'Mở tủ đồ chi tiết (Mặt, Tóc, Áo, Phụ kiện…)'}
           onPress={() => setShowDetail((v) => !v)}
         />
 
@@ -407,7 +437,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                     onPress={() => updateChar({ gender: opt.id })}
                     style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                   >
-                    <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
+                    <View style={styles.chipIconRow}>
+                      <EmojiIcon emoji={opt.icon} size={15} />
+                      <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -599,7 +632,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                     onPress={() => updateChar({ detail: opt.id })}
                     style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                   >
-                    <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
+                    <View style={styles.chipIconRow}>
+                      <EmojiIcon emoji={opt.icon} size={15} />
+                      <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -913,7 +949,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                     onPress={() => updateChar({ outfit: opt.id })}
                     style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                   >
-                    <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
+                    <View style={styles.chipIconRow}>
+                      <EmojiIcon emoji={opt.icon} size={15} />
+                      <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -953,7 +992,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                     onPress={() => updateChar({ accessory: opt.id })}
                     style={[styles.optChip, active && { backgroundColor: myColor.hex, borderColor: C.ink }]}
                   >
-                    <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.icon} {opt.label}</T>
+                    <View style={styles.chipIconRow}>
+                      <EmojiIcon emoji={opt.icon} size={15} />
+                      <T style={[styles.optChipText, active && { color: '#FFF' }]}>{opt.label}</T>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -1086,6 +1128,7 @@ function SectionBox({
   onToggle: () => void;
   children: ReactNode;
 }) {
+  const parsed = splitEdgeEmoji(title);
   return (
     <View style={styles.secBox}>
       <Pressable
@@ -1095,8 +1138,11 @@ function SectionBox({
         onPress={onToggle}
         style={styles.secHeader}
       >
-        <T style={styles.secTitle}>{title}</T>
-        <T style={styles.secArrow}>{open ? '▾' : '▸'}</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
+          {parsed.leading && <EmojiIcon emoji={parsed.leading} size={16} />}
+          <T style={styles.secTitle}>{parsed.text || title}</T>
+        </View>
+        <UiIcon name={open ? 'ChevronDown' : 'ChevronRight'} size={16} color={C.muted} />
       </Pressable>
       {open && <View style={styles.secBody}>{children}</View>}
     </View>
@@ -1154,6 +1200,8 @@ const styles = StyleSheet.create({
   chosen: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   chosenName: { fontSize: 22, fontWeight: '900' },
   h3: { fontSize: 16, fontWeight: '800' },
+  headIconRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  chipIconRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   row: { flexDirection: 'row', gap: 10 },
   roundRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   charHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },

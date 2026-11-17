@@ -27,6 +27,7 @@ import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
 import { ANNOUNCE_MS, TyPhuAnnounce, type Announce } from '../components/TyPhuAnnounce';
 import { Pawn, TyPhuFxLayer, fxEnd, type Fx } from '../components/TyPhuFx';
 import { ThrowSheet, useShake } from '../components/Fun';
+import { EmojiIcon, UiIcon } from '../components/Icons';
 
 /** màu dự phòng theo thứ tự lượt nếu người chơi chưa có character */
 export const TOKEN_COLORS = PLAYER_COLORS.map((c) => c.hex);
@@ -997,7 +998,7 @@ function DecisionCard(p: Parameters<typeof DecisionBody>[0] & { onPoke?: () => v
       <DecisionBody {...p} />
       {p.onPoke && (
         <Pressable testID="poke-open-dialog" accessibilityRole="button" accessibilityLabel="Chọc đối thủ" onPress={p.onPoke} hitSlop={6} style={[dc.chatPeek, { top: 50 }]}>
-          <T style={{ fontSize: 16 }}>😈</T>
+          <EmojiIcon emoji="😈" size={16} />
         </Pressable>
       )}
       {tools && (
@@ -1009,7 +1010,7 @@ function DecisionCard(p: Parameters<typeof DecisionBody>[0] & { onPoke?: () => v
           hitSlop={6}
           style={dc.chatPeek}
         >
-          <T style={{ fontSize: 16 }}>💬</T>
+          <UiIcon name="MessageCircle" size={16} color={C.ink} />
           {tools.unread > 0 && <View style={dc.chatPeekBadge}><T style={{ fontSize: 9, fontWeight: '900' }}>{tools.unread > 9 ? '9+' : tools.unread}</T></View>}
         </Pressable>
       )}
@@ -1051,7 +1052,7 @@ function DecisionBody(p: {
             <View style={dc.btns}>
               <Button testID="stay-jail" small variant="paper" title="Ở lại" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'stayJail' })} />
               {tix > 0 ? (
-                <Button testID="use-ticket" small variant="jade" title="Dùng vé 🎫" style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'useTicket' })} />
+                <Button testID="use-ticket" small variant="jade" icon="🎫" title="Dùng vé" style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'useTicket' })} />
               ) : (
                 <Button testID="pay-jail" small variant="jade" disabled={!afford} title={`Trả ${money(TYPHU_JAIL_FINE)}$`} style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'payJail' })} />
               )}
@@ -1068,7 +1069,7 @@ function DecisionBody(p: {
         <View testID="ticket-card" style={dc.card}>
           <View style={[dc.head, { backgroundColor: '#2B8A3E' }]}>
             <T style={dc.headSub}>THẺ CƠ HỘI · NỬA GIÁ</T>
-            <T numberOfLines={1} style={dc.headName}>🎫 VÉ RA TÙ</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><EmojiIcon emoji="🎫" size={16} /><T numberOfLines={1} style={dc.headName}>VÉ RA TÙ</T></View>
           </View>
           <View style={dc.body}>
             <T style={dc.note}>Mua vé {money(TYPHU_JAIL_TICKET)}$ (ra tù bình thường {money(TYPHU_JAIL_FINE)}$). Vé cất trong túi, lúc vào tù dùng để ra ngay không mất tiền.</T>

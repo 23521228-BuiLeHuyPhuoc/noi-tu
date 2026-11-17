@@ -13,6 +13,7 @@ import { play } from '../sound';
 import { vibrate } from '../web';
 import { FONT } from '../theme';
 import { useShake } from './Fun';
+import { EmojiIcon } from './Icons';
 
 /** chờ món bay tới avatar rồi mới bật hiệu ứng phụ */
 const IMPACT_MS = 650;
@@ -230,7 +231,10 @@ function Freeze() {
   return (
     <View testID="side-freeze" style={[StyleSheet.absoluteFill, styles.freeze]}>
       <ActivityIndicator color="#FFF" size="large" />
-      <Text style={styles.freezeText}>📡 Mất kết nối... đang thử lại</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <EmojiIcon emoji="📡" size={18} />
+        <Text style={styles.freezeText}>Mất kết nối... đang thử lại</Text>
+      </View>
     </View>
   );
 }
@@ -239,7 +243,7 @@ function Freeze() {
 function Ring({ from, onDone }: { from: string; onDone: () => void }) {
   return (
     <Pressable testID="side-ring" onPress={onDone} style={styles.ring}>
-      <Text style={{ fontSize: 30 }}>📞</Text>
+      <EmojiIcon emoji="📞" size={28} />
       <View style={{ flex: 1 }}>
         <Text style={styles.ringTitle}>{from} đang gọi...</Text>
         <Text style={styles.ringSub}>Chạm để tắt máy</Text>

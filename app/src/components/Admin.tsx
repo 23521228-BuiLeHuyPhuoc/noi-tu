@@ -1,6 +1,5 @@
 /**
- * Trang quản trị (chỉ ADMIN_USERNAMES): duyệt yêu cầu nạp sau khi đối chiếu app BIDV, cộng theo mã nạp,
- * xem doanh thu, cộng/trừ Ruby có lý do. Server kiểm tra quyền cho từng lệnh.
+ * Trang quản trị (chỉ ADMIN_USERNAMES): duyệt yêu cầu nạp, cộng theo mã, doanh thu, cộng/trừ Ruby.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -10,6 +9,7 @@ import { C, FONT } from '../theme';
 import { Button, T } from '../ui';
 import { Sheet } from './Sheet';
 import { fmtRuby, fmtVnd } from './Wallet';
+import { UiIcon } from './Icons';
 
 type Tab = 'pending' | 'code' | 'revenue' | 'adjust';
 const TABS: { id: Tab; label: string }[] = [
@@ -24,7 +24,6 @@ function Input(props: React.ComponentProps<typeof TextInput>) {
 }
 
 const digits = (t: string) => Number(t.replace(/\D/g, '')) || 0;
-/** mã ngẫu nhiên cho một lần cộng theo mã: bấm lại (mạng chậm) gửi đúng mã cũ nên server không cộng trùng */
 const newNonce = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 function PendingRow({ game, r, onDone }: { game: Game; r: TopupRequest; onDone: (msg: string) => void }) {
@@ -103,7 +102,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
   };
 
   return (
-    <Sheet title="Quản trị Ruby" onClose={onClose}>
+    <Sheet title="🛠️ Quản trị Ruby" onClose={onClose}>
       <View style={styles.tabs}>
         {TABS.map((t) => (
           <Pressable
@@ -138,7 +137,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
               }}
             />
           ))}
-          <Button small variant="paper" icon="🔄" title="Tải lại" onPress={loadPending} />
+          <Button small variant="paper" iconNode={<UiIcon name="RefreshCw" size={15} color={C.ink} />} title="Tải lại" onPress={loadPending} />
         </View>
       )}
 
@@ -183,14 +182,14 @@ const styles = StyleSheet.create({
   tabOn: { backgroundColor: C.ink },
   tabText: { fontWeight: '800', fontSize: 13 },
   muted: { color: C.muted, fontSize: 13 },
-  msg: { backgroundColor: '#D8F8E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
-  card: { backgroundColor: C.mist, borderRadius: 14, padding: 10, gap: 6, borderWidth: 2, borderColor: C.ink },
+  msg: { backgroundColor: '#D6F1E3', color: '#134E3A', padding: 10, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
+  card: { backgroundColor: C.mist, borderRadius: 16, padding: 12, gap: 6, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.12)' },
   cardTitle: { fontWeight: '900', fontSize: 15 },
   code: { fontWeight: '900', color: C.son },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: {
-    fontFamily: FONT, backgroundColor: C.paper, borderRadius: 10, paddingHorizontal: 10, height: 42, fontSize: 16, color: C.ink,
-    borderWidth: 2, borderColor: C.ink, fontWeight: '600',
+    fontFamily: FONT, backgroundColor: C.paper, borderRadius: 12, paddingHorizontal: 12, height: 44, fontSize: 15, color: C.ink,
+    borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.18)', fontWeight: '600',
   },
   rev: { fontSize: 16 },
   revNum: { fontWeight: '900', color: C.son },

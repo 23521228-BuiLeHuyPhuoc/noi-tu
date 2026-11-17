@@ -4,7 +4,7 @@ import { GIAN_DIEP_ROLE_META, type GianDiepRole, type GianDiepView } from '../..
 import { themeById } from '../../../shared/src/themes';
 import type { PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { C, FONT } from '../theme';
+import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { Button, Card, T } from '../ui';
 import { Shell, type StripOptions } from '../components/Shell';
@@ -12,13 +12,15 @@ import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { KeyboardLift } from '../components/KeyboardLift';
+import { EmojiIcon, UiIcon } from '../components/Icons';
+import { FlipCard } from '../components/MotionPrimitives';
 
-const PHASE_META: Record<GianDiepView['phase'], { title: string; icon: string; hint: string }> = {
-  word_reveal: { title: 'Nhận Từ Khóa Bí Mật', icon: '🔐', hint: 'Ghi nhớ từ khóa của bạn và giữ kín màn hình!' },
-  clue_turn: { title: 'Vòng Khai Gợi Ý', icon: '🎤', hint: 'Lần lượt từng người mô tả 1 câu về từ khóa (không được nhắc trực tiếp từ đó).' },
-  discussion: { title: 'Thảo Luận Truy Tìm', icon: '💬', hint: 'Ai nói trật khớp nhất? Trao đổi nhanh trước khi bỏ phiếu!' },
-  vote: { title: 'Bỏ Phiếu Loại Gián Điệp', icon: '⚖️', hint: 'Chạm chọn người đáng nghi nhất để bỏ phiếu loại!' },
-  mrwhite_guess: { title: 'Cơ Hội Cuối Của Mr. White', icon: '🤍', hint: 'Mr. White vừa bị loại! Nếu đoán đúng từ của Dân Thường, Mr. White sẽ lật kèo thắng!' },
+const PHASE_META: Record<GianDiepView['phase'], { title: string; emoji: string; hint: string }> = {
+  word_reveal: { title: 'Nhận Từ Khóa Bí Mật', emoji: '🔐', hint: 'Ghi nhớ từ khóa của bạn và giữ kín màn hình!' },
+  clue_turn: { title: 'Vòng Khai Gợi Ý', emoji: '🎤', hint: 'Lần lượt từng người mô tả 1 câu về từ khóa (không được nhắc trực tiếp từ đó).' },
+  discussion: { title: 'Thảo Luận Truy Tìm', emoji: '💬', hint: 'Ai nói trật khớp nhất? Trao đổi nhanh trước khi bỏ phiếu!' },
+  vote: { title: 'Bỏ Phiếu Loại Gián Điệp', emoji: '⚖️', hint: 'Chạm chọn người đáng nghi nhất để bỏ phiếu loại!' },
+  mrwhite_guess: { title: 'Cơ Hội Cuối Của Mr. White', emoji: '🤍', hint: 'Mr. White vừa bị loại! Nếu đoán đúng từ của Dân Thường, Mr. White sẽ lật kèo thắng!' },
 };
 
 export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) {
@@ -88,10 +90,10 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
       dim: (p: PublicPlayer) => !aliveSet.has(p.id),
       ring: (p: PublicPlayer) => (view.votes[me] === p.id ? C.gold : !aliveSet.has(p.id) ? '#64748B' : undefined),
       sub: (p: PublicPlayer) => {
-        if (!aliveSet.has(p.id)) return '❌ Đã loại';
-        if (view.phase === 'vote' && voteTally[p.id]) return `🗳️ ${voteTally[p.id]}`;
-        if (view.currentSpeakerId === p.id) return '🎤 Đang nói';
-        if (roundCluesByPlayer[p.id]) return '💬 Đã khai';
+        if (!aliveSet.has(p.id)) return 'Đã loại';
+        if (view.phase === 'vote' && voteTally[p.id]) return `${voteTally[p.id]} phiếu`;
+        if (view.currentSpeakerId === p.id) return 'Đang nói';
+        if (roundCluesByPlayer[p.id]) return 'Đã khai';
         return undefined;
       },
     }),
@@ -104,7 +106,7 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
         return (
           <KeyboardLift>
             <View style={styles.dock}>
-              <T style={[styles.dockNote, { color: theme.onBg }]}>🤍 Đoán đúng từ khóa của phe Dân Thường để THẮNG NGƯỢC!</T>
+              <T style={[styles.dockNote, { color: theme.onBg }]}>Đoán đúng từ khóa của phe Dân Thường để THẮNG NGƯỢC!</T>
               {err && <T style={styles.err}>{err}</T>}
               <View style={styles.inputRow}>
                 <TextInput
@@ -123,11 +125,11 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
           </KeyboardLift>
         );
       }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>🤍 Đang chờ Mr. White {view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ…</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đang chờ Mr. White {view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ…</T>;
     }
 
     if (!iAlive) {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>👀 Bạn đã bị loại khỏi vòng suy luận. Theo dõi xem ai là Gián Điệp nhé!</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Bạn đã bị loại khỏi vòng suy luận. Theo dõi xem ai là Gián Điệp nhé!</T>;
     }
 
     if (view.phase === 'clue_turn') {
@@ -135,10 +137,18 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
         return (
           <KeyboardLift>
             <View style={styles.dock}>
-              <T style={[styles.dockNote, { color: '#4ADE80' }]}>
-                🎤 Tới lượt bạn mô tả! (Tuyệt đối không nhắc trực tiếp từ «{view.myWord ?? '...'}»)
-              </T>
-              {err && <T style={styles.err}>{err}</T>}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <EmojiIcon emoji="🎤" size={16} />
+                <T style={[styles.dockNote, { color: '#4ADE80' }]}>
+                  Tới lượt bạn mô tả! (Tránh nhắc thẳng «{view.myWord ?? '...'}»)
+                </T>
+              </View>
+              {err && (
+                <View style={styles.errBanner}>
+                  <UiIcon name="ShieldAlert" size={15} color="#FFFFFF" />
+                  <T style={styles.errBannerTxt}>{err}</T>
+                </View>
+              )}
               <View style={styles.inputRow}>
                 <TextInput
                   testID="gd-clue-input"
@@ -150,13 +160,13 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
                   maxLength={80}
                   style={styles.input}
                 />
-                <Button testID="gd-clue-submit" disabled={busy || !clueText.trim()} title="Gửi" onPress={submitClue} />
+                <Button testID="gd-clue-submit" disabled={busy || !clueText.trim()} iconNode={<UiIcon name="Send" size={15} color="#271400" />} title="Gửi" onPress={submitClue} />
               </View>
             </View>
           </KeyboardLift>
         );
       }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>🎤 Đang nghe {view.names[view.currentSpeakerId ?? ''] ?? 'bạn chơi'} mô tả từ khóa…</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đang nghe {view.names[view.currentSpeakerId ?? ''] ?? 'bạn chơi'} mô tả từ khóa…</T>;
     }
 
     if (view.phase === 'discussion') {
@@ -169,10 +179,11 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
             testID="gd-ready-btn"
             variant={myReady ? 'jade' : 'ink'}
             disabled={busy || myReady}
+            iconNode={<UiIcon name={myReady ? 'CheckCircle2' : 'Zap'} size={17} color={myReady ? '#FFFFFF' : C.gold} />}
             title={
               myReady
-                ? `✅ Đã sẵn sàng bỏ phiếu (${view.readySkip.length}/${needReady})`
-                : `⚡ Vào bỏ phiếu ngay (${view.readySkip.length}/${needReady})`
+                ? `Đã sẵn sàng bỏ phiếu (${view.readySkip.length}/${needReady})`
+                : `Vào bỏ phiếu ngay (${view.readySkip.length}/${needReady})`
             }
             onPress={() => act({ type: 'gd_ready' })}
           />
@@ -182,16 +193,17 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 
     if (view.phase === 'vote') {
       const myVote = view.votes[me];
-      const votedText = myVote === 'skip' ? '🏳️ Đã bỏ phiếu trắng' : myVote ? `🗳️ Đang chọn loại: ${view.names[myVote]}` : null;
+      const votedText = myVote === 'skip' ? 'Đã bỏ phiếu trắng' : myVote ? `Đang chọn loại: ${view.names[myVote]}` : null;
       return (
         <View style={styles.dock}>
-          {votedText && <T style={[styles.dockNote, { color: C.jade }]}>{votedText}</T>}
+          {votedText && <T style={[styles.dockNote, { color: '#6EE7B7' }]}>{votedText}</T>}
           {err && <T style={styles.err}>{err}</T>}
           <View style={styles.inputRow}>
             <Button
               testID="gd-vote-btn"
               disabled={!selected || busy}
-              title={selected ? `⚖️ Loại ${view.names[selected]}` : 'Chạm chọn 1 người ở trên'}
+              icon={selected ? '⚖️' : undefined}
+              title={selected ? `Loại ${view.names[selected]}` : 'Chạm chọn 1 người ở trên'}
               onPress={async () => {
                 if (selected && (await act({ type: 'gd_vote', target: selected }))) setSelected(null);
               }}
@@ -201,7 +213,8 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
               testID="gd-skip-vote"
               variant="paper"
               disabled={busy}
-              title="🏳️ Bỏ qua"
+              icon="🏳️"
+              title="Bỏ qua"
               onPress={async () => {
                 await act({ type: 'gd_vote', target: 'skip' });
                 setSelected(null);
@@ -213,7 +226,7 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
       );
     }
 
-    return <T style={styles.waitNote}>{meta.hint}</T>;
+    return <T style={[styles.waitNote, { color: theme.onBg }]}>{meta.hint}</T>;
   };
 
   const roleBadge = (r: GianDiepRole | null) => {
@@ -225,48 +238,59 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 
   return (
     <Shell game={game} room={room} strip={strip} bottom={renderBottom()}>
-      {/* Header giai đoạn */}
-      <View style={styles.phaseBanner}>
+      <View style={[styles.phaseBanner, sticker(3)]}>
         <View style={styles.phaseTop}>
-          <T style={styles.phaseTitle}>{meta.icon} {meta.title} · Vòng {view.round}</T>
+          <EmojiIcon emoji={meta.emoji} size={20} />
+          <T style={styles.phaseTitle}>{meta.title} · Vòng {view.round}</T>
           <View style={styles.catBadge}>
-            <T style={styles.catTxt}>🏷️ {view.category}</T>
+            <EmojiIcon emoji="🏷️" size={13} />
+            <T style={styles.catTxt}>{view.category}</T>
           </View>
         </View>
         <T style={styles.phaseHint}>{meta.hint}</T>
         <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="gd-timer" />
       </View>
 
-      {/* Hồ Sơ Từ Khóa Bí Mật */}
-      <Pressable testID="gd-secret-card" onPress={() => setWordVisible((v) => !v)} style={styles.secretCard}>
-        <View style={styles.secretHead}>
-          <T style={styles.secretLabel}>📁 TỪ KHÓA BÍ MẬT CỦA BẠN</T>
-          <T style={styles.tapHint}>{wordVisible ? '👁️ Chạm để che' : '👆 Chạm để xem'}</T>
-        </View>
-        {wordVisible ? (
-          <View style={styles.secretBody}>
-            {view.myRole === 'mrwhite' ? (
-              <>
-                <T testID="gd-secret-word" style={[styles.secretWord, { color: '#FDE047' }]}>🤍 BẠN LÀ MR. WHITE</T>
-                <T style={styles.secretSub}>Không có từ khóa! Hãy nghe lời khai của mọi người để suy luận nhé.</T>
-              </>
-            ) : (
-              <>
-                <T testID="gd-secret-word" style={styles.secretWord}>{view.myWord ?? '---'}</T>
-                <T style={styles.secretSub}>
-                  {shownMeta?.desc ?? 'Mô tả khéo léo để đồng đội nhận ra nhau, đừng để Gián Điệp chép bài!'}
-                </T>
-              </>
-            )}
+      <FlipCard flipped={!wordVisible}>
+        <Pressable testID="gd-secret-card" onPress={() => setWordVisible((v) => !v)} style={[styles.secretCard, sticker(3)]}>
+          <View style={styles.secretHead}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <UiIcon name="Fingerprint" size={14} color="#94A3B8" />
+              <T style={styles.secretLabel}>TỪ KHÓA BÍ MẬT CỦA BẠN</T>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <UiIcon name={wordVisible ? 'EyeOff' : 'Eye'} size={13} color="#CBD5E1" />
+              <T style={styles.tapHint}>{wordVisible ? 'Chạm để che' : 'Chạm để xem'}</T>
+            </View>
           </View>
-        ) : (
-          <View style={styles.secretHidden}>
-            <T style={styles.secretHiddenTxt}>🔒 Đang che từ khóa (chạm để mở lại)</T>
-          </View>
-        )}
-      </Pressable>
+          {wordVisible ? (
+            <View style={styles.secretBody}>
+              {view.myRole === 'mrwhite' ? (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <EmojiIcon emoji="🤍" size={24} />
+                    <T testID="gd-secret-word" style={[styles.secretWord, { color: '#FDE047' }]}>BẠN LÀ MR. WHITE</T>
+                  </View>
+                  <T style={styles.secretSub}>Không có từ khóa! Hãy nghe lời khai của mọi người để suy luận nhé.</T>
+                </>
+              ) : (
+                <>
+                  <T testID="gd-secret-word" style={styles.secretWord}>{view.myWord ?? '---'}</T>
+                  <T style={styles.secretSub}>
+                    {shownMeta?.desc ?? 'Mô tả khéo léo để đồng đội nhận ra nhau, đừng để Gián Điệp chép bài!'}
+                  </T>
+                </>
+              )}
+            </View>
+          ) : (
+            <View style={styles.secretHidden}>
+              <UiIcon name="Lock" size={20} color="#CBD5E1" />
+              <T style={styles.secretHiddenTxt}>Đang che từ khóa (chạm để mở lại)</T>
+            </View>
+          )}
+        </Pressable>
+      </FlipCard>
 
-      {/* Bảng Người Chơi & Lời Khai Vòng Hiện Tại */}
       <View style={styles.grid}>
         {view.order.map((id) => {
           const player = playerMap.get(id);
@@ -295,20 +319,27 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
                 {player ? (
                   <Portrait p={player} size={38} frame={player.cosmetics?.frame} pet={player.cosmetics?.pet} />
                 ) : (
-                  <T style={{ fontSize: 22 }}>{alive ? '🧑' : '❌'}</T>
+                  <UiIcon name={alive ? 'User' : 'XCircle'} size={24} color={alive ? C.muted : C.danger} />
                 )}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <NameText fx={player?.cosmetics?.nameFx} style={[styles.seatName, !alive && styles.deadName]}>
                     {view.names[id] ?? id}
                   </NameText>
                   {!alive && elim ? (
-                    <T style={styles.elimTag}>
-                      {GIAN_DIEP_ROLE_META[elim.role].emoji} {GIAN_DIEP_ROLE_META[elim.role].name}
-                    </T>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <EmojiIcon emoji={GIAN_DIEP_ROLE_META[elim.role].emoji} size={12} />
+                      <T style={styles.elimTag}>{GIAN_DIEP_ROLE_META[elim.role].name}</T>
+                    </View>
                   ) : isTurn ? (
-                    <T style={styles.turnTag}>🎤 Đang khai…</T>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <EmojiIcon emoji="🎤" size={12} />
+                      <T style={styles.turnTag}>Đang khai…</T>
+                    </View>
                   ) : votes > 0 ? (
-                    <T style={styles.voteTag}>🗳️ {votes} phiếu</T>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <EmojiIcon emoji="🗳️" size={12} />
+                      <T style={styles.voteTag}>{votes} phiếu</T>
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -322,10 +353,12 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
         })}
       </View>
 
-      {/* Nhật Ký Toàn Bộ Lời Khai */}
       {view.clues.length > 0 && (
         <Card>
-          <T style={styles.secTitle}>🗒️ Biên Bản Các Vòng</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <EmojiIcon emoji="🗒️" size={16} />
+            <T style={styles.secTitle}>Biên Bản Các Vòng</T>
+          </View>
           <View style={{ gap: 4 }}>
             {view.clues.slice(-12).reverse().map((c) => (
               <T key={c.id} style={styles.histLine}>
@@ -340,41 +373,41 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 }
 
 const styles = StyleSheet.create({
-  phaseBanner: { backgroundColor: '#FFFDF8', borderRadius: 16, borderWidth: 2.5, borderColor: C.ink, padding: 12, gap: 6 },
-  phaseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  phaseBanner: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 13, gap: 6 },
+  phaseTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   phaseTitle: { fontSize: 16, fontWeight: '900', fontFamily: FONT, color: C.ink, flex: 1 },
-  catBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#FEF3C7', borderWidth: 1.5, borderColor: C.ink },
+  catBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: 'rgba(217,119,6,0.28)' },
   catTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
   phaseHint: { fontSize: 12, fontWeight: '700', color: C.muted },
 
-  secretCard: { backgroundColor: '#1E293B', borderRadius: 16, borderWidth: 2.5, borderColor: C.ink, padding: 14, gap: 6 },
+  secretCard: { backgroundColor: '#1E293B', borderRadius: 20, padding: 14, gap: 6 },
   secretHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   secretLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.7, color: '#94A3B8' },
   tapHint: { fontSize: 11, fontWeight: '700', color: '#CBD5E1' },
   secretBody: { alignItems: 'center', paddingVertical: 4, gap: 4 },
   secretWord: { fontSize: 24, fontWeight: '900', color: '#FDE047', textAlign: 'center', fontFamily: FONT },
   secretSub: { fontSize: 12, color: '#E2E8F0', textAlign: 'center', fontWeight: '600' },
-  secretHidden: { paddingVertical: 10, alignItems: 'center' },
+  secretHidden: { paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   secretHiddenTxt: { color: '#CBD5E1', fontWeight: '800', fontSize: 13 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   seat: {
-    flexGrow: 1, minWidth: 138, maxWidth: '49%', backgroundColor: '#FFFDF8',
-    borderRadius: 14, borderWidth: 2, borderColor: C.ink, padding: 9, gap: 6,
+    flexGrow: 1, minWidth: 138, maxWidth: '49%', backgroundColor: '#FFFFFF',
+    borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.14)', padding: 10, gap: 6,
   },
-  seatSpeaking: { borderColor: C.jade, borderWidth: 3, backgroundColor: '#F0FDF4' },
-  seatPicked: { borderColor: C.gold, borderWidth: 3, backgroundColor: '#FEFCE8' },
+  seatSpeaking: { borderColor: C.jade, borderWidth: 2.5, backgroundColor: '#F0FDF4' },
+  seatPicked: { borderColor: C.gold, borderWidth: 2.5, backgroundColor: '#FEFCE8' },
   seatDead: { opacity: 0.58, backgroundColor: '#E2E8F0' },
   seatTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   seatName: { fontSize: 13, fontWeight: '900', color: C.ink },
   deadName: { textDecorationLine: 'line-through', color: C.muted },
   elimTag: { fontSize: 11, fontWeight: '800', color: '#DC2626' },
-  turnTag: { fontSize: 11, fontWeight: '900', color: C.jade },
+  turnTag: { fontSize: 11, fontWeight: '900', color: C.jadeDeep },
   voteTag: { fontSize: 11, fontWeight: '900', color: '#B45309' },
   clueBubble: { backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, borderWidth: 1, borderColor: '#E2E8F0' },
   clueBubbleTxt: { fontSize: 12, fontWeight: '700', color: '#334155', fontStyle: 'italic' },
 
-  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink, marginBottom: 4 },
+  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
   histLine: { fontSize: 12, fontWeight: '600', color: C.ink },
 
   dock: { gap: 8 },
@@ -382,8 +415,13 @@ const styles = StyleSheet.create({
   waitNote: { fontSize: 13, fontWeight: '800', textAlign: 'center', color: C.muted, paddingVertical: 6 },
   inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: {
-    flex: 1, backgroundColor: '#FFFFFF', borderColor: C.ink, borderWidth: 2,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, color: C.ink, fontSize: 14, fontWeight: '700',
+    flex: 1, backgroundColor: '#FFFFFF', borderColor: 'rgba(28,32,36,0.22)', borderWidth: 1.5,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, color: C.ink, fontSize: 14, fontWeight: '700',
   },
-  err: { fontSize: 12, fontWeight: '800', color: C.danger, textAlign: 'center' },
+  err: { fontSize: 12, fontWeight: '800', color: '#FCA5A5', textAlign: 'center' },
+  errBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: C.danger, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  errBannerTxt: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
 });

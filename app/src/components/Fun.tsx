@@ -29,6 +29,8 @@ import { PokeGallery } from './PokeGallery';
 import { POKES, type PokeItem } from '../../../shared/src/pokes';
 import { getSmoothModeSync } from '../smoothMode';
 import { chatBubbleStyleOf, chatBubbleTextColorOf } from './Cosmetics';
+import confetti from 'canvas-confetti';
+import { EmojiIcon, UiIcon, splitEdgeEmoji } from './Icons';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -189,21 +191,20 @@ function Flying({ emoji, from, to, onDone, fast }: { emoji: string; from: Rect; 
   const tx = to.x + to.w / 2 - 22;
   const ty = to.y + to.h / 2 - 22;
   return (
-    <Animated.Text
-      style={[
-        styles.fly,
-        {
-          left: t.interpolate({ inputRange: [0, 1], outputRange: [fx, tx] }),
-          // bay theo đường vòng cung (cú đấm thì bay thẳng)
-          top: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, fast ? (fy + ty) / 2 : Math.min(fy, ty) - 90, ty] }),
-          transform: fast
-            ? [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.6] }) }]
-            : [{ rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
-        },
-      ]}
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        zIndex: 90,
+        left: t.interpolate({ inputRange: [0, 1], outputRange: [fx, tx] }),
+        top: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [fy, fast ? (fy + ty) / 2 : Math.min(fy, ty) - 90, ty] }),
+        transform: fast
+          ? [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.6] }) }]
+          : [{ rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
+      }}
     >
-      {emoji}
-    </Animated.Text>
+      <EmojiIcon emoji={emoji} size={44} />
+    </Animated.View>
   );
 }
 
@@ -213,19 +214,19 @@ function Splat({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => v
     Animated.timing(t, { toValue: 1, duration: 900, useNativeDriver: false }).start(onDone);
   }, [t, onDone]);
   return (
-    <Animated.Text
-      style={[
-        styles.splat,
-        {
-          left: at.x + at.w / 2 - 40,
-          top: at.y + at.h / 2 - 40,
-          opacity: t.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] }),
-          transform: [{ scale: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.3, 1.4, 1.1] }) }],
-        },
-      ]}
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        zIndex: 90,
+        left: at.x + at.w / 2 - 38,
+        top: at.y + at.h / 2 - 38,
+        opacity: t.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 1, 0] }),
+        transform: [{ scale: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.3, 1.35, 1.05] }) }],
+      }}
     >
-      {emoji}
-    </Animated.Text>
+      <EmojiIcon emoji={emoji} size={76} />
+    </Animated.View>
   );
 }
 
@@ -296,19 +297,19 @@ function Float({ emoji, at, onDone }: { emoji: string; at: Rect; onDone: () => v
     return () => animation.stop();
   }, [t]);
   return (
-    <Animated.Text
-      style={[
-        styles.float,
-        {
-          left: t.interpolate({ inputRange: [0, 1], outputRange: [at.x + at.w / 2 - 22, at.x + at.w / 2 - 22 + dx] }),
-          top: t.interpolate({ inputRange: [0, 1], outputRange: [at.y, at.y + 160] }),
-          opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
-          transform: [{ scale: t.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.4, 1.5, 1.1] }) }],
-        },
-      ]}
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        zIndex: 92,
+        left: t.interpolate({ inputRange: [0, 1], outputRange: [at.x + at.w / 2 - 22, at.x + at.w / 2 - 22 + dx] }),
+        top: t.interpolate({ inputRange: [0, 1], outputRange: [at.y, at.y + 160] }),
+        opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
+        transform: [{ scale: t.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.4, 1.5, 1.1] }) }],
+      }}
     >
-      {emoji}
-    </Animated.Text>
+      <EmojiIcon emoji={emoji} size={42} />
+    </Animated.View>
   );
 }
 
@@ -565,8 +566,9 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
       ))}
       {combo >= 2 && (
         <View testID="poke-combo" style={[styles.comboBadge, sticker(3)]}>
+          <EmojiIcon emoji={combo >= 7 ? '🌪️' : combo >= 4 ? '⚡' : '🔥'} size={15} />
           <Text style={styles.comboText}>
-            {combo >= 7 ? `🌪️ SIÊU BÃO XÓM LẦY x${combo}!` : combo >= 4 ? `⚡ LIÊN HOÀN x${combo}!` : `🔥 COMBO x${combo}!`}
+            {combo >= 7 ? `SIÊU BÃO XÓM LẦY x${combo}!` : combo >= 4 ? `LIÊN HOÀN x${combo}!` : `COMBO x${combo}!`}
           </Text>
         </View>
       )}
@@ -625,7 +627,9 @@ function Roach({ size, onDone: finish }: { size: Size; onDone: () => void }) {
     >
       <Pressable testID={squashed ? 'roach-squashed' : 'roach'} accessibilityRole="button" accessibilityLabel="Đập gián" hitSlop={16} onPress={squash} style={{ width: 44, height: 58 }}>
         {squashed ? (
-          <Text style={styles.squashed}>💥</Text>
+          <View style={{ width: 44, height: 58, alignItems: 'center', justifyContent: 'center' }}>
+            <EmojiIcon emoji="💥" size={38} />
+          </View>
         ) : (
           <AnimatedImage
             source={{ uri: ROACH_URI }}
@@ -726,7 +730,10 @@ function BlackoutSplash({ onDone: finish }: { onDone: () => void }) {
         },
       ]}
     >
-      <Text style={{ fontSize: 54 }}>🔌⚡</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <EmojiIcon emoji="🔌" size={48} />
+        <EmojiIcon emoji="⚡" size={48} />
+      </View>
       <T style={{ color: C.gold, fontSize: 20, fontWeight: '900', textAlign: 'center' }}>SỤP NGUỒN SÁNG!</T>
       <T style={{ color: '#CED4DA', fontSize: 14, fontWeight: '700', textAlign: 'center' }}>Ai đó vừa giật cầu dao làm tối sầm màn hình của bạn</T>
       <Pressable
@@ -739,10 +746,11 @@ function BlackoutSplash({ onDone: finish }: { onDone: () => void }) {
         }}
         style={{
           marginTop: 6, backgroundColor: C.gold, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
-          borderWidth: 2.5, borderColor: '#FFF',
+          borderWidth: 2, borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8,
         }}
       >
-        <T style={{ color: C.ink, fontWeight: '900', fontSize: 15 }}>🔦 Bật lại cầu dao</T>
+        <UiIcon name="Zap" size={17} color={C.ink} />
+        <T style={{ color: C.ink, fontWeight: '900', fontSize: 15 }}>Bật lại cầu dao</T>
       </Pressable>
     </Animated.View>
   );
@@ -856,18 +864,30 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
   const show = (sec: Exclude<ThrowFilter, 'all'>) => filter === 'all' || filter === sec;
   return (
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
-      {quota && <T testID="poke-quota" style={styles.quota}>🎟️ Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)</T>}
+      {quota && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 }}>
+          <EmojiIcon emoji="🎟️" size={16} />
+          <T testID="poke-quota" style={[styles.quota, { marginTop: 0 }]}>
+            Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)
+          </T>
+        </View>
+      )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
-        {THROW_FILTERS.map((f) => (
-          <Pressable
-            key={f.id}
-            testID={`poke-filter-${f.id}`}
-            onPress={() => setFilter(f.id)}
-            style={[styles.filterPill, filter === f.id && styles.filterPillOn]}
-          >
-            <T style={[styles.filterPillTxt, filter === f.id && { color: C.gold }]}>{f.label}</T>
-          </Pressable>
-        ))}
+        {THROW_FILTERS.map((f) => {
+          const on = filter === f.id;
+          const sp = splitEdgeEmoji(f.label);
+          return (
+            <Pressable
+              key={f.id}
+              testID={`poke-filter-${f.id}`}
+              onPress={() => setFilter(f.id)}
+              style={[styles.filterPill, on && styles.filterPillOn]}
+            >
+              {sp.leading && <EmojiIcon emoji={sp.leading} size={13} />}
+              <T style={[styles.filterPillTxt, on && { color: C.gold }]}>{sp.text || f.label}</T>
+            </Pressable>
+          );
+        })}
       </ScrollView>
       <Button
         testID="poke-kho-open"
@@ -879,7 +899,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       {kho && <PokeGallery onPick={(p: PokeItem) => send({ kind: 'poke', to: target.id, poke: p.id })} />}
       {show('hit') && (
         <>
-          <T style={styles.sectionLabel}>🥊 Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
+          <View style={styles.secHeadingRow}>
+            <EmojiIcon emoji="🥊" size={16} />
+            <T style={styles.sectionLabel}>Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
+          </View>
           <View style={styles.hits}>
             {HITS.map((h) => (
               <View key={h.move} style={styles.hitCell}>
@@ -893,7 +916,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
 
       {show('troll') && (
         <>
-          <T style={styles.sectionLabel}>😈 Chọc mất dạy (chỉ để cười thôi nha)</T>
+          <View style={styles.secHeadingRow}>
+            <EmojiIcon emoji="😈" size={16} />
+            <T style={styles.sectionLabel}>Chọc mất dạy (chỉ để cười thôi nha)</T>
+          </View>
           <T style={styles.limitNote}>Rung, xoay, sụp nguồn, gián, mực, hối: mỗi người chỉ dính tối đa 3 lần mỗi 15 giây. Đang tới lượt nối từ thì được bù lại thời gian.</T>
           {pane ? (
             <>
@@ -944,7 +970,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
 
       {show('skill') && (
         <>
-          <T style={styles.sectionLabel}>⚡ Kỹ năng VIP trả Ruby (hiệu ứng cực ngầu)</T>
+          <View style={styles.secHeadingRow}>
+            <EmojiIcon emoji="⚡" size={16} />
+            <T style={styles.sectionLabel}>Kỹ năng VIP trả Ruby (hiệu ứng cực ngầu)</T>
+          </View>
           <View style={styles.trolls}>
             {SKILL_IDS.map((id) => {
               const it = shopItem(id)!;
@@ -968,7 +997,10 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
 
       {show('gift') && (
         <>
-          <T style={styles.sectionLabel}>🎁 Tặng quà Phú Hào (tặng điểm quà & lên VIP)</T>
+          <View style={styles.secHeadingRow}>
+            <EmojiIcon emoji="🎁" size={16} />
+            <T style={styles.sectionLabel}>Tặng quà Phú Hào (tặng điểm quà & lên VIP)</T>
+          </View>
           <View style={styles.trolls}>
             {GIFT_IDS.map((id) => {
               const it = shopItem(id)!;
@@ -1154,7 +1186,11 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
             }}
           >
             <Image source={item.source} accessibilityLabel={item.alt} style={[styles.stickerThumb, !ownsPack && { opacity: 0.45 }]} resizeMode="contain" />
-            {!ownsPack && <Text style={styles.stickerLock}>🔒</Text>}
+            {!ownsPack && (
+              <View style={styles.stickerLockPill}>
+                <UiIcon name="Lock" size={12} color="#FFFFFF" strokeWidth={2.5} />
+              </View>
+            )}
           </Pressable>
         ))}
       </ScrollView>}
@@ -1199,7 +1235,37 @@ function Piece({ i, width }: { i: number; width: number }) {
 }
 
 export function Confetti() {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const smooth = getSmoothModeSync();
+    let cancelled = false;
+    const fire = () => {
+      if (cancelled) return;
+      try {
+        void confetti({
+          particleCount: smooth ? 28 : 80,
+          spread: 78,
+          origin: { y: 0.62 },
+          colors: CONFETTI_COLORS,
+          disableForReducedMotion: smooth,
+        });
+        if (!smooth) {
+          setTimeout(() => {
+            if (cancelled) return;
+            try {
+              void confetti({ particleCount: 45, angle: 60, spread: 55, origin: { x: 0.08, y: 0.68 }, colors: CONFETTI_COLORS });
+              void confetti({ particleCount: 45, angle: 120, spread: 55, origin: { x: 0.92, y: 0.68 }, colors: CONFETTI_COLORS });
+            } catch { /* bỏ qua trên headless thiếu 2D context */ }
+          }, 180);
+        }
+      } catch { /* bỏ qua trên headless thiếu 2D context */ }
+    };
+    fire();
+    return () => { cancelled = true; };
+  }, []);
+
   const width = Math.min(Dimensions.get('window').width, 520);
+  if (Platform.OS === 'web') return null;
   const count = getSmoothModeSync() ? 22 : 70;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', zIndex: 60 }]}>
@@ -1211,8 +1277,11 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
-  quota: { fontSize: 13, fontWeight: '800', color: C.jade, marginTop: -4 },
-  stickerLock: { position: 'absolute', right: 2, top: 2, fontSize: 16 },
+  quota: { fontSize: 13, fontWeight: '800', color: C.jadeDeep },
+  stickerLockPill: {
+    position: 'absolute', right: 4, top: 4, width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(15,23,42,0.86)', alignItems: 'center', justifyContent: 'center',
+  },
   limitNote: { fontSize: 11, color: C.muted, lineHeight: 15, marginTop: -4 },
   stickerRow: { gap: 8, paddingVertical: 4 },
   stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 12 },
@@ -1242,7 +1311,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 },
   cell: { width: '31%', alignItems: 'stretch' },
   cellLabel: { textAlign: 'center', fontSize: 13, fontWeight: '700', color: C.muted },
-  sectionLabel: { fontSize: 14, fontWeight: '800', color: C.muted, marginBottom: -6 },
+  sectionLabel: { fontSize: 14, fontWeight: '800', color: C.muted },
+  secHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: -4 },
   hits: { flexDirection: 'row', justifyContent: 'space-between' },
   trollLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 85, overflow: 'hidden' },
   squashed: { fontSize: 40, textAlign: 'center' },
@@ -1275,6 +1345,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 86,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: '#181016',
     borderRadius: 99,
     paddingHorizontal: 14,
@@ -1288,8 +1361,9 @@ const styles = StyleSheet.create({
     color: C.gold,
   },
   filterPill: {
-    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 99,
-    backgroundColor: C.mist, borderWidth: 1.5, borderColor: '#D0C9B8',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99,
+    backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.14)',
   },
   filterPillOn: { backgroundColor: C.ink, borderColor: C.ink },
   filterPillTxt: { fontSize: 12, fontWeight: '800', color: C.ink },

@@ -17,6 +17,7 @@ import { Shell } from '../components/Shell';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { TimerBar } from '../components/TimerBar';
 import { useShake } from '../components/Fun';
+import { EmojiIcon, UiIcon } from '../components/Icons';
 
 export function WordChainScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as WordChainView;
@@ -164,7 +165,10 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   const controls = (
     <>
       {isSpectator ? null : meOut ? (
-        <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé 🩴</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé</T>
+          <EmojiIcon emoji="🩴" size={16} />
+        </View>
       ) : myTurn ? (
         <>
           <KeyboardLift>
@@ -172,7 +176,9 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               <View style={[styles.inputBox, voting && { opacity: 0.5 }]}>
                 <View testID="word-prefix" style={styles.prefix} accessibilityLabel={`Chữ đầu: ${last}`}>
                   <T style={styles.prefixText}>{last}</T>
-                  <T style={styles.lock}>🔒</T>
+                  <View style={{ marginLeft: 3 }}>
+                    <UiIcon name="Lock" size={12} color="#FEF08A" />
+                  </View>
                 </View>
                 <TextInput
                   testID="word-input"
@@ -303,26 +309,42 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
   return (
     <View pointerEvents="box-none" style={styles.voteLayer}>
       <View testID="vote-card" style={[styles.voteCard, sticker(6)]}>
-        <T style={styles.voteHead}>🗳️ {vote.byId === me ? 'Bạn' : vote.byName} xin duyệt từ</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <EmojiIcon emoji="🗳️" size={16} />
+          <T style={styles.voteHead}>{vote.byId === me ? 'Bạn' : vote.byName} xin duyệt từ</T>
+        </View>
         <T style={styles.voteWord}>“{vote.word}”</T>
         <T style={styles.voteSub}>
           {canVote ? 'Từ này có nghĩa không?' : vote.byId === me ? 'Đang chờ cả phòng bỏ phiếu…' : 'Cả phòng đang bỏ phiếu…'} ({left}s)
         </T>
-        <T testID="vote-tally" style={styles.tally}>
-          👍 {vote.yes.length}   👎 {vote.no.length}   ⏳ {vote.voters.length - vote.yes.length - vote.no.length}
-        </T>
+        <View testID="vote-tally" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <EmojiIcon emoji="👍" size={14} />
+            <T style={styles.tally}>{vote.yes.length}</T>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <EmojiIcon emoji="👎" size={14} />
+            <T style={styles.tally}>{vote.no.length}</T>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <EmojiIcon emoji="⏳" size={14} />
+            <T style={styles.tally}>{vote.voters.length - vote.yes.length - vote.no.length}</T>
+          </View>
+        </View>
         {canVote && (
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button
               testID="vote-yes"
-              title="👍 Có nghĩa"
+              icon="👍"
+              title="Có nghĩa"
               variant={myVote === 'yes' ? 'jade' : 'paper'}
               style={{ flex: 1 }}
               onPress={() => cast(true)}
             />
             <Button
               testID="vote-no"
-              title="👎 Không"
+              icon="👎"
+              title="Không"
               variant={myVote === 'no' ? 'ink' : 'paper'}
               style={{ flex: 1 }}
               onPress={() => cast(false)}

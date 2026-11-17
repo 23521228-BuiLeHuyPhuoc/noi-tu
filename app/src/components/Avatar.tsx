@@ -7,20 +7,21 @@ import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
 import { FrameWrap, NameText, TitleBadge, VipBadge } from './Cosmetics';
+import { EmojiIcon, RankMedal, UiIcon } from './Icons';
 import { useMeasuredView } from '../viewMeasurements';
 
 /** màu phủ lên avatar theo chiêu: sét (cháy đen), băng, hôn gió (đỏ mặt) */
 const TINTS = {
-  burnt: { bg: 'rgba(14,10,8,0.74)', emoji: '💨' },
-  ice: { bg: 'rgba(120,205,255,0.55)', emoji: '🧊' },
-  blush: { bg: 'rgba(255,70,110,0.38)', emoji: '😘' },
+  burnt: { bg: 'rgba(14,10,8,0.76)', emoji: '💨' },
+  ice: { bg: 'rgba(120,205,255,0.58)', emoji: '🧊' },
+  blush: { bg: 'rgba(255,70,110,0.42)', emoji: '😘' },
 } as const;
 
-/** biến hình do hiệu ứng phụ của món chọc: nền phủ + emoji to giữa mặt */
+/** biến hình do hiệu ứng phụ của món chọc: nền phủ + vector icon giữa mặt */
 const MORPHS = {
-  pig: { bg: 'rgba(255,170,200,0.86)', emoji: '🐷' },
-  baby: { bg: 'rgba(255,236,200,0.86)', emoji: '👶' },
-  stone: { bg: 'rgba(110,110,116,0.88)', emoji: '🗿' },
+  pig: { bg: 'rgba(255,170,200,0.88)', emoji: '🐷' },
+  baby: { bg: 'rgba(255,236,200,0.88)', emoji: '👶' },
+  stone: { bg: 'rgba(110,110,116,0.9)', emoji: '🗿' },
 } as const;
 
 /** bom trên đầu đếm ngược 5 → 1 (tự đếm theo thời gian thật) */
@@ -33,8 +34,10 @@ function BombBadge() {
   }, [left]);
   return (
     <View pointerEvents="none" style={styles.bomb}>
-      <Text style={{ fontSize: 20 }}>💣</Text>
-      <Text style={styles.bombCount}>{Math.max(1, left)}</Text>
+      <EmojiIcon emoji="💣" size={22} />
+      <View style={styles.bombCountPill}>
+        <Text style={styles.bombCount}>{Math.max(1, left)}</Text>
+      </View>
     </View>
   );
 }
@@ -46,7 +49,7 @@ const PortraitImage = memo(function PortraitImage({ p, mood = 'normal', size, re
   return (
     <>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ fontSize: size * 0.55 }}>{avatarOf(p.avatar).emoji}</Text>
+        <EmojiIcon emoji={avatarOf(p.avatar).emoji} size={Math.max(16, Math.round(size * 0.56))} />
       </View>
       <Image source={{ uri }} onError={() => setFailedUri(primary)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
     </>
@@ -88,7 +91,6 @@ export const Avatar = memo(function Avatar({
       return;
     }
     if (face.wobble === 'big') {
-      // Mặt phồng to gấp đôi rồi lắc lư ngớ ngẩn
       Animated.spring(grow, { toValue: 2, friction: 3, tension: 120, useNativeDriver: true }).start();
       const anim = Animated.loop(
         Animated.sequence([
@@ -100,7 +102,6 @@ export const Avatar = memo(function Avatar({
       return () => anim.stop();
     }
     if (face.wobble === 'slip') {
-      // Trượt vỏ chuối: ngửa ra sau, xoay một vòng rồi nằm sõng soài
       const anim = Animated.sequence([
         Animated.timing(rot, { toValue: -0.12, duration: 110, useNativeDriver: true }),
         Animated.timing(rot, { toValue: 1, duration: 420, useNativeDriver: true }),
@@ -111,7 +112,6 @@ export const Avatar = memo(function Avatar({
       return () => anim.stop();
     }
     if (face.wobble === 'spin') {
-      // Xoay qua xoay lại lắc lư rồi lộn vòng 360 độ
       const anim = Animated.loop(
         Animated.sequence([
           Animated.timing(rot, { toValue: -0.14, duration: 95, useNativeDriver: true }),
@@ -125,7 +125,6 @@ export const Avatar = memo(function Avatar({
       anim.start();
       return () => anim.stop();
     }
-    // shake / blackout: lắc qua lắc lại liên hồi
     const anim = Animated.loop(
       Animated.sequence([
         Animated.parallel([
@@ -170,7 +169,7 @@ export const Avatar = memo(function Avatar({
           {
             width: size, height: size, borderRadius: size / 2,
             backgroundColor: pt.light,
-            borderColor: borderCol, borderWidth: ring || player.character ? 3.5 : 2.5,
+            borderColor: borderCol, borderWidth: ring || player.character ? 3 : 2,
             transform: [
               ...(active ? [{ scale: 1.08 }] : []),
               { scale: grow },
@@ -187,34 +186,56 @@ export const Avatar = memo(function Avatar({
         )}
         {face.tint && (
           <View pointerEvents="none" testID={`tint-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: TINTS[face.tint].bg }]}>
-            <Text style={{ fontSize: Math.max(14, size * 0.4) }}>{TINTS[face.tint].emoji}</Text>
+            <EmojiIcon emoji={TINTS[face.tint].emoji} size={Math.max(16, Math.round(size * 0.44))} />
           </View>
         )}
         {face.morph && face.morph in MORPHS && (
           <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: MORPHS[face.morph as keyof typeof MORPHS].bg }]}>
-            <Text style={{ fontSize: Math.max(18, size * 0.62) }}>{MORPHS[face.morph as keyof typeof MORPHS].emoji}</Text>
+            <EmojiIcon emoji={MORPHS[face.morph as keyof typeof MORPHS].emoji} size={Math.max(20, Math.round(size * 0.64))} />
           </View>
         )}
         {face.morph === 'cage' && (
           <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.cage, { borderRadius: size / 2 }]}>
             {[0, 1, 2, 3, 4].map((i) => <View key={i} style={styles.cageBar} />)}
-            <Text style={styles.cageLock}>🔒</Text>
+            <View style={styles.cageLockPill}>
+              <UiIcon name="Lock" size={11} color="#FEF08A" strokeWidth={2.5} />
+            </View>
           </View>
         )}
         {face.wobble === 'blackout' && (
           <View pointerEvents="none" style={[styles.blackoutMask, { borderRadius: size / 2 }]}>
-            <Text style={{ fontSize: 16 }}>🔌</Text>
+            <EmojiIcon emoji="🔌" size={Math.max(16, Math.round(size * 0.42))} />
           </View>
         )}
-        {player.avatarUrl && face.mood !== 'normal' && <Text style={styles.moodBadge}>{MOOD_EMOJI[face.mood]}</Text>}
-        {face.charm && <Text testID={`charm-${player.id}`} style={styles.charm}>✨</Text>}
+        {player.avatarUrl && face.mood !== 'normal' && (
+          <View pointerEvents="none" style={styles.moodBadge}>
+            <EmojiIcon emoji={MOOD_EMOJI[face.mood]} size={16} />
+          </View>
+        )}
+        {face.charm && (
+          <View pointerEvents="none" testID={`charm-${player.id}`} style={styles.charm}>
+            <EmojiIcon emoji="✨" size={18} />
+          </View>
+        )}
         {face.morph === 'bomb' && <BombBadge />}
-        {host && <Text style={styles.crown}>👑</Text>}
-        {!player.connected && <Text style={styles.off}>💤</Text>}
-        {editable && player.connected && <Text testID="avatar-edit-badge" style={styles.edit}>✏️</Text>}
+        {host && (
+          <View pointerEvents="none" style={styles.crown}>
+            <EmojiIcon emoji="👑" size={18} />
+          </View>
+        )}
+        {!player.connected && (
+          <View pointerEvents="none" style={styles.offPill}>
+            <EmojiIcon emoji="💤" size={14} />
+          </View>
+        )}
+        {editable && player.connected && (
+          <View pointerEvents="none" testID="avatar-edit-badge" style={styles.editPill}>
+            <UiIcon name="Pencil" size={10} color="#1C2024" strokeWidth={2.5} />
+          </View>
+        )}
         {rank !== undefined && (
-          <View testID={`rank-badge-${player.id}`} style={[styles.rank, rank === 1 && { backgroundColor: C.gold }]}>
-            <Text style={styles.rankText}>{rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}</Text>
+          <View testID={`rank-badge-${player.id}`} style={[styles.rank, rank === 1 && { backgroundColor: '#FFF7C2', borderColor: '#F59E0B' }]}>
+            <RankMedal rank={rank} size={16} />
           </View>
         )}
       </Animated.View>
@@ -225,7 +246,6 @@ export const Avatar = memo(function Avatar({
           {cos?.title ? <TitleBadge title={cos.title} /> : null}
         </View>
       )}
-      {/* tên đầy đủ, xuống dòng khi dài (không cắt bớt) */}
       <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: cos?.title || player.vipTier ? 1 : 7 }]}>
         {face.morph === 'flipname' ? Array.from(player.name).reverse().join('') : player.name}{me ? ' (bạn)' : ''}
       </NameText>
@@ -243,39 +263,47 @@ const styles = StyleSheet.create({
   active: {
     shadowColor: C.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 0,
     borderColor: C.gold, transform: [{ scale: 1.08 }],
-    // vòng sáng vàng quanh người đang tới lượt
-    outlineWidth: 4, outlineColor: C.gold, outlineStyle: 'solid', outlineOffset: 2,
+    outlineWidth: 3.5, outlineColor: C.gold, outlineStyle: 'solid', outlineOffset: 2,
   } as object,
   doodle: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   blackoutMask: {
     position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
     backgroundColor: 'rgba(5, 7, 15, 0.72)', alignItems: 'center', justifyContent: 'center',
   },
-  moodBadge: { position: 'absolute', bottom: -4, left: -4, fontSize: 16 },
-  charm: { position: 'absolute', top: -8, right: -8, fontSize: 18 },
+  moodBadge: { position: 'absolute', bottom: -4, left: -4 },
+  charm: { position: 'absolute', top: -8, right: -8 },
   cage: {
     position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', overflow: 'hidden',
     flexDirection: 'row', justifyContent: 'space-evenly', backgroundColor: 'rgba(20,20,30,0.25)',
   },
   cageBar: { width: 3, height: '100%', backgroundColor: '#2B2B33', borderRadius: 2 },
-  cageLock: { position: 'absolute', bottom: -2, alignSelf: 'center', fontSize: 14 },
-  bomb: { position: 'absolute', top: -14, alignSelf: 'center', alignItems: 'center' },
-  bombCount: {
-    position: 'absolute', top: 4, fontSize: 10, fontWeight: '900', color: '#FFF',
-    textShadowColor: '#000', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 },
+  cageLockPill: {
+    position: 'absolute', bottom: 1, alignSelf: 'center', width: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(15,23,42,0.88)', alignItems: 'center', justifyContent: 'center',
   },
+  bomb: { position: 'absolute', top: -15, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
+  bombCountPill: {
+    position: 'absolute', bottom: -2, right: -4, width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#DC2626', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+  },
+  bombCount: { fontSize: 9, fontWeight: '900', color: '#FFFFFF' },
   nick: {
     fontFamily: FONT, fontSize: 10, lineHeight: 12, textAlign: 'center', fontWeight: '900', color: C.ink, backgroundColor: C.gold, borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden', maxWidth: '100%',
   },
-  crown: { position: 'absolute', top: -14, fontSize: 18 },
+  crown: { position: 'absolute', top: -13 },
   rank: {
-    position: 'absolute', top: -5, left: -7, minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 3,
-    backgroundColor: C.paper, borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: -5, left: -7, minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 2,
+    backgroundColor: C.paper, borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.25)', alignItems: 'center', justifyContent: 'center',
   },
-  rankText: { fontFamily: FONT, fontSize: 11, fontWeight: '900', color: C.ink },
-  off: { position: 'absolute', bottom: -6, right: -6, fontSize: 16 },
-  edit: { position: 'absolute', bottom: -6, right: -8, fontSize: 15 },
+  offPill: {
+    position: 'absolute', bottom: -5, right: -5, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(15,23,42,0.85)', alignItems: 'center', justifyContent: 'center',
+  },
+  editPill: {
+    position: 'absolute', bottom: -4, right: -5, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.25)', alignItems: 'center', justifyContent: 'center',
+  },
   name: {
     fontFamily: FONT, fontSize: 12, lineHeight: 15, fontWeight: '700', color: C.onSon, maxWidth: '100%', textAlign: 'center',
     wordBreak: 'break-word', overflowWrap: 'anywhere',
@@ -291,7 +319,7 @@ export const Portrait = memo(function Portrait({ p, size = 40, border = 2.5, fra
     <View
       style={{
         width: size, height: size, borderRadius: size / 2, backgroundColor: pt.light, overflow: 'hidden',
-        borderWidth: border, borderColor: p.character ? pt.hex : C.ink,
+        borderWidth: border, borderColor: p.character ? pt.hex : 'rgba(28,32,36,0.35)',
       }}
     >
       <PortraitImage p={p} size={size} resolvedUri={pt.uri} />

@@ -23,9 +23,9 @@ noi-tu/
   shared/   kiểu dữ liệu, từ vựng, bộ vai Ma Sói / Gián Điệp / Đố Vui / Vẽ & Đoán / Map / Shop VIP
   server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho mọi game
     src/games/   wordchain.ts, baucua.ts, typhu.ts, masoi.ts, giandiep.ts, vedoan.ts, bomtu.ts, dovui.ts
-  app/      giao diện React Native Web (Expo) + bộ CSS shader GPU
+  app/      giao diện React Native Web (Expo) — DiceBear Studio, Lucide, Fluent Emoji Flat, Game Icons, Be Vietnam Pro, Motion, Radix Colors & Open Props
   e2e/      test trình duyệt thật (Playwright đa màn hình & kiểm tra hình ảnh)
-  docs/     tài liệu thiết kế các phase (00–08)
+  docs/     tài liệu thiết kế các phase (00–09)
 ```
 
 ## Tóm tắt 9 trò chơi

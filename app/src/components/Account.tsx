@@ -15,6 +15,7 @@ import { authText } from '../messages';
 import { WalletSheet } from './Wallet';
 import { ShopSheet } from './Shop';
 import { AdminSheet } from './Admin';
+import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
 
 function AvatarPicker({ value, onChange, disabled = false }: { value: number; onChange: (i: number) => void; disabled?: boolean }) {
   return (
@@ -319,7 +320,8 @@ function AccountSecurity({ game, user }: { game: Game; user: PublicUser }) {
         </View>
       ) : (
         <View style={styles.emailRow}>
-          <T style={{ flex: 1 }}>📧 {user.email}</T>
+          <UiIcon name="Info" size={16} color={C.muted} />
+          <T style={{ flex: 1 }}>{user.email}</T>
           <Button small variant="paper" title="Sửa" onPress={() => setEditing(true)} />
         </View>
       )}
@@ -482,9 +484,12 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
       <Button testID="profile-save" title={busy ? 'Đang lưu…' : 'Lưu tên'} disabled={busy || uploading || !displayName.trim()} onPress={saveName} />
       {user && (
         <View testID="profile-wallet" style={styles.rubyRow}>
-          <T style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
-          {user.admin && <Button testID="admin-open" small variant="ink" title="🛠 Quản trị" onPress={() => setSub('admin')} />}
-          <Button testID="shop-open-profile" small variant="paper" title="🛍️ Cửa hàng" onPress={() => setSub('shop')} />
+          <View style={styles.rubyPill}>
+            <RubyIcon size={17} />
+            <T style={styles.rubyText}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+          </View>
+          {user.admin && <Button testID="admin-open" small variant="ink" icon="🛠" title="Quản trị" onPress={() => setSub('admin')} />}
+          <Button testID="shop-open-profile" small variant="paper" icon="🛍️" title="Cửa hàng" onPress={() => setSub('shop')} />
           <Button testID="wallet-open-profile" small variant="gold" title="Nạp / lịch sử" onPress={() => setSub('wallet')} />
         </View>
       )}
@@ -510,7 +515,9 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
   return (
     <Pressable testID="guest-profile-edit" accessibilityRole="button" accessibilityLabel="Sửa tên và ảnh" onPress={onPress} style={styles.guestAvatar}>
       <Portrait p={{ avatar: game.guest.avatar ?? 0, avatarUrl: game.guest.avatarUrl }} size={52} />
-      <T style={styles.editBadge}>✏️</T>
+      <View style={styles.editBadge}>
+        <UiIcon name="Pencil" size={11} color="#1C2024" strokeWidth={2.5} />
+      </View>
     </Pressable>
   );
 }
@@ -540,15 +547,23 @@ export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user:
           {eq.title && <TitleBadge title={eq.title} />}
           <T style={styles.puser}>@{user.username}</T>
           <T style={styles.pstat}>{played} ván · {won} lần thắng</T>
-          {(user.giftPoints ?? 0) > 0 && <T testID="gift-points" style={styles.pgift}>💝 {(user.giftPoints ?? 0).toLocaleString('vi-VN')} điểm quà</T>}
+          {(user.giftPoints ?? 0) > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <EmojiIcon emoji="💝" size={14} />
+              <T testID="gift-points" style={styles.pgift}>{(user.giftPoints ?? 0).toLocaleString('vi-VN')} điểm quà</T>
+            </View>
+          )}
         </View>
-        <Button testID="profile-edit" small variant="paper" title="Sửa" onPress={onEdit} />
+        <Button testID="profile-edit" small variant="paper" iconNode={<UiIcon name="Pencil" size={14} color={C.ink} />} title="Sửa" onPress={onEdit} />
       </View>
       {onWallet && (
         <View style={styles.rubyRow}>
-          <T testID="home-ruby" style={styles.rubyText}>💎 {(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
-          {user.admin && onAdmin && <Button testID="admin-open-home" small variant="ink" title="🛠 Quản trị" onPress={onAdmin} />}
-          {onShop && <Button testID="shop-open" small variant="paper" title="🛍️ Cửa hàng" onPress={onShop} />}
+          <View style={styles.rubyPill}>
+            <RubyIcon size={17} />
+            <T testID="home-ruby" style={styles.rubyText}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+          </View>
+          {user.admin && onAdmin && <Button testID="admin-open-home" small variant="ink" icon="🛠" title="Quản trị" onPress={onAdmin} />}
+          {onShop && <Button testID="shop-open" small variant="paper" icon="🛍️" title="Cửa hàng" onPress={onShop} />}
           <Button testID="wallet-open" small variant="gold" title="Nạp Ruby" onPress={onWallet} />
         </View>
       )}
@@ -572,17 +587,17 @@ const styles = StyleSheet.create({
   tabText: { fontWeight: '800', fontSize: 15 },
   label: { fontSize: 14, fontWeight: '800', color: C.muted },
   input: {
-    fontFamily: FONT, backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, height: 48,
-    fontSize: 17, color: C.ink, borderWidth: 2, borderColor: C.ink, fontWeight: '600',
+    fontFamily: FONT, backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, height: 48,
+    fontSize: 16, color: C.ink, borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.18)', fontWeight: '600',
   },
-  error: { color: C.ink, backgroundColor: '#FFD6D6', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   note: { fontSize: 12, color: C.muted, textAlign: 'center' },
   avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   pick: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  pickOn: { transform: [{ scale: 1.12 }], shadowColor: C.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 0 },
+  pickOn: { transform: [{ scale: 1.12 }], shadowColor: C.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  bigAvatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink },
-  userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: C.ink, overflow: 'hidden' },
+  bigAvatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.ink },
+  userAvatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.ink, overflow: 'hidden' },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   photoNote: { fontSize: 11, color: C.muted, lineHeight: 15 },
   mismatch: { color: C.danger, fontWeight: '800', fontSize: 13 },
@@ -590,10 +605,19 @@ const styles = StyleSheet.create({
   warnNote: { color: C.ink, backgroundColor: C.gold, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   emailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rubyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rubyText: { flex: 1, fontSize: 17, fontWeight: '900', color: C.son },
-  okNote: { color: C.ink, backgroundColor: '#D8F8E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
+  rubyPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFF1F2', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: 'rgba(202,36,77,0.18)', minWidth: 120,
+  },
+  rubyText: { fontSize: 16, fontWeight: '900', color: C.son },
+  okNote: { color: '#134E3A', backgroundColor: '#D6F1E3', padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
   guestAvatar: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
-  editBadge: { position: 'absolute', right: -4, bottom: -4, fontSize: 16 },
+  editBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   pname: { fontSize: 20, fontWeight: '900' },
   puser: { fontSize: 13, color: C.muted, fontWeight: '600' },
   pstat: { fontSize: 13, color: C.jade, fontWeight: '800' },

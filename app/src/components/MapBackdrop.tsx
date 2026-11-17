@@ -1,10 +1,11 @@
 /**
- * Nền Map & Chủ Đề Màu Phòng: đổi toàn bộ không khí thị giác + hiệu ứng hạt nền chạy GPU CSS.
- * Khi bật chế độ "⚡ Siêu mượt", giữ nguyên bảng màu đẹp và tắt bớt hạt bay để tối ưu hiệu năng.
+ * Nền Map & Chủ Đề Màu Phòng: kết hợp gradient đa tầng + hạt vector Fluent chạy GPU CSS 60fps.
+ * Khi bật chế độ "Siêu mượt", giữ nguyên gradient tinh tế và tắt hạt bay để tối ưu hiệu năng.
  */
 import { memo, useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { themeById, type RoomTheme } from '../../../shared/src/themes';
+import { EmojiIcon } from './Icons';
 
 const web = (o: Record<string, unknown>) => (Platform.OS === 'web' ? (o as object) : {});
 
@@ -36,16 +37,15 @@ function makeParticles(fx: NonNullable<RoomTheme['particleFx']>, count: number):
   const glyphs = GLYPHS[fx];
   if (!glyphs.length || count <= 0) return [];
   return Array.from({ length: count }, (_, i) => {
-    // rải vị trí cố định không dùng Math.random lúc render
     const s1 = ((i * 37 + 13) % 94) + 3;
     const s2 = ((i * 53 + 7) % 88) + 4;
     return {
       id: i,
       leftPct: s1,
       topPct: s2,
-      delay: ((i * 0.65) % 5).toFixed(2) as unknown as number,
+      delay: Number(((i * 0.65) % 5).toFixed(2)),
       dur: 5.5 + (i % 5) * 1.4,
-      size: fx === 'galaxy' ? 10 + (i % 3) * 5 : 14 + (i % 4) * 4,
+      size: fx === 'galaxy' ? 12 + (i % 3) * 5 : 15 + (i % 4) * 4,
       glyph: glyphs[i % glyphs.length],
     };
   });
@@ -63,6 +63,8 @@ function backgroundGradient(t: RoomTheme): string {
       return 'radial-gradient(circle at 50% 20%, rgba(245,158,11,0.18), transparent 55%), linear-gradient(165deg, #094D38 0%, #042219 100%)';
     case 'pho_dem_neon':
       return 'radial-gradient(circle at 15% 15%, rgba(8,247,254,0.16), transparent 42%), radial-gradient(circle at 85% 80%, rgba(255,0,229,0.16), transparent 42%), linear-gradient(160deg, #0C1220 0%, #191D38 100%)';
+    case 'son_mac_dinh':
+      return 'radial-gradient(circle at 20% 10%, rgba(255,197,61,0.18), transparent 44%), radial-gradient(circle at 85% 88%, rgba(100,23,43,0.45), transparent 55%), linear-gradient(170deg, #C81E4C 0%, #8E1132 56%, #5B0B21 100%)';
     default:
       return `linear-gradient(175deg, ${t.bg} 0%, ${t.bgAlt} 100%)`;
   }
@@ -108,24 +110,24 @@ export const MapBackdrop = memo(function MapBackdrop({ themeId, smooth = false }
               : 'xl-star-twinkle';
         const isFallOrRise = animName !== 'xl-star-twinkle';
         return (
-          <Text
+          <View
             key={p.id}
             style={[
               styles.particle,
               {
                 left: `${p.leftPct}%`,
-                top: isFallOrRise ? -30 : `${p.topPct}%`,
-                fontSize: p.size,
+                top: isFallOrRise ? -32 : `${p.topPct}%`,
                 opacity: fx === 'galaxy' ? 0.85 : 0.72,
-              },
+              } as object,
               web({
-                animation: `${animName} ${p.dur}s ${isFallOrRise ? 'linear' : 'ease-in-out'} ${p.delay}s infinite`,
+                animation: `${animName} ${p.dur}s linear ${p.delay}s infinite`,
                 willChange: 'transform, opacity',
+                filter: fx === 'neon' || fx === 'galaxy' ? 'drop-shadow(0 0 6px rgba(255,255,255,0.45))' : undefined,
               }),
             ]}
           >
-            {p.glyph}
-          </Text>
+            <EmojiIcon emoji={p.glyph} size={p.size} />
+          </View>
         );
       })}
     </View>
@@ -135,6 +137,6 @@ export const MapBackdrop = memo(function MapBackdrop({ themeId, smooth = false }
 const styles = StyleSheet.create({
   particle: {
     position: 'absolute',
-    userSelect: 'none',
+    pointerEvents: 'none',
   } as object,
 });

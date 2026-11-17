@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GAME_INFO, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
@@ -20,38 +20,32 @@ import { PokeLayer } from './PokeFx';
 import { PokeSideLayer } from './PokeSideFx';
 import { Sheet } from './Sheet';
 import { ProfileSheet } from './Account';
+import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
 
 export interface StripOptions {
   sub?: (p: PublicPlayer) => string | undefined;
   active?: string | null;
   dim?: (p: PublicPlayer) => boolean;
   ring?: (p: PublicPlayer) => string | undefined;
-  /** hạng hiển thị thành huy hiệu ở góc avatar */
   rank?: (p: PublicPlayer) => number | undefined;
-  /** thứ tự hiển thị (vd: theo lượt chơi) */
   order?: string[];
 }
 
-/** Các nút chung (trò chuyện, âm thanh, rời phòng) cho màn tự vẽ thanh công cụ (vd: Cờ tỷ phú, bỏ thanh trên) */
 export interface ShellTools {
   openChat: () => void;
   unread: number;
   muted: boolean;
   toggleMute: () => void;
   leave: () => void;
-  /** chạm vào người khác: bảng chọc; chạm vào chính mình: bảng sửa tên & ảnh */
   openPlayer: (id: string) => void;
-  /** mở bảng sửa tên & ảnh của mình */
   openProfile: () => void;
-  /** admin: chọc loạn xạ cả phòng (không có khi không phải admin) */
   chaos?: () => void;
-  /** số lần chọc loạn xạ thành công (đổi số thì hiện lại chữ "-💎20" cạnh nút) */
   chaosHits: number;
 }
 const ToolsCtx = createContext<ShellTools | null>(null);
 export const useShellTools = () => useContext(ToolsCtx);
 
-/** Khung chung cho mọi màn trong phòng: nền Map, thanh trên gọn, hàng avatar 1–12 người, nội dung, vùng nút dưới */
+/** Khung chung cho mọi màn trong phòng: nền Map, HUD kính mờ, hàng avatar 1–12 người, nội dung, vùng nút dưới */
 export function Shell({
   game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false, bare = false,
 }: {
@@ -61,22 +55,16 @@ export function Shell({
   children: ReactNode;
   bottom?: ReactNode;
   scroll?: boolean;
-  /** lớp phủ toàn màn hình (vd: hiệu ứng mở bát) */
   overlay?: ReactNode;
-  /** Cho các bàn chơi ngang như Cờ Tỷ Phú dùng toàn bộ chiều rộng khả dụng. */
   wide?: boolean;
-  /** Chế độ toàn màn hình cho bàn Cờ tỷ phú: gọn thanh trên để bàn cờ choán trọn màn hình. */
   fullscreen?: boolean;
-  /** bỏ hẳn thanh trên + hàng avatar; màn tự đặt nút qua useShellTools() */
   bare?: boolean;
-  /** Ẩn hàng avatar (màn thấp: nhường chỗ cho bàn cờ, thông tin người chơi nằm trong bàn) */
   hideStrip?: boolean;
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [visualOpen, setVisualOpen] = useState(false);
-  // tin nhắn chưa đọc: chỉ đếm tin mới sau khi vào màn hình
   const lastId = game.chat.at(-1)?.id ?? 0;
   const [seenId, setSeenId] = useState(lastId);
   if (chatOpen && seenId !== lastId) setSeenId(lastId);
@@ -97,12 +85,10 @@ export function Shell({
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
   const inlineStrip = compactLandscape && width >= 700;
   const baseSize = fullscreen || compactLandscape || (wide && width >= 700) ? 50 : height >= 780 ? 58 : height >= 700 ? 52 : 44;
-  // Khi phòng 7–12 người, tự thu gọn nhẹ kích thước avatar để strip đỡ cuộn và giảm tải vẽ
   const stripSize = room.players.length >= 10 ? Math.min(baseSize, 42) : room.players.length >= 7 ? Math.min(baseSize, 46) : baseSize;
 
   const openMyProfile = useCallback(() => setProfileOpen(true), []);
 
-  // admin "chọc loạn xạ": bấm liên tục được, mỗi lần thành công hiện "-💎20" bay lên
   const [chaosHits, setChaosHits] = useState(0);
   const chaos = game.user?.admin
     ? () => {
@@ -137,7 +123,7 @@ export function Shell({
         host={p.id === room.hostId}
         active={strip.active === p.id}
         dim={strip.dim?.(p) || p.spectator}
-        sub={p.spectator ? '👀 Đang xem' : strip.sub?.(p)}
+        sub={p.spectator ? 'Đang xem' : strip.sub?.(p)}
         ring={strip.ring?.(p)}
         rank={p.spectator ? undefined : strip.rank?.(p)}
         size={stripSize}
@@ -167,11 +153,19 @@ export function Shell({
       <MapBackdrop themeId={activeThemeId} smooth={smooth} />
       <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
         {!bare && (<>
-        <View style={[styles.top, compactLandscape && styles.topLandscape, iconOnly && styles.topTight]}>
+        <View
+          style={[
+            styles.top,
+            compactLandscape && styles.topLandscape,
+            iconOnly && styles.topTight,
+            Platform.OS === 'web' ? ({ backdropFilter: 'blur(12px)' } as object) : null,
+          ]}
+        >
           <Button
             testID="room-chip"
             small
             variant="paper"
+            iconNode={<UiIcon name="Copy" size={13} color={C.ink} />}
             title={iconOnly ? room.code : `Phòng ${room.code}`}
             style={[styles.chip, iconOnly && styles.chipTight]}
             onPress={async () => (await copyText(room.code)) && feed('Đã sao chép mã phòng')}
@@ -179,13 +173,16 @@ export function Shell({
           {iconOnly && chaos ? (
             <View style={styles.spacer} />
           ) : iconOnly ? (
-            <T accessibilityLabel={GAME_INFO[room.gameType].name} style={[styles.gameIcon, compactLandscape && { flex: 0 }]}>
-              {GAME_META[room.gameType].emoji}
-            </T>
+            <View accessibilityLabel={GAME_INFO[room.gameType].name} style={[styles.gameIconWrap, compactLandscape && { flex: 0 }]}>
+              <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={20} />
+            </View>
           ) : (
-            <T style={[styles.gameName, { color: theme.onBg }, compactLandscape && styles.gameNameLandscape]}>
-              {GAME_META[room.gameType].emoji} {GAME_INFO[room.gameType].name}
-            </T>
+            <View style={[styles.gameNameWrap, compactLandscape && styles.gameNameLandscape]}>
+              <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={20} />
+              <T numberOfLines={1} style={[styles.gameName, { color: theme.onBg }]}>
+                {GAME_INFO[room.gameType].name}
+              </T>
+            </View>
           )}
           {inlineStrip && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
@@ -194,14 +191,21 @@ export function Shell({
           )}
           {chaos && (
             <View>
-              <IconButton testID="chaos-btn" icon="🌪️" label={`Chọc loạn xạ cả phòng (💎${CHAOS_POKE_RUBY})`} style={iconOnly && styles.chaosSmall} onPress={chaos} />
+              <IconButton
+                testID="chaos-btn"
+                icon="🌪️"
+                iconNode={<UiIcon name="Flame" size={iconOnly ? 17 : 19} color="#EA580C" />}
+                label={`Chọc loạn xạ cả phòng (💎${CHAOS_POKE_RUBY})`}
+                style={iconOnly && styles.iconTight}
+                onPress={chaos}
+              />
               {chaosHits > 0 && <ChaosFloat key={chaosHits} style={styles.chaosFloatTop} />}
             </View>
           )}
-          <IconButton testID="room-visual-open" icon="🎨" label="Map phòng & Siêu mượt" onPress={() => setVisualOpen(true)} />
-          <IconButton testID="profile-open" icon="✏️" label="Sửa tên & ảnh" onPress={openMyProfile} />
+          <IconButton testID="room-visual-open" icon="🎨" iconNode={<UiIcon name="Palette" size={iconOnly ? 16 : 19} color={C.violet} />} label="Map phòng & Siêu mượt" style={iconOnly && styles.iconTight} onPress={() => setVisualOpen(true)} />
+          <IconButton testID="profile-open" icon="✏️" iconNode={<UiIcon name="Pencil" size={iconOnly ? 16 : 18} color={C.ink} />} label="Sửa tên & ảnh" style={iconOnly && styles.iconTight} onPress={openMyProfile} />
           <View>
-            <IconButton testID="chat-open" icon="💬" label="Trò chuyện" onPress={() => setChatOpen(true)} />
+            <IconButton testID="chat-open" icon="💬" iconNode={<UiIcon name="MessageCircle" size={iconOnly ? 16 : 19} color={C.ink} />} label="Trò chuyện" style={iconOnly && styles.iconTight} onPress={() => setChatOpen(true)} />
             {unread > 0 && (
               <View testID="chat-badge" pointerEvents="none" style={styles.badge}>
                 <T style={styles.badgeText}>{unread > 9 ? '9+' : unread}</T>
@@ -210,13 +214,15 @@ export function Shell({
           </View>
           <IconButton
             icon={muted ? '🔇' : '🔊'}
+            iconNode={<UiIcon name={muted ? 'VolumeX' : 'Volume2'} size={iconOnly ? 16 : 19} color={muted ? C.danger : C.ink} />}
             label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+            style={iconOnly && styles.iconTight}
             onPress={() => {
               setMuted(!muted);
               setMutedState(!muted);
             }}
           />
-          <IconButton testID="leave-open" icon="🚪" label="Rời phòng" onPress={() => setLeaving(true)} />
+          <IconButton testID="leave-open" icon="🚪" iconNode={<UiIcon name="LogOut" size={iconOnly ? 16 : 18} color={C.son} />} label="Rời phòng" style={iconOnly && styles.iconTight} onPress={() => setLeaving(true)} />
         </View>
 
         {!compactLandscape && (
@@ -234,7 +240,8 @@ export function Shell({
 
         {meIsSpectator && (
           <View testID="spectator-banner" style={styles.spectatorBanner}>
-            <T style={styles.spectatorText}>👀 Bạn đang xem ván này. Ván sau sẽ được chơi!</T>
+            <UiIcon name="Eye" size={14} color={C.gold} />
+            <T style={styles.spectatorText}>Bạn đang xem ván này. Ván sau sẽ được chơi!</T>
           </View>
         )}
 
@@ -247,7 +254,7 @@ export function Shell({
         )}
 
         {bottom ? (
-          <View style={[styles.bottom, { borderTopColor: 'rgba(0,0,0,0.22)' }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
+          <View style={[styles.bottom, { borderTopColor: 'rgba(255,255,255,0.12)' }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
         ) : (
           <View onLayout={() => setFeedInset(12)} />
         )}
@@ -265,8 +272,11 @@ export function Shell({
         {visualOpen && (
           <Sheet title="🎨 Giao Diện & Chống Lag" onClose={() => setVisualOpen(false)}>
             <View style={styles.smoothBox}>
-              <View style={{ flex: 1 }}>
-                <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>⚡ Chế độ Siêu Mượt</T>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <UiIcon name="Gauge" size={16} color={C.jadeDeep} />
+                  <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>Chế độ Siêu Mượt</T>
+                </View>
                 <T style={{ fontSize: 12, color: C.muted }}>Tắt hạt bay nền & giảm pháo giấy để máy yếu / phòng 12 người mượt 60fps.</T>
               </View>
               <Button
@@ -278,9 +288,12 @@ export function Shell({
               />
             </View>
 
-            <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>
-              {isHost ? '🗺️ Đổi Map cho cả phòng (kể cả giữa ván)' : '🗺️ Đổi Map hiển thị trên máy bạn'}
-            </T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <UiIcon name="Map" size={16} color={C.ink} />
+              <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>
+                {isHost ? 'Đổi Map cho cả phòng (kể cả giữa ván)' : 'Đổi Map hiển thị trên máy bạn'}
+              </T>
+            </View>
             <View style={{ gap: 6 }}>
               {ROOM_THEMES.map((t) => {
                 const canUse = !isHost ? true : t.price === 0 || ownedSet.has(t.id);
@@ -295,7 +308,7 @@ export function Shell({
                         const err = await game.configure({ settings: { roomTheme: t.id } });
                         if (err) feed(err, 'bad');
                         else {
-                          feed(`Đã đổi Map phòng: ${t.emoji} ${t.name}`, 'good');
+                          feed(`Đã đổi Map phòng: ${t.name}`, 'good');
                           setVisualOpen(false);
                         }
                       } else {
@@ -306,15 +319,27 @@ export function Shell({
                     style={[styles.mapItem, selected && styles.mapItemOn, !canUse && { opacity: 0.5 }]}
                   >
                     <View style={[styles.mapSwatch, { backgroundColor: t.bg, borderColor: t.accent }]}>
-                      <T style={{ fontSize: 18 }}>{t.emoji}</T>
+                      <EmojiIcon emoji={t.emoji} size={20} />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <T style={{ fontWeight: '900', fontSize: 13 }}>{t.name}</T>
                       <T style={{ fontSize: 11, color: C.muted }}>{t.desc}</T>
                     </View>
-                    <T style={{ fontWeight: '900', fontSize: 12, color: selected ? C.jade : C.son }}>
-                      {selected ? '✔ Dùng' : canUse ? 'Chọn' : `💎${t.price}`}
-                    </T>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      {selected ? (
+                        <>
+                          <UiIcon name="CheckCircle2" size={14} color={C.jadeDeep} />
+                          <T style={{ fontWeight: '900', fontSize: 12, color: C.jadeDeep }}>Dùng</T>
+                        </>
+                      ) : canUse ? (
+                        <T style={{ fontWeight: '900', fontSize: 12, color: C.son }}>Chọn</T>
+                      ) : (
+                        <>
+                          <RubyIcon size={13} />
+                          <T style={{ fontWeight: '900', fontSize: 12, color: C.son }}>{t.price}</T>
+                        </>
+                      )}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -326,7 +351,7 @@ export function Shell({
             <T style={{ color: C.muted }}>
               {room.phase === 'playing' ? 'Bạn đang trong ván, rời bây giờ là tính như bỏ cuộc.' : 'Bạn có thể vào lại bằng mã phòng.'}
             </T>
-            <Button testID="leave-confirm" title="Rời phòng" variant="ink" onPress={game.leave} />
+            <Button testID="leave-confirm" title="Rời phòng" variant="danger" onPress={game.leave} />
             <Button title="Ở lại" variant="paper" onPress={() => setLeaving(false)} />
           </Sheet>
         )}
@@ -336,7 +361,7 @@ export function Shell({
   );
 }
 
-/** chữ "-💎20" bay lên rồi mờ dần sau mỗi lần chọc loạn xạ (không chặn lần bấm sau) */
+/** chữ "-N Ruby" bay lên rồi mờ dần sau mỗi lần chọc loạn xạ */
 export function ChaosFloat({ style }: { style: StyleProp<ViewStyle> }) {
   const t = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -348,22 +373,36 @@ export function ChaosFloat({ style }: { style: StyleProp<ViewStyle> }) {
     <Animated.View
       testID="chaos-float"
       pointerEvents="none"
-      style={[style, { opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }), transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }] }]}
+      style={[
+        style,
+        {
+          flexDirection: 'row', alignItems: 'center', gap: 3, justifyContent: 'center',
+          opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
+          transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }],
+        },
+      ]}
     >
-      <T style={styles.chaosFloatText}>-💎{CHAOS_POKE_RUBY}</T>
+      <T style={styles.chaosFloatText}>-{CHAOS_POKE_RUBY}</T>
+      <RubyIcon size={13} />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, width: '100%', maxWidth: 620, alignSelf: 'center' },
+  root: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
   rootWide: { maxWidth: 1120 },
   rootFullscreen: { maxWidth: '100%' },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 4 },
-  topLandscape: { paddingTop: 3, paddingBottom: 2, paddingHorizontal: 8, gap: 6 },
-  chip: { marginBottom: 0, flexShrink: 1, minWidth: 0 },
-  gameName: { flex: 1, color: C.onSon, fontWeight: '800', fontSize: 15 },
-  gameIcon: { flex: 1, minWidth: 0, fontSize: 22, textAlign: 'center' },
+  top: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginHorizontal: 10, marginTop: 8, paddingHorizontal: 8, paddingVertical: 6,
+    borderRadius: 18, backgroundColor: 'rgba(15, 23, 42, 0.36)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  topLandscape: { marginTop: 3, paddingVertical: 3, paddingHorizontal: 8, gap: 6 },
+  chip: { flexShrink: 0 },
+  gameNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  gameName: { color: C.onSon, fontWeight: '800', fontSize: 15, flexShrink: 1 },
+  gameIconWrap: { flex: 1, minWidth: 28, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   gameNameLandscape: { flex: 0, marginRight: 4 },
   stripScroll: { flexGrow: 0, flexShrink: 0 },
   stripScrollRow: { flexGrow: 0, flexShrink: 0, maxHeight: 68, minHeight: 68 },
@@ -376,24 +415,26 @@ const styles = StyleSheet.create({
   contentLandscape: { paddingBottom: 4, gap: 6 },
   contentFullscreen: { paddingHorizontal: 4, paddingBottom: 4, gap: 4 },
   spectatorBanner: {
-    marginHorizontal: 12, marginBottom: 4, paddingVertical: 5, paddingHorizontal: 10,
-    backgroundColor: 'rgba(25, 18, 14, 0.86)', borderRadius: 10, borderWidth: 1.5, borderColor: C.gold,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: 12, marginTop: 4, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.78)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,197,61,0.55)',
   },
   spectatorText: { color: C.gold, fontSize: 12, fontWeight: '800', textAlign: 'center' },
   badge: {
-    position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.gold,
-    borderWidth: 2, borderColor: C.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    position: 'absolute', top: -5, right: -5, minWidth: 19, height: 19, borderRadius: 9.5, backgroundColor: '#EF4444',
+    borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
-  badgeText: { fontSize: 11, fontWeight: '900' },
-  chaosSmall: { width: 34, height: 34, borderRadius: 17 },
-  topTight: { gap: 4 },
-  chipTight: { paddingHorizontal: 6 },
+  badgeText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
+  chaosSmall: { width: 34, height: 34, borderRadius: 12 },
+  iconTight: { width: 34, height: 34, borderRadius: 11 },
+  topTight: { gap: 4, marginHorizontal: 8, paddingHorizontal: 6 },
+  chipTight: {},
   spacer: { flex: 1 },
-  chaosFloatTop: { position: 'absolute', top: 40, left: -8, right: -8, alignItems: 'center', zIndex: 60 },
+  chaosFloatTop: { position: 'absolute', top: 42, left: -10, right: -10, zIndex: 60 },
   chaosFloatText: { fontSize: 13, fontWeight: '900', color: C.gold, textShadowColor: C.ink, textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-  bottom: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, gap: 8, borderTopWidth: 2, borderTopColor: C.sonDark },
-  smoothBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', borderRadius: 14, borderWidth: 2, borderColor: C.ink, padding: 10 },
-  mapItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12, backgroundColor: C.mist, borderWidth: 2, borderColor: 'transparent' },
+  bottom: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
+  smoothBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(217,119,6,0.28)', padding: 12 },
+  mapItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.08)' },
   mapItemOn: { borderColor: C.jade, backgroundColor: '#ECFDF5' },
-  mapSwatch: { width: 38, height: 38, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  mapSwatch: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 });

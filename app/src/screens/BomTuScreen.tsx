@@ -4,7 +4,7 @@ import type { BomTuView } from '../../../shared/src/bomtu';
 import { themeById } from '../../../shared/src/themes';
 import type { PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { C, FONT } from '../theme';
+import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { Button, Card, T } from '../ui';
 import { Shell, type StripOptions } from '../components/Shell';
@@ -13,6 +13,7 @@ import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { useSecondsLeft } from '../hooks';
+import { EmojiIcon, UiIcon } from '../components/Icons';
 
 export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as BomTuView;
@@ -34,7 +35,7 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
   useEffect(() => {
     const a = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: panic ? 1.12 : 1.05, duration: panic ? 200 : 480, useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: panic ? 1.14 : 1.06, duration: panic ? 200 : 480, useNativeDriver: false }),
         Animated.timing(pulse, { toValue: 1, duration: panic ? 200 : 480, useNativeDriver: false }),
       ]),
     );
@@ -67,7 +68,7 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
       ring: (p: PublicPlayer) => (p.id === view.holderId ? C.danger : !aliveSet.has(p.id) ? '#64748B' : undefined),
       sub: (p: PublicPlayer) => {
         const h = view.hearts[p.id] ?? 0;
-        return h > 0 ? '❤️'.repeat(h) : '💥 Loại';
+        return h > 0 ? `${h} tim` : 'Loại';
       },
     }),
     [view.order, view.holderId, view.hearts, aliveSet],
@@ -75,21 +76,24 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const renderBottom = () => {
     if (!aliveSet.has(me)) {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>💥 Bạn đã hết tim! Cùng cổ vũ những người còn lại nhé.</T>;
+      return <T style={[styles.waitNote, { color: theme.onBg }]}>Bạn đã hết tim! Cùng cổ vũ những người còn lại nhé.</T>;
     }
     if (!isHolder) {
       return (
         <T style={[styles.waitNote, { color: theme.onBg }]}>
-          💣 Quả bom đang trên tay {view.names[view.holderId ?? ''] ?? '...'} — Chuẩn bị sẵn từ chứa tiếng «{view.bombSyllable}»!
+          Quả bom đang trên tay {view.names[view.holderId ?? ''] ?? '...'} — Chuẩn bị sẵn từ chứa tiếng «{view.bombSyllable}»!
         </T>
       );
     }
     return (
       <KeyboardLift>
         <View style={styles.dock}>
-          <T style={[styles.dockAlert, panic && { color: '#DC2626' }]}>
-            🔥 NHANH TAY! Gõ từ 2 chữ chứa tiếng «{view.bombSyllable.toUpperCase()}» để chuyền bom!
-          </T>
+          <View style={styles.alertRow}>
+            <UiIcon name="Flame" size={16} color={panic ? '#FCA5A5' : '#FDE047'} />
+            <T style={[styles.dockAlert, { color: panic ? '#FCA5A5' : theme.onBg }]}>
+              NHANH TAY! Gõ từ 2 chữ chứa tiếng «{view.bombSyllable.toUpperCase()}» để chuyền bom!
+            </T>
+          </View>
           {err && <T style={styles.err}>{err}</T>}
           <View style={styles.inputRow}>
             <TextInput
@@ -102,7 +106,7 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
               maxLength={40}
               style={styles.input}
             />
-            <Button testID="bt-submit" disabled={busy || !word.trim()} title="Nộp!" onPress={submitWord} />
+            <Button testID="bt-submit" disabled={busy || !word.trim()} iconNode={<UiIcon name="Send" size={15} color="#271400" />} title="Nộp!" onPress={submitWord} />
           </View>
         </View>
       </KeyboardLift>
@@ -111,24 +115,24 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
 
   return (
     <Shell game={game} room={room} strip={strip} bottom={renderBottom()}>
-      {/* Thông Báo Nổ Bom Vừa Xảy Ra */}
       {view.lastBoom && (
         <View style={styles.boomBanner}>
+          <EmojiIcon emoji="💥" size={18} />
           <T style={styles.boomTxt}>
-            💥 BÙM!! {view.lastBoom.name} ôm bom tiếng «{view.lastBoom.syllable}» mất 1 tim!
+            BÙM!! {view.lastBoom.name} ôm bom tiếng «{view.lastBoom.syllable}» mất 1 tim!
           </T>
         </View>
       )}
 
       {/* Quả Bom Đếm Ngược Ở Trung Tâm */}
-      <View testID="bt-bomb" style={[styles.bombStage, panic && styles.bombStagePanic]}>
+      <View testID="bt-bomb" style={[styles.bombStage, sticker(4), panic && styles.bombStagePanic]}>
         <View style={styles.stageMeta}>
           <T style={styles.metaChip}>Vòng {view.round}</T>
           <T style={styles.metaChip}>Đã nối: {view.usedCount} từ</T>
         </View>
-        <Animated.Text style={[styles.bombEmoji, { transform: [{ scale: pulse }] }]}>
-          {panic ? '🧨' : '💣'}
-        </Animated.Text>
+        <Animated.View style={[styles.bombHalo, panic && styles.bombHaloPanic, { transform: [{ scale: pulse }] }]}>
+          <EmojiIcon emoji={panic ? '🧨' : '💣'} size={62} />
+        </Animated.View>
         <T style={styles.bombPrompt}>GÕ TỪ 2 CHỮ CÓ TIẾNG</T>
         <View style={styles.syllablePill}>
           <T testID="bt-syllable" style={styles.syllableTxt}>{view.bombSyllable.toUpperCase()}</T>
@@ -139,7 +143,7 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
         <CountdownBar endsAt={view.fuseEndsAt} total={view.fuseSeconds} clockOffset={game.clockOffset} testID="bt-timer" lightText />
       </View>
 
-      {/* Vòng Người Chơi & Tim */}
+      {/* Vòng Người Chơi & Tim Vector */}
       <View style={styles.grid}>
         {view.order.map((id) => {
           const player = playerMap.get(id);
@@ -157,25 +161,39 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
                 dead && styles.seatDead,
               ]}
             >
-              {isHolding && <T style={styles.bombBadge}>💣</T>}
+              {isHolding && (
+                <View style={styles.bombBadge}>
+                  <EmojiIcon emoji="💣" size={16} />
+                </View>
+              )}
               {player ? (
                 <Portrait p={player} size={42} frame={player.cosmetics?.frame} pet={player.cosmetics?.pet} />
               ) : (
-                <T style={{ fontSize: 24 }}>{dead ? '💥' : '🧑'}</T>
+                <UiIcon name={dead ? 'Skull' : 'User'} size={24} color={dead ? C.danger : C.muted} />
               )}
               <NameText fx={player?.cosmetics?.nameFx} style={styles.seatName}>
                 {view.names[id] ?? id}
               </NameText>
-              <T style={styles.heartsTxt}>{h > 0 ? '❤️'.repeat(h) + '🤍'.repeat(Math.max(0, 3 - h)) : '💥 Loại'}</T>
+              <View style={styles.heartsRow}>
+                {h > 0 ? (
+                  Array.from({ length: 3 }, (_, idx) => (
+                    <UiIcon key={idx} name={idx < h ? 'Heart' : 'HeartOff'} size={13} color={idx < h ? '#EF4444' : '#CBD5E1'} />
+                  ))
+                ) : (
+                  <T style={styles.deadTag}>Đã nổ</T>
+                )}
+              </View>
             </View>
           );
         })}
       </View>
 
-      {/* Lịch Sử Chuyền Bom */}
       {view.recent.length > 0 && (
         <Card>
-          <T style={styles.secTitle}>⚡ Lịch Sử Chuyền Bom</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <UiIcon name="Zap" size={15} color={C.goldDeep} />
+            <T style={styles.secTitle}>Lịch Sử Chuyền Bom</T>
+          </View>
           <View style={{ gap: 4 }}>
             {view.recent.slice(-8).reverse().map((entry) => (
               <T key={entry.id} style={[styles.logTxt, entry.boom && { color: '#DC2626', fontWeight: '900' }]}>
@@ -190,44 +208,54 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  boomBanner: { backgroundColor: '#FEE2E2', borderRadius: 14, borderWidth: 2, borderColor: '#DC2626', padding: 10 },
-  boomTxt: { color: '#991B1B', fontWeight: '900', fontSize: 13, textAlign: 'center' },
+  boomBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#FEE2E2', borderRadius: 14, borderWidth: 1.5, borderColor: '#DC2626', padding: 10,
+  },
+  boomTxt: { color: '#991B1B', fontWeight: '900', fontSize: 13, textAlign: 'center', flexShrink: 1 },
 
   bombStage: {
-    backgroundColor: '#1E293B', borderRadius: 18, borderWidth: 3, borderColor: C.ink,
-    padding: 14, alignItems: 'center', gap: 6,
+    backgroundColor: '#0F172A', borderRadius: 22, padding: 15, alignItems: 'center', gap: 8,
   },
   bombStagePanic: { backgroundColor: '#450A0A', borderColor: '#EF4444' },
   stageMeta: { flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch' },
-  metaChip: { color: '#CBD5E1', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
-  bombEmoji: { fontSize: 54 },
+  metaChip: { color: '#CBD5E1', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
+  bombHalo: {
+    width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(255,197,61,0.12)',
+    borderWidth: 1.5, borderColor: 'rgba(255,197,61,0.35)', alignItems: 'center', justifyContent: 'center',
+  },
+  bombHaloPanic: {
+    backgroundColor: 'rgba(239,68,68,0.22)', borderColor: 'rgba(239,68,68,0.6)',
+  },
   bombPrompt: { color: '#CBD5E1', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  syllablePill: { backgroundColor: '#FDE047', borderRadius: 14, borderWidth: 2.5, borderColor: C.ink, paddingHorizontal: 22, paddingVertical: 6 },
-  syllableTxt: { color: C.ink, fontSize: 24, fontWeight: '900', fontFamily: FONT },
+  syllablePill: { backgroundColor: '#FDE047', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 6 },
+  syllableTxt: { color: C.ink, fontSize: 25, fontWeight: '900', fontFamily: FONT },
   holderTxt: { color: '#F8FAFC', fontSize: 13, fontWeight: '700' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
   seat: {
     flexGrow: 1, minWidth: 96, maxWidth: '48%', alignItems: 'center', gap: 4,
-    backgroundColor: '#FFFDF8', borderRadius: 14, borderWidth: 2, borderColor: C.ink,
-    paddingVertical: 9, paddingHorizontal: 6, position: 'relative',
+    backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.14)',
+    paddingVertical: 10, paddingHorizontal: 6, position: 'relative',
   },
-  seatHolding: { borderColor: '#DC2626', borderWidth: 3, backgroundColor: '#FEF2F2' },
+  seatHolding: { borderColor: '#DC2626', borderWidth: 2.5, backgroundColor: '#FEF2F2' },
   seatDead: { opacity: 0.5, backgroundColor: '#E2E8F0' },
-  bombBadge: { position: 'absolute', top: 4, right: 6, fontSize: 16 },
+  bombBadge: { position: 'absolute', top: 6, right: 6 },
   seatName: { fontSize: 12, fontWeight: '900', color: C.ink, textAlign: 'center' },
-  heartsTxt: { fontSize: 12 },
+  heartsRow: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 16 },
+  deadTag: { fontSize: 11, fontWeight: '900', color: C.danger },
 
-  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink, marginBottom: 4 },
+  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
   logTxt: { fontSize: 13, color: C.ink },
 
   dock: { gap: 6 },
-  dockAlert: { fontSize: 13, fontWeight: '900', textAlign: 'center', color: C.ink },
+  alertRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  dockAlert: { fontSize: 13, fontWeight: '900', textAlign: 'center', flexShrink: 1 },
   inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: {
-    flex: 1, backgroundColor: '#FFFFFF', borderColor: C.ink, borderWidth: 2,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, color: C.ink, fontSize: 14, fontWeight: '700',
+    flex: 1, backgroundColor: '#FFFFFF', borderColor: 'rgba(28,32,36,0.22)', borderWidth: 1.5,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, color: C.ink, fontSize: 14, fontWeight: '700',
   },
   waitNote: { fontSize: 13, fontWeight: '800', textAlign: 'center', color: C.muted, paddingVertical: 6 },
-  err: { fontSize: 12, fontWeight: '800', color: C.danger, textAlign: 'center' },
+  err: { fontSize: 12, fontWeight: '800', color: '#FCA5A5', textAlign: 'center' },
 });

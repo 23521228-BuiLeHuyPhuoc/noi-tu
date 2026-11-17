@@ -21,6 +21,7 @@ import { compactXu } from '../format';
 import { rectOf, type Rect } from '../components/Fun';
 import { setMood } from '../funState';
 import { coinFrontUri, coinTiltedUri } from '../coins';
+import { EmojiIcon, RankMedal } from '../components/Icons';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const PAPER = '#F7E7C1';
@@ -42,17 +43,18 @@ function Bowl({ shaking, size = 72 }: { shaking: boolean; size?: number }) {
     return () => loop.stop();
   }, [shaking, a]);
   return (
-    <Animated.Text
+    <Animated.View
       style={{
-        fontSize: size,
+        alignItems: 'center',
+        justifyContent: 'center',
         transform: [
           { rotate: a.interpolate({ inputRange: [-1, 1], outputRange: ['-16deg', '16deg'] }) },
           { translateY: a.interpolate({ inputRange: [-1, 1], outputRange: [-5, 5] }) },
         ],
       }}
     >
-      🥣
-    </Animated.Text>
+      <EmojiIcon emoji="🥣" size={size} />
+    </Animated.View>
   );
 }
 
@@ -261,9 +263,9 @@ function Drop({ x, d, delay }: { x: number; d: number; delay: number }) {
     };
   }, [t, d, delay]);
   return (
-    <Animated.Text style={{ position: 'absolute', left: x, fontSize: 18, top: t.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }}>
-      💧
-    </Animated.Text>
+    <Animated.View style={{ position: 'absolute', left: x, top: t.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }}>
+      <EmojiIcon emoji="💧" size={18} />
+    </Animated.View>
   );
 }
 
@@ -347,8 +349,8 @@ function Reveal({ dice, myBets, delta, onDone }: {
           {phase === 'after' && (
             <View style={[styles.revealMsg, { top: cy + size / 2 + 26 }]}>
               {lost ? (
-                <View testID="bc-sad" style={{ alignItems: 'center' }}>
-                  <T style={{ fontSize: 64 }}>😭</T>
+                <View testID="bc-sad" style={{ alignItems: 'center', gap: 4 }}>
+                  <EmojiIcon emoji="😭" size={62} />
                   <T style={styles.sadText}>Trật lất hết rồi…</T>
                 </View>
               ) : delta && delta > 0 ? (
@@ -470,7 +472,6 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     (a, b) => netOf(b) - netOf(a) || (g.balances[b] ?? 0) - (g.balances[a] ?? 0),
   );
   const rankOf = (id: string) => rankedIds.indexOf(id) + 1;
-  const rankBadge = (rank: number) => (rank === 1 ? '🥇#1' : rank === 2 ? '🥈#2' : rank === 3 ? '🥉#3' : `#${rank}`);
   const [boardOpen, setBoardOpen] = useState(false);
 
   useOnChange(g.step, (step) => {
@@ -659,14 +660,15 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
         <View style={styles.infoRow}>
           {!isSpectator && (
             <T style={styles.wallet}>
-              <T style={{ fontWeight: '900', color: C.son }}>{rankBadge(rankOf(me))}/{rankedIds.length}</T> · Ví{' '}
+              <T style={{ fontWeight: '900', color: C.son }}>#{rankOf(me)}/{rankedIds.length}</T> · Ví{' '}
               <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
               {staked > 0 ? `, cược ${fmt(staked)}` : ''}
               {g.debts[me] ? `, nợ ${g.debts[me]}` : ''}
             </T>
           )}
-          <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={[styles.bxhBtn, sticker(2)]}>
-            <T style={styles.bxhText}>🏆 BXH</T>
+          <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={[styles.bxhBtn, sticker(2), { flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+            <EmojiIcon emoji="🏆" size={14} />
+            <T style={styles.bxhText}>BXH</T>
           </Pressable>
         </View>
       </Card>
@@ -726,7 +728,9 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                     id === me && styles.rankRowMe,
                   ]}
                 >
-                  <T style={styles.rankMedal}>{rankBadge(rank)}</T>
+                  <View style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
+                    <RankMedal rank={rank} size={22} />
+                  </View>
                   <Portrait p={playerOf(id) ?? { avatar: 0 }} size={30} border={2} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <T style={styles.rankName}>

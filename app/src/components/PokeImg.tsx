@@ -1,17 +1,17 @@
 import { Image } from './Image';
 /**
  * Hình 3D của món chọc (Microsoft Fluent Emoji, MIT, (c) Microsoft) tải từ jsDelivr.
- * Không tải được thì dùng ký tự emoji gốc. Hình đã tải được nhớ lại để lần sau hiện ngay.
+ * Không tải được (hoặc offline) thì dùng bộ vector Fluent Flat SVG ngoại tuyến đồng bộ.
  */
 import { memo, useEffect, useState } from 'react';
-import { Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import { pokeImageUrl, type PokeItem } from '../../../shared/src/pokes';
+import { EmojiIcon } from './Icons';
 
 type State = 'ok' | 'fail';
 const known = new Map<string, State>();
 const waiting = new Map<string, Promise<State>>();
 
-/** tải trước một hình; hết `ms` mà chưa xong thì coi như lỗi (nhưng vẫn nhớ kết quả nếu tải xong sau đó) */
 export function preloadPoke(p: Pick<PokeItem, 'fluent'>, ms = 2200): Promise<State> {
   const url = pokeImageUrl(p);
   const k = known.get(url);
@@ -34,7 +34,6 @@ export function preloadPoke(p: Pick<PokeItem, 'fluent'>, ms = 2200): Promise<Sta
   return Promise.race([pending, new Promise<State>((r) => setTimeout(() => r('fail'), ms))]);
 }
 
-/** trạng thái tải của hình: undefined = đang chờ */
 export function usePokeImage(p: Pick<PokeItem, 'fluent'>): State | undefined {
   const url = pokeImageUrl(p);
   const [got, setS] = useState<{ url: string; s: State } | undefined>();
@@ -48,9 +47,9 @@ export function usePokeImage(p: Pick<PokeItem, 'fluent'>): State | undefined {
   return known.get(url) ?? (got?.url === url ? got.s : undefined);
 }
 
-const SHADOW = Platform.OS === 'web' ? { filter: 'drop-shadow(0px 4px 4px rgba(42,10,16,0.35))' } as object : {};
+const SHADOW = Platform.OS === 'web' ? { filter: 'drop-shadow(0px 4px 5px rgba(15,23,42,0.32))' } as object : {};
 
-/** hình món chọc vuông `size` px; `ok` = false (hoặc hình lỗi) thì hiện emoji gốc */
+/** hình món chọc vuông `size` px; `ok` = false (hoặc hình lỗi) thì hiện vector Fluent SVG */
 export const PokeImg = memo(function PokeImg({ item, size, ok = true, shadow = true, style }: {
   item: Pick<PokeItem, 'fluent' | 'emoji'>; size: number; ok?: boolean; shadow?: boolean; style?: StyleProp<ViewStyle>;
 }) {
@@ -67,7 +66,9 @@ export const PokeImg = memo(function PokeImg({ item, size, ok = true, shadow = t
           style={[{ width: size, height: size }, shadow ? SHADOW : null]}
         />
       ) : (
-        <Text style={[{ fontSize: size * 0.78, lineHeight: size, textAlign: 'center', width: size }, shadow ? ({ textShadow: '0px 3px 3px rgba(42,10,16,0.35)' } as object) : null]}>{item.emoji}</Text>
+        <View style={shadow ? SHADOW : undefined}>
+          <EmojiIcon emoji={item.emoji} size={Math.round(size * 0.86)} />
+        </View>
       )}
     </View>
   );

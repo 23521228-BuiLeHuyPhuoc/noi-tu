@@ -3,21 +3,37 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
+    "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
+    "@radix-ui/colors": "^3.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "animate.css": "^4.1.1",
+    "canvas-confetti": "^1.9.4",
     "expo": "~58.0.25",
     "expo-asset": "~58.0.21",
     "expo-audio": "~58.0.12",
+    "expo-blur": "~58.0.6",
+    "expo-font": "~58.0.12",
     "expo-image": "~58.0.18",
     "expo-image-picker": "~58.0.10",
+    "expo-linear-gradient": "~58.0.4",
     "expo-status-bar": "~58.0.5",
+    "lucide-react-native": "^1.74.0",
+    "motion": "^14.14.0",
+    "open-props": "^1.7.23",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.11.1",
+    "react-native-svg": "^15.16.0",
     "react-native-web": "~0.21.4",
     "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
+    "@iconify-json/fluent-emoji-flat": "^1.2.6",
+    "@iconify-json/game-icons": "^1.2.4",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
@@ -28,7 +44,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "sync:icons": "node scripts/sync-iconify-pack.mjs"
   },
   "private": true
 }

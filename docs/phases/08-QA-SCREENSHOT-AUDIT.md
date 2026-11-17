@@ -59,3 +59,11 @@
    - Thêm viền bóng tối cho `NameText` (`GRAD_TEXT`, `name_divine_glitch`, `name_neon_pulse`, `name_royal_3d`) giúp tên VIP nổi bật trên cả thẻ sáng lẫn nền tối.
    - Bổ sung `lightText` cho `CountdownBar` và áp `theme.onBg` cho `waitNote` dưới đáy màn hình.
 5. **Khớp các test cũ sau khi mở rộng lên 12 người & 36 mẫu nhân vật**: Cập nhật assertion trong `server/test/lobby.test.ts` (`maxPlayers: 12`) và `server/test/fun.test.ts` (`36` mẫu nhân vật, danh sách tóc/phụ kiện/áo mở rộng).
+
+---
+
+## 4. Tái Kiểm Thử Sau Refactor Phase 9 (Hệ Thống Thiết Kế OSS)
+
+- **Icon Pack Offline**: `npm run sync:icons` sinh `438` icon Microsoft Fluent Emoji Flat + `24` RPG Game Icons + `511` ánh xạ emoji (`0` unresolved).
+- **Typecheck & Lint**: `app` đạt `0` lỗi TypeScript và `0` lỗi / `0` cảnh báo `expo lint`; `server` pass `typecheck`, `35/35` file test (`330/330` tests) và `build` (`dist/server.js`).
+- **Tái kiểm tra E2E & ảnh chụp màn hình**: `e2e/mega-audit.mjs` đạt `MEGA AUDIT ALL OK` (`0` pageerror) trên bộ Web export mới; phát hiện & khắc phục 3 lỗi hiển thị (lưới 2 cột Desktop trong `MotionPrimitives.tsx`, chật thanh header Mobile trong `Shell.tsx`, và độ tương phản `NameText` VIP trên nền tối), sau đó chụp lại và kiểm tra trực quan các màn hình đã sửa.

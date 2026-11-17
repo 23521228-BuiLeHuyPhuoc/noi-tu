@@ -16,6 +16,7 @@ import type { DiceRollView, ThrowImpulse } from '../../../shared/src/dice';
 import { ChaosFloat, useShellTools } from './Shell';
 import { TyPhuDice3D } from './TyPhuDice3D';
 import { useMeasuredView } from '../viewMeasurements';
+import { EmojiIcon } from './Icons';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const abs = (r: Rect) => ({ position: 'absolute' as const, left: r.x, top: r.y, width: r.w, height: r.h });
@@ -95,7 +96,7 @@ export interface CenterProps {
 function MiniBtn({ icon, label, onPress, testID, badge, size = 30 }: { icon: string; label: string; onPress: () => void; testID?: string; badge?: number; size?: number }) {
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={6} style={[styles.mini, size !== 30 && { width: size, height: size, borderRadius: size / 2 }]}>
-      <T style={{ fontSize: Math.round((icon.startsWith('x') ? 13 : 15) * size / 30), fontWeight: '900', color: C.ink }}>{icon}</T>
+      {/^[a-zA-Z0-9⛶]+$/.test(icon) ? <T style={{ fontSize: Math.round((icon.startsWith('x') ? 12 : 13) * size / 30), fontWeight: '900', color: C.ink }}>{icon}</T> : <EmojiIcon emoji={icon} size={Math.round((16 * size) / 30)} />}
       {!!badge && badge > 0 && <View style={styles.miniBadge}><T style={styles.miniBadgeTxt}>{badge > 9 ? '9+' : badge}</T></View>}
     </Pressable>
   );
