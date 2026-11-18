@@ -1,19 +1,20 @@
 # Xóm Lầy
 
-Đại tiệc game party & co-op đa người chơi ngay trên trình duyệt điện thoại & máy tính: **14 trò chơi** hỗ trợ tới **12 người / phòng**, giao diện **Mobile-First 4 Fragment** gọn đẹp, mời bằng link hoặc mã 6 ký tự:
-- 🐸 **Đầm Lầy Quái Chiêu / Croak Squad Co-op** (2–6 người thật — Vật lý 2D đồng bộ 30Hz, nuốt đồng đội & ngắm bắn vượt vực qua 3 màn đầm lầy!)
-- 🃏 **Hội Bàn Tròn Vô Tri / Cards Against Humanity VN** (3–12 người — 115 Thẻ Đen tự chèn `@TênBạnBè` + 280 Thẻ Trắng bựa & bình chọn ẩn danh)
-- 🔫 **Chia Chác Giang Hồ / Cash 'n Guns** (3–12 người — 5 Đạn Giả / 3 Đạn Thật, đấu súng cân não Đứng lại hay Đầu hàng, Quyền Bố Già & Vua Kim Cương +60.000$)
+Đại tiệc game party & co-op đa người chơi ngay trên trình duyệt điện thoại & máy tính: **15 trò chơi** hỗ trợ tới **12 người / phòng**, giao diện **Mobile-First 4 Fragment** siêu mượt (chống lag GPU & chống bôi đen label cảm ứng), mời bằng link hoặc mã 6 ký tự:
+- 🐸 **Đầm Lầy Quái Chiêu 2.0 / Croak Squad Co-op** (2–6 người thật — Engine `<canvas>` HiDPI **60fps** phong cách Kenney Platformer + Fluent 3D, Client-Side Prediction 0ms, bàn trượt Thumbpad kiểu `nipplejs` nuốt & bắn đồng đội vượt 3 màn đầm lầy!)
+- 🐊 **Khám Răng Cá Sấu** (2–12 người — Hàm răng đối xứng `14..24` chiếc, săn Răng Vàng `+40đ`, Răng Đảo Chiều & hồi hộp né Răng Đau `"PHẬP!"`)
+- 👀 **Tinh Mắt Đập Nhanh** (2–12 người — Đua phản xạ tay-mắt **đồng thời không chờ lượt** qua 3 chế độ: Đập trùng mục tiêu, Tìm hình độc nhất & Săn Kho Báu né Bom `💣`)
+- 🚦 **Đèn Đỏ Đèn Xanh** (2–12 người — Đua nước rút `0 → 100m`, Laser Đèn Đỏ phạt `-28m` kèm Đạo Cụ Bóp Đồng Đội: 📣 Còi Giả Đèn Xanh dụ chạy ẩu, 🍌 Vỏ Chuối trượt ngã & 🛡️ Áo Tàng Hình)
 - 🎱 **Lô Tô Hội Chợ** (2–12 người — Vé giấy 3×9 chuẩn Gale-Ryser `1..90`, 90 câu vè rao số truyền thống, báo *"Đợi!"* 4/5 & phạt khóa khi hô *"KINH!"* hụt)
-- ⭕ **Cờ Caro Đại Chiến 15×15** (2–4 phe `X, O, ▲, ◆` — Bật/tắt luật *"Chặn 2 đầu"*, phóng to 1.5× trên di động & AI chiến thuật)
+- ⭕ **Cờ Caro Đại Chiến Co Giãn Đa Phe** (2–4 phe `X, O, ▲, ◆` — Tự động phóng to bàn cờ theo số người: `15×15` → `22×22` (`484` ô) → `28×28` (`784` ô) / `32×32`, luật *"Chặn 2 đầu"*, định vị Tâm Cờ & Zoom trên di động)
 - 🐺 **Ma Sói 2.0** (4–12 người — Trung tâm Chat Làng trực tiếp + Lịch sử cuộn + Kênh Sói, Sổ Tay Vai Trò, Ghim nghi vấn & Kết quả Tiên Tri ngay trên ghế, nhịp 90s/65s/40s)
-- 🧠 **Đấu Trường Đố Vui CNTT & Tiếng Anh C1–C2** (1–12 người — **252 câu hỏi khó/cực khó** kiểm chứng kỹ thuật qua 7 chuyên đề: `OOP`, `DSA`, `JS/TS`, `Node/Backend`, `React/RN Mobile`, `Fullstack/System`, `English C1–C2`)
+- 🧠 **Đấu Trường Đố Vui CNTT & Tiếng Anh IT** (1–12 người — **252 câu hỏi thực chiến Intern / Fresher / Junior** qua 7 chuyên đề gồm `OOP đa ngôn ngữ`, `DSA`, `JS/TS`, `Node/Backend`, `React/RN Mobile`, `System/Sec`, `Tiếng Anh IT B1–C1`; tùy chọn độ khó `Dễ 16s / Vừa 22s / Khó 30s / Tăng dần`)
 - 🕵️ **Ai là gián điệp** (3–12 người — 160 cặp từ, vai Mr. White, chống lộ từ)
 - 🎨 **Vẽ & Đoán** (2–12 người — Bảng vẽ vector, 180+ từ, bot biết vẽ nét mẫu)
 - 💣 **Bom Chữ** (2–12 người — Gõ từ chứa âm tiết trước khi bom phát nổ)
 - 🔤 **Nối từ** & 🇬🇧 **Nối từ Anh** (1–8 người — 4 cấp độ khó tới *Địa Ngục 4s*, luật *Danh từ / Động từ / Tính từ / Cấm lặp chữ đầu* & Combo Streak)
 - 🦀 **Bầu cua** (1–12 người — Chế độ *Lộc Trời ×2/×3 & Bão Tam Hoa*, đặt nhanh *Đặt lại / Gấp x2 / Tất tay*)
-- 🏦 **Cờ tỷ phú** (2–6 người — Chế độ *Lễ Hội x2, Hũ Độc Đắc & Thâu Tóm Mua Đứt 160%*)
+- 🏦 **Cờ tỷ phú** (2–6 người — Icon *Nhà tù / Vào tù* chuẩn Game-Icons/Fluent 3D, **ô Sân Bay hiện sẵn thành phố bay tới trước khi dẫm**, kèm chế độ *Lễ Hội x2, Hũ Độc Đắc & Mua Đứt 160%*)
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
@@ -21,36 +22,37 @@
   - 36 nhân vật mẫu + tùy biến sâu tóc, mắt, mũi, miệng, trang phục, phụ kiện, hình xăm và 12 màu đại diện.
   - **473 biểu tượng Fluent Emoji 3D Shaded** đa tầng rực rỡ đóng gói tĩnh + hiệu ứng rung chấn `csshake` + lớp phủ **Holographic Prismatic Foil** 7 màu.
   - **15 Map / Chủ đề màu phòng** (5 miễn phí + 10 Map động Ruby: Tết Cổ Truyền, Hoa Anh Đào, Chợ Đêm, Sàn Disco Bất Ổn, Đầm Lầy Quái Chiêu, Sòng Bài Hoàng Gia, Thủy Cung Thần Long, Ma Trận Hacker, Cung Điện Ngân Hà, Điện Hoàng Kim Tỷ Phú).
-  - **146 vật phẩm Shop Ruby** gồm **8 ô trang bị VIP** (`frame`, `nameFx`, `aura`, `entrance`, `pet`, `title`, `chatBubble`, `roomTheme`), **Cấp bậc VIP Phú Hào 1→6** (*Chí Tôn Vũ Trụ*), **28 tuyệt kỹ chọc trả Ruby** (Màn Hình Xanh BSOD, Bão Dép Tổ Ong 24K, Còi Cảnh Sát, Búa Tạ 9999 Tấn, Phán Quyết Thiên Đế...) và **15 Siêu Quà Đại Gia** (tới *Ngai Vàng Vô Cực 10.000 💎*).
-  - **Tối ưu chống lag phòng 12 người**: Cache SVG 300 ảnh (LRU), tách tick bộ đếm giây từng widget, đăng ký trạng thái chọc theo từng avatar (`funState`), đồng bộ shader GPU CSS 60fps trên web và chế độ **⚡ Siêu mượt**.
+  - **146 vật phẩm Shop Ruby + Sân Khấu Xem Thử Ghim Đỉnh (`ShopPreviewDock`)**: cuộn xuống tận cuối danh sách bấm Mua / Trang bị / Xem thử vẫn thấy ngay diện mạo mới trên đỉnh màn hình mà không cần cuộn ngược lên; gồm **8 ô trang bị VIP** (`frame`, `nameFx`, `aura`, `entrance`, `pet`, `title`, `chatBubble`, `roomTheme`), **Cấp bậc VIP Phú Hào 1→6** (*Chí Tôn Vũ Trụ*), **28 tuyệt kỹ chọc trả Ruby** và **15 Siêu Quà Đại Gia** (tới *Ngai Vàng Vô Cực 10.000 💎*).
+  - **Tối ưu chống lag phòng 12 người & Mobile Touch Hygiene**: Code-splitting `React.lazy` tách chunk 15 màn chơi, gỡ bỏ `drop-shadow` FBO nặng trên hàng trăm SVG icon, `content-visibility: auto` cho danh sách 146 món Shop, chống bôi đen chữ khi nhấn giữ nút cảm ứng (`user-select: none; -webkit-touch-callout: none`) và chế độ **⚡ Siêu mượt**.
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
 
 ```
 noi-tu/
-  shared/   kiểu dữ liệu, từ vựng, vật lý 2D Croak Squad, bộ đề CNTT/C2, CAH, Cash'n'Guns, Lô Tô, Caro, Ma Sói 2.0, Map & Shop VIP
-  server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho cả 14 game + 36 bộ kiểm thử (2.558 tests)
-    src/games/   wordchain, baucua, typhu, masoi, giandiep, vedoan, bomtu, dovui, cah, cashnguns, loto, caro, croaksquad
-  app/      giao diện React Native Web (Expo) — 4-Fragment Mobile UI, Fluent Emoji 3D, DiceBear, Lucide, CSShake, Holofoil Shaders
-  e2e/      test trình duyệt thật (Playwright đa màn hình Mobile + Desktop & kiểm tra hình ảnh 14 game)
-  docs/     tài liệu thiết kế & nghiên cứu các phase (00–17)
+  shared/   kiểu dữ liệu, từ vựng, vật lý 2D Croak Squad, bộ đề CNTT Intern-Junior, Cá Sấu, Tinh Mắt, Đèn Đỏ Đèn Xanh, Lô Tô, Caro, Ma Sói 2.0, Map & Shop VIP
+  server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho cả 15 game + 36 bộ kiểm thử (>2.700 tests)
+    src/games/   wordchain, baucua, typhu, masoi, giandiep, vedoan, bomtu, dovui, casau, tinhmat, dendo, loto, caro, croaksquad
+  app/      giao diện React Native Web (Expo) — 4-Fragment Mobile UI, Fluent Emoji 3D, Game-Icons, DiceBear, Lucide, CSShake, Holofoil Shaders
+  e2e/      test trình duyệt thật (Playwright đa màn hình Mobile + Desktop & kiểm tra hình ảnh 15 game)
+  docs/     tài liệu thiết kế & nghiên cứu các phase (00–25)
 ```
 
-## Tóm tắt 14 trò chơi
+## Tóm tắt 15 trò chơi
 
-1. **Đầm Lầy Quái Chiêu (`croaksquad`, 2–6 người thật)**: Co-op puzzle-platformer 2D đồng bộ vật lý `30Hz` trên server (không dùng bot). Phóng lưỡi nuốt đồng đội vào bụng, căn đường ngắm parabol `computeSpitArc` rồi bắn bạn vượt hố bùn độc, bật công tắc cầu gỗ, lấy Chìa Khóa Vàng, mở Checkpoint và cùng chạm Cổng Sen Vàng qua 3 màn chơi.
-2. **Hội Bàn Tròn Vô Tri (`cah`, 3–12 người)**: 115 Thẻ Đen khuyết từ tự động chèn tên người thật trong phòng + 280 Thẻ Trắng lầy lội, quyền đổi bài rác (`cah_mulligan`) và bình chọn ẩn danh.
-3. **Chia Chác Giang Hồ (`cashnguns`, 3–12 người)**: Mỗi người có 5 Đạn Giả (`Click!`) & 3 Đạn Thật (`Bang!`), bí mật chĩa súng, quyền Bố Già ép đổi hướng nòng súng, 10s cân não chọn Đứng lại chia chiến lợi phẩm hay Đầu hàng nằm xuống bảo toàn mạng, thưởng Vua Kim Cương +60.000$.
-4. **Lô Tô Hội Chợ (`loto`, 2–12 người)**: Phát vé 3×9 chuẩn xác `1..90`, lồng cầu 3D rao 90 câu vè dân gian vui nhộn, tự động báo *"Đợi!"* khi có người chạm 4/5 số trên hàng và khóa phạt 2 lượt gọi nếu hô *"KINH!"* sai.
-5. **Cờ Caro Đại Chiến (`caro`, 2–4 người)**: Bàn cờ 15×15 hỗ trợ đấu 2, 3 hoặc 4 phe (`X, O, ▲, ◆`), tùy chọn luật *"Chặn 2 đầu"*, chế độ Zoom 1.5× trên điện thoại và AI công thủ hai chiều.
-6. **Ma Sói 2.0 (`masoi`, 4–12 người)**: 9 vai trò, khung **Chat Làng + Kênh Sói + Nhật Ký** tích hợp ngay trên bàn chơi, Sổ Tay Vai Trò chi tiết, ghim nghi vấn cá nhân & ghim tự động kết quả soi của Tiên Tri lên từng ghế `#1..#12`.
-7. **Đấu Trường Đố Vui CNTT & C1–C2 (`do_vui`, 1–12 người)**: 252 câu hỏi chuyên sâu có giải thích học thuật thuộc 7 chủ đề (`OOP`, `DSA`, `JS/TS`, `NodeJS/Backend`, `React/RN Mobile`, `Fullstack/System`, `Tiếng Anh C1–C2`), chọn chủ đề trước khi bắt đầu.
-8. **Ai là gián điệp (`giandiep`, 3–12 người)**: 160 cặp từ tiếng Việt 8 chủ đề, chặn tự động lỗi nhắc từ khóa (`word_leaked`), Mr. White đoán từ lật kèo khi bị loại.
-9. **Vẽ & Đoán (`ve_doan`, 2–12 người)**: Bảng vẽ SVG đa màu mượt mà (`0..1000`), gợi ý chữ cái dần theo giờ, 25+ bộ nét vẽ mẫu cho Bot.
-10. **Bom Chữ (`bom_tu`, 2–12 người)**: Quả bom hẹn giờ chuyền tay đòi từ 2 chữ hợp lệ chứa âm tiết bom; mất hết 3 tim là bị loại.
-11. **Nối từ (`wordchain`, 1–8 người)**: Kho ~114.900 từ tiếng Việt, 4 mức độ khó (`Dễ 40s`, `Chuẩn 30s`, `Khó 15s→6s`, `Địa Ngục 8s→4s`) và luật từ loại (`Danh từ`, `Động từ`, `Tính từ`, `Cấm lặp chữ đầu`).
-12. **Nối từ Anh (`wordchain_en`, 1–8 người)**: Kho 210.987 từ tiếng Anh, dịch ngược bộ gõ Telex/VNI, giải nghĩa tiếng Việt + IPA, hỗ trợ đầy đủ 4 độ khó & luật từ loại.
-13. **Bầu cua (`baucua`, 1–12 người, xu ảo)**: Chế độ Cổ điển hoặc **Lộc Trời ×2/×3 & Bão Tam Hoa**, thống kê tần suất Nóng/Lạnh và nút cược nhanh Đặt lại / Gấp x2 / Tất tay.
-14. **Cờ tỷ phú (`typhu`, 2–6 người)**: Bàn 40 ô Việt Nam 3D/2D kèm chế độ mở rộng **Lễ Hội x2 tiền thuê, Hũ Độc Đắc gom thuế phạt & Thâu Tóm Mua Đứt 160%**.
+1. **Đầm Lầy Quái Chiêu 2.0 (`croaksquad`, 2–6 người thật)**: Co-op puzzle-platformer 2D dựng bằng `<canvas>` HiDPI `60fps` phong cách Kenney Platformer + Fluent 3D, dự đoán chuyển động `0ms` phía client và bàn trượt cảm ứng mượt kiểu `nipplejs`. Phóng lưỡi nuốt đồng đội vào bụng, kéo ngắm đường cong `computeSpitArc` trên bản đồ rồi bắn bạn vượt hố bùn độc, bật công tắc cầu gỗ, lấy Chìa Khóa Vàng và cùng chạm Đài Sen Vàng qua 3 màn chơi.
+2. **Khám Răng Cá Sấu (`ca_sau`, 2–12 người)**: Hàm Cá Sấu Chúa đối xứng `14..24` chiếc răng. Nhấn trúng Răng Lành ăn điểm can đảm tăng dần, trúng 💎 Răng Vàng nổ `+40đ`, trúng 🔄 Răng Xoáy đảo ngược chiều lượt đi, còn chạm 💥 Răng Đau sẽ bị đớp `"PHẬP!"` (`-25đ`) rồi sang hiệp mới — không ai bị loại ngồi ngoài!
+3. **Tinh Mắt Đập Nhanh (`tinh_mat`, 2–12 người)**: Tất cả người chơi cùng nhìn và đập đồng thời trên lưới biểu tượng Fluent 3D qua 3 thử thách xoay vòng (*Đập hình trùng khớp*, *Tìm hình chỉ xuất hiện 1 lần*, *Săn Kho Báu né Bom 💣*). Đập đúng nhanh nhất ăn `+150đ`; đập nhầm bị choáng tê tay `1,3 giây`.
+4. **Đèn Đỏ Đèn Xanh (`den_do`, 2–12 người)**: Đua nước rút `0 → 100m` cùng Búp Bê Cảnh Sát Giao Thông (`🟢 Chạy +3,5m`, `🟡 Giảm tốc`, `🔴 Đứng im — nhúc nhích ăn Laser -28m`). Vượt mốc `25m / 55m / 80m` nhận Đạo Cụ Bóp Đồng Đội: `📣 Còi Giả Đèn Xanh` hô giả lúc Đèn Đỏ dụ đối thủ giật mình bị bắn, `🍌 Vỏ Chuối` quật ngã người dẫn đầu `-12m`, hoặc `🛡️ Áo Tàng Hình` chắn Laser.
+5. **Lô Tô Hội Chợ (`loto`, 2–12 người)**: Phát vé 3×9 chuẩn xác `1..90`, lồng cầu 3D rao 90 câu vè dân gian vui nhộn, tự động báo *"Đợi!"* khi có người chạm 4/5 số trên hàng và khóa phạt 2 lượt gọi nếu hô *"KINH!"* sai.
+6. **Cờ Caro Đại Chiến (`caro`, 2–4 người)**: Bàn cờ tự mở rộng theo số phe (`2p = 15×15`, `3p = 22×22`, `4p = 28×28`, hoặc `Siêu Đại Chiến 32×32`), tùy chọn luật *"Chặn 2 đầu"*, nút *Tâm cờ* + Zoom trên điện thoại và AI công thủ hai chiều.
+7. **Ma Sói 2.0 (`masoi`, 4–12 người)**: 9 vai trò, khung **Chat Làng + Kênh Sói + Nhật Ký** tích hợp ngay trên bàn chơi, Sổ Tay Vai Trò chi tiết, ghim nghi vấn cá nhân & ghim tự động kết quả soi của Tiên Tri lên từng ghế `#1..#12`.
+8. **Đấu Trường Đố Vui CNTT & Tiếng Anh IT (`do_vui`, 1–12 người)**: 252 câu hỏi phỏng vấn thực chiến cấp độ `Intern (16s)` / `Fresher (22s)` / `Junior (30s)` qua 7 chủ đề (`OOP đa ngôn ngữ`, `DSA`, `JS/TS`, `NodeJS/Backend`, `React/RN Mobile`, `System/Sec`, `Tiếng Anh IT B1–C1`), chọn chủ đề & độ khó trước khi bắt đầu.
+9. **Ai là gián điệp (`giandiep`, 3–12 người)**: 160 cặp từ tiếng Việt 8 chủ đề, chặn tự động lỗi nhắc từ khóa (`word_leaked`), Mr. White đoán từ lật kèo khi bị loại.
+10. **Vẽ & Đoán (`ve_doan`, 2–12 người)**: Bảng vẽ SVG đa màu mượt mà (`0..1000`), gợi ý chữ cái dần theo giờ, 25+ bộ nét vẽ mẫu cho Bot.
+11. **Bom Chữ (`bom_tu`, 2–12 người)**: Quả bom hẹn giờ chuyền tay đòi từ 2 chữ hợp lệ chứa âm tiết bom; mất hết 3 tim là bị loại.
+12. **Nối từ (`wordchain`, 1–8 người)**: Kho ~114.900 từ tiếng Việt, 4 mức độ khó (`Dễ 40s`, `Chuẩn 30s`, `Khó 15s→6s`, `Địa Ngục 8s→4s`) và luật từ loại (`Danh từ`, `Động từ`, `Tính từ`, `Cấm lặp chữ đầu`).
+13. **Nối từ Anh (`wordchain_en`, 1–8 người)**: Kho 210.987 từ tiếng Anh, dịch ngược bộ gõ Telex/VNI, giải nghĩa tiếng Việt + IPA, hỗ trợ đầy đủ 4 độ khó & luật từ loại.
+14. **Bầu cua (`baucua`, 1–12 người, xu ảo)**: Chế độ Cổ điển hoặc **Lộc Trời ×2/×3 & Bão Tam Hoa**, thống kê tần suất Nóng/Lạnh và nút cược nhanh Đặt lại / Gấp x2 / Tất tay.
+15. **Cờ tỷ phú (`typhu`, 2–6 người)**: Bàn 40 ô Việt Nam 3D/2D với icon *Nhà tù / Vào tù* chuẩn studio, **ô Sân Bay báo trước điểm đến chuyến bay ngay trên mặt bàn**, kèm chế độ **Lễ Hội x2 tiền thuê, Hũ Độc Đắc gom thuế phạt & Thâu Tóm Mua Đứt 160%**.
 
 ---
 

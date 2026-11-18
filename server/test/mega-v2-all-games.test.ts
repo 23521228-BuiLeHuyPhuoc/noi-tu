@@ -7,24 +7,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BOM_TU_FALLBACK_WORDS, type BomTuView } from '../../shared/src/bomtu';
 import {
-  CAH_BLACK_CARDS, CAH_WHITE_CARDS, fillBlackCard, renderBlackCard, type CahView,
-} from '../../shared/src/cah';
-import {
-  CARO_SIZE, CARO_SYMBOLS, checkCaroWin, pickCaroBotMove, type CaroSymbol, type CaroView,
+  CARO_SIZE, CARO_SYMBOLS, caroSizeForPlayers, checkCaroWin, pickCaroBotMove,
+  type CaroSizeMode, type CaroSymbol,
 } from '../../shared/src/caro';
 import {
-  buildCgLootDeck, cgTotalWealth,
-} from '../../shared/src/cashnguns';
+  CA_SAU_ROUND_OPTIONS, computeCaSauTeethCount,
+} from '../../shared/src/casau';
 import {
   CROAK_DT, CROAK_STAGES, computeSpitArc, createCroakWorld, stepCroakWorld,
   type CroakTickPayload,
 } from '../../shared/src/croaksquad';
 import {
-  DO_VUI_QUESTIONS, DO_VUI_TOPICS, questionsForTopic, type DoVuiTopic,
+  DEN_DO_GOAL_METERS, DEN_DO_ITEMS, DEN_DO_ROUND_OPTIONS,
+} from '../../shared/src/dendo';
+import {
+  DO_VUI_DIFFICULTIES, DO_VUI_QUESTIONS, DO_VUI_TOPICS, pickDoVuiQuestions, questionsForTopic, secondsForDoVuiLevel,
+  type DoVuiDifficulty, type DoVuiTopic,
 } from '../../shared/src/dovui';
 import { GIAN_DIEP_WORDS } from '../../shared/src/giandiep';
 import {
-  LOTO_RHYMES, checkLotoRow, generateLotoTicket, type LotoView,
+  LOTO_RHYMES, checkLotoRow, generateLotoTicket,
 } from '../../shared/src/loto';
 import { MASOI_PHASE_SECONDS, MASOI_ROLES, buildMaSoiDeck, type MaSoiView } from '../../shared/src/masoi';
 import {
@@ -33,6 +35,9 @@ import {
 } from '../../shared/src/pos';
 import { GIFT_IDS, SHOP_ITEMS, SKILL_IDS, vipOf } from '../../shared/src/shop';
 import { ROOM_THEMES } from '../../shared/src/themes';
+import {
+  TINH_MAT_BOMB_EMOJI, TINH_MAT_EMOJIS, TINH_MAT_ROUND_OPTIONS, generateTinhMatPuzzle,
+} from '../../shared/src/tinhmat';
 import { TYPHU_BOARD, isTyPhuProperty, upgradeCostOf } from '../../shared/src/typhu';
 import {
   BAUCUA_SYMBOLS, GAME_INFO,
@@ -42,15 +47,16 @@ import { VE_DOAN_WORDS, type VeDoanView } from '../../shared/src/vedoan';
 import { Dictionary } from '../src/dictionary';
 import { BauCuaGame } from '../src/games/baucua';
 import { BomTuGame } from '../src/games/bomtu';
-import { CahGame } from '../src/games/cah';
 import { CaroGame } from '../src/games/caro';
-import { CashGunsGame } from '../src/games/cashnguns';
+import { CaSauGame } from '../src/games/casau';
 import { CroakSquadGame } from '../src/games/croaksquad';
+import { DenDoGame } from '../src/games/dendo';
 import { DoVuiGame } from '../src/games/dovui';
 import type { EngineContext, EnginePlayer } from '../src/games/engine';
 import { GianDiepGame } from '../src/games/giandiep';
 import { LotoGame } from '../src/games/loto';
 import { MaSoiGame } from '../src/games/masoi';
+import { TinhMatGame } from '../src/games/tinhmat';
 import { TyPhuGame } from '../src/games/typhu';
 import { VeDoanGame } from '../src/games/vedoan';
 import { WordChainGame } from '../src/games/wordchain';
@@ -335,6 +341,8 @@ describe('Game 4 — Cờ Tỷ Phú Lễ Hội Sốt Đất & Thâu Tóm 160% (1
 
       const v0 = g.view();
       expect(v0.mode).toBe(mode);
+      expect(v0.airportDest).toBeDefined();
+      expect(isTyPhuProperty(TYPHU_BOARD[v0.airportDest!])).toBe(true);
       if (mode === 'chaos_festival') {
         expect(v0.jackpotPool).toBe(200);
         expect(v0.festivalCell).not.toBeNull();
@@ -596,58 +604,100 @@ describe('Game 8 — Bom Chữ Sinh Tử (120 cases)', () => {
 });
 
 // ============================================================================
-// 9. ĐẤU TRƯỜNG ĐỐ VUI CNTT & TIẾNG ANH C1-C2 (316 TEST CASES!)
+// 9. ĐẤU TRƯỜNG ĐỐ VUI INTERN / FRESHER / JUNIOR & ĐỘ KHÓ THÍCH ỨNG (320 CASES!)
 // ============================================================================
-describe('Game 9 — Đấu Trường Đố Vui Hardcore CNTT & C1-C2 (316 cases)', () => {
-  // Kiểm tra TỪNG CÂU HỎI MỘT trong 252 câu hỏi chuyên sâu!
+describe('Game 9 — Đấu Trường Đố Vui Intern/Fresher/Junior & Độ Khó Thích Ứng (320 cases)', () => {
+  it('chủ đề OOP hoàn toàn đa ngôn ngữ (0 câu trói buộc Java/JVM/Spring) & mỗi chuyên đề chia đều 12 easy + 12 medium + 12 hard', () => {
+    expect(DO_VUI_QUESTIONS).toHaveLength(252);
+    expect(secondsForDoVuiLevel('easy')).toBe(16);
+    expect(secondsForDoVuiLevel('medium')).toBe(22);
+    expect(secondsForDoVuiLevel('hard')).toBe(30);
+    expect(Object.keys(DO_VUI_DIFFICULTIES)).toEqual(['easy', 'medium', 'hard', 'mixed']);
+
+    for (const tp of DO_VUI_TOPICS.filter((t) => t.id !== 'all')) {
+      const qs = DO_VUI_QUESTIONS.filter((q) => q.topic === tp.id);
+      expect(qs).toHaveLength(36);
+      expect(qs.filter((q) => q.difficulty === 'easy')).toHaveLength(12);
+      expect(qs.filter((q) => q.difficulty === 'medium')).toHaveLength(12);
+      expect(qs.filter((q) => q.difficulty === 'hard')).toHaveLength(12);
+    }
+
+    const oopJavaBound = DO_VUI_QUESTIONS.filter(
+      (q) => q.topic === 'oop' && /\b(Java|JVM|Spring|Hibernate|JDK|Servlet|System\.out)\b/i.test(`${q.q} ${q.options.join(' ')}`),
+    );
+    expect(oopJavaBound).toHaveLength(0);
+  });
+
+  it('thời gian thực tế (khi không giới hạn turnMs) tự động tăng lên 30s cho câu Khó, 22s cho câu Vừa và 16s cho câu Dễ', () => {
+    vi.useFakeTimers();
+    for (const [diff, expectedSec] of [['easy', 16], ['medium', 22], ['hard', 30]] as const) {
+      const { ctx } = makeHarness(9901, { doVuiTopic: 'oop', doVuiDifficulty: diff, doVuiQuestions: 5 }, 0);
+      ctx.turnMs = undefined;
+      const g = new DoVuiGame(ctx);
+      g.start(makePlayers(2));
+      const v = g.view('p0');
+      expect(v.selectedDifficulty).toBe(diff);
+      expect(v.difficulty).toBe(diff);
+      expect(v.phaseSeconds).toBe(expectedSec);
+      g.dispose();
+    }
+  });
+
+  // Kiểm tra TỪNG CÂU HỎI MỘT trong 252 câu hỏi thực chiến!
   it.each(DO_VUI_QUESTIONS.map((q, idx) => ({ idx: idx + 1, q })))(
-    'Câu hỏi Đố Vui #$idx [$q.topic / $q.difficulty]: đủ 4 đáp án phân biệt, đáp án đúng hợp lệ & có giải thích kỹ thuật',
+    'Câu hỏi Đố Vui #$idx [$q.topic / $q.difficulty]: đủ 4 đáp án phân biệt, súc tích cho mobile & có giải thích rõ ràng',
     ({ q }) => {
       expect(['oop', 'dsa', 'js_ts', 'node_backend', 'mobile_fe', 'fullstack_it', 'english_adv']).toContain(q.topic);
-      expect(['hard', 'extreme']).toContain(q.difficulty);
-      expect(q.q.trim().length).toBeGreaterThan(15);
+      expect(['easy', 'medium', 'hard']).toContain(q.difficulty);
+      expect(q.q.trim().length).toBeGreaterThan(12);
+      expect(q.q.trim().length).toBeLessThanOrEqual(175);
       expect(q.options).toHaveLength(4);
       const trimmedOpts = q.options.map((o) => o.trim());
       for (const o of trimmedOpts) expect(o.length).toBeGreaterThan(0);
       expect(new Set(trimmedOpts).size).toBe(4);
       expect([0, 1, 2, 3]).toContain(q.correct);
-      expect(q.explain.trim().length).toBeGreaterThan(20);
+      expect(q.explain.trim().length).toBeGreaterThan(15);
     },
   );
 
-  const topicCases: { topic: DoVuiTopic; qCount: 5 | 10 | 15; players: number; seed: number }[] = [];
+  const topicCases: { topic: DoVuiTopic; diff: DoVuiDifficulty; qCount: 5 | 10 | 15; players: number; seed: number }[] = [];
   let dvSeed = 9000;
+  const diffs: DoVuiDifficulty[] = ['easy', 'medium', 'hard', 'mixed'];
   for (const tp of DO_VUI_TOPICS) {
-    for (const qCount of [5, 10, 15] as const) {
-      for (const players of [1, 4, 8]) {
-        if (topicCases.length < 64) {
-          topicCases.push({ topic: tp.id, qCount, players, seed: dvSeed++ });
-        }
-      }
+    for (const diff of diffs) {
+      const qCount = ([5, 10, 15] as const)[dvSeed % 3];
+      const players = ([1, 4, 8] as const)[dvSeed % 3];
+      topicCases.push({ topic: tp.id, diff, qCount, players, seed: dvSeed++ });
+      topicCases.push({ topic: tp.id, diff, qCount: 10, players: 3, seed: dvSeed++ });
     }
   }
 
   it.each(topicCases)(
-    'Đố Vui lọc đúng chuyên đề "$topic" ($qCount câu, $players người): cách ly đáp án trước reveal & tính điểm x2 cuối ván',
-    ({ topic, qCount, players, seed }) => {
+    'Đố Vui "$topic" (diff=$diff, $qCount câu, $players người): lọc đúng cấp độ, cách ly đáp án & x2 điểm cuối ván',
+    ({ topic, diff, qCount, players, seed }) => {
       vi.useFakeTimers();
-      const pool = questionsForTopic(topic);
-      if (topic !== 'all') {
-        expect(pool.length).toBeGreaterThanOrEqual(30);
-        expect(pool.every((x) => x.topic === topic)).toBe(true);
+      const pool = questionsForTopic(topic, diff);
+      expect(pool.length).toBeGreaterThanOrEqual(12);
+      if (diff !== 'mixed') {
+        expect(pool.every((x) => x.difficulty === diff)).toBe(true);
       } else {
-        expect(pool.length).toBeGreaterThanOrEqual(245);
+        const ordered = pickDoVuiQuestions(seededRng(seed), qCount, topic, 'mixed');
+        const rank = { easy: 0, medium: 1, hard: 2 };
+        for (let i = 1; i < ordered.length; i++) {
+          expect(rank[ordered[i].difficulty]).toBeGreaterThanOrEqual(rank[ordered[i - 1].difficulty]);
+        }
       }
 
       const ps = makePlayers(players);
       const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, { doVuiTopic: topic, doVuiQuestions: qCount }, 300, bots);
+      const { ctx, getResult } = makeHarness(seed, { doVuiTopic: topic, doVuiDifficulty: diff, doVuiQuestions: qCount }, 300, bots);
       const g = new DoVuiGame(ctx);
       g.start(ps);
 
       const vQ = g.view('p0');
       expect(vQ.selectedTopic).toBe(topic);
-      expect(vQ.correctIndex).toBeUndefined(); // Không lộ đáp án khi đang hỏi!
+      expect(vQ.selectedDifficulty).toBe(diff);
+      expect(vQ.correctIndex).toBeUndefined();
 
       let guard = 0;
       while (!getResult() && guard++ < 80) {
@@ -666,157 +716,207 @@ describe('Game 9 — Đấu Trường Đố Vui Hardcore CNTT & C1-C2 (316 cases
 });
 
 // ============================================================================
-// 10. HỘI BÀN TRÒN VÔ TRI — CARDS AGAINST HUMANITY VN (150 TEST CASES)
+// 10. KHÁM RĂNG CÁ SẤU — CROCODILE DENTIST PARTY (155 TEST CASES)
 // ============================================================================
-describe('Game 10 — Hội Bàn Tròn Vô Tri (CAH, 150 cases)', () => {
-  it('kho bài CAH >= 110 Thẻ Đen & >= 260 Thẻ Trắng không trùng lặp, chèn tên thật {p} mượt mà', () => {
-    expect(CAH_BLACK_CARDS.length).toBeGreaterThanOrEqual(110);
-    expect(CAH_WHITE_CARDS.length).toBeGreaterThanOrEqual(260);
-    expect(new Set(CAH_WHITE_CARDS).size).toBe(CAH_WHITE_CARDS.length);
-    const sample = renderBlackCard({ id: 'b', text: 'Lịch sử web của {p} là ___', usesPlayer: true, category: 'xom_lay' }, 'Minh');
-    expect(sample).toContain('@Minh');
-    expect(fillBlackCard(sample, 'mì tôm sống')).toContain('mì tôm sống');
+describe('Game 10 — Khám Răng Cá Sấu (2–12 Người, Răng Vàng / Đảo Chiều / Răng Sâu, 155 cases)', () => {
+  it('số răng luôn chẵn đối xứng 14..24 theo số người & ẩn tuyệt đối trapTooth khi đang pressing', () => {
+    for (let n = 2; n <= 12; n++) {
+      const t = computeCaSauTeethCount(n);
+      expect(t % 2).toBe(0);
+      expect(t).toBeGreaterThanOrEqual(14);
+      expect(t).toBeLessThanOrEqual(24);
+    }
+    vi.useFakeTimers();
+    const { ctx } = makeHarness(10001, { caSauRounds: 3 }, 500);
+    const g = new CaSauGame(ctx);
+    g.start(makePlayers(4));
+    expect(g.view().phase).toBe('pressing');
+    expect(g.view().trapTooth).toBeNull();
+    g.dispose();
   });
 
-  it.each(Array.from({ length: 149 }, (_, i) => ({
-    players: 3 + (i % 10),
-    rounds: ([5, 8, 12] as const)[i % 3],
-    useMulligan: i % 2 === 0,
-    seed: 10000 + i,
+  it.each(Array.from({ length: 154 }, (_, i) => ({
+    players: 2 + (i % 11), // 2..12 người chơi!
+    rounds: CA_SAU_ROUND_OPTIONS[i % CA_SAU_ROUND_OPTIONS.length],
+    seed: 10100 + i,
   })))(
-    'CAH ($players người, $rounds vòng, mulligan=$useMulligan, seed=$seed): ẩn tác giả lúc vote, chặn tự bầu & chạy trọn ván',
-    ({ players, rounds, useMulligan, seed }) => {
+    'Khám Răng Cá Sấu ($players người, $rounds hiệp, seed=$seed): chặn nhấn trái lượt / nhấn đè răng cũ & hoàn thành đủ hiệp',
+    ({ players, rounds, seed }) => {
       vi.useFakeTimers();
       const ps = makePlayers(players);
       const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, { cahRounds: rounds }, 300, bots);
-      const g = new CahGame(ctx);
+      const { ctx, getResult } = makeHarness(seed, { caSauRounds: rounds }, 250, bots);
+      const g = new CaSauGame(ctx);
       g.start(ps);
 
-      // Mỗi người cầm đúng 7 lá trắng riêng biệt, người khác không nhìn thấy bài của nhau
-      const v0 = g.view('p0');
-      const v1 = g.view('p1');
-      expect(v0.myHand).toHaveLength(7);
-      expect(v1.myHand).toHaveLength(7);
-      expect(v0.myHand).not.toEqual(v1.myHand);
-
-      if (useMulligan) {
-        expect(g.action('p0', { type: 'cah_mulligan' }).ok).toBe(true);
-        expect(g.view('p0').myHand).toHaveLength(7);
-        // Dùng lần 2 trong cùng ván phải bị từ chối!
-        expect(g.action('p0', { type: 'cah_mulligan' }).ok).toBe(false);
-      }
-
-      // Tất cả nộp bài -> sang pha vote ẩn danh
-      for (const p of ps) {
-        const hand = g.view(p.id).myHand;
-        expect(g.action(p.id, { type: 'cah_pick', card: hand[0] }).ok).toBe(true);
-      }
-      const voteView = g.view('p0');
-      expect(voteView.phase).toBe('vote');
-      expect(voteView.entries).toHaveLength(players);
-      for (const sub of voteView.entries) {
-        expect(sub.authorId).toBeUndefined(); // Ẩn danh tuyệt đối!
-      }
-      // Chặn tự bầu bài của chính mình (khi >= 3 người)
-      const myOwnSlot = voteView.entries.find((e) => e.text === voteView.myPicked);
-      if (myOwnSlot) {
-        expect(g.action('p0', { type: 'cah_vote', slotId: myOwnSlot.slotId }).ok).toBe(false);
-      }
+      const v0 = g.view();
+      const cur = v0.currentPlayerId!;
+      const notCur = ps.find((p) => p.id !== cur)!.id;
+      expect(g.action(notCur, { type: 'cs_press', tooth: 0 })).toEqual({ ok: false, reason: 'not_your_turn' });
+      expect(g.action(cur, { type: 'cs_press', tooth: -1 })).toEqual({ ok: false, reason: 'bad_action' });
 
       let guard = 0;
-      while (!getResult() && guard++ < 160) {
-        for (const p of ps) {
-          const ba = g.botAction(p.id);
-          if (ba) g.action(p.id, ba);
+      while (!getResult() && guard++ < 260) {
+        const v = g.view();
+        if (v.phase === 'pressing' && v.currentPlayerId) {
+          const ba = g.botAction(v.currentPlayerId);
+          if (ba) expect(g.action(v.currentPlayerId, ba).ok).toBe(true);
         }
-        vi.advanceTimersByTime(350);
+        vi.advanceTimersByTime(320);
       }
       expect(getResult()).not.toBeNull();
+      expect(getResult()!.ranking).toHaveLength(players);
       g.dispose();
     },
   );
 });
 
 // ============================================================================
-// 11. CHIA CHÁC GIANG HỒ — CASH 'N GUNS (150 TEST CASES)
+// 11. TINH MẮT ĐẬP NHANH — SIMULTANEOUS REFLEX ARENA (155 TEST CASES)
 // ============================================================================
-describe('Game 11 — Chia Chác Giang Hồ (Cash n Guns, 150 cases)', () => {
-  it('bộ chiến lợi phẩm 64 lá & thưởng Vua Kim Cương +60.000$ chuẩn xác (người chết mất quyền chia tiền)', () => {
-    expect(buildCgLootDeck()).toHaveLength(64);
-    const w1 = cgTotalWealth({ p0: 10_000, p1: 20_000 }, { p0: 3, p1: 1 }, new Set(['p0', 'p1']));
-    expect(w1.totals.p0).toBe(70_000);
-    expect(w1.totals.p1).toBe(20_000);
-    const wDead = cgTotalWealth({ p0: 90_000, p1: 20_000 }, { p0: 5, p1: 1 }, new Set(['p1']));
-    expect(wDead.totals.p0).toBe(0);
-    expect(wDead.totals.p1).toBe(80_000);
+describe('Game 11 — Tinh Mắt Đập Nhanh (2–12 Người Đồng Thời Không Chờ Lượt, 155 cases)', () => {
+  it('kho 48 biểu tượng Fluent 3D độc nhất không chứa Bom & sinh đề chuẩn xác cho cả 3 chế độ', () => {
+    expect(TINH_MAT_EMOJIS).toHaveLength(48);
+    expect(new Set(TINH_MAT_EMOJIS).size).toBe(48);
+    expect(TINH_MAT_EMOJIS).not.toContain(TINH_MAT_BOMB_EMOJI);
+
+    for (let r = 1; r <= 9; r++) {
+      for (const pCount of [2, 6, 12]) {
+        const puz = generateTinhMatPuzzle(r, pCount, seededRng(11000 + r * 17 + pCount));
+        expect([12, 16]).toContain(puz.emojis.length);
+        expect(puz.validCellIds.size).toBeGreaterThanOrEqual(1);
+        if (puz.challengeKind === 'odd_one_out') {
+          const counts = new Map<string, number>();
+          for (const em of puz.emojis) counts.set(em, (counts.get(em) ?? 0) + 1);
+          const singles = [...counts.entries()].filter(([, cnt]) => cnt === 1);
+          expect(singles.length).toBe(pCount >= 5 ? 2 : 1);
+        }
+      }
+    }
   });
 
-  it.each(Array.from({ length: 149 }, (_, i) => ({
-    players: 3 + (i % 10),
-    forceGodfather: i % 2 === 0,
-    forceSurrender: i % 3 === 0,
-    seed: 11000 + i,
+  it.each(Array.from({ length: 154 }, (_, i) => ({
+    players: 2 + (i % 11), // 2..12 người chơi đồng thời!
+    rounds: TINH_MAT_ROUND_OPTIONS[i % TINH_MAT_ROUND_OPTIONS.length],
+    testStun: i % 3 === 0,
+    seed: 11200 + i,
   })))(
-    'Cash n Guns ($players người, godfather=$forceGodfather, surrender=$forceSurrender, seed=$seed): đạn thật/giả, đầu hàng né đạn & chia tiền',
-    ({ players, forceGodfather, forceSurrender, seed }) => {
+    'Tinh Mắt Đập Nhanh ($players người, $rounds vòng, stun=$testStun, seed=$seed): đua đồng thời, choáng khi bấm sai & tổng kết chuẩn',
+    ({ players, rounds, testStun, seed }) => {
       vi.useFakeTimers();
       const ps = makePlayers(players);
       const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, {}, 300, bots);
-      const g = new CashGunsGame(ctx);
+      const { ctx, getResult } = makeHarness(seed, { tinhMatRounds: rounds }, 260, bots);
+      const g = new TinhMatGame(ctx);
       g.start(ps);
 
-      // Mỗi người 5 Click + 3 Bang = 8 viên
-      const v0 = g.view('p0');
-      expect(v0.myClip).toHaveLength(8);
-      expect(v0.myClip.filter((b) => b === 'click')).toHaveLength(5);
-      expect(v0.myClip.filter((b) => b === 'bang')).toHaveLength(3);
-      expect(Object.keys(v0.aims)).toHaveLength(0); // Chưa lộ mục tiêu ở pha plan!
-      // Không được tự bắn chính mình
-      expect(g.action('p0', { type: 'cg_plan', bulletIndex: 0, targetId: 'p0' }).ok).toBe(false);
-
-      // Mọi người nạp đạn
-      for (let i = 0; i < ps.length; i++) {
-        const shooter = ps[i].id;
-        const target = ps[(i + 1) % ps.length].id;
-        expect(g.action(shooter, { type: 'cg_plan', bulletIndex: 0, targetId: target }).ok).toBe(true);
-      }
-
-      expect(g.view('p0').phase).toBe('standoff');
-      expect(Object.keys(g.view('p0').aims)).toHaveLength(players);
-
-      if (forceGodfather) {
-        const gf = g.view('p0').godfatherId;
-        const other = ps.find((p) => p.id !== gf)!.id;
-        const curAim = g.view(gf).aims[other];
-        const redirectTo = ps.find((p) => p.id !== other && p.id !== curAim)!.id;
-        expect(g.action(gf, { type: 'cg_godfather', targetId: other, newAimId: redirectTo }).ok).toBe(true);
-        expect(g.view(gf).aims[other]).toBe(redirectTo);
-      }
-
-      if (forceSurrender) {
-        expect(g.action('p1', { type: 'cg_standoff', decision: 'surrender' }).ok).toBe(true);
+      if (testStun) {
+        // Tìm 1 ô sai để bấm thử choáng tay 1.3s
+        const v = g.view();
+        const wrongIdx = v.grid.findIndex((c) => {
+          if (v.challengeKind === 'match_target') return c.emoji !== v.targetEmoji;
+          if (v.challengeKind === 'avoid_bomb') return !v.bonusEmojis.includes(c.emoji);
+          return v.grid.filter((x) => x.emoji === c.emoji).length > 1;
+        });
+        if (wrongIdx >= 0) {
+          expect(g.action('p0', { type: 'tm_tap', cellId: wrongIdx }).ok).toBe(true);
+          expect(g.view().stunnedUntil.p0).toBeGreaterThan(Date.now());
+          // Đang bị choáng mà cố bấm tiếp -> bị từ chối ngay!
+          const anotherIdx = (wrongIdx + 1) % v.grid.length;
+          expect(g.action('p0', { type: 'tm_tap', cellId: anotherIdx }).ok).toBe(false);
+        }
       }
 
       let guard = 0;
-      while (!getResult() && guard++ < 150) {
-        for (const p of ps) {
-          const ba = g.botAction(p.id);
-          if (ba) g.action(p.id, ba);
+      while (!getResult() && guard++ < 220) {
+        if (g.view().phase === 'playing') {
+          for (const p of ps) {
+            const ba = g.botAction(p.id);
+            if (ba) g.action(p.id, ba);
+          }
         }
-        vi.advanceTimersByTime(350);
+        vi.advanceTimersByTime(320);
       }
       expect(getResult()).not.toBeNull();
+      expect(getResult()!.ranking).toHaveLength(players);
       g.dispose();
     },
   );
 });
 
 // ============================================================================
-// 12. LÔ TÔ HỘI CHỢ 90 SỐ (160 TEST CASES)
+// 12. ĐÈN ĐỎ ĐÈN XANH — TROLL SPRINT ARENA (155 TEST CASES)
 // ============================================================================
-describe('Game 12 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)', () => {
+describe('Game 12 — Đèn Đỏ Đèn Xanh (2–12 Người, Laser Đèn Đỏ & Đạo Cụ Bóp Đồng Đội, 155 cases)', () => {
+  it('phạt lùi -28m khi chạy lúc Đèn Đỏ, Khiên chắn Laser an toàn, Còi Giả & Vỏ Chuối hoạt động chính xác', () => {
+    vi.useFakeTimers();
+    const { ctx } = makeHarness(11801, { denDoRounds: 10 }, 0);
+    ctx.turnMs = undefined;
+    const g = new DenDoGame(ctx);
+    g.start(makePlayers(3));
+
+    // Pha đầu là Đèn Xanh: chạy liên tiếp vượt mốc 25m để nhận đạo cụ!
+    for (let step = 0; step < 9; step++) {
+      expect(g.action('p0', { type: 'dd_step' }).ok).toBe(true);
+      vi.advanceTimersByTime(120);
+    }
+    expect(g.view().progress.p0).toBeGreaterThanOrEqual(25);
+    expect(DEN_DO_ITEMS).toContain(g.view().items.p0);
+
+    // Chờ sang Đèn Đỏ và qua 180ms ân huệ -> p1 chạy không khiên sẽ bị bắn lùi & đưa vào caughtIds!
+    let guard = 0;
+    while (g.view().light !== 'red' && guard++ < 40) {
+      vi.advanceTimersByTime(250);
+    }
+    expect(g.view().light).toBe('red');
+    vi.advanceTimersByTime(220);
+
+    // Cho p1 nhích trước ở Đèn Xanh không kịp thì đang ở 0m -> vẫn bị ghi vào caughtIds!
+    expect(g.action('p1', { type: 'dd_step' }).ok).toBe(true);
+    expect(g.view().caughtIds).toContain('p1');
+    g.dispose();
+  });
+
+  it.each(Array.from({ length: 154 }, (_, i) => ({
+    players: 2 + (i % 11), // 2..12 người chơi!
+    rounds: DEN_DO_ROUND_OPTIONS[i % DEN_DO_ROUND_OPTIONS.length],
+    seed: 11900 + i,
+  })))(
+    'Đèn Đỏ Đèn Xanh ($players người, $rounds nhịp đèn, seed=$seed): đua 0->100m, nhặt đạo cụ & hoàn tất ván không rò timer',
+    ({ players, rounds, seed }) => {
+      vi.useFakeTimers();
+      const ps = makePlayers(players);
+      const bots = new Set(ps.map((p) => p.id));
+      const { ctx, getResult } = makeHarness(seed, { denDoRounds: rounds }, 260, bots);
+      const g = new DenDoGame(ctx);
+      g.start(ps);
+
+      let guard = 0;
+      while (!getResult() && guard++ < 260) {
+        const v = g.view();
+        if (v.light === 'green') {
+          g.action('p0', { type: 'dd_step' });
+        }
+        if (v.items.p0) {
+          g.action('p0', { type: 'dd_trick' });
+        }
+        for (const p of ps) {
+          const ba = g.botAction(p.id);
+          if (ba) g.action(p.id, ba);
+        }
+        vi.advanceTimersByTime(220);
+      }
+      expect(getResult()).not.toBeNull();
+      expect(DEN_DO_GOAL_METERS).toBe(100);
+      g.dispose();
+    },
+  );
+});
+
+// ============================================================================
+// 13. LÔ TÔ HỘI CHỢ 90 SỐ (160 TEST CASES)
+// ============================================================================
+describe('Game 13 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)', () => {
   it('đủ 90 câu vè tiếng Việt không trùng cho từng số từ 1..90', () => {
     for (let num = 1; num <= 90; num++) {
       expect(LOTO_RHYMES[num]).toBeDefined();
@@ -904,9 +1004,18 @@ describe('Game 12 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)
 });
 
 // ============================================================================
-// 13. CỜ CARO ĐẠI CHIẾN 15×15 (160 TEST CASES)
+// 14. CỜ CARO ĐẠI CHIẾN CO GIÃN BÀN CỜ THEO SỐ PHE (160 TEST CASES)
 // ============================================================================
-describe('Game 13 — Cờ Caro Đại Chiến 15×15 (2–4 Người & Luật Chặn 2 Đầu, 160 cases)', () => {
+describe('Game 14 — Cờ Caro Đại Chiến Co Giãn 15×15 / 22×22 / 28×28 / 32×32 (160 cases)', () => {
+  it('tự động phóng to bàn cờ gấp nhiều lần khi tăng số người chơi (2p=225 ô, 3p=484 ô, 4p=784 ô, mega=1024 ô)', () => {
+    expect(caroSizeForPlayers(2, 'auto')).toBe(15);
+    expect(caroSizeForPlayers(3, 'auto')).toBe(22);
+    expect(caroSizeForPlayers(4, 'auto')).toBe(28);
+    expect(caroSizeForPlayers(2, 'mega')).toBe(24);
+    expect(caroSizeForPlayers(3, 'mega')).toBe(28);
+    expect(caroSizeForPlayers(4, 'mega')).toBe(32);
+  });
+
   it.each([
     { desc: 'ngang 5 tự do -> THẮNG', dr: 0, dc: 1, blockA: false, blockB: false, rule: true, expectWin: true },
     { desc: 'dọc 5 tự do -> THẮNG', dr: 1, dc: 0, blockA: false, blockB: false, rule: true, expectWin: true },
@@ -940,29 +1049,34 @@ describe('Game 13 — Cờ Caro Đại Chiến 15×15 (2–4 Người & Luật C
     expect([[7, 3], [7, 8]]).toContainEqual([blockMove.row, blockMove.col]);
   });
 
-  it.each(Array.from({ length: 152 }, (_, i) => ({
+  it.each(Array.from({ length: 151 }, (_, i) => ({
     players: 2 + (i % 3), // 2, 3, 4 người chơi!
     blockTwoEnds: i % 2 === 0,
+    sizeMode: (i % 4 === 0 ? 'mega' : 'auto') as CaroSizeMode,
     seed: 13000 + i,
   })))(
-    'Ván Caro ($players phe, chặn2đầu=$blockTwoEnds, seed=$seed): xoay lượt chuẩn, cấm đè ô & AI đấu trọn ván',
-    ({ players, blockTwoEnds, seed }) => {
+    'Ván Caro ($players phe, mode=$sizeMode, chặn2đầu=$blockTwoEnds, seed=$seed): bàn cờ mở rộng đúng kích thước, cấm đè ô & AI đấu trọn ván',
+    ({ players, blockTwoEnds, sizeMode, seed }) => {
       vi.useFakeTimers();
       const ps = makePlayers(players);
       const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, { caroBlockTwoEnds: blockTwoEnds }, 300, bots);
+      const { ctx, getResult } = makeHarness(seed, { caroBlockTwoEnds: blockTwoEnds, caroSizeMode: sizeMode }, 300, bots);
       const g = new CaroGame(ctx);
       g.start(ps);
 
       const v0 = g.view();
+      const expectedSide = caroSizeForPlayers(players, sizeMode);
+      expect(v0.size).toBe(expectedSide);
+      expect(v0.board).toHaveLength(expectedSide * expectedSide);
       expect(Object.values(v0.symbols)).toEqual(CARO_SYMBOLS.slice(0, players));
 
-      // Đánh nước đầu ở tâm (7,7), người kế tiếp đánh đè lên (7,7) phải bị từ chối cell_occupied!
+      // Đánh nước đầu ở tâm (mid,mid), người kế tiếp đánh đè lên phải bị từ chối cell_occupied!
+      const mid = Math.floor(expectedSide / 2);
       const first = v0.currentPlayerId!;
-      expect(g.action(first, { type: 'caro_move', row: 7, col: 7 }).ok).toBe(true);
+      expect(g.action(first, { type: 'caro_move', row: mid, col: mid }).ok).toBe(true);
       const second = g.view().currentPlayerId!;
       expect(second).not.toBe(first);
-      expect(g.action(second, { type: 'caro_move', row: 7, col: 7 })).toEqual({ ok: false, reason: 'cell_occupied' });
+      expect(g.action(second, { type: 'caro_move', row: mid, col: mid })).toEqual({ ok: false, reason: 'cell_occupied' });
 
       const maxSteps = seed < 13025 ? 230 : 18;
       let guard = 0;
@@ -1158,12 +1272,12 @@ describe('Game 14 — Đầm Lầy Quái Chiêu (Croak Squad Co-op 2D Physics & 
 });
 
 // ============================================================================
-// 15. KIỂM TOÁN 146 VẬT PHẨM CỬA HÀNG RUBY, 15 MAP & 14 GAME METADATA (165 CASES)
+// 16. KIỂM TOÁN 146 VẬT PHẨM CỬA HÀNG RUBY, 15 MAP & 15 GAME METADATA (165 CASES)
 // ============================================================================
-describe('Hệ Thống Phú Hào 146 Vật Phẩm, 15 Map & 14 Game Configs (165 cases)', () => {
-  it('đủ 14 trò chơi trong GAME_INFO, 28 kỹ năng Ruby, 15 siêu quà & 15 Map chuẩn xác', () => {
+describe('Hệ Thống Phú Hào 146 Vật Phẩm, 15 Map & 15 Game Configs (165 cases)', () => {
+  it('đủ 15 trò chơi trong GAME_INFO, 28 kỹ năng Ruby, 15 siêu quà & 15 Map chuẩn xác', () => {
     const allTypes = Object.keys(GAME_INFO) as GameType[];
-    expect(allTypes).toHaveLength(14);
+    expect(allTypes).toHaveLength(15);
     expect(SKILL_IDS).toHaveLength(28);
     expect(GIFT_IDS).toHaveLength(15);
     expect(ROOM_THEMES).toHaveLength(15);

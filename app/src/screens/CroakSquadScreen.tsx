@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import {
-  CROAK_DT, CROAK_FROG_H, CROAK_FROG_W, CROAK_STAGES,
-  computeSpitArc, platformRectAt,
-  type CroakInput, type CroakSoundFx, type CroakSquadView, type CroakTickPayload,
+  CROAK_CARRY_MULT,
+  CROAK_DT,
+  CROAK_FROG_H,
+  CROAK_FROG_W,
+  CROAK_GRAVITY,
+  CROAK_JUMP_VY,
+  CROAK_MAX_FALL,
+  CROAK_MOVE_SPEED,
+  CROAK_STAGES,
+  computeSpitArc,
+  getSolidRects,
+  platformRectAt,
+  rectsOverlap,
+  type CroakInput,
+  type CroakRect,
+  type CroakSoundFx,
+  type CroakSquadView,
+  type CroakStageDef,
+  type CroakTickPayload,
+  type FrogState,
 } from '../../../shared/src/croaksquad';
 import { PLAYER_COLORS, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
@@ -13,22 +29,28 @@ import { useStableWindow } from '../hooks';
 import { C, FONT, sticker } from '../theme';
 import { Button, T } from '../ui';
 import { Shell, type StripOptions } from '../components/Shell';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { EmojiIcon, UiIcon, emojiSvgUri } from '../components/Icons';
 import { Confetti } from '../components/Fun';
 
-let sharedCroakAudioCtx: AudioContext | null = null;
+// ============================================================================
+// SINGLETON WEBAUDIO SYNTH (KHÔNG TẠO MỚI AudioContext MỖI NHỊP -> 0 GC LAG)
+// ============================================================================
+
+let sharedAudioCtx: AudioContext | null = null;
 
 function getCroakAudioCtx(): AudioContext | null {
-  const AudioCtx = (globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-    ?? (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) return null;
-  if (!sharedCroakAudioCtx || sharedCroakAudioCtx.state === 'closed') {
-    sharedCroakAudioCtx = new AudioCtx();
+  if (Platform.OS !== 'web') return null;
+  if (!sharedAudioCtx) {
+    const AudioCtor =
+      (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
+      (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return null;
+    sharedAudioCtx = new AudioCtor();
   }
-  if (sharedCroakAudioCtx.state === 'suspended') {
-    void sharedCroakAudioCtx.resume().catch(() => {});
+  if (sharedAudioCtx.state === 'suspended') {
+    void sharedAudioCtx.resume().catch(() => {});
   }
-  return sharedCroakAudioCtx;
+  return sharedAudioCtx;
 }
 
 function playCroakSfx(sfx: CroakSoundFx): void {
@@ -44,50 +66,330 @@ function playCroakSfx(sfx: CroakSoundFx): void {
 
     if (sfx === 'jump') {
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(240, now);
-      osc.frequency.exponentialRampToValueAtTime(520, now + 0.11);
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.frequency.setValueAtTime(250, now);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.1);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
       osc.start(now);
-      osc.stop(now + 0.12);
+      osc.stop(now + 0.11);
     } else if (sfx === 'tongue' || sfx === 'swallow') {
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(sfx === 'swallow' ? 190 : 380, now);
-      osc.frequency.exponentialRampToValueAtTime(sfx === 'swallow' ? 440 : 210, now + 0.13);
-      gain.gain.setValueAtTime(0.11, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc.frequency.setValueAtTime(sfx === 'swallow' ? 190 : 390, now);
+      osc.frequency.exponentialRampToValueAtTime(sfx === 'swallow' ? 460 : 210, now + 0.12);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
       osc.start(now);
-      osc.stop(now + 0.14);
+      osc.stop(now + 0.13);
     } else if (sfx === 'spit' || sfx === 'bounce') {
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(760, now + 0.16);
-      gain.gain.setValueAtTime(0.11, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      osc.frequency.exponentialRampToValueAtTime(760, now + 0.15);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
       osc.start(now);
-      osc.stop(now + 0.17);
+      osc.stop(now + 0.16);
     } else if (sfx === 'switch' || sfx === 'key' || sfx === 'checkpoint' || sfx === 'stage_clear') {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(440, now);
-      osc.frequency.setValueAtTime(660, now + 0.07);
-      osc.frequency.setValueAtTime(sfx === 'stage_clear' ? 880 : 784, now + 0.14);
-      gain.gain.setValueAtTime(0.11, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc.frequency.setValueAtTime(660, now + 0.06);
+      osc.frequency.setValueAtTime(sfx === 'stage_clear' ? 880 : 784, now + 0.13);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
       osc.start(now);
-      osc.stop(now + 0.28);
+      osc.stop(now + 0.26);
     } else if (sfx === 'die') {
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(95, now + 0.2);
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+      osc.frequency.exponentialRampToValueAtTime(95, now + 0.19);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc.start(now);
-      osc.stop(now + 0.21);
+      osc.stop(now + 0.2);
+    } else {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(360, now);
+      osc.frequency.exponentialRampToValueAtTime(520, now + 0.09);
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now);
+      osc.stop(now + 0.1);
     }
   } catch {
-    // WebAudio bị trình duyệt chặn trước tương tác đầu tiên: bỏ qua an toàn
+    // Trình duyệt chặn tự phát trước tương tác đầu tiên: bỏ qua an toàn
   }
 }
+
+// ============================================================================
+// BỘ NẠP SPRITE VECTOR MICROSOFT FLUENT EMOJI 3D CHO CANVAS 60FPS
+// ============================================================================
+
+interface CroakSprites {
+  frog: HTMLImageElement | null;
+  crown: HTMLImageElement | null;
+  key: HTMLImageElement | null;
+  lotus: HTMLImageElement | null;
+  mushroom: HTMLImageElement | null;
+  bubble: HTMLImageElement | null;
+  rocket: HTMLImageElement | null;
+}
+
+let cachedSprites: CroakSprites | null = null;
+
+function loadFluentImage(emoji: string): HTMLImageElement | null {
+  if (Platform.OS !== 'web' || typeof Image === 'undefined') return null;
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = emojiSvgUri(emoji);
+  return img;
+}
+
+function getCroakSprites(): CroakSprites {
+  if (!cachedSprites) {
+    cachedSprites = {
+      frog: loadFluentImage('🐸'),
+      crown: loadFluentImage('👑'),
+      key: loadFluentImage('🔑'),
+      lotus: loadFluentImage('🪷'),
+      mushroom: loadFluentImage('🍄'),
+      bubble: loadFluentImage('🫧'),
+      rocket: loadFluentImage('🚀'),
+    };
+  }
+  return cachedSprites;
+}
+
+// ============================================================================
+// HÀM VẼ ĐỊA HÌNH PHONG CÁCH KENNEY PLATFORMER DELUXE (OFFSCREEN CACHE)
+// ============================================================================
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const rad = Math.min(r, w * 0.5, h * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+
+function bakeStageStaticCanvas(
+  stage: CroakStageDef,
+  switchesOn: Record<string, boolean>,
+): HTMLCanvasElement | null {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return null;
+  const off = document.createElement('canvas');
+  off.width = stage.width;
+  off.height = stage.height;
+  const ctx = off.getContext('2d');
+  if (!ctx) return null;
+
+  // 1. Bầu trời rừng đầm lầy chạng vạng đa tầng chiều sâu
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, stage.height);
+  skyGrad.addColorStop(0, '#051523');
+  skyGrad.addColorStop(0.46, '#0B2D3D');
+  skyGrad.addColorStop(0.82, '#114B48');
+  skyGrad.addColorStop(1, '#092B29');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, stage.width, stage.height);
+
+  // Mặt trăng sương mù dịu nhẹ phía xa
+  const moonX = stage.width * 0.72;
+  const moonY = 108;
+  const moonGlow = ctx.createRadialGradient(moonX, moonY, 14, moonX, moonY, 130);
+  moonGlow.addColorStop(0, 'rgba(254, 249, 195, 0.42)');
+  moonGlow.addColorStop(0.45, 'rgba(153, 246, 228, 0.14)');
+  moonGlow.addColorStop(1, 'rgba(15, 23, 42, 0)');
+  ctx.fillStyle = moonGlow;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 130, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(254, 249, 195, 0.85)';
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dãy đồi & tán cây đầm lầy xa mờ (Kenney Parallax Silhouette)
+  ctx.fillStyle = 'rgba(6, 38, 45, 0.68)';
+  ctx.beginPath();
+  ctx.moveTo(0, stage.height);
+  for (let x = 0; x <= stage.width; x += 90) {
+    const hillY = stage.height - 220 - Math.sin(x * 0.0065 + stage.index) * 58 - Math.cos(x * 0.014) * 26;
+    ctx.lineTo(x, hillY);
+  }
+  ctx.lineTo(stage.width, stage.height);
+  ctx.closePath();
+  ctx.fill();
+
+  // Trụ đá cổ & dây leo mờ ở hậu cảnh
+  ctx.fillStyle = 'rgba(13, 62, 62, 0.48)';
+  for (let px = 150; px < stage.width; px += 340) {
+    const ph = 180 + ((px * 17) % 110);
+    roundRectPath(ctx, px, stage.height - ph - 80, 34, ph, 8);
+    ctx.fill();
+    roundRectPath(ctx, px - 8, stage.height - ph - 90, 50, 14, 5);
+    ctx.fill();
+  }
+
+  // 2. Vẽ các địa hình tĩnh (moss, stone, và khung cầu ẩn chưa bật)
+  for (const plat of stage.platforms) {
+    if (plat.move) continue; // Bệ di động vẽ động ở 60fps
+    if (plat.kind === 'bounce') continue; // Nấm nhún vẽ động ở 60fps
+    if (plat.x + plat.w <= 0 || plat.x >= stage.width) continue;
+
+    const active = !plat.activeWhenSwitch || !!switchesOn[plat.activeWhenSwitch];
+    if (!active) {
+      ctx.save();
+      ctx.setLineDash([9, 7]);
+      roundRectPath(ctx, plat.x, plat.y, plat.w, plat.h, 8);
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.09)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.72)';
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    if (plat.kind === 'wood') {
+      drawKenneyWoodPlank(ctx, plat.x, plat.y, plat.w, plat.h);
+      continue;
+    }
+
+    if (plat.kind === 'stone') {
+      // Khối gạch đá Đền Cổ (Kenney Stone Block Tile)
+      const stoneGrad = ctx.createLinearGradient(plat.x, plat.y, plat.x, plat.y + plat.h);
+      stoneGrad.addColorStop(0, '#64748B');
+      stoneGrad.addColorStop(1, '#334155');
+      roundRectPath(ctx, plat.x, plat.y, plat.w, plat.h, 8);
+      ctx.fillStyle = stoneGrad;
+      ctx.fill();
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = '#1E293B';
+      ctx.stroke();
+
+      // Viền sáng bevel đỉnh khối đá
+      roundRectPath(ctx, plat.x + 3, plat.y + 3, Math.max(6, plat.w - 6), 6, 3);
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.42)';
+      ctx.fill();
+
+      // Đường mạch gạch đá so le
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+      ctx.lineWidth = 1.4;
+      for (let by = plat.y + 24; by < plat.y + plat.h - 6; by += 24) {
+        ctx.beginPath();
+        ctx.moveTo(plat.x + 4, by);
+        ctx.lineTo(plat.x + plat.w - 4, by);
+        ctx.stroke();
+        const rowShift = ((Math.floor((by - plat.y) / 24) % 2) * 18);
+        for (let bx = plat.x + 28 + rowShift; bx < plat.x + plat.w - 10; bx += 38) {
+          ctx.beginPath();
+          ctx.moveTo(bx, by - 22);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+        }
+      }
+      continue;
+    }
+
+    // Địa hình đất & thảm cỏ xanh mướt chuẩn Kenney Grass Platformer
+    const soilGrad = ctx.createLinearGradient(plat.x, plat.y, plat.x, plat.y + plat.h);
+    soilGrad.addColorStop(0, '#5C3A21');
+    soilGrad.addColorStop(0.45, '#3E2514');
+    soilGrad.addColorStop(1, '#23140B');
+    roundRectPath(ctx, plat.x, plat.y, plat.w, plat.h, 10);
+    ctx.fillStyle = soilGrad;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#1A0F08';
+    ctx.stroke();
+
+    // Hạt sỏi trang trí trong lòng đất
+    ctx.fillStyle = 'rgba(120, 78, 46, 0.42)';
+    for (let sx = plat.x + 22; sx < plat.x + plat.w - 22; sx += 46) {
+      const sy = plat.y + 34 + ((sx * 13) % Math.max(12, Math.min(60, plat.h - 40)));
+      if (sy + 8 < plat.y + plat.h) {
+        roundRectPath(ctx, sx, sy, 14, 8, 4);
+        ctx.fill();
+      }
+    }
+
+    // Mũ cỏ xanh non phủ rủ mép (scalloped grass overhang)
+    const capH = Math.min(18, plat.h);
+    const grassGrad = ctx.createLinearGradient(plat.x, plat.y, plat.x, plat.y + capH);
+    grassGrad.addColorStop(0, '#86EFAC');
+    grassGrad.addColorStop(0.35, '#22C55E');
+    grassGrad.addColorStop(1, '#15803D');
+    roundRectPath(ctx, plat.x - 1, plat.y - 1, plat.w + 2, capH, 9);
+    ctx.fillStyle = grassGrad;
+    ctx.fill();
+
+    // Viền cỏ rủ tròn mềm mại dọc mép dưới thảm cỏ
+    ctx.fillStyle = '#16A34A';
+    for (let gx = plat.x + 10; gx < plat.x + plat.w - 14; gx += 22) {
+      ctx.beginPath();
+      ctx.arc(gx + 6, plat.y + capH - 1, 7, 0, Math.PI);
+      ctx.fill();
+    }
+
+    // Highlight nắng trên đỉnh cỏ
+    roundRectPath(ctx, plat.x + 6, plat.y + 2, Math.max(8, plat.w - 12), 4, 2);
+    ctx.fillStyle = 'rgba(220, 252, 231, 0.58)';
+    ctx.fill();
+  }
+
+  return off;
+}
+
+function drawKenneyWoodPlank(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const woodGrad = ctx.createLinearGradient(x, y, x, y + h);
+  woodGrad.addColorStop(0, '#D97706');
+  woodGrad.addColorStop(0.55, '#B45309');
+  woodGrad.addColorStop(1, '#78350F');
+  roundRectPath(ctx, x, y, w, h, 7);
+  ctx.fillStyle = woodGrad;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#451A03';
+  ctx.stroke();
+
+  roundRectPath(ctx, x + 4, y + 3, Math.max(6, w - 8), 4, 2);
+  ctx.fillStyle = 'rgba(253, 230, 138, 0.5)';
+  ctx.fill();
+
+  // Khe ván gỗ & đinh tán đồng
+  ctx.strokeStyle = 'rgba(69, 26, 3, 0.48)';
+  ctx.lineWidth = 1.5;
+  for (let px = x + 32; px < x + w - 12; px += 32) {
+    ctx.beginPath();
+    ctx.moveTo(px, y + 2);
+    ctx.lineTo(px, y + h - 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#FDE68A';
+  ctx.beginPath();
+  ctx.arc(x + 10, y + h * 0.5, 2.6, 0, Math.PI * 2);
+  ctx.arc(x + w - 10, y + h * 0.5, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ============================================================================
+// CẤU HÌNH PRESET GÓC BẮN & TRẠNG THÁI GIAO DIỆN TỐI GIẢN (0 RE-RENDER/TICK)
+// ============================================================================
 
 const AIM_PRESETS: { id: string; label: string; angleRight: number; angleLeft: number; power: number }[] = [
   { id: 'high_left', label: '↖ Cao Trái', angleRight: -Math.PI * 0.68, angleLeft: -Math.PI * 0.68, power: 0.88 },
@@ -96,27 +398,235 @@ const AIM_PRESETS: { id: string; label: string; angleRight: number; angleLeft: n
   { id: 'far_fwd', label: '➡ Bắn Xa', angleRight: -Math.PI * 0.2, angleLeft: -Math.PI * 0.8, power: 0.96 },
 ];
 
+interface UiHudMeta {
+  stageIndex: number;
+  myState: FrogState | null;
+  myBellyId: string | null;
+  myFacing: 1 | -1;
+  finishedCount: number;
+  connectedCount: number;
+}
+
+interface PredictedMe {
+  stageIndex: number;
+  initialized: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  facing: 1 | -1;
+  onGround: boolean;
+}
+
+function stepPredictedFrog(
+  pred: PredictedMe,
+  moveDir: -1 | 0 | 1,
+  carrying: boolean,
+  solids: (CroakRect & { bounceVy?: number; vxPlatform?: number; vyPlatform?: number })[],
+  dt: number,
+): void {
+  const speed = CROAK_MOVE_SPEED * (carrying ? CROAK_CARRY_MULT : 1);
+  pred.vx = moveDir * speed;
+  if (moveDir !== 0) pred.facing = moveDir;
+  pred.vy = Math.min(CROAK_MAX_FALL, pred.vy + CROAK_GRAVITY * dt);
+
+  pred.x += pred.vx * dt;
+  const boxX: CroakRect = { x: pred.x, y: pred.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
+  for (const r of solids) {
+    if (!rectsOverlap(boxX, r)) continue;
+    if (pred.vx > 0) pred.x = r.x - CROAK_FROG_W;
+    else if (pred.vx < 0) pred.x = r.x + r.w;
+    pred.vx = 0;
+    boxX.x = pred.x;
+  }
+
+  pred.onGround = false;
+  pred.y += pred.vy * dt;
+  const boxY: CroakRect = { x: pred.x, y: pred.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
+  for (const r of solids) {
+    if (!rectsOverlap(boxY, r)) continue;
+    if (pred.vy >= 0) {
+      pred.y = r.y - CROAK_FROG_H;
+      if (r.bounceVy !== undefined) {
+        pred.vy = r.bounceVy;
+      } else {
+        pred.vy = 0;
+        pred.onGround = true;
+        if (r.vxPlatform) pred.x += r.vxPlatform * dt;
+      }
+    } else {
+      pred.y = r.y + r.h;
+      pred.vy = 0;
+    }
+    boxY.y = pred.y;
+  }
+}
+
 export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }) {
   const baseView = room.game as CroakSquadView;
-  const [liveTick, setLiveTick] = useState<CroakTickPayload | null>(null);
-  const [fullMap, setFullMap] = useState(false);
-  const [aimAngle, setAimAngle] = useState<number>(-Math.PI * 0.32);
-  const [aimPower, setAimPower] = useState<number>(0.86);
-  const [toastText, setToastText] = useState<string | null>(null);
-
-  const lastEventIdRef = useRef<number>(0);
-  const moveDirRef = useRef<-1 | 0 | 1>(0);
-  const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
-  const seqRef = useRef<number>(1);
-
   const { width } = useStableWindow();
   const wide = width >= 760;
   const me = game.me ?? '';
   const isHost = room.hostId === me;
 
+  const [fullMap, setFullMap] = useState(false);
+  const [aimAngle, setAimAngle] = useState<number>(-Math.PI * 0.32);
+  const [aimPower, setAimPower] = useState<number>(0.86);
+  const [toastText, setToastText] = useState<string | null>(null);
+  const [thumbDir, setThumbDir] = useState<-1 | 0 | 1>(0);
+
+  const initMyFrog = baseView.frogs.find((f) => f.id === me) ?? null;
+  const initConnected = baseView.frogs.filter((f) => f.connected);
+  const [hud, setHud] = useState<UiHudMeta>(() => ({
+    stageIndex: baseView.stageIndex,
+    myState: initMyFrog?.state ?? null,
+    myBellyId: initMyFrog?.bellyId ?? null,
+    myFacing: initMyFrog?.facing ?? 1,
+    finishedCount: initConnected.filter((f) => f.state === 'finished').length,
+    connectedCount: Math.max(1, initConnected.length),
+  }));
+
+  // Snapshot buffer cho nội suy 60fps mượt mà mà KHÔNG gọi setState mỗi tick!
+  const snapRef = useRef<{
+    prev: CroakTickPayload | null;
+    curr: CroakTickPayload;
+    prevAt: number;
+    currAt: number;
+  }>({
+    prev: null,
+    curr: {
+      stageIndex: baseView.stageIndex,
+      tick: baseView.tick,
+      switchesOn: baseView.switchesOn,
+      keysCollected: baseView.keysCollected,
+      activeCheckpointId: baseView.activeCheckpointId,
+      frogs: baseView.frogs,
+      events: baseView.events,
+    },
+    prevAt: 0,
+    currAt: 0,
+  });
+
+  const predRef = useRef<PredictedMe>({
+    stageIndex: baseView.stageIndex,
+    initialized: !!initMyFrog,
+    x: initMyFrog?.x ?? 90,
+    y: initMyFrog?.y ?? 520,
+    vx: 0,
+    vy: 0,
+    facing: initMyFrog?.facing ?? 1,
+    onGround: initMyFrog?.onGround ?? false,
+  });
+
+  const camSmoothRef = useRef<{ x: number; y: number; stageIndex: number }>({
+    x: 0,
+    y: 0,
+    stageIndex: -1,
+  });
+
+  const lastEventIdRef = useRef<number>(0);
+  const moveDirRef = useRef<-1 | 0 | 1>(0);
+  const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const seqRef = useRef<number>(1);
+  const aimRef = useRef<{ angle: number; power: number }>({ angle: aimAngle, power: aimPower });
+  useEffect(() => {
+    aimRef.current = { angle: aimAngle, power: aimPower };
+  }, [aimAngle, aimPower]);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bakedLayerRef = useRef<{ key: string; canvas: HTMLCanvasElement | null }>({
+    key: '',
+    canvas: null,
+  });
+  const lastPointerActionAtRef = useRef<number>(0);
+
+  // Đồng bộ khi `room.game` thay đổi lớn (vd reset màn, đổi màn, người ra vào)
+  useEffect(() => {
+    const now = performance.now();
+    if (
+      baseView.stageIndex !== snapRef.current.curr.stageIndex ||
+      baseView.tick > snapRef.current.curr.tick
+    ) {
+      snapRef.current = {
+        prev: snapRef.current.curr,
+        curr: {
+          stageIndex: baseView.stageIndex,
+          tick: baseView.tick,
+          switchesOn: baseView.switchesOn,
+          keysCollected: baseView.keysCollected,
+          activeCheckpointId: baseView.activeCheckpointId,
+          frogs: baseView.frogs,
+          events: baseView.events,
+        },
+        prevAt: snapRef.current.currAt,
+        currAt: now,
+      };
+      const mine = baseView.frogs.find((f) => f.id === me) ?? null;
+      const conn = baseView.frogs.filter((f) => f.connected);
+      setHud((prev) => {
+        const next: UiHudMeta = {
+          stageIndex: baseView.stageIndex,
+          myState: mine?.state ?? null,
+          myBellyId: mine?.bellyId ?? null,
+          myFacing: mine?.facing ?? 1,
+          finishedCount: conn.filter((f) => f.state === 'finished').length,
+          connectedCount: Math.max(1, conn.length),
+        };
+        if (
+          prev.stageIndex === next.stageIndex &&
+          prev.myState === next.myState &&
+          prev.myBellyId === next.myBellyId &&
+          prev.myFacing === next.myFacing &&
+          prev.finishedCount === next.finishedCount &&
+          prev.connectedCount === next.connectedCount
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    }
+  }, [baseView, me]);
+
+  // Lắng nghe luồng vật lý 30Hz từ Server vào thẳng Ref (0 React re-render cho chuyển động!)
   useEffect(() => {
     return game.onCroakTick((payload) => {
-      setLiveTick(payload);
+      const now = performance.now();
+      snapRef.current = {
+        prev: snapRef.current.curr.stageIndex === payload.stageIndex ? snapRef.current.curr : null,
+        curr: payload,
+        prevAt: snapRef.current.currAt,
+        currAt: now,
+      };
+
+      // Hòa giải (reconcile) vị trí dự đoán của bản thân với vị trí trọng tài Server
+      const srvMe = payload.frogs.find((f) => f.id === me);
+      if (srvMe) {
+        const pr = predRef.current;
+        const hardSync =
+          !pr.initialized ||
+          pr.stageIndex !== payload.stageIndex ||
+          srvMe.state === 'swallowed' ||
+          srvMe.state === 'launched' ||
+          srvMe.state === 'dead' ||
+          srvMe.state === 'finished';
+        const dist = Math.hypot(srvMe.x - pr.x, srvMe.y - pr.y);
+        if (hardSync || dist > 95) {
+          pr.stageIndex = payload.stageIndex;
+          pr.initialized = true;
+          pr.x = srvMe.x;
+          pr.y = srvMe.y;
+          pr.vx = srvMe.vx;
+          pr.vy = srvMe.vy;
+          pr.facing = srvMe.facing;
+          pr.onGround = srvMe.onGround;
+        } else {
+          pr.x += (srvMe.x - pr.x) * 0.32;
+          pr.y += (srvMe.y - pr.y) * 0.32;
+          if (Math.abs(srvMe.vy - pr.vy) > 180) pr.vy = srvMe.vy;
+          pr.onGround = srvMe.onGround;
+        }
+      }
+
       if (payload.events.length > 0) {
         for (const ev of payload.events) {
           if (ev.id > lastEventIdRef.current) {
@@ -126,8 +636,35 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
           }
         }
       }
+
+      // Chỉ cập nhật HUD React khi có thay đổi trạng thái thực sự (ngậm/nhả/qua màn/về đích)
+      const conn = payload.frogs.filter((f) => f.connected);
+      const fin = conn.filter((f) => f.state === 'finished').length;
+      const mySt = srvMe?.state ?? null;
+      const myBelly = srvMe?.bellyId ?? null;
+      const myFac = srvMe?.facing ?? 1;
+      setHud((prev) => {
+        if (
+          prev.stageIndex === payload.stageIndex &&
+          prev.myState === mySt &&
+          prev.myBellyId === myBelly &&
+          (mySt !== 'carrying' || prev.myFacing === myFac) &&
+          prev.finishedCount === fin &&
+          prev.connectedCount === Math.max(1, conn.length)
+        ) {
+          return prev;
+        }
+        return {
+          stageIndex: payload.stageIndex,
+          myState: mySt,
+          myBellyId: myBelly,
+          myFacing: myFac,
+          finishedCount: fin,
+          connectedCount: Math.max(1, conn.length),
+        };
+      });
     });
-  }, [game]);
+  }, [game, me]);
 
   useEffect(() => {
     if (!toastText) return;
@@ -135,18 +672,8 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
     return () => clearTimeout(t);
   }, [toastText]);
 
-  const effectiveTick = liveTick && liveTick.stageIndex === baseView.stageIndex && liveTick.tick >= baseView.tick
-    ? liveTick
-    : null;
-
-  const stageIndex = effectiveTick?.stageIndex ?? baseView.stageIndex;
-  const stage = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, stageIndex))];
-  const tick = effectiveTick?.tick ?? baseView.tick;
-  const elapsedSec = tick * CROAK_DT;
-  const switchesOn = effectiveTick?.switchesOn ?? baseView.switchesOn;
-  const keysCollected = effectiveTick?.keysCollected ?? baseView.keysCollected;
-  const activeCheckpointId = effectiveTick?.activeCheckpointId ?? baseView.activeCheckpointId;
-  const frogs = effectiveTick?.frogs ?? baseView.frogs;
+  const stage = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, hud.stageIndex))];
+  const isSpectator = hud.myState === null;
 
   const colorMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -157,40 +684,77 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
     return m;
   }, [room.players]);
 
-  const myFrog = useMemo(() => frogs.find((f) => f.id === me) ?? null, [frogs, me]);
-  const isSpectator = !myFrog;
-
-  const sendInput = useCallback((patch: Partial<CroakInput>) => {
-    const payload: CroakInput = {
-      seq: seqRef.current++,
-      moveX: patch.moveX ?? moveDirRef.current,
-      aimAngle: patch.aimAngle ?? aimAngle,
-      aimPower: patch.aimPower ?? aimPower,
-      ...(patch.jump ? { jump: true } : {}),
-      ...(patch.tongue ? { tongue: true } : {}),
-      ...(patch.spit ? { spit: true } : {}),
+  const liveRenderCtxRef = useRef({
+    me,
+    wide,
+    fullMap,
+    aimAngle,
+    aimPower,
+    colorMap,
+    names: baseView.names,
+  });
+  useEffect(() => {
+    liveRenderCtxRef.current = {
+      me,
+      wide,
+      fullMap,
+      aimAngle,
+      aimPower,
+      colorMap,
+      names: baseView.names,
     };
-    void game.act({ type: 'cs_input', input: payload });
-  }, [aimAngle, aimPower, game]);
+  }, [me, wide, fullMap, aimAngle, aimPower, colorMap, baseView.names]);
 
-  const setMoveDir = useCallback((dir: -1 | 0 | 1) => {
-    moveDirRef.current = dir;
-    if (dir === 1 && Math.cos(aimAngle) < -0.25) {
-      const flipped = -Math.PI - aimAngle;
-      setAimAngle(flipped);
-      void game.act({ type: 'cs_input', input: { seq: seqRef.current++, moveX: dir, aimAngle: flipped, aimPower } });
-      return;
-    }
-    if (dir === -1 && Math.cos(aimAngle) > 0.25) {
-      const flipped = -Math.PI - aimAngle;
-      setAimAngle(flipped);
-      void game.act({ type: 'cs_input', input: { seq: seqRef.current++, moveX: dir, aimAngle: flipped, aimPower } });
-      return;
-    }
-    void game.act({ type: 'cs_input', input: { seq: seqRef.current++, moveX: dir, aimAngle, aimPower } });
-  }, [aimAngle, aimPower, game]);
+  const sendInput = useCallback(
+    (patch: Partial<CroakInput>) => {
+      if (patch.jump && predRef.current.onGround && hud.myState !== 'swallowed') {
+        predRef.current.vy = CROAK_JUMP_VY;
+        predRef.current.onGround = false;
+        playCroakSfx('jump');
+      }
+      const curAim = aimRef.current;
+      const payload: CroakInput = {
+        seq: seqRef.current++,
+        moveX: patch.moveX ?? moveDirRef.current,
+        aimAngle: patch.aimAngle ?? curAim.angle,
+        aimPower: patch.aimPower ?? curAim.power,
+        ...(patch.jump ? { jump: true } : {}),
+        ...(patch.tongue ? { tongue: true } : {}),
+        ...(patch.spit ? { spit: true } : {}),
+      };
+      void game.act({ type: 'cs_input', input: payload });
+    },
+    [game, hud.myState],
+  );
 
-  // Điều khiển bàn phím trên Web (WASD / Phím mũi tên / Space / J / Q / E)
+  const setMoveDir = useCallback(
+    (dir: -1 | 0 | 1) => {
+      if (moveDirRef.current === dir) return;
+      moveDirRef.current = dir;
+      setThumbDir(dir);
+      const curAim = aimRef.current;
+      let nextAngle = curAim.angle;
+      if (dir === 1 && Math.cos(curAim.angle) < -0.25) {
+        nextAngle = -Math.PI - curAim.angle;
+        setAimAngle(nextAngle);
+      } else if (dir === -1 && Math.cos(curAim.angle) > 0.25) {
+        nextAngle = -Math.PI - curAim.angle;
+        setAimAngle(nextAngle);
+      }
+      void game.act({
+        type: 'cs_input',
+        input: {
+          seq: seqRef.current++,
+          moveX: dir,
+          aimAngle: nextAngle,
+          aimPower: curAim.power,
+        },
+      });
+    },
+    [game],
+  );
+
+  // Điều khiển bàn phím trên Web (WASD / Mũi tên / Space / J / Q / E)
   useEffect(() => {
     if (Platform.OS !== 'web' || isSpectator) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -211,18 +775,24 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
         sendInput({ jump: true });
       } else if (e.key === 'j' || e.key === 'J' || e.key === 'Enter') {
         e.preventDefault();
-        if (myFrog?.state === 'carrying') sendInput({ spit: true });
+        if (hud.myState === 'carrying') sendInput({ spit: true });
         else sendInput({ tongue: true });
       } else if (e.key === 'q' || e.key === 'Q') {
         setAimAngle((prev) => {
           const next = Math.max(-Math.PI * 0.92, prev - 0.14);
-          void game.act({ type: 'cs_input', input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: next, aimPower } });
+          void game.act({
+            type: 'cs_input',
+            input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: next, aimPower: aimRef.current.power },
+          });
           return next;
         });
       } else if (e.key === 'e' || e.key === 'E') {
         setAimAngle((prev) => {
           const next = Math.min(-Math.PI * 0.08, prev + 0.14);
-          void game.act({ type: 'cs_input', input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: next, aimPower } });
+          void game.act({
+            type: 'cs_input',
+            input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: next, aimPower: aimRef.current.power },
+          });
           return next;
         });
       }
@@ -242,79 +812,552 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [aimPower, game, isSpectator, myFrog?.state, sendInput, setMoveDir]);
+  }, [game, hud.myState, isSpectator, sendInput, setMoveDir]);
 
-  // Tính camera thông minh bám nhân vật (hoặc người đang ngậm mình)
-  const focusFrog = useMemo(() => {
-    if (!myFrog) return frogs[0] ?? null;
-    if (myFrog.state === 'swallowed' && myFrog.carrierId) {
-      return frogs.find((f) => f.id === myFrog.carrierId) ?? myFrog;
-    }
-    return myFrog;
-  }, [frogs, myFrog]);
+  // ============================================================================
+  // VÒNG LẶP DỰNG HÌNH 60FPS HTML5 CANVAS HIDPI (0 REACT RE-RENDER!)
+  // ============================================================================
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const sprites = getCroakSprites();
+    let rafId = 0;
+    let lastFrameAt = performance.now();
 
-  const cam = useMemo(() => {
-    if (fullMap) {
-      return { x: 0, y: 0, w: stage.width, h: stage.height };
-    }
-    const viewW = wide ? Math.min(stage.width, 1080) : Math.min(stage.width, 680);
-    const viewH = wide ? Math.min(stage.height, 600) : Math.min(stage.height, 490);
-    const cx = focusFrog ? focusFrog.x + CROAK_FROG_W * 0.5 : stage.spawn.x;
-    const cy = focusFrog ? focusFrog.y + CROAK_FROG_H * 0.5 : stage.spawn.y;
-    const x = Math.max(0, Math.min(stage.width - viewW, Math.round(cx - viewW * 0.45)));
-    const y = Math.max(0, Math.min(stage.height - viewH, Math.round(cy - viewH * 0.56)));
-    return { x, y, w: viewW, h: viewH };
-  }, [focusFrog, fullMap, stage, wide]);
+    const renderFrame = (now: number) => {
+      rafId = requestAnimationFrame(renderFrame);
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-  // Đường ngắm quỹ đạo khi có bất kỳ ếch nào đang ngậm đồng đội
-  const activeArcs = useMemo(() => {
-    return frogs
-      .filter((f) => f.state === 'carrying' && f.bellyId)
-      .map((f) => ({
-        carrierId: f.id,
-        color: colorMap.get(f.bellyId!) ?? '#FDE047',
-        pts: computeSpitArc(
+      const rawDt = Math.min(0.035, Math.max(0.001, (now - lastFrameAt) / 1000));
+      lastFrameAt = now;
+
+      const { curr, prev, currAt, prevAt } = snapRef.current;
+      const stg = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, curr.stageIndex))];
+      const env = liveRenderCtxRef.current;
+
+      const spanMs = Math.max(18, currAt - prevAt);
+      const alpha = prev ? Math.max(0, Math.min(1.12, (now - currAt) / spanMs + 1)) : 1;
+      const interpTick = prev ? prev.tick + (curr.tick - prev.tick) * Math.min(1, alpha) : curr.tick;
+      const elapsedSec = interpTick * CROAK_DT;
+
+      // Bước dự đoán Client-Side Prediction mượt 60fps cho nhân vật của tôi
+      const srvMe = curr.frogs.find((f) => f.id === env.me);
+      if (
+        srvMe &&
+        predRef.current.initialized &&
+        (srvMe.state === 'normal' || srvMe.state === 'carrying' || srvMe.state === 'tongue')
+      ) {
+        const solids = getSolidRects(stg, curr.switchesOn, curr.keysCollected, elapsedSec);
+        stepPredictedFrog(
+          predRef.current,
+          moveDirRef.current,
+          srvMe.state === 'carrying',
+          solids,
+          rawDt,
+        );
+      }
+
+      // Chuẩn hóa kích thước Canvas theo DPR sắc nét (tối đa 2x để siêu mượt trên điện thoại)
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(300, Math.round(rect.width || 640));
+      const cssH = Math.max(220, Math.round(rect.height || (env.wide ? 390 : 280)));
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const targetW = Math.round(cssW * dpr);
+      const targetH = Math.round(cssH * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+
+      // Danh sách vị trí hiển thị đã nội suy / dự đoán cho tất cả các ếch
+      const prevMap = new Map(prev?.frogs.map((f) => [f.id, f]) ?? []);
+      const drawFrogs = curr.frogs.map((cf) => {
+        if (
+          cf.id === env.me &&
+          predRef.current.initialized &&
+          (cf.state === 'normal' || cf.state === 'carrying' || cf.state === 'tongue')
+        ) {
+          return {
+            ...cf,
+            x: predRef.current.x,
+            y: predRef.current.y,
+            vx: predRef.current.vx,
+            vy: predRef.current.vy,
+            facing: predRef.current.facing,
+          };
+        }
+        const pf = prevMap.get(cf.id);
+        if (!pf || Math.hypot(cf.x - pf.x, cf.y - pf.y) > 180) return cf;
+        const t = Math.max(0, Math.min(1, (now - currAt + spanMs) / spanMs));
+        return {
+          ...cf,
+          x: pf.x + (cf.x - pf.x) * t,
+          y: pf.y + (cf.y - pf.y) * t,
+        };
+      });
+
+      // Tính camera mượt mà bám theo nhân vật của tôi
+      const myDraw = drawFrogs.find((f) => f.id === env.me) ?? drawFrogs[0] ?? null;
+      const focusDraw =
+        myDraw && myDraw.state === 'swallowed' && myDraw.carrierId
+          ? drawFrogs.find((f) => f.id === myDraw.carrierId) ?? myDraw
+          : myDraw;
+
+      let camW = stg.width;
+      let camH = stg.height;
+      let camX = 0;
+      let camY = 0;
+
+      if (!env.fullMap) {
+        const aspect = cssW / Math.max(1, cssH);
+        camH = env.wide ? Math.min(stg.height, 560) : Math.min(stg.height, 470);
+        camW = Math.min(stg.width, Math.round(camH * aspect));
+        const fx = focusDraw ? focusDraw.x + CROAK_FROG_W * 0.5 : stg.spawn.x;
+        const fy = focusDraw ? focusDraw.y + CROAK_FROG_H * 0.5 : stg.spawn.y;
+        const goalX = Math.max(0, Math.min(stg.width - camW, fx - camW * 0.44));
+        const goalY = Math.max(0, Math.min(stg.height - camH, fy - camH * 0.56));
+        if (camSmoothRef.current.stageIndex !== curr.stageIndex) {
+          camSmoothRef.current = { x: goalX, y: goalY, stageIndex: curr.stageIndex };
+        } else {
+          camSmoothRef.current.x += (goalX - camSmoothRef.current.x) * 0.18;
+          camSmoothRef.current.y += (goalY - camSmoothRef.current.y) * 0.18;
+        }
+        camX = camSmoothRef.current.x;
+        camY = camSmoothRef.current.y;
+      }
+
+      // Kiểm tra và lấy bản đồ tĩnh đã bake sẵn trên offscreen canvas
+      const bakeKey = `${stg.id}|${ Object.keys(curr.switchesOn).filter((k) => curr.switchesOn[k]).sort().join(',') }`;
+      if (bakedLayerRef.current.key !== bakeKey) {
+        bakedLayerRef.current = {
+          key: bakeKey,
+          canvas: bakeStageStaticCanvas(stg, curr.switchesOn),
+        };
+      }
+
+      ctx.save();
+      ctx.scale(targetW / camW, targetH / camH);
+      ctx.translate(-camX, -camY);
+
+      // 1. Blit nền rừng đầm lầy + địa hình tĩnh chỉ bằng 1 lệnh GPU drawImage!
+      if (bakedLayerRef.current.canvas) {
+        ctx.drawImage(bakedLayerRef.current.canvas, 0, 0);
+      } else {
+        ctx.fillStyle = '#071925';
+        ctx.fillRect(camX, camY, camW, camH);
+      }
+
+      // 2. Đom đóm rừng đêm lung linh
+      for (let i = 0; i < 10; i++) {
+        const fx = ((i * 223 + 110 + Math.sin(elapsedSec * 0.7 + i) * 28) % stg.width + stg.width) % stg.width;
+        const fy = 85 + ((i * 97) % 320) + Math.sin(elapsedSec * 2.2 + i * 1.4) * 14;
+        const pulse = 0.45 + 0.45 * Math.sin(elapsedSec * 3.5 + i);
+        ctx.fillStyle = `rgba(190, 242, 100, ${pulse.toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. Bẫy bùn độc sủi tăm & chông gai thép
+      for (const hz of stg.hazards) {
+        if (hz.kind === 'swamp') {
+          const swampGrad = ctx.createLinearGradient(hz.x, hz.y, hz.x, hz.y + hz.h);
+          swampGrad.addColorStop(0, '#A855F7');
+          swampGrad.addColorStop(0.35, '#7E22CE');
+          swampGrad.addColorStop(1, '#3B0764');
+          roundRectPath(ctx, hz.x, hz.y + 4, hz.w, hz.h - 4, 8);
+          ctx.fillStyle = swampGrad;
+          ctx.fill();
+
+          // Sóng bùn phát quang
+          ctx.fillStyle = '#D8B4FE';
+          ctx.beginPath();
+          ctx.moveTo(hz.x, hz.y + 10);
+          for (let wx = hz.x; wx <= hz.x + hz.w; wx += 16) {
+            const wy = hz.y + 5 + Math.sin(elapsedSec * 5 + wx * 0.08) * 3;
+            ctx.lineTo(wx, wy);
+          }
+          ctx.lineTo(hz.x + hz.w, hz.y + 12);
+          ctx.closePath();
+          ctx.fill();
+
+          // Bong bóng khí độc nổi lên
+          for (let bi = 0; bi < 3; bi++) {
+            const bx = hz.x + hz.w * (0.2 + bi * 0.3);
+            const lift = ((elapsedSec * 28 + bi * 11) % 18);
+            ctx.fillStyle = 'rgba(233, 213, 255, 0.85)';
+            ctx.beginPath();
+            ctx.arc(bx, hz.y + 8 - lift, 3.8 - bi * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          roundRectPath(ctx, hz.x, hz.y + hz.h - 6, hz.w, 6, 3);
+          ctx.fillStyle = '#334155';
+          ctx.fill();
+          const count = Math.max(2, Math.floor(hz.w / 16));
+          const stepW = hz.w / count;
+          for (let si = 0; si < count; si++) {
+            const sx = hz.x + si * stepW;
+            ctx.beginPath();
+            ctx.moveTo(sx + 1, hz.y + hz.h - 4);
+            ctx.lineTo(sx + stepW * 0.5, hz.y);
+            ctx.lineTo(sx + stepW - 1, hz.y + hz.h - 4);
+            ctx.closePath();
+            ctx.fillStyle = '#F43F5E';
+            ctx.fill();
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = '#FFE4E6';
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 4. Bệ gỗ di động & Nấm nhún lò xo Fluent 3D
+      for (const plat of stg.platforms) {
+        const active = !plat.activeWhenSwitch || !!curr.switchesOn[plat.activeWhenSwitch];
+        if (!active) continue;
+        if (plat.move) {
+          const r = platformRectAt(plat, elapsedSec);
+          drawKenneyWoodPlank(ctx, r.x, r.y, r.w, r.h);
+        } else if (plat.kind === 'bounce') {
+          if (sprites.mushroom && sprites.mushroom.complete && sprites.mushroom.naturalWidth > 0) {
+            ctx.drawImage(sprites.mushroom, plat.x + 2, plat.y - 22, plat.w - 4, plat.h + 24);
+          } else {
+            roundRectPath(ctx, plat.x + plat.w * 0.34, plat.y + 8, plat.w * 0.32, plat.h - 4, 4);
+            ctx.fillStyle = '#FEF3C7';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(plat.x + plat.w * 0.5, plat.y + 8, plat.w * 0.5, 12, 0, Math.PI, 0);
+            ctx.fillStyle = '#EC4899';
+            ctx.fill();
+          }
+        }
+      }
+
+      // 5. Công tắc cơ học & Cổng Đền Cổ
+      ctx.font = '900 12px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      for (const sw of stg.switches) {
+        const on = !!curr.switchesOn[sw.id];
+        roundRectPath(ctx, sw.x - 4, sw.y + sw.h - 5, sw.w + 8, 6, 3);
+        ctx.fillStyle = '#475569';
+        ctx.fill();
+        roundRectPath(ctx, sw.x, on ? sw.y + 6 : sw.y, sw.w, on ? sw.h - 6 : sw.h, 5);
+        ctx.fillStyle = on ? '#22C55E' : '#EF4444';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+        if (sw.label) {
+          ctx.fillStyle = on ? '#86EFAC' : '#FECACA';
+          ctx.fillText(`${sw.label}${on ? ' ✓' : ''}`, sw.x + sw.w * 0.5, sw.y - 8);
+        }
+      }
+
+      for (const gt of stg.gates) {
+        const opened =
+          (gt.openBySwitch && curr.switchesOn[gt.openBySwitch]) ||
+          (gt.openByKey && curr.keysCollected[gt.openByKey]);
+        if (opened) {
+          roundRectPath(ctx, gt.x, gt.y, gt.w, 16, 4);
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.55)';
+          ctx.fill();
+        } else {
+          const gateGrad = ctx.createLinearGradient(gt.x, gt.y, gt.x + gt.w, gt.y);
+          gateGrad.addColorStop(0, '#78350F');
+          gateGrad.addColorStop(0.5, '#B45309');
+          gateGrad.addColorStop(1, '#451A03');
+          roundRectPath(ctx, gt.x, gt.y, gt.w, gt.h, 6);
+          ctx.fillStyle = gateGrad;
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#FBBF24';
+          ctx.stroke();
+          if (sprites.key && sprites.key.complete && sprites.key.naturalWidth > 0) {
+            ctx.drawImage(sprites.key, gt.x + gt.w * 0.5 - 11, gt.y + gt.h * 0.5 - 11, 22, 22);
+          }
+        }
+      }
+
+      // 6. Chìa khóa vàng 3D Fluent & Cột đèn Checkpoint
+      for (const k of stg.keys) {
+        if (curr.keysCollected[k.id]) continue;
+        const bobY = k.y + Math.sin(elapsedSec * 4.2) * 6;
+        ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+        ctx.beginPath();
+        ctx.arc(k.x, bobY, k.r + 8, 0, Math.PI * 2);
+        ctx.fill();
+        if (sprites.key && sprites.key.complete && sprites.key.naturalWidth > 0) {
+          ctx.drawImage(sprites.key, k.x - 18, bobY - 18, 36, 36);
+        } else {
+          ctx.fillStyle = '#FACC15';
+          ctx.beginPath();
+          ctx.arc(k.x, bobY, 10, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      for (const cp of stg.checkpoints) {
+        const active = curr.activeCheckpointId === cp.id;
+        roundRectPath(ctx, cp.x + 10, cp.y + 8, 5, cp.h - 8, 2);
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(cp.x + 15, cp.y + 10);
+        ctx.lineTo(cp.x + 48, cp.y + 21);
+        ctx.lineTo(cp.x + 15, cp.y + 32);
+        ctx.closePath();
+        ctx.fillStyle = active ? '#22C55E' : '#F59E0B';
+        ctx.fill();
+        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+
+        if (active) {
+          ctx.fillStyle = 'rgba(134, 239, 172, 0.35)';
+          ctx.beginPath();
+          ctx.arc(cp.x + 12.5, cp.y + 10, 14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 7. Đài Sen Vàng Đích Đến (Fluent 3D Lotus Sanctuary)
+      const gx = stg.goal.x + stg.goal.w * 0.5;
+      const gy = stg.goal.y + stg.goal.h * 0.55;
+      const sanctuaryGlow = ctx.createRadialGradient(gx, gy, 8, gx, gy, 62);
+      sanctuaryGlow.addColorStop(0, 'rgba(254, 240, 138, 0.78)');
+      sanctuaryGlow.addColorStop(0.55, 'rgba(245, 158, 11, 0.28)');
+      sanctuaryGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = sanctuaryGlow;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 62, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cổng vòm vàng tôn nghiêm
+      ctx.strokeStyle = '#FACC15';
+      ctx.lineWidth = 4;
+      roundRectPath(ctx, stg.goal.x + 4, stg.goal.y + 4, stg.goal.w - 8, stg.goal.h - 4, 38);
+      ctx.stroke();
+
+      if (sprites.lotus && sprites.lotus.complete && sprites.lotus.naturalWidth > 0) {
+        const bobLotus = Math.sin(elapsedSec * 3) * 3;
+        ctx.drawImage(sprites.lotus, gx - 32, stg.goal.y + stg.goal.h - 62 + bobLotus, 64, 64);
+      }
+
+      const connCount = Math.max(1, drawFrogs.filter((f) => f.connected).length);
+      const finCount = drawFrogs.filter((f) => f.connected && f.state === 'finished').length;
+      ctx.fillStyle = '#FEF08A';
+      ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`ĐÀI SEN (${finCount}/${connCount})`, gx, stg.goal.y - 8);
+
+      // 8. Đường ngắm đạn đạo vòng cung khi đang ngậm đồng đội
+      for (const f of drawFrogs) {
+        if (f.state !== 'carrying' || !f.bellyId) continue;
+        const arcColor = env.colorMap.get(f.bellyId) ?? '#FDE047';
+        const pts = computeSpitArc(
           f.x,
           f.y,
-          f.id === me ? aimAngle : f.aimAngle,
-          f.id === me ? aimPower : f.aimPower,
-          stage,
-          switchesOn,
-          keysCollected,
+          f.id === env.me ? env.aimAngle : f.aimAngle,
+          f.id === env.me ? env.aimPower : f.aimPower,
+          stg,
+          curr.switchesOn,
+          curr.keysCollected,
           elapsedSec,
           22,
-        ),
-      }));
-  }, [aimAngle, aimPower, colorMap, elapsedSec, frogs, keysCollected, me, stage, switchesOn]);
+        );
+        pts.forEach((pt, idx) => {
+          const r = pt.hitWall ? 7 : Math.max(2.6, 5.4 - idx * 0.11);
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = pt.hitWall ? '#F43F5E' : arcColor;
+          ctx.fill();
+          ctx.lineWidth = pt.hitWall ? 2.2 : 1.2;
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.stroke();
+        });
+      }
 
-  const connectedFrogs = frogs.filter((f) => f.connected);
-  const finishedCount = connectedFrogs.filter((f) => f.state === 'finished').length;
+      // 9. Vẽ Biệt Đội Ếch Fluent 3D (Squash & Stretch + Bong bóng hồi sinh + Vương miện)
+      drawFrogs.forEach((f, idx) => {
+        if (!f.connected || f.state === 'swallowed') return;
+        const hex = env.colorMap.get(f.id) ?? '#22C55E';
+        const name = env.names[f.id] ?? f.id;
+        const cx = f.x + CROAK_FROG_W * 0.5;
+        const cy = f.y + CROAK_FROG_H * 0.5;
+        const isMe = f.id === env.me;
 
-  const strip: StripOptions = useMemo(
-    () => ({
-      order: baseView.order,
-      dim: (p: PublicPlayer) => !p.connected,
-      ring: (p: PublicPlayer) => {
-        const f = frogs.find((x) => x.id === p.id);
-        if (f?.state === 'finished') return '#FACC15';
-        if (f?.state === 'carrying') return '#EC4899';
-        return undefined;
-      },
-      sub: (p: PublicPlayer) => {
-        const f = frogs.find((x) => x.id === p.id);
-        if (!f) return undefined;
-        if (f.state === 'finished') return 'Về đích!';
-        if (f.state === 'carrying') return 'Ngậm bạn';
-        if (f.state === 'swallowed') return 'Trong bụng';
-        if (f.state === 'dead') return 'Bong bóng';
-        return f.spits > 0 ? `${f.spits} nhổ` : undefined;
-      },
-    }),
-    [baseView.order, frogs],
+        if (f.state === 'dead') {
+          if (sprites.bubble && sprites.bubble.complete && sprites.bubble.naturalWidth > 0) {
+            ctx.drawImage(sprites.bubble, cx - 22, cy - 22, 44, 44);
+          } else {
+            ctx.beginPath();
+            ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(125, 211, 252, 0.32)';
+            ctx.fill();
+            ctx.strokeStyle = '#BAE6FD';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#BAE6FD';
+          ctx.font = '800 11px system-ui, -apple-system, sans-serif';
+          ctx.fillText(name, cx, cy - 26);
+          return;
+        }
+
+        // Lưỡi hồng co giãn đàn hồi
+        if (f.tongueTicks > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(cx + f.facing * 8, cy + 2);
+          ctx.lineTo(f.tongueEndX, f.tongueEndY);
+          ctx.strokeStyle = '#FB7185';
+          ctx.lineWidth = 6.5;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(f.tongueEndX, f.tongueEndY, 6.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#F43F5E';
+          ctx.fill();
+          ctx.strokeStyle = '#FFE4E6';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Vòng hào quang nhận diện màu đội & bản thân dưới chân ếch
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, f.y + CROAK_FROG_H + 1, 16, 5.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = hex;
+        ctx.globalAlpha = 0.52;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = isMe ? 2.4 : 1.5;
+        ctx.strokeStyle = isMe ? '#FEF08A' : '#FFFFFF';
+        ctx.stroke();
+        ctx.restore();
+
+        // Co giãn đàn hồi Squash & Stretch theo vận tốc dọc & trạng thái ngậm bạn
+        const isCarrying = f.state === 'carrying';
+        const isLaunched = f.state === 'launched';
+        const stretch = Math.max(-0.18, Math.min(0.24, -f.vy / 1600));
+        const scaleX = (isCarrying ? 1.28 : 1) * (1 - stretch * 0.55);
+        const scaleY = (isCarrying ? 1.22 : 1) * (1 + stretch);
+
+        if (isLaunched) {
+          ctx.fillStyle = 'rgba(250, 204, 21, 0.34)';
+          ctx.beginPath();
+          ctx.ellipse(cx - Math.sign(f.vx || 1) * 15, cy, 13, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.save();
+        ctx.translate(cx, cy + CROAK_FROG_H * 0.5);
+        ctx.scale(f.facing * scaleX, scaleY);
+        if (sprites.frog && sprites.frog.complete && sprites.frog.naturalWidth > 0) {
+          ctx.drawImage(sprites.frog, -19, -36, 38, 38);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, -16, 15, 0, Math.PI * 2);
+          ctx.fillStyle = hex;
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // Vương miện vàng khi đã chạm Đài Sen
+        if (f.state === 'finished' && sprites.crown && sprites.crown.complete && sprites.crown.naturalWidth > 0) {
+          ctx.drawImage(sprites.crown, cx - 11, f.y - 24, 22, 22);
+        }
+
+        // Nhãn tên sắc nét có nền pill tối chống chồng chéo
+        const crowdLift = drawFrogs.some(
+          (o, oIdx) =>
+            oIdx < idx &&
+            o.connected &&
+            o.state !== 'swallowed' &&
+            Math.abs(o.x - f.x) < 74 &&
+            Math.abs(o.y - f.y) < 42,
+        )
+          ? 16
+          : 0;
+
+        const passengerName = isCarrying && f.bellyId ? (env.names[f.bellyId] ?? '') : '';
+        const label = passengerName ? `${name} (ngậm ${passengerName})` : name;
+        ctx.font = '800 11.5px system-ui, -apple-system, sans-serif';
+        const tw = ctx.measureText(label).width;
+        const pillW = tw + 12;
+        const pillY = f.y - (f.state === 'finished' ? 38 : 22) - crowdLift;
+
+        roundRectPath(ctx, cx - pillW * 0.5, pillY - 11, pillW, 16, 8);
+        ctx.fillStyle = isMe ? 'rgba(15, 23, 42, 0.86)' : 'rgba(15, 23, 42, 0.72)';
+        ctx.fill();
+        ctx.lineWidth = 1.3;
+        ctx.strokeStyle = hex;
+        ctx.stroke();
+
+        ctx.fillStyle = isMe ? '#FEF08A' : '#F8FAFC';
+        ctx.fillText(label, cx, pillY + 1);
+      });
+
+      ctx.restore();
+    };
+
+    rafId = requestAnimationFrame(renderFrame);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // ============================================================================
+  // TAY CẦM CẢM ỨNG TRƯỢT MƯỢT KIỂU NIPPLEJS (KHÔNG BÔI ĐEN LABEL!)
+  // ============================================================================
+  const updateThumbpadFromClientX = useCallback(
+    (clientX: number, rect: DOMRect) => {
+      const rel = (clientX - rect.left) / Math.max(1, rect.width);
+      if (rel < 0.46) setMoveDir(-1);
+      else if (rel > 0.54) setMoveDir(1);
+      else setMoveDir(0);
+    },
+    [setMoveDir],
   );
 
-  const applyAimPreset = (p: typeof AIM_PRESETS[number]) => {
-    const facing = myFrog?.facing ?? 1;
+  // Kéo trực tiếp trên màn hình Canvas để căn góc bắn 360 độ khi đang ngậm bạn!
+  const aimFromCanvasClientPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      if (hud.myState !== 'carrying' || !canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const stg = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, hud.stageIndex))];
+      const aspect = rect.width / rect.height;
+      const camH = fullMap ? stg.height : wide ? Math.min(stg.height, 560) : Math.min(stg.height, 470);
+      const camW = fullMap ? stg.width : Math.min(stg.width, Math.round(camH * aspect));
+      const camX = fullMap ? 0 : camSmoothRef.current.x;
+      const camY = fullMap ? 0 : camSmoothRef.current.y;
+
+      const worldX = camX + ((clientX - rect.left) / rect.width) * camW;
+      const worldY = camY + ((clientY - rect.top) / rect.height) * camH;
+      const mx = predRef.current.x + CROAK_FROG_W * 0.5;
+      const my = predRef.current.y + CROAK_FROG_H * 0.5;
+      const dx = worldX - mx;
+      const dy = worldY - my;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 10) return;
+
+      const ang = Math.max(-Math.PI * 0.94, Math.min(-Math.PI * 0.06, Math.atan2(Math.min(-18, dy), dx)));
+      const pwr = Math.max(0.45, Math.min(1, dist / 260));
+      setAimAngle(ang);
+      setAimPower(pwr);
+      void game.act({
+        type: 'cs_input',
+        input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: ang, aimPower: pwr },
+      });
+    },
+    [fullMap, game, hud.myState, hud.stageIndex, wide],
+  );
+
+  const applyAimPreset = (p: (typeof AIM_PRESETS)[number]) => {
+    const facing = hud.myFacing ?? 1;
     const ang = facing >= 0 ? p.angleRight : p.angleLeft;
     setAimAngle(ang);
     setAimPower(p.power);
@@ -324,9 +1367,44 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
     });
   };
 
+  const strip: StripOptions = useMemo(
+    () => ({
+      order: baseView.order,
+      dim: (p: PublicPlayer) => !p.connected,
+      ring: (p: PublicPlayer) => {
+        const f = snapRef.current.curr.frogs.find((x) => x.id === p.id);
+        if (f?.state === 'finished') return '#FACC15';
+        if (f?.state === 'carrying') return '#EC4899';
+        return undefined;
+      },
+      sub: (p: PublicPlayer) => {
+        const f = snapRef.current.curr.frogs.find((x) => x.id === p.id);
+        if (!f) return undefined;
+        if (f.state === 'finished') return 'Về đích!';
+        if (f.state === 'carrying') return 'Ngậm bạn';
+        if (f.state === 'swallowed') return 'Trong bụng';
+        if (f.state === 'dead') return 'Bong bóng';
+        return f.spits > 0 ? `${f.spits} nhổ` : undefined;
+      },
+    }),
+    // Chỉ phụ thuộc các mốc trạng thái HUD lớn để không làm re-render Shell mỗi tick!
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseView.order, hud.stageIndex, hud.finishedCount, hud.myState, hud.myBellyId],
+  );
+
+  const triggerActionImmediate = (fn: () => void) => {
+    lastPointerActionAtRef.current = performance.now();
+    fn();
+  };
+
+  const triggerActionFallbackPress = (fn: () => void) => {
+    if (performance.now() - lastPointerActionAtRef.current < 340) return;
+    fn();
+  };
+
   return (
     <Shell game={game} room={room} strip={strip} wide>
-      {finishedCount > 0 && finishedCount >= connectedFrogs.length && <Confetti />}
+      {hud.finishedCount > 0 && hud.finishedCount >= hud.connectedCount && <Confetti />}
 
       {/* Thanh tiêu đề Màn chơi & Gợi ý phối hợp */}
       <View style={[styles.stageBar, sticker(3)]} testID="croak-stage-bar">
@@ -334,7 +1412,7 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
           <View style={styles.stageBadge}>
             <EmojiIcon emoji="🐸" size={18} />
             <T style={styles.stageBadgeTxt}>
-              MÀN {stageIndex + 1}/{CROAK_STAGES.length}
+              MÀN {hud.stageIndex + 1}/{CROAK_STAGES.length}
             </T>
           </View>
           <T style={styles.stageTitle} numberOfLines={1}>
@@ -343,7 +1421,7 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
           <View style={styles.goalCounter}>
             <EmojiIcon emoji="🪷" size={14} />
             <T style={styles.goalCounterTxt}>
-              {finishedCount}/{Math.max(1, connectedFrogs.length)}
+              {hud.finishedCount}/{hud.connectedCount}
             </T>
           </View>
           <Pressable
@@ -351,407 +1429,56 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
             onPress={() => setFullMap((v) => !v)}
             style={[styles.mapToggle, fullMap && styles.mapToggleActive]}
           >
-            <UiIcon name={fullMap ? 'Minimize2' : 'Maximize2'} size={14} color={fullMap ? '#0F172A' : '#E2E8F0'} />
-            <T style={[styles.mapToggleTxt, fullMap && { color: '#0F172A' }]}>{fullMap ? 'Cận cảnh' : 'Toàn cảnh'}</T>
+            <UiIcon
+              name={fullMap ? 'Minimize2' : 'Maximize2'}
+              size={14}
+              color={fullMap ? '#0F172A' : '#E2E8F0'}
+            />
+            <T style={[styles.mapToggleTxt, fullMap && { color: '#0F172A' }]}>
+              {fullMap ? 'Cận cảnh' : 'Toàn cảnh'}
+            </T>
           </Pressable>
         </View>
         <T style={styles.stageHint}>{toastText ?? stage.hint}</T>
       </View>
 
-      {/* Khung Thế Giới Vật Lý 2D Đầm Lầy */}
+      {/* Khung Thế Giới Vật Lý 2D Đầm Lầy 60FPS HiDPI Canvas */}
       <View style={[styles.viewportWrap, sticker(4)]} testID="croak-viewport">
-        <Svg
-          width="100%"
-          height={wide ? 390 : 275}
-          viewBox={`${cam.x} ${cam.y} ${cam.w} ${cam.h}`}
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <Defs>
-            <LinearGradient id="swampSky" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#071925" />
-              <Stop offset="55%" stopColor="#0D333E" />
-              <Stop offset="100%" stopColor="#134E4A" />
-            </LinearGradient>
-            <LinearGradient id="mossTop" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#4ADE80" />
-              <Stop offset="100%" stopColor="#16A34A" />
-            </LinearGradient>
-            <LinearGradient id="earthBody" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#3F2E21" />
-              <Stop offset="100%" stopColor="#1E1610" />
-            </LinearGradient>
-            <LinearGradient id="stoneBody" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#64748B" />
-              <Stop offset="100%" stopColor="#334155" />
-            </LinearGradient>
-            <LinearGradient id="lotusGlow" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#FEF08A" stopOpacity="0.9" />
-              <Stop offset="100%" stopColor="#F59E0B" stopOpacity="0.2" />
-            </LinearGradient>
-          </Defs>
-
-          {/* Nền trời đầm lầy & đom đóm phát sáng */}
-          <Rect x={cam.x} y={cam.y} width={cam.w} height={cam.h} fill="url(#swampSky)" />
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-            const fx = ((i * 257 + 120) % stage.width);
-            const fy = 90 + ((i * 97) % 280) + Math.sin(elapsedSec * 2 + i) * 12;
-            return <Circle key={i} cx={fx} cy={fy} r={3.5} fill="#BEF264" opacity={0.55} />;
-          })}
-
-          {/* Bẫy bùn độc & gai nhọn */}
-          {stage.hazards.map((hz) => (
-            <G key={hz.id}>
-              {hz.kind === 'swamp' ? (
-                <>
-                  <Rect x={hz.x} y={hz.y} width={hz.w} height={hz.h} rx={8} fill="#7E22CE" opacity={0.88} />
-                  <Rect x={hz.x} y={hz.y} width={hz.w} height={9} rx={4} fill="#C084FC" opacity={0.85} />
-                  <Circle cx={hz.x + hz.w * 0.28} cy={hz.y + 8 - ((tick + 5) % 10)} r={5} fill="#E9D5FF" opacity={0.8} />
-                  <Circle cx={hz.x + hz.w * 0.72} cy={hz.y + 10 - ((tick + 11) % 12)} r={4} fill="#86EFAC" opacity={0.8} />
-                </>
-              ) : (
-                <G>
-                  <Rect x={hz.x} y={hz.y + hz.h - 8} width={hz.w} height={8} fill="#475569" />
-                  {Array.from({ length: Math.max(2, Math.floor(hz.w / 18)) }, (_, idx) => {
-                    const sx = hz.x + idx * 18;
-                    return (
-                      <Path
-                        key={idx}
-                        d={`M ${sx} ${hz.y + hz.h} L ${sx + 9} ${hz.y} L ${sx + 18} ${hz.y + hz.h} Z`}
-                        fill="#F43F5E"
-                        stroke="#FFE4E6"
-                        strokeWidth={1.2}
-                      />
-                    );
-                  })}
-                </G>
-              )}
-            </G>
-          ))}
-
-          {/* Địa hình & Cầu gỗ / Nấm nhún / Bệ di động */}
-          {stage.platforms.map((plat) => {
-            const active = !plat.activeWhenSwitch || !!switchesOn[plat.activeWhenSwitch];
-            const r = platformRectAt(plat, elapsedSec);
-            if (!active) {
-              return (
-                <Rect
-                  key={plat.id}
-                  x={r.x}
-                  y={r.y}
-                  width={r.w}
-                  height={r.h}
-                  rx={6}
-                  fill="rgba(251, 191, 36, 0.08)"
-                  stroke="#FBBF24"
-                  strokeWidth={2}
-                  strokeDasharray="8,6"
-                />
-              );
-            }
-            if (plat.kind === 'bounce') {
-              return (
-                <G key={plat.id}>
-                  <Rect x={r.x + r.w * 0.36} y={r.y + 10} width={r.w * 0.28} height={r.h - 6} rx={4} fill="#FDE68A" />
-                  <Path
-                    d={`M ${r.x} ${r.y + 14} Q ${r.x + r.w * 0.5} ${r.y - 12} ${r.x + r.w} ${r.y + 14} Z`}
-                    fill="#EC4899"
-                    stroke="#FBCFE8"
-                    strokeWidth={2}
-                  />
-                  <Circle cx={r.x + r.w * 0.32} cy={r.y + 6} r={3.5} fill="#FDF2F8" />
-                  <Circle cx={r.x + r.w * 0.66} cy={r.y + 7} r={3} fill="#FDF2F8" />
-                </G>
-              );
-            }
-            if (plat.kind === 'wood') {
-              return (
-                <G key={plat.id}>
-                  <Rect x={r.x} y={r.y} width={r.w} height={r.h} rx={6} fill="#B45309" stroke="#FDE68A" strokeWidth={2} />
-                  <Line x1={r.x + 8} y1={r.y + 7} x2={r.x + r.w - 8} y2={r.y + 7} stroke="#F59E0B" strokeWidth={2} />
-                </G>
-              );
-            }
-            if (plat.kind === 'stone') {
-              return (
-                <G key={plat.id}>
-                  <Rect x={r.x} y={r.y} width={r.w} height={r.h} rx={6} fill="url(#stoneBody)" stroke="#94A3B8" strokeWidth={2} />
-                  <Rect x={r.x + 4} y={r.y + 4} width={Math.max(8, r.w - 8)} height={5} rx={2} fill="#CBD5E1" opacity={0.45} />
-                </G>
-              );
-            }
-            return (
-              <G key={plat.id}>
-                <Rect x={r.x} y={r.y} width={r.w} height={r.h} rx={8} fill="url(#earthBody)" stroke="#14532D" strokeWidth={2} />
-                <Rect x={r.x} y={r.y} width={r.w} height={Math.min(16, r.h)} rx={6} fill="url(#mossTop)" />
-              </G>
-            );
-          })}
-
-          {/* Công tắc giẫm mở cầu / mở cổng */}
-          {stage.switches.map((sw) => {
-            const on = !!switchesOn[sw.id];
-            return (
-              <G key={sw.id}>
-                <Rect
-                  x={sw.x}
-                  y={on ? sw.y + 6 : sw.y}
-                  width={sw.w}
-                  height={on ? sw.h - 6 : sw.h}
-                  rx={5}
-                  fill={on ? '#22C55E' : '#EF4444'}
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                />
-                {sw.label && (
-                  <SvgText
-                    x={sw.x + sw.w * 0.5}
-                    y={sw.y - 8}
-                    fill={on ? '#86EFAC' : '#FECACA'}
-                    fontSize={12}
-                    fontWeight="bold"
-                    textAnchor="middle"
-                  >
-                    {sw.label} {on ? '✓' : ''}
-                  </SvgText>
-                )}
-              </G>
-            );
-          })}
-
-          {/* Cổng đá chắn đường */}
-          {stage.gates.map((gt) => {
-            const opened = (gt.openBySwitch && switchesOn[gt.openBySwitch]) || (gt.openByKey && keysCollected[gt.openByKey]);
-            if (opened) {
-              return (
-                <Rect
-                  key={gt.id}
-                  x={gt.x}
-                  y={gt.y}
-                  width={gt.w}
-                  height={18}
-                  rx={4}
-                  fill="#22C55E"
-                  opacity={0.45}
-                />
-              );
-            }
-            return (
-              <G key={gt.id}>
-                <Rect x={gt.x} y={gt.y} width={gt.w} height={gt.h} rx={6} fill="#7C2D12" stroke="#FBBF24" strokeWidth={2.5} />
-                <Circle cx={gt.x + gt.w * 0.5} cy={gt.y + gt.h * 0.5} r={8} fill="#FACC15" />
-              </G>
-            );
-          })}
-
-          {/* Chìa khóa vàng lơ lửng */}
-          {stage.keys.map((k) => {
-            if (keysCollected[k.id]) return null;
-            const bobY = k.y + Math.sin(elapsedSec * 4) * 5;
-            return (
-              <G key={k.id}>
-                <Circle cx={k.x} cy={bobY} r={k.r + 5} fill="rgba(250, 204, 21, 0.24)" />
-                <Circle cx={k.x} cy={bobY - 3} r={8} fill="#FACC15" stroke="#FEF08A" strokeWidth={2.5} />
-                <Rect x={k.x - 2.5} y={bobY + 4} width={5} height={11} rx={2} fill="#FACC15" />
-              </G>
-            );
-          })}
-
-          {/* Cờ Checkpoint lồng đèn */}
-          {stage.checkpoints.map((cp) => {
-            const active = activeCheckpointId === cp.id;
-            return (
-              <G key={cp.id}>
-                <Line x1={cp.x + 12} y1={cp.y + cp.h} x2={cp.x + 12} y2={cp.y + 8} stroke="#E2E8F0" strokeWidth={3.5} />
-                <Path
-                  d={`M ${cp.x + 14} ${cp.y + 8} L ${cp.x + 48} ${cp.y + 20} L ${cp.x + 14} ${cp.y + 32} Z`}
-                  fill={active ? '#22C55E' : '#F59E0B'}
-                  stroke="#FFFFFF"
-                  strokeWidth={1.5}
-                />
-                {active && <Circle cx={cp.x + 12} cy={cp.y + 6} r={6} fill="#86EFAC" />}
-              </G>
-            );
-          })}
-
-          {/* Cổng Đích Hoa Sen Vàng */}
-          <G>
-            <Ellipse
-              cx={stage.goal.x + stage.goal.w * 0.5}
-              cy={stage.goal.y + stage.goal.h * 0.52}
-              rx={stage.goal.w * 0.55}
-              ry={stage.goal.h * 0.52}
-              fill="url(#lotusGlow)"
-              stroke="#FDE047"
-              strokeWidth={3}
-            />
-            <Ellipse
-              cx={stage.goal.x + stage.goal.w * 0.5}
-              cy={stage.goal.y + stage.goal.h - 6}
-              rx={stage.goal.w * 0.56}
-              ry={9}
-              fill="#22C55E"
-              stroke="#BBF7D0"
-              strokeWidth={2}
-            />
-            <SvgText
-              x={stage.goal.x + stage.goal.w * 0.5}
-              y={stage.goal.y - 10}
-              fill="#FEF08A"
-              fontSize={13}
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              ĐÍCH ({finishedCount}/{Math.max(1, connectedFrogs.length)})
-            </SvgText>
-          </G>
-
-          {/* Đường ngắm bắn vòng cung trực quan (computeSpitArc) */}
-          {activeArcs.map((arc) => (
-            <G key={`arc-${arc.carrierId}`}>
-              {arc.pts.map((pt, idx) => (
-                <Circle
-                  key={idx}
-                  cx={pt.x}
-                  cy={pt.y}
-                  r={pt.hitWall ? 6.5 : Math.max(2.6, 5.2 - idx * 0.11)}
-                  fill={pt.hitWall ? '#F43F5E' : arc.color}
-                  stroke="#FFFFFF"
-                  strokeWidth={pt.hitWall ? 2 : 1}
-                  opacity={pt.hitWall ? 0.98 : 0.86}
-                />
-              ))}
-            </G>
-          ))}
-
-          {/* Các chú Ếch Xóm Lầy (6 trạng thái trực quan) */}
-          {frogs.map((f, fIdx) => {
-            if (!f.connected) return null;
-            const hex = colorMap.get(f.id) ?? '#22C55E';
-            const name = baseView.names[f.id] ?? f.id;
-            const cx = f.x + CROAK_FROG_W * 0.5;
-            const cy = f.y + CROAK_FROG_H * 0.5;
-            const crowdLift = frogs.some(
-              (o, oIdx) =>
-                oIdx < fIdx &&
-                o.connected &&
-                o.state !== 'swallowed' &&
-                Math.abs(o.x - f.x) < 74 &&
-                Math.abs(o.y - f.y) < 42,
-            )
-              ? 15
-              : 0;
-
-            if (f.state === 'swallowed') {
-              return null; // Vẽ huy hiệu người trong bụng ngay trên đầu ếch đang ngậm bên dưới
-            }
-
-            if (f.state === 'dead') {
-              return (
-                <G key={f.id}>
-                  <Circle cx={cx} cy={cy} r={20} fill="rgba(125, 211, 252, 0.28)" stroke="#BAE6FD" strokeWidth={2} strokeDasharray="4,3" />
-                  <Circle cx={cx} cy={cy + 2} r={10} fill={hex} opacity={0.7} />
-                  <SvgText x={cx} y={cy - 24} fill="#BAE6FD" fontSize={11} fontWeight="bold" textAnchor="middle">
-                    🫧 {name}
-                  </SvgText>
-                </G>
-              );
-            }
-
-            const isCarrying = f.state === 'carrying';
-            const isLaunched = f.state === 'launched';
-            const rx = isCarrying ? 21 : isLaunched ? 18 : 15.5;
-            const ry = isCarrying ? 18 : isLaunched ? 11.5 : 13;
-            const eyeOffsetX = f.facing * 5.5;
-            const passengerName = f.bellyId ? (baseView.names[f.bellyId] ?? '') : '';
-
-            return (
-              <G key={f.id}>
-                {/* Lưỡi hồng co giãn khi phóng lưỡi */}
-                {f.tongueTicks > 0 && (
-                  <G>
-                    <Line
-                      x1={cx + f.facing * 8}
-                      y1={cy + 2}
-                      x2={f.tongueEndX}
-                      y2={f.tongueEndY}
-                      stroke="#FB7185"
-                      strokeWidth={6.5}
-                      strokeLinecap="round"
-                    />
-                    <Circle cx={f.tongueEndX} cy={f.tongueEndY} r={6.5} fill="#F43F5E" stroke="#FFE4E6" strokeWidth={1.5} />
-                  </G>
-                )}
-
-                {/* Vệt gió siêu tốc khi đang được nhổ bay */}
-                {isLaunched && (
-                  <Ellipse
-                    cx={cx - Math.sign(f.vx || 1) * 14}
-                    cy={cy}
-                    rx={12}
-                    ry={7}
-                    fill="rgba(250, 204, 21, 0.35)"
-                  />
-                )}
-
-                {/* Thân ếch tròn trịa (phình má to khi đang ngậm bạn!) */}
-                <Ellipse
-                  cx={cx}
-                  cy={cy + (isCarrying ? -2 : 0)}
-                  rx={rx}
-                  ry={ry}
-                  fill={hex}
-                  stroke={f.id === me ? '#FEF08A' : '#FFFFFF'}
-                  strokeWidth={f.id === me ? 3 : 2}
-                />
-                {/* Bụng kem xinh xắn */}
-                <Ellipse
-                  cx={cx + f.facing * 2}
-                  cy={cy + 3}
-                  rx={rx * 0.62}
-                  ry={ry * 0.52}
-                  fill="#FEF9C3"
-                  opacity={0.9}
-                />
-                {/* Đôi mắt lồi ngộ nghĩnh */}
-                <Circle cx={cx + eyeOffsetX - 4} cy={cy - ry + 2} r={5.2} fill="#FFFFFF" stroke="#0F172A" strokeWidth={1.5} />
-                <Circle cx={cx + eyeOffsetX + 5} cy={cy - ry + 2} r={5.2} fill="#FFFFFF" stroke="#0F172A" strokeWidth={1.5} />
-                <Circle cx={cx + eyeOffsetX - 3 + f.facing * 1.3} cy={cy - ry + 2} r={2.3} fill="#0F172A" />
-                <Circle cx={cx + eyeOffsetX + 6 + f.facing * 1.3} cy={cy - ry + 2} r={2.3} fill="#0F172A" />
-                {/* Má phính hồng hào */}
-                <Circle cx={cx + f.facing * 8} cy={cy + 2} r={isCarrying ? 5 : 3} fill="#FB7185" opacity={0.85} />
-
-                {/* Vương miện nhỏ khi đã chạm Cổng Hoa Sen */}
-                {f.state === 'finished' && (
-                  <Path
-                    d={`M ${cx - 8} ${cy - ry - 5} L ${cx - 5} ${cy - ry - 14} L ${cx} ${cy - ry - 8} L ${cx + 5} ${cy - ry - 14} L ${cx + 8} ${cy - ry - 5} Z`}
-                    fill="#FACC15"
-                    stroke="#FEF08A"
-                    strokeWidth={1.2}
-                  />
-                )}
-
-                {/* Nhãn tên người chơi + báo hiệu đang ngậm ai */}
-                <SvgText
-                  x={cx}
-                  y={cy - ry - (f.state === 'finished' ? 18 : 9) - crowdLift}
-                  fill={f.id === me ? '#FDE047' : '#F8FAFC'}
-                  fontSize={12}
-                  fontWeight="bold"
-                  textAnchor="middle"
-                >
-                  {name}{isCarrying && passengerName ? ` (ngậm ${passengerName})` : ''}
-                </SvgText>
-              </G>
-            );
-          })}
-        </Svg>
+        {Platform.OS === 'web' ? (
+          <canvas
+            ref={canvasRef}
+            onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={(e) => {
+              if (hud.myState === 'carrying') {
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+                aimFromCanvasClientPoint(e.clientX, e.clientY);
+              }
+            }}
+            onPointerMove={(e) => {
+              if (hud.myState === 'carrying' && e.buttons > 0) {
+                aimFromCanvasClientPoint(e.clientX, e.clientY);
+              }
+            }}
+            style={{
+              display: 'block',
+              width: '100%',
+              height: wide ? 332 : 268,
+              touchAction: hud.myState === 'carrying' ? 'none' : 'pan-y',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              cursor: hud.myState === 'carrying' ? 'crosshair' : 'default',
+            }}
+          />
+        ) : (
+          <View style={{ height: 268 }} />
+        )}
       </View>
 
-      {/* Thanh chọn nhanh góc bắn khi đang ngậm đồng đội */}
-      {myFrog?.state === 'carrying' && (
+      {/* Thanh chọn nhanh góc bắn (hoặc chạm kéo trực tiếp lên bản đồ!) khi đang ngậm đồng đội */}
+      {hud.myState === 'carrying' && (
         <View style={[styles.aimBar, sticker(2)]} testID="croak-aim-bar">
           <T style={styles.aimTitle}>
-            🎯 Đang ngậm {baseView.names[myFrog.bellyId ?? ''] ?? 'đồng đội'} — Chọn góc bắn:
+            🎯 Đang ngậm {baseView.names[hud.myBellyId ?? ''] ?? 'đồng đội'} — Chạm bản đồ kéo góc hoặc chọn nhanh:
           </T>
           <View style={styles.aimChips}>
             {AIM_PRESETS.map((p) => (
@@ -761,75 +1488,151 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
                 onPress={() => applyAimPreset(p)}
                 style={styles.aimChip}
               >
-                <T style={styles.aimChipTxt}>{p.label}</T>
+                <T selectable={false} style={styles.aimChipTxt}>
+                  {p.label}
+                </T>
               </Pressable>
             ))}
           </View>
         </View>
       )}
 
-      {/* Bộ Tay Cầm Cảm Ứng Chuẩn Mobile & Desktop */}
+      {/* Bộ Tay Cầm Cảm Ứng Trượt Mượt Mobile-First (Chống Copy Nhãn 100%) */}
       {!isSpectator ? (
-        <View style={[styles.padWrap, sticker(3)]} testID="croak-controls">
-          {/* Cụm di chuyển Trái / Phải */}
-          <View style={styles.dpad}>
+        <View
+          style={[
+            styles.padWrap,
+            sticker(3),
+            Platform.OS === 'web'
+              ? ({
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  touchAction: 'none',
+                } as object)
+              : null,
+          ]}
+          testID="croak-controls"
+          // @ts-expect-error chặn menu chuột phải / nhấn giữ copy trên mobile web
+          onContextMenu={(e: Event) => e.preventDefault()}
+        >
+          {/* Bàn trượt Thumbpad liên hoàn Trái <-> Phải kiểu nipplejs */}
+          <View
+            style={styles.thumbTrack}
+            onPointerDown={(e: unknown) => {
+              const pe = e as PointerEvent;
+              pe.preventDefault?.();
+              const el = pe.currentTarget as HTMLElement;
+              el.setPointerCapture?.(pe.pointerId);
+              updateThumbpadFromClientX(pe.clientX, el.getBoundingClientRect());
+            }}
+            onPointerMove={(e: unknown) => {
+              const pe = e as PointerEvent;
+              if (pe.buttons === 0 && pe.pressure === 0) return;
+              const el = pe.currentTarget as HTMLElement;
+              updateThumbpadFromClientX(pe.clientX, el.getBoundingClientRect());
+            }}
+            onPointerUp={() => setMoveDir(0)}
+            onPointerCancel={() => setMoveDir(0)}
+            onLostPointerCapture={() => setMoveDir(0)}
+          >
             <Pressable
               testID="croak-left"
               onPressIn={() => setMoveDir(-1)}
               onPressOut={() => setMoveDir(0)}
-              style={({ pressed }) => [styles.dpadBtn, pressed && styles.dpadBtnActive]}
+              style={[styles.thumbHalf, thumbDir === -1 && styles.thumbHalfActive]}
             >
-              <UiIcon name="ChevronLeft" size={28} color="#FFFFFF" />
-              <T style={styles.dpadLbl}>TRÁI</T>
+              <UiIcon
+                name="ChevronLeft"
+                size={28}
+                color={thumbDir === -1 ? '#042F2E' : '#F8FAFC'}
+                strokeWidth={2.8}
+              />
             </Pressable>
+
+            <View pointerEvents="none" style={styles.thumbDivider}>
+              <View
+                style={[
+                  styles.thumbPuck,
+                  thumbDir === -1 && { transform: [{ translateX: -26 }] },
+                  thumbDir === 1 && { transform: [{ translateX: 26 }] },
+                ]}
+              />
+            </View>
+
             <Pressable
               testID="croak-right"
               onPressIn={() => setMoveDir(1)}
               onPressOut={() => setMoveDir(0)}
-              style={({ pressed }) => [styles.dpadBtn, pressed && styles.dpadBtnActive]}
+              style={[styles.thumbHalf, thumbDir === 1 && styles.thumbHalfActive]}
             >
-              <UiIcon name="ChevronRight" size={28} color="#FFFFFF" />
-              <T style={styles.dpadLbl}>PHẢI</T>
+              <UiIcon
+                name="ChevronRight"
+                size={28}
+                color={thumbDir === 1 ? '#042F2E' : '#F8FAFC'}
+                strokeWidth={2.8}
+              />
             </Pressable>
           </View>
 
-          {/* Cụm hành động Nhảy + Phóng Lưỡi / Nhổ Bắn */}
+          {/* Cụm nút Hành Động Nhảy + Nuốt / Bắn siêu nhạy ngay khi chạm ngón tay */}
           <View style={styles.actionCluster}>
             <Pressable
               testID="croak-jump"
-              onPress={() => sendInput({ jump: true })}
+              // @ts-expect-error phản hồi 0ms ngay khi ngón tay chạm xuống màn hình
+              onPointerDown={(e: PointerEvent) => {
+                e.preventDefault();
+                triggerActionImmediate(() => sendInput({ jump: true }));
+              }}
+              onPress={() => triggerActionFallbackPress(() => sendInput({ jump: true }))}
               style={({ pressed }) => [styles.jumpBtn, pressed && styles.btnPressed]}
             >
               <EmojiIcon emoji="🐸" size={20} />
-              <T style={styles.actionBtnTxt}>
-                {myFrog?.state === 'swallowed' ? 'GIÃY THOÁT!' : 'NHẢY'}
+              <T selectable={false} style={styles.actionBtnTxt}>
+                {hud.myState === 'swallowed' ? 'GIÃY!' : 'NHẢY'}
               </T>
             </Pressable>
 
-            {myFrog?.state === 'carrying' ? (
+            {hud.myState === 'carrying' ? (
               <Pressable
                 testID="croak-spit"
-                onPress={() => sendInput({ spit: true })}
+                // @ts-expect-error phản hồi 0ms ngay khi chạm
+                onPointerDown={(e: PointerEvent) => {
+                  e.preventDefault();
+                  triggerActionImmediate(() => sendInput({ spit: true }));
+                }}
+                onPress={() => triggerActionFallbackPress(() => sendInput({ spit: true }))}
                 style={({ pressed }) => [styles.spitBtn, pressed && styles.btnPressed]}
               >
                 <EmojiIcon emoji="🚀" size={20} />
-                <T style={[styles.actionBtnTxt, { color: '#0F172A' }]}>BẮN BẠN!</T>
+                <T selectable={false} style={[styles.actionBtnTxt, { color: '#0F172A' }]}>
+                  BẮN BẠN!
+                </T>
               </Pressable>
             ) : (
               <Pressable
                 testID="croak-tongue"
-                onPress={() => sendInput({ tongue: true })}
+                // @ts-expect-error phản hồi 0ms ngay khi chạm
+                onPointerDown={(e: PointerEvent) => {
+                  e.preventDefault();
+                  triggerActionImmediate(() => sendInput({ tongue: true }));
+                }}
+                onPress={() => triggerActionFallbackPress(() => sendInput({ tongue: true }))}
                 style={({ pressed }) => [styles.tongueBtn, pressed && styles.btnPressed]}
               >
                 <EmojiIcon emoji="👅" size={20} />
-                <T style={styles.actionBtnTxt}>NUỐT BẠN</T>
+                <T selectable={false} style={styles.actionBtnTxt}>
+                  NUỐT BẠN
+                </T>
               </Pressable>
             )}
           </View>
         </View>
       ) : (
         <View style={[styles.spectatorBanner, sticker(2)]}>
-          <T style={styles.spectatorTxt}>Bạn đang theo dõi đội Ếch vượt đầm lầy ở chế độ Khán Giả.</T>
+          <T style={styles.spectatorTxt}>
+            Bạn đang theo dõi đội Ếch vượt đầm lầy ở chế độ Khán Giả.
+          </T>
         </View>
       )}
 
@@ -863,8 +1666,8 @@ const styles = StyleSheet.create({
     borderColor: '#2DD4BF',
     borderRadius: 18,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 5,
+    paddingVertical: 9,
+    gap: 4,
   },
   stageTop: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   stageBadge: {
@@ -877,7 +1680,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   stageBadgeTxt: { fontSize: 11.5, fontWeight: '900', color: '#042F2E', fontFamily: FONT },
-  stageTitle: { fontSize: 15, fontWeight: '900', color: '#F0FDFA', flex: 1, minWidth: 110, fontFamily: FONT },
+  stageTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#F0FDFA',
+    flex: 1,
+    minWidth: 110,
+    fontFamily: FONT,
+  },
   goalCounter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -906,7 +1716,7 @@ const styles = StyleSheet.create({
   stageHint: { fontSize: 12, fontWeight: '700', color: '#99F6E4', lineHeight: 16 },
 
   viewportWrap: {
-    backgroundColor: '#071925',
+    backgroundColor: '#051523',
     borderColor: '#34D399',
     borderRadius: 20,
     overflow: 'hidden',
@@ -919,7 +1729,7 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 7,
   },
-  aimTitle: { fontSize: 12.5, fontWeight: '900', color: '#FBCFE8' },
+  aimTitle: { fontSize: 12, fontWeight: '900', color: '#FBCFE8' },
   aimChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   aimChip: {
     paddingHorizontal: 10,
@@ -936,31 +1746,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    backgroundColor: '#0F172A',
-    borderColor: '#475569',
-    borderRadius: 20,
-    padding: 10,
+    backgroundColor: '#0B1324',
+    borderColor: '#38BDF8',
+    borderRadius: 22,
+    padding: 9,
   },
-  dpad: { flexDirection: 'row', gap: 8 },
-  dpadBtn: {
-    width: 68,
-    height: 62,
-    borderRadius: 16,
+  thumbTrack: {
+    width: 154,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#1E293B',
     borderWidth: 2,
-    borderColor: '#64748B',
+    borderColor: '#475569',
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbHalf: {
+    flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
-  dpadBtnActive: { backgroundColor: '#334155', borderColor: '#38BDF8', transform: [{ scale: 0.96 }] },
-  dpadLbl: { fontSize: 10, fontWeight: '900', color: '#CBD5E1' },
+  thumbHalfActive: {
+    backgroundColor: '#2DD4BF',
+  },
+  thumbDivider: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  thumbPuck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(148, 163, 184, 0.28)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(226, 232, 240, 0.45)',
+  },
 
   actionCluster: { flexDirection: 'row', gap: 8, flex: 1, justifyContent: 'flex-end' },
   jumpBtn: {
     flex: 1,
-    maxWidth: 118,
-    height: 62,
-    borderRadius: 16,
+    maxWidth: 112,
+    height: 64,
+    borderRadius: 18,
     backgroundColor: '#16A34A',
     borderWidth: 2,
     borderColor: '#86EFAC',
@@ -970,9 +1807,9 @@ const styles = StyleSheet.create({
   },
   tongueBtn: {
     flex: 1,
-    maxWidth: 126,
-    height: 62,
-    borderRadius: 16,
+    maxWidth: 122,
+    height: 64,
+    borderRadius: 18,
     backgroundColor: '#DB2777',
     borderWidth: 2,
     borderColor: '#F9A8D4',
@@ -982,9 +1819,9 @@ const styles = StyleSheet.create({
   },
   spitBtn: {
     flex: 1,
-    maxWidth: 132,
-    height: 62,
-    borderRadius: 16,
+    maxWidth: 128,
+    height: 64,
+    borderRadius: 18,
     backgroundColor: '#FACC15',
     borderWidth: 2.5,
     borderColor: '#FEF9C3',
@@ -992,8 +1829,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  btnPressed: { transform: [{ scale: 0.95 }], opacity: 0.9 },
-  actionBtnTxt: { fontSize: 12, fontWeight: '900', color: '#FFFFFF', fontFamily: FONT },
+  btnPressed: { transform: [{ scale: 0.95 }], opacity: 0.92 },
+  actionBtnTxt: { fontSize: 11.5, fontWeight: '900', color: '#FFFFFF', fontFamily: FONT },
 
   spectatorBanner: {
     backgroundColor: '#1E293B',

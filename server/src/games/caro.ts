@@ -1,12 +1,14 @@
 /**
- * Server Engine: Cờ Caro Đại Chiến (`caro` — 15×15 Gomoku Arena, hỗ trợ solo 2 người & Hỗn Chiến 3–4 người).
+ * Server Engine: Cờ Caro Đại Chiến (`caro` — tự động mở rộng bàn cờ 15×15 / 22×22 / 28×28 / 32×32 theo số phe 2–4 người).
  */
 import {
   CARO_SIZE,
   CARO_SYMBOLS,
+  caroSizeForPlayers,
   checkCaroWin,
   pickCaroBotMove,
   type CaroMove,
+  type CaroSizeMode,
   type CaroSymbol,
   type CaroView,
 } from '../../../shared/src/caro';
@@ -16,7 +18,8 @@ import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from '.
 const DEFAULT_TURN_SECONDS = 25;
 
 export class CaroGame implements GameEngine {
-  private readonly size = CARO_SIZE;
+  private size = CARO_SIZE;
+  private readonly sizeMode: CaroSizeMode;
   private readonly blockTwoEnds: boolean;
   private readonly turnMs: number;
 
@@ -43,6 +46,8 @@ export class CaroGame implements GameEngine {
 
   constructor(private readonly ctx: EngineContext) {
     this.blockTwoEnds = ctx.settings.caroBlockTwoEnds ?? true;
+    const rawMode = (ctx.settings as { caroSizeMode?: CaroSizeMode }).caroSizeMode;
+    this.sizeMode = rawMode === 'mega' ? 'mega' : 'auto';
     const defMs = DEFAULT_TURN_SECONDS * 1000;
     this.turnMs = ctx.turnMs ? Math.min(defMs, Math.max(250, ctx.turnMs)) : defMs;
   }
@@ -54,6 +59,7 @@ export class CaroGame implements GameEngine {
 
   start(players: EnginePlayer[]): void {
     const capped = players.slice(0, CARO_SYMBOLS.length);
+    this.size = caroSizeForPlayers(capped.length, this.sizeMode);
     this.order = capped.map((p) => p.id);
     this.activeOrder = [...this.order];
 
@@ -140,7 +146,11 @@ export class CaroGame implements GameEngine {
     if (this.moveCount >= this.size * this.size) {
       this.isDraw = true;
       this.turnEndsAt = null;
-      this.finishGame(null, true, '🤝 Kín sạch 225 ô bàn cờ — Ván Cờ Caro bất phân thắng bại!');
+      this.finishGame(
+        null,
+        true,
+        `🤝 Kín sạch ${this.size * this.size} ô bàn cờ (${this.size}×${this.size}) — Ván Cờ Caro bất phân thắng bại!`,
+      );
       return;
     }
 
@@ -290,6 +300,7 @@ export class CaroGame implements GameEngine {
     return {
       type: 'caro',
       size: this.size,
+      sizeMode: this.sizeMode,
       blockTwoEnds: this.blockTwoEnds,
       order: [...this.order],
       names: Object.fromEntries(this.names),

@@ -1,10 +1,31 @@
 /**
- * Kiểu dữ liệu, luật thắng "chặn hai đầu" & AI chiến thuật cho game Cờ Caro Đại Chiến (`caro`, 15×15, 2–4 người).
+ * Kiểu dữ liệu, luật thắng "chặn hai đầu", co giãn kích thước bàn cờ theo số phe & AI chiến thuật cho Cờ Caro Đại Chiến (`caro`, 2–4 người).
  * Thuần TypeScript, không phụ thuộc thư viện ngoài.
  */
 
 export const CARO_SIZE = 15;
 export const CARO_WIN_LEN = 5;
+
+/** Chế độ kích thước bàn cờ: `auto` tự mở rộng theo số phe (15×15 → 22×22 → 28×28), `mega` siêu đại chiến (24×24 → 28×28 → 32×32) */
+export type CaroSizeMode = 'auto' | 'mega';
+
+/**
+ * Tính kích thước cạnh bàn cờ theo số người tham chiến:
+ * - 2 phe (`auto`): `15×15` (`225` ô — chuẩn Gomoku đối kháng)
+ * - 3 phe (`auto`): `22×22` (`484` ô — rộng gấp `2.15×` bàn 2 người!)
+ * - 4 phe (`auto`): `28×28` (`784` ô — rộng gấp `3.48×` bàn 2 người!)
+ * - Chế độ `mega`: nâng lên `24×24` (`576` ô) cho 2 phe, `28×28` (`784` ô) cho 3 phe, `32×32` (`1024` ô) cho 4 phe!
+ */
+export function caroSizeForPlayers(playerCount: number, mode: CaroSizeMode = 'auto'): number {
+  if (mode === 'mega') {
+    if (playerCount <= 2) return 24;
+    if (playerCount === 3) return 28;
+    return 32;
+  }
+  if (playerCount <= 2) return CARO_SIZE;
+  if (playerCount === 3) return 22;
+  return 28;
+}
 
 /** X đỏ, O xanh dương, A tam giác vàng, D thoi ngọc (hỗ trợ cả solo 2 người lẫn Hỗn Chiến 3–4 người) */
 export type CaroSymbol = 'X' | 'O' | 'A' | 'D';
@@ -22,6 +43,7 @@ export interface CaroMove {
 export interface CaroView {
   type: 'caro';
   size: number;
+  sizeMode?: CaroSizeMode;
   blockTwoEnds: boolean;
   order: string[];
   names: Record<string, string>;
@@ -457,11 +479,23 @@ export function pickCaroBotMove(
   }
 
   // 4. Đánh giá chiến thuật toàn diện (Tấn công + Phòng thủ Tam Mở / Tứ Nhảy / Đôi Tam + Vị trí gần quân)
-  let bestRow = candidates[0][0];
-  let bestCol = candidates[0][1];
+  // Trên bàn đại chiến 28×28 / 32×32 giai đoạn cuối ván (>90 ô trống lân cận), lọc 90 điểm nóng nhất theo mật độ quân để giữ <2ms/nước!
+  const evalPool =
+    candidates.length > 90
+      ? [...candidates]
+          .sort(
+            (a, b) =>
+              proximityBonus(board, size, b[0], b[1], mySymbol) -
+              proximityBonus(board, size, a[0], a[1], mySymbol),
+          )
+          .slice(0, 90)
+      : candidates;
+
+  let bestRow = evalPool[0][0];
+  let bestCol = evalPool[0][1];
   let bestScore = -Infinity;
 
-  for (const [r, c] of candidates) {
+  for (const [r, c] of evalPool) {
     const myScore = evaluateSymbolMove(workBoard, size, r, c, mySymbol, blockTwoEnds);
 
     let maxOppScore = 0;

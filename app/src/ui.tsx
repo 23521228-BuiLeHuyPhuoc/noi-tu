@@ -7,8 +7,15 @@ import { EmojiIcon, UiIcon, splitEdgeEmoji, type UiIconName } from './components
 
 // ---------- Chữ ----------
 
-export function T({ style, ...rest }: TextProps) {
-  return <Text style={[styles.text, style]} {...rest} />;
+export function T({ style, selectable, ...rest }: TextProps) {
+  return (
+    <Text
+      selectable={selectable ?? false}
+      {...(Platform.OS === 'web' && selectable ? ({ dataSet: { selectable: 'true' } } as object) : {})}
+      style={[styles.text, style]}
+      {...rest}
+    />
+  );
 }
 
 // ---------- Nút bấm gradient & bề mặt tactile ----------
@@ -79,7 +86,7 @@ export function Button({
           {iconNode}
           {!iconNode && effectiveLead && <EmojiIcon emoji={effectiveLead} size={iconSz} />}
           {cleanTitle ? (
-            <Text numberOfLines={small ? 2 : 1} style={[styles.btnText, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
+            <Text selectable={false} numberOfLines={small ? 2 : 1} style={[styles.btnText, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
               {cleanTitle}
             </Text>
           ) : null}
@@ -99,7 +106,7 @@ export function Button({
           {iconNode}
           {!iconNode && effectiveLead && <EmojiIcon emoji={effectiveLead} size={iconSz} />}
           {cleanTitle ? (
-            <Text numberOfLines={small ? 2 : 1} style={[styles.btnText, small && { textAlign: 'center' }, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
+            <Text selectable={false} numberOfLines={small ? 2 : 1} style={[styles.btnText, small && { textAlign: 'center' }, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
               {cleanTitle}
             </Text>
           ) : null}

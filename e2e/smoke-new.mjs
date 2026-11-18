@@ -130,15 +130,20 @@ await A.shot('11-game-start');
 // tới lượt mình: dùng "Cứu trợ" nối hộ một từ, rồi xem máy có tự đánh trong ~4s không
 const wordOf = async () => (await A.t('current-word').innerText().catch(() => '')).replace(/\s+/g, ' ');
 const w0 = await wordOf();
-await A.page.getByText(/Cứu trợ: nối hộ/).click();
-await sleep(800);
+const myTurnFirst = await has(A.page.getByText('Tới lượt bạn!'), 1200);
+if (myTurnFirst) {
+  await A.page.getByText(/Cứu trợ: nối hộ/).click();
+  await sleep(800);
+}
 const w1 = await wordOf();
-console.log('  từ:', w0, '->', w1);
-let botPlayed = false;
+console.log('  từ:', w0, '->', w1, '(mình đi trước:', myTurnFirst, ')');
+let botPlayed = !myTurnFirst && Boolean(w1 && w1 !== w0);
+const deadEnd = await has(A.page.getByText(/Còn 0 từ có thể nối/), 500);
+if (deadEnd && myTurnFirst) botPlayed = true;
 for (let i = 0; i < 14 && !botPlayed; i++) {
   await sleep(500);
   const w = await wordOf();
-  if (w && w !== w1) botPlayed = true;
+  if (w && w !== (myTurnFirst ? w1 : w0)) botPlayed = true;
 }
 await A.shot('12-game-bot-played');
 check(botPlayed, 'máy Nối từ tự đánh một từ trong ~7s sau khi tới lượt');

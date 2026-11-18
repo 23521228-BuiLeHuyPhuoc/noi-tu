@@ -9,7 +9,11 @@ import {
   type CharacterConfig, type CharacterLook, type GameType, type RoomState,
 } from '../../../shared/src/types';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
-import { DO_VUI_TOPICS } from '../../../shared/src/dovui';
+import { DO_VUI_DIFFICULTIES, DO_VUI_TOPICS, type DoVuiDifficulty } from '../../../shared/src/dovui';
+import { caroSizeForPlayers } from '../../../shared/src/caro';
+import { CA_SAU_ROUND_OPTIONS } from '../../../shared/src/casau';
+import { TINH_MAT_ROUND_OPTIONS } from '../../../shared/src/tinhmat';
+import { DEN_DO_ROUND_OPTIONS } from '../../../shared/src/dendo';
 import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES, type WordChainDifficulty, type WordChainRule } from '../../../shared/src/pos';
 import { CROAK_STAGES } from '../../../shared/src/croaksquad';
 import type { Game } from '../useGame';
@@ -27,7 +31,7 @@ import { Shell } from '../components/Shell';
 import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji } from '../components/Icons';
 
 const GAMES: GameType[] = [
-  'croaksquad', 'cah', 'cashnguns', 'loto', 'caro',
+  'croaksquad', 'ca_sau', 'tinh_mat', 'den_do', 'loto', 'caro',
   'masoi', 'do_vui', 'giandiep', 've_doan', 'bom_tu',
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
 ];
@@ -181,7 +185,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <T style={[styles.section, { color: theme.onBg }]}>{isHost ? 'Chọn game (14 trò chơi)' : 'Game của phòng'}</T>
+      <T style={[styles.section, { color: theme.onBg }]}>{isHost ? 'Chọn game (15 trò chơi)' : 'Game của phòng'}</T>
       {isHost ? (
         <View style={styles.games}>
           {GAMES.map((g) => {
@@ -469,7 +473,25 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={{ gap: 10 }}>
           <View style={styles.headIconRow}>
             <EmojiIcon emoji="🧠" size={18} />
-            <T style={styles.h3}>Chuyên đề CNTT / Tiếng Anh C1–C2 & Số câu</T>
+            <T style={styles.h3}>Chuyên đề, Độ khó (Intern → Junior) & Số câu</T>
+          </View>
+          <View style={styles.roundRow}>
+            {(['easy', 'medium', 'hard', 'mixed'] as DoVuiDifficulty[]).map((df) => {
+              const meta = DO_VUI_DIFFICULTIES[df];
+              const active = (room.settings.doVuiDifficulty ?? 'mixed') === df;
+              return (
+                <Button
+                  key={df}
+                  testID={`dv-diff-${df}`}
+                  small
+                  variant={active ? 'gold' : 'paper'}
+                  title={`${meta.emoji} ${meta.shortName}`}
+                  disabled={!isHost}
+                  style={{ flexGrow: 1, minWidth: 96 }}
+                  onPress={() => game.configure({ settings: { doVuiDifficulty: df } })}
+                />
+              );
+            })}
           </View>
           <View style={styles.roundRow}>
             {DO_VUI_TOPICS.map((tp) => {
@@ -505,23 +527,69 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      {room.gameType === 'cah' && (
+      {room.gameType === 'ca_sau' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <EmojiIcon emoji="🃏" size={18} />
-            <T style={styles.h3}>Số vòng Hội Bàn Tròn Vô Tri</T>
+            <EmojiIcon emoji="🐊" size={18} />
+            <T style={styles.h3}>Số hiệp Khám Răng Cá Sấu</T>
           </View>
           <View style={styles.roundRow}>
-            {([5, 8, 12] as const).map((r) => (
+            {CA_SAU_ROUND_OPTIONS.map((r) => (
               <Button
                 key={r}
-                testID={`cah-rounds-${r}`}
+                testID={`ca-sau-rounds-${r}`}
                 small
-                variant={(room.settings.cahRounds ?? 8) === r ? 'ink' : 'paper'}
+                variant={(room.settings.caSauRounds ?? 4) === r ? 'ink' : 'paper'}
+                title={`${r} hiệp`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { caSauRounds: r } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'tinh_mat' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="👀" size={18} />
+            <T style={styles.h3}>Số vòng Tinh Mắt Đập Nhanh</T>
+          </View>
+          <View style={styles.roundRow}>
+            {TINH_MAT_ROUND_OPTIONS.map((r) => (
+              <Button
+                key={r}
+                testID={`tinh-mat-rounds-${r}`}
+                small
+                variant={(room.settings.tinhMatRounds ?? 12) === r ? 'ink' : 'paper'}
                 title={`${r} vòng`}
                 disabled={!isHost}
                 style={{ flex: 1 }}
-                onPress={() => game.configure({ settings: { cahRounds: r } })}
+                onPress={() => game.configure({ settings: { tinhMatRounds: r } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'den_do' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji="🚦" size={18} />
+            <T style={styles.h3}>Số nhịp Đèn Đỏ Đèn Xanh (Đích 100m)</T>
+          </View>
+          <View style={styles.roundRow}>
+            {DEN_DO_ROUND_OPTIONS.map((r) => (
+              <Button
+                key={r}
+                testID={`den-do-rounds-${r}`}
+                small
+                variant={(room.settings.denDoRounds ?? 14) === r ? 'ink' : 'paper'}
+                title={`${r} nhịp đèn`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { denDoRounds: r } })}
               />
             ))}
           </View>
@@ -561,7 +629,31 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
             <EmojiIcon emoji="⭕" size={18} />
-            <T style={styles.h3}>Luật Cờ Caro 15×15</T>
+            <T style={styles.h3}>
+              Quy mô bàn Cờ Caro ({Math.min(4, Math.max(2, n))} Phe →{' '}
+              {caroSizeForPlayers(Math.min(4, Math.max(2, n)), room.settings.caroSizeMode ?? 'auto')}×
+              {caroSizeForPlayers(Math.min(4, Math.max(2, n)), room.settings.caroSizeMode ?? 'auto')})
+            </T>
+          </View>
+          <View style={styles.roundRow}>
+            {[
+              { mode: 'auto' as const, label: '📐 Tự mở rộng theo số phe (15 → 22 → 28)' },
+              { mode: 'mega' as const, label: '🔥 Siêu Đại Chiến (24 → 28 → 32)' },
+            ].map((opt) => {
+              const active = (room.settings.caroSizeMode ?? 'auto') === opt.mode;
+              return (
+                <Button
+                  key={opt.mode}
+                  testID={`caro-size-${opt.mode}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={opt.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { caroSizeMode: opt.mode } })}
+                />
+              );
+            })}
           </View>
           <View style={styles.roundRow}>
             {[

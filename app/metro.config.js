@@ -40,7 +40,7 @@ function ensureWebIconPack() {
   const slimFluent = {};
   for (const [key, def] of Object.entries(FLUENT_ICONS)) {
     const svgFile = path.join(fluentPublicDir, `${key}.svg`);
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${def.v}">${def.b}</svg>`;
+    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="${def.v}">${def.b}</svg>`;
     if (!fs.existsSync(svgFile) || fs.statSync(svgFile).size !== Buffer.byteLength(svgContent)) {
       fs.writeFileSync(svgFile, svgContent, 'utf8');
     }

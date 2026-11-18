@@ -22,8 +22,9 @@ import { GianDiepGame } from './games/giandiep';
 import { VeDoanGame } from './games/vedoan';
 import { BomTuGame } from './games/bomtu';
 import { DoVuiGame } from './games/dovui';
-import { CahGame } from './games/cah';
-import { CashGunsGame } from './games/cashnguns';
+import { CaSauGame } from './games/casau';
+import { TinhMatGame } from './games/tinhmat';
+import { DenDoGame } from './games/dendo';
 import { LotoGame } from './games/loto';
 import { CaroGame } from './games/caro';
 import { CroakSquadGame } from './games/croaksquad';
@@ -80,7 +81,8 @@ const BOT_THINK_MS: Record<GameType, [number, number]> = {
   wordchain: [1500, 3200], wordchain_en: [1500, 3200], baucua: [700, 2200], typhu: [900, 1700],
   masoi: [300, 700], giandiep: [350, 750],
   ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
-  cah: [400, 950], cashnguns: [450, 1000], loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
+  ca_sau: [450, 950], tinh_mat: [420, 900], den_do: [300, 680],
+  loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -565,9 +567,23 @@ export class Room {
       }
       this.settings = { ...this.settings, doVuiTopic: settings.doVuiTopic };
     }
-    if (settings?.cahRounds !== undefined) {
-      if (settings.cahRounds !== 5 && settings.cahRounds !== 8 && settings.cahRounds !== 12) return { ok: false, error: 'bad_request' };
-      this.settings = { ...this.settings, cahRounds: settings.cahRounds };
+    if (settings?.doVuiDifficulty !== undefined) {
+      if (!['easy', 'medium', 'hard', 'mixed'].includes(settings.doVuiDifficulty)) {
+        return { ok: false, error: 'bad_request' };
+      }
+      this.settings = { ...this.settings, doVuiDifficulty: settings.doVuiDifficulty };
+    }
+    if (settings?.caSauRounds !== undefined) {
+      if (settings.caSauRounds !== 3 && settings.caSauRounds !== 4 && settings.caSauRounds !== 6) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, caSauRounds: settings.caSauRounds };
+    }
+    if (settings?.tinhMatRounds !== undefined) {
+      if (settings.tinhMatRounds !== 8 && settings.tinhMatRounds !== 12 && settings.tinhMatRounds !== 16) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, tinhMatRounds: settings.tinhMatRounds };
+    }
+    if (settings?.denDoRounds !== undefined) {
+      if (settings.denDoRounds !== 10 && settings.denDoRounds !== 14 && settings.denDoRounds !== 18) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, denDoRounds: settings.denDoRounds };
     }
     if (settings?.lotoAutoMark !== undefined) {
       if (typeof settings.lotoAutoMark !== 'boolean') return { ok: false, error: 'bad_request' };
@@ -576,6 +592,10 @@ export class Room {
     if (settings?.caroBlockTwoEnds !== undefined) {
       if (typeof settings.caroBlockTwoEnds !== 'boolean') return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, caroBlockTwoEnds: settings.caroBlockTwoEnds };
+    }
+    if (settings?.caroSizeMode !== undefined) {
+      if (settings.caroSizeMode !== 'auto' && settings.caroSizeMode !== 'mega') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, caroSizeMode: settings.caroSizeMode };
     }
     if (settings?.croakStage !== undefined) {
       if (settings.croakStage !== 0 && settings.croakStage !== 1 && settings.croakStage !== 2) return { ok: false, error: 'bad_request' };
@@ -739,10 +759,12 @@ export class Room {
         return new BomTuGame(ctx);
       case 'do_vui':
         return new DoVuiGame(ctx);
-      case 'cah':
-        return new CahGame(ctx);
-      case 'cashnguns':
-        return new CashGunsGame(ctx);
+      case 'ca_sau':
+        return new CaSauGame(ctx);
+      case 'tinh_mat':
+        return new TinhMatGame(ctx);
+      case 'den_do':
+        return new DenDoGame(ctx);
       case 'loto':
         return new LotoGame(ctx);
       case 'caro':

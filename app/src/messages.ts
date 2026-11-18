@@ -99,12 +99,13 @@ export const GAME_META: Record<GameType, { emoji: string; tagline: string; playe
   giandiep: { emoji: '🕵️', tagline: 'Ai cầm từ khác? Lắng nghe gợi ý để lật mặt gián điệp!', players: '3–12 người' },
   ve_doan: { emoji: '🎨', tagline: 'Vẽ hình siêu lầy cho cả xóm đua nhau đoán từ khóa!', players: '2–12 người' },
   bom_tu: { emoji: '💣', tagline: 'Gõ nhanh từ có tiếng bom đang cháy để chuyền trước khi nổ!', players: '2–12 người' },
-  do_vui: { emoji: '🧠', tagline: 'Đấu trường kiến thức CNTT, OOP, DSA, JS/TS & Tiếng Anh C1-C2 cực gắt!', players: '1–12 người' },
-  cah: { emoji: '🃏', tagline: 'Ghép thẻ trắng mất não vào câu khuyết tên bạn bè trong phòng!', players: '3–12 người' },
-  cashnguns: { emoji: '🔫', tagline: 'Chĩa súng đạn thật/giả, đấu trí đầu hàng và chia chác kim cương!', players: '3–12 người' },
+  do_vui: { emoji: '🧠', tagline: 'Phỏng vấn CNTT (Intern → Junior), OOP đa ngôn ngữ, DSA, JS/TS & Tiếng Anh!', players: '1–12 người' },
+  ca_sau: { emoji: '🐊', tagline: 'Nhấn răng Cá Sấu Chúa cực căng: săn Răng Vàng +40đ, né Răng Sâu đớp tay!', players: '2–12 người' },
+  tinh_mat: { emoji: '👀', tagline: 'Không chờ lượt! Đua tay-mắt đập mục tiêu & săn kho báu thời gian thực!', players: '2–12 người' },
+  den_do: { emoji: '🚦', tagline: 'Đua 100m Đèn Đỏ Đèn Xanh kèm Còi Giả & Vỏ Chuối bóp đồng đội cười xỉu!', players: '2–12 người' },
   loto: { emoji: '🎱', tagline: 'Rao vè 90 số rộn ràng, dò vé giấy 3×9 và hô KINH giật giải!', players: '2–12 người' },
-  caro: { emoji: '⭕', tagline: 'Cờ Caro 15×15 đại chiến 2–4 phe, hỗ trợ luật chặn hai đầu!', players: '2–4 người' },
-  croaksquad: { emoji: '🐸', tagline: 'Ếch co-op nuốt đồng đội rồi nhổ bắn vượt vực thẳm & mở cổng!', players: '2–6 người thật' },
+  caro: { emoji: '⭕', tagline: 'Cờ Caro tự mở rộng bàn 15×15 → 22×22 → 28×28 theo số phe (2–4 người)!', players: '2–4 người' },
+  croaksquad: { emoji: '🐸', tagline: 'Ếch co-op 60fps nuốt đồng đội rồi nhổ bắn vượt vực thẳm & mở cổng!', players: '2–6 người thật' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -152,19 +153,24 @@ export const RULES: Record<GameType, string[]> = {
     'Bom nổ trên tay ai thì mất 1 tim; người sống sót cuối cùng giành chiến thắng!',
   ],
   do_vui: [
-    'Chọn chuyên đề chuyên sâu (OOP, DSA, JS/TS, Node/Backend, React Native/FE, Fullstack/System, Tiếng Anh C1–C2) hoặc Tổng hợp.',
-    'Trả lời nhanh 4 đáp án A/B/C/D trong 15 giây; giữ chuỗi đúng (streak) nhận thêm điểm thưởng.',
-    '2 câu cuối nhân đôi điểm số (x2) kèm giải thích kỹ thuật chi tiết sau mỗi câu!',
+    'Chọn chuyên đề (OOP đa ngôn ngữ, DSA, JS/TS, Node/Backend, React Native/FE, Fullstack/IT, Tiếng Anh) & cấp độ Intern (16s), Fresher (22s), Junior (30s) hoặc Tăng dần.',
+    'Trả lời nhanh 4 đáp án A/B/C/D; câu khó hơn sẽ được cộng thêm thời gian suy nghĩ hợp lý!',
+    '2 câu cuối nhân đôi điểm số (x2) kèm giải thích thực tế dễ hiểu sau mỗi câu!',
   ],
-  cah: [
-    'Mỗi vòng lật 1 Thẻ Đen khuyết chỗ trống (tự động điểm mặt tên thật người chơi trong phòng!).',
-    'Mỗi người bí mật chọn 1 Thẻ Trắng bựa nhất trên tay nộp ẩn danh (có 1 quyền Đổi Bài mới mỗi ván).',
-    'Cả phòng bình chọn câu ghép "mất não" nhất (không tự bầu mình) để trao điểm vô địch!',
+  ca_sau: [
+    'Hàm Cá Sấu Chúa có 14–24 chiếc răng (tự mở rộng theo số người chơi). Đến lượt ai chỉ cần chạm 1 chiếc răng trắng.',
+    'Trúng Răng Lành ăn điểm can đảm tăng dần; trúng 💎 Răng Vàng nổ +40đ; trúng 🔄 Răng Xoáy đảo ngược chiều lượt đi!',
+    'Ai xui chạm đúng 💥 Răng Đau sẽ bị Cá Sấu đớp PHẬP (-25đ) rồi mở hàm hiệp mới — không ai bị loại ngồi xem!',
   ],
-  cashnguns: [
-    'Mỗi tay anh chị có 3 máu ❤️ và băng đạn 8 viên (5 Đạn Giả Click! + 3 Đạn Thật Bang!).',
-    'Bí mật nạp đạn và chĩa súng vào 1 người khác; Bố Già có quyền ép 1 người đổi hướng súng.',
-    '15 giây Cân Não: bấm Đầu Hàng để né đạn (nhịn chia tiền), hoặc Đứng Lại ăn đạn / chia chiến lợi phẩm & Kim Cương!',
+  tinh_mat: [
+    'Tất cả người chơi nhìn và đập CÙNG LÚC trên lưới biểu tượng 3D — không ai phải chờ lượt!',
+    'Xoay vòng 3 thử thách: Đập hình trùng mục tiêu, Tìm hình chỉ xuất hiện 1 lần, và Săn Kho Báu né Bom 💣.',
+    'Ai đập đúng nhanh nhất ăn +150đ; đập nhầm ô bị choáng tê tay 1,3 giây nên đừng bấm bừa nhé!',
+  ],
+  den_do: [
+    'Đua nước rút từ 0m tới 100m: Đèn Xanh bấm CHẠY liên hoàn (+3,5m/bước), Đèn Vàng giảm tốc, Đèn Đỏ phải đứng im!',
+    'Nhúc nhích lúc Đèn Đỏ sẽ bị tia Laser bắn lùi -28m (trừ khi đang bật Áo Tàng Hình 🛡️).',
+    'Vượt mốc 25m / 55m / 80m nhận Đạo Cụ Bóp Đồng Đội: 📣 Còi Giả Đèn Xanh dụ đối thủ chạy lúc Đèn Đỏ, hoặc 🍌 Vỏ Chuối quật ngã người dẫn đầu!',
   ],
   loto: [
     'Mỗi người nhận 1 tờ vé Lô Tô 3×9 chuẩn hội chợ (mỗi hàng 5 số từ 1–90).',
@@ -172,7 +178,7 @@ export const RULES: Record<GameType, string[]> = {
     'Đủ 5 số trên 1 hàng ngang thì bấm HÔ KINH ngay! Báo nhầm Kinh hụt sẽ bị phạt khóa nút 2 lượt số!',
   ],
   caro: [
-    'Bàn cờ 15×15 hỗ trợ từ 2 đến 4 người chơi cùng lúc (X, O, ▲, ◆).',
+    'Bàn cờ tự động phóng to theo số phe: 2 người (15×15 = 225 ô), 3 người (22×22 = 484 ô), 4 người (28×28 = 784 ô) hoặc chế độ Siêu Đại Chiến!',
     'Ai xếp được 5 quân liên tiếp theo hàng ngang, dọc hoặc chéo trước là thắng.',
     'Khi bật luật "Chặn hai đầu": chuỗi đúng 5 quân bị đối phương chặn sát cả 2 đầu sẽ chưa được tính thắng.',
   ],

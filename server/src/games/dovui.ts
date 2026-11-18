@@ -1,11 +1,14 @@
-import { questionsForTopic, type DoVuiPhase, type DoVuiQuestion, type DoVuiView } from '../../../shared/src/dovui';
+import {
+  pickDoVuiQuestions,
+  secondsForDoVuiLevel,
+  type DoVuiPhase,
+  type DoVuiQuestion,
+  type DoVuiView,
+} from '../../../shared/src/dovui';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
-const DEFAULT_SEC: Record<DoVuiPhase, number> = {
-  question: 22,
-  reveal: 5,
-};
+const REVEAL_SEC = 5;
 
 export class DoVuiGame implements GameEngine {
   readonly perPlayerView = true;
@@ -19,8 +22,8 @@ export class DoVuiGame implements GameEngine {
   private index = 0;
   private phase: DoVuiPhase = 'question';
   private phaseEndsAt: number | null = null;
-  private phaseSeconds = DEFAULT_SEC.question;
-  private phaseMs = DEFAULT_SEC.question * 1000;
+  private phaseSeconds = 22;
+  private phaseMs = 22_000;
 
   private answers = new Map<string, { choice: number; at: number }>();
   private finished = false;
@@ -29,7 +32,13 @@ export class DoVuiGame implements GameEngine {
   constructor(private readonly ctx: EngineContext) {}
 
   private msFor(p: DoVuiPhase): number {
-    const def = DEFAULT_SEC[p] * 1000;
+    if (p === 'reveal') {
+      const def = REVEAL_SEC * 1000;
+      return this.ctx.turnMs ? Math.min(def, Math.max(250, this.ctx.turnMs)) : def;
+    }
+    const q = this.questions[this.index];
+    const sec = q ? secondsForDoVuiLevel(q.difficulty) : 22;
+    const def = sec * 1000;
     return this.ctx.turnMs ? Math.min(def, Math.max(250, this.ctx.turnMs)) : def;
   }
 
@@ -41,12 +50,12 @@ export class DoVuiGame implements GameEngine {
       this.streaks.set(p.id, 0);
     }
     const total = this.ctx.settings.doVuiQuestions ?? 10;
-    const pool = questionsForTopic(this.ctx.settings.doVuiTopic ?? 'all');
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(this.ctx.rng() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    this.questions = pool.slice(0, Math.min(total, pool.length));
+    this.questions = pickDoVuiQuestions(
+      this.ctx.rng,
+      total,
+      this.ctx.settings.doVuiTopic ?? 'all',
+      this.ctx.settings.doVuiDifficulty ?? 'mixed',
+    );
     this.index = 0;
     this.startQuestion();
   }
@@ -180,6 +189,7 @@ export class DoVuiGame implements GameEngine {
       phaseSeconds: this.phaseSeconds,
       category: q?.category ?? '',
       selectedTopic: this.ctx.settings.doVuiTopic ?? 'all',
+      selectedDifficulty: this.ctx.settings.doVuiDifficulty ?? 'mixed',
       difficulty: q?.difficulty,
       question: q?.q ?? '',
       options: q?.options ?? ['', '', '', ''],

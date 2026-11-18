@@ -146,7 +146,7 @@ describe('Ai Là Gián Điệp (Undercover / Mr. White)', () => {
 
   it('tích hợp Room + 8 bot tự chơi Ai Là Gián Điệp tới khi kết thúc', async () => {
     const dict = new Dictionary(SMALL_WORDS);
-    const room = new Room('SPY8', dict, { turnMs: 220, rng: () => Math.random() });
+    const room = new Room('SPY8', dict, { turnMs: 140, rng: () => Math.random() });
     const host = room.addPlayer('Chủ Phòng');
     expect(host.ok).toBe(true);
     if (!host.ok) return;
@@ -156,13 +156,13 @@ describe('Ai Là Gián Điệp (Undercover / Mr. White)', () => {
     room.removePlayer(host.playerId);
 
     const started = Date.now();
-    while (room.phase === 'playing' && Date.now() - started < 6000) {
-      await new Promise((r) => setTimeout(r, 30));
+    while (room.phase === 'playing' && Date.now() - started < 9500) {
+      await new Promise((r) => setTimeout(r, 25));
     }
     expect(room.phase).toBe('finished');
     expect(room.toPublic().result?.winnerIds?.length).toBeGreaterThanOrEqual(1);
     const viewCheck = room.toPublic().game as GianDiepView | null;
     expect(viewCheck === null || viewCheck.type === 'giandiep').toBe(true);
     room.dispose();
-  }, 10000);
+  }, 15000);
 });

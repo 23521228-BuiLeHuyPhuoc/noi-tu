@@ -525,7 +525,7 @@ export function GuestAvatarButton({ game, onPress }: { game: Game; onPress: () =
 const ORDER: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
-  'cah', 'cashnguns', 'loto', 'caro', 'croaksquad',
+  'ca_sau', 'tinh_mat', 'den_do', 'loto', 'caro', 'croaksquad',
 ];
 
 export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user: PublicUser; onEdit: () => void; onWallet?: () => void; onAdmin?: () => void; onShop?: () => void }) {

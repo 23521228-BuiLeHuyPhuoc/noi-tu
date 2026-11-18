@@ -20,8 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Circle,
   Copy,
+  Crosshair,
   Crown,
+  Diamond,
   Dices,
   Eraser,
   Eye,
@@ -72,6 +75,7 @@ import {
   Swords,
   Timer,
   Trash2,
+  Triangle,
   Trophy,
   Undo2,
   Unlock,
@@ -84,6 +88,8 @@ import {
   X,
   XCircle,
   Zap,
+  ZoomIn,
+  ZoomOut,
   LayoutGrid,
 } from 'lucide-react-native';
 import { SvgXml } from 'react-native-svg';
@@ -103,8 +109,11 @@ const LUCIDE_MAP = {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Circle,
   Copy,
+  Crosshair,
   Crown,
+  Diamond,
   Dices,
   Eraser,
   Eye,
@@ -156,6 +165,7 @@ const LUCIDE_MAP = {
   Swords,
   Timer,
   Trash2,
+  Triangle,
   Trophy,
   Undo2,
   Unlock,
@@ -168,6 +178,8 @@ const LUCIDE_MAP = {
   X,
   XCircle,
   Zap,
+  ZoomIn,
+  ZoomOut,
 } as const;
 
 export type UiIconName = keyof typeof LUCIDE_MAP;
@@ -188,22 +200,46 @@ export const UiIcon = memo(function UiIcon({
 });
 
 const SVG_URI_CACHE = new globalThis.Map<VectorDef, string>();
-function svgDataUriOf(def: VectorDef): string {
+export function svgDataUriOf(def: VectorDef): string {
   const staticUrl = (def as { readonly u?: string }).u;
   if (staticUrl) return staticUrl;
   let u = SVG_URI_CACHE.get(def);
   if (!u) {
-    const raw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${def.v}">${def.b}</svg>`;
-    u = `data:image/svg+xml;utf8,${encodeURIComponent(raw)}`;
+    const raw = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="${def.v}">${def.b}</svg>`;
+    u = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(raw)}`;
     SVG_URI_CACHE.set(def, u);
+  }
+  return u;
+}
+
+const TINTED_GAME_URI_CACHE = new globalThis.Map<string, string>();
+export function fluentSvgUri(name: string): string {
+  const def = FLUENT_ICONS[name] ?? FLUENT_ICONS.sparkles;
+  return svgDataUriOf(def);
+}
+export function emojiSvgUri(emoji: string): string {
+  const k = fluentKeyOf(emoji);
+  return fluentSvgUri(k ?? 'sparkles');
+}
+export function gameIconSvgUri(name: string, color = '#1E293B', bgFill?: string): string {
+  const k = `${name}|${color}|${bgFill ?? ''}`;
+  let u = TINTED_GAME_URI_CACHE.get(k);
+  if (!u) {
+    const def = GAME_ICONS[name];
+    if (!def) return fluentSvgUri('sparkles');
+    const body = def.b.replace(/currentColor/gi, color);
+    const bgRect = bgFill ? `<rect x="24" y="24" width="464" height="464" rx="96" fill="${bgFill}"/>` : '';
+    const raw = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="${def.v}">${bgRect}${body}</svg>`;
+    u = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(raw)}`;
+    TINTED_GAME_URI_CACHE.set(k, u);
   }
   return u;
 }
 
 /**
  * Render định nghĩa SVG 3D-shaded từ iconPack:
- * - Trên Web dùng `<img>` tải lười (`loading="lazy"`) trỏ tới SVG tĩnh trên CDN / data-URI.
- * - Tắt `filter: drop-shadow` mặc định (Fluent 3D đã có đổ bóng bên trong SVG), giảm hàng trăm pass GPU khi cuộn trên Mobile.
+ * - Tắt hoàn toàn `filter: drop-shadow` mặc định (vì Fluent 3D đã có sẵn đổ bóng đa lớp bên trong SVG),
+ *   giúp trình duyệt Mobile giảm 100+ pass shader FBO mỗi khung hình khi cuộn!
  */
 export const PackSvg = memo(function PackSvg({
   def,
@@ -218,9 +254,9 @@ export const PackSvg = memo(function PackSvg({
   glow?: string | boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const glowColor = typeof glow === 'string' ? glow : glow ? 'rgba(250,204,21,0.85)' : undefined;
+  const glowColor = typeof glow === 'string' ? glow : glow ? 'rgba(250,204,21,0.8)' : undefined;
   if (Platform.OS === 'web') {
-    const filter = glowColor ? `drop-shadow(0 0 ${Math.max(4, Math.round(size * 0.26))}px ${glowColor})` : undefined;
+    const filter = glowColor ? `drop-shadow(0 0 ${Math.max(3, Math.round(size * 0.24))}px ${glowColor})` : undefined;
     if (!color) {
       return (
         <View pointerEvents="none" style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, style]}>
@@ -228,12 +264,11 @@ export const PackSvg = memo(function PackSvg({
             src: svgDataUriOf(def),
             alt: '',
             draggable: false,
-            loading: 'lazy',
             decoding: 'async',
             width: size,
             height: size,
             'aria-hidden': true,
-            style: { display: 'block', width: size, height: size, objectFit: 'contain', ...(filter ? { filter } : {}), userSelect: 'none' },
+            style: { display: 'block', width: size, height: size, objectFit: 'contain', ...(filter ? { filter } : {}), userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' },
           })}
         </View>
       );
@@ -246,7 +281,7 @@ export const PackSvg = memo(function PackSvg({
           width: size,
           height: size,
           'aria-hidden': true,
-          style: { display: 'block', width: size, height: size, overflow: 'visible', ...(filter ? { filter } : {}) },
+          style: { display: 'block', width: size, height: size, overflow: 'visible', ...(filter ? { filter } : {}), userSelect: 'none', pointerEvents: 'none' },
           dangerouslySetInnerHTML: { __html: body },
         })}
       </View>

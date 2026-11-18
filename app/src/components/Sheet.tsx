@@ -12,8 +12,18 @@ export function useSheetOpen(): boolean {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => openCount > 0, () => false);
 }
 
-/** Bảng trượt từ dưới lên chuẩn glassmorphism + bo tròn mềm mại */
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/** Bảng trượt từ dưới lên chuẩn glassmorphism + bo tròn mềm mại, hỗ trợ `stickyTop` ghim cố định phía trên vùng cuộn */
+export function Sheet({
+  title,
+  onClose,
+  stickyTop,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  stickyTop?: ReactNode;
+  children: ReactNode;
+}) {
   const kb = useKeyboardInset();
   const { height } = useStableWindow();
   const maxHeight = kb > 0 && Platform.OS === 'web'
@@ -70,6 +80,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
               <UiIcon name="X" size={18} color={C.ink} strokeWidth={2.5} />
             </Pressable>
           </View>
+          {stickyTop ? <View style={styles.stickyTopWrap}>{stickyTop}</View> : null}
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {children}
           </ScrollView>
@@ -87,6 +98,7 @@ const styles = StyleSheet.create({
     padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 540, alignSelf: 'center', overflow: 'hidden',
   },
   panelShort: { maxWidth: 680, padding: 12, paddingBottom: 14, gap: 8 },
+  stickyTopWrap: { flexShrink: 0 },
   body: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   bodyContent: { gap: 14 },
   grip: { width: 42, height: 4.5, borderRadius: 3, backgroundColor: 'rgba(28,32,36,0.16)', alignSelf: 'center' },

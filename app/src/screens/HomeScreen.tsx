@@ -25,8 +25,9 @@ import { MotionSurface } from '../components/MotionPrimitives';
 
 const GAMES: GameType[] = [
   'croaksquad',
-  'cah',
-  'cashnguns',
+  'ca_sau',
+  'tinh_mat',
+  'den_do',
   'loto',
   'caro',
   'masoi',
@@ -51,8 +52,8 @@ const FRAGMENTS: { id: HomeFragment; label: string; emoji: string }[] = [
 
 type Category = 'all' | 'party' | 'hidden' | 'coop' | 'word' | 'classic';
 const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[] }[] = [
-  { id: 'all', label: 'Tất cả (14)', icon: 'LayoutGrid' },
-  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['cah', 'cashnguns', 've_doan', 'bom_tu', 'do_vui'] },
+  { id: 'all', label: 'Tất cả (15)', icon: 'LayoutGrid' },
+  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['ca_sau', 'tinh_mat', 'den_do', 've_doan', 'bom_tu', 'do_vui'] },
   { id: 'hidden', label: 'Ẩn Vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
   { id: 'coop', label: 'Co-op & Cờ', icon: 'Swords', games: ['croaksquad', 'caro'] },
   { id: 'classic', label: 'Hội Chợ', icon: 'Dices', games: ['loto', 'baucua', 'typhu'] },
@@ -60,32 +61,34 @@ const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[]
 ];
 
 const BADGE_FOR: Partial<Record<GameType, { text: string; grad: readonly [string, string] }>> = {
-  croaksquad: { text: 'CO-OP 2D', grad: ['#10B981', '#047857'] },
-  cah: { text: 'SIÊU BỰA', grad: ['#EC4899', '#9D174D'] },
-  cashnguns: { text: 'ĐẤU SÚNG', grad: ['#EF4444', '#991B1B'] },
+  croaksquad: { text: '60FPS 2D', grad: ['#10B981', '#047857'] },
+  ca_sau: { text: 'CỰC CĂNG', grad: ['#16A34A', '#14532D'] },
+  tinh_mat: { text: 'PHẢN XẠ', grad: ['#0284C7', '#1E3A8A'] },
+  den_do: { text: 'HOT TREND', grad: ['#E11D48', '#881337'] },
   loto: { text: 'HỘI CHỢ', grad: ['#F59E0B', '#B45309'] },
-  caro: { text: '2–4 PHE', grad: ['#06B6D4', '#0E7490'] },
+  caro: { text: 'BÀN KHỦNG', grad: ['#06B6D4', '#0E7490'] },
   masoi: { text: 'BẢN 2.0', grad: ['#7C3AED', '#4C1D95'] },
-  do_vui: { text: 'IT & C2', grad: ['#2563EB', '#1E3A8A'] },
+  do_vui: { text: 'IT QUIZ', grad: ['#2563EB', '#1E3A8A'] },
   baucua: { text: 'LỘC x3', grad: ['#EA580C', '#9A3412'] },
   typhu: { text: 'MUA ĐỨT', grad: ['#16A34A', '#14532D'] },
 };
 
 const GAME_TILE_GRAD: Record<GameType, readonly [string, string]> = {
   croaksquad: ['#A7F3D0', '#34D399'],
-  cah: ['#FBCFE8', '#F472B6'],
-  cashnguns: ['#FECACA', '#F87171'],
+  ca_sau: ['#BBF7D0', '#22C55E'],
+  tinh_mat: ['#BAE6FD', '#38BDF8'],
+  den_do: ['#FECDD3', '#FB7185'],
   loto: ['#FDE68A', '#FBBF24'],
-  caro: ['#BAE6FD', '#38BDF8'],
+  caro: ['#99F6E4', '#2DD4BF'],
   masoi: ['#DDD6FE', '#A78BFA'],
   giandiep: ['#C7D2FE', '#818CF8'],
   ve_doan: ['#F5D0FE', '#E879F9'],
   bom_tu: ['#FED7AA', '#FB923C'],
-  do_vui: ['#99F6E4', '#2DD4BF'],
+  do_vui: ['#BFDBFE', '#60A5FA'],
   wordchain: ['#FEF08A', '#FACC15'],
-  wordchain_en: ['#BFDBFE', '#60A5FA'],
-  baucua: ['#FECDD3', '#FB7185'],
-  typhu: ['#BBF7D0', '#4ADE80'],
+  wordchain_en: ['#E0E7FF', '#818CF8'],
+  baucua: ['#FED7AA', '#F97316'],
+  typhu: ['#A7F3D0', '#10B981'],
 };
 
 export function HomeScreen({ game }: { game: Game }) {
@@ -277,7 +280,7 @@ export function HomeScreen({ game }: { game: Game }) {
             <View style={{ flex: 1, minWidth: 120 }}>
               <T style={[styles.logo, { color: theme.accent }]}>Xóm Lầy</T>
               <T style={[styles.tagline, { color: theme.onBg }]} numberOfLines={1}>
-                14 đại tiệc trò chơi · Phú Hào Lố Lăng
+                15 đại tiệc trò chơi · Phú Hào Lố Lăng
               </T>
             </View>
           </View>
@@ -485,7 +488,7 @@ export function HomeScreen({ game }: { game: Game }) {
                 <Card style={{ gap: 8 }}>
                   <T style={styles.h2}>🌟 Tạo tài khoản Phú Hào Xóm Lầy</T>
                   <T style={{ color: C.muted, fontSize: 13, lineHeight: 19 }}>
-                    Lưu thành tích 14 trò chơi, điểm danh nhận Ruby miễn phí mỗi ngày, mở khóa 146 vật phẩm Hóa Trang Lố Lăng & danh hiệu Thiên Đế Chí Tôn!
+                    Lưu thành tích 15 trò chơi, điểm danh nhận Ruby miễn phí mỗi ngày, mở khóa 146 vật phẩm Hóa Trang Lố Lăng & danh hiệu Thiên Đế Chí Tôn!
                   </T>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Button style={{ flex: 1 }} variant="gold" title="Đăng ký miễn phí" onPress={() => setAuth('register')} />

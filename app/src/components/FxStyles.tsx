@@ -52,6 +52,21 @@ const CSS = `
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Chống bôi đen / hiện menu Sao chép chữ khi người chơi di động nhấn giữ nút hoặc tay cầm game */
+body, [role="button"], [role="tab"], [data-nosel="1"], canvas, svg, img {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* Giữ nguyên khả năng nhập & bôi đen sao chép cho ô nhập liệu và mã phòng selectable */
+input, textarea, [contenteditable="true"], [data-selectable="true"], [data-selectable="true"] * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -59,15 +74,18 @@ const CSS = `
 ::-webkit-scrollbar-thumb { background: rgba(232, 121, 249, 0.42); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(232, 121, 249, 0.72); }
 
-[role="button"] {
+[role="button"], [role="tab"] {
   touch-action: manipulation;
-  transition: transform 140ms var(--xl-ease-spring), opacity 140ms ease;
-}
-[role="button"]:hover:not([aria-disabled="true"]) {
-  opacity: 0.94;
+  transition: transform 120ms var(--xl-ease-spring);
 }
 [role="button"]:active:not([aria-disabled="true"]) {
   transform: translate3d(0, 2px, 0) scale(0.975);
+}
+
+/* Bỏ qua tính toán layout & paint cho các thẻ vật phẩm đang nằm ngoài khung nhìn cuộn */
+.xl-shop-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 86px;
 }
 
 ${CSSHAKES_CDN_FALLBACK}

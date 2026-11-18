@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TyPhuGame, TYPHU_CARDS, TYPHU_COMMUNITY_CARDS } from '../src/games/typhu';
 import type { EngineContext } from '../src/games/engine';
 import type { GameResult, TyPhuView } from '../../shared/src/types';
-import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, TYPHU_PASS_START, rentOf, typhuCellPos, stationRent, utilityRent, suggestSales } from '../../shared/src/typhu';
+import { TYPHU_BOARD, TYPHU_MOVE_STEP_MS, TYPHU_PASS_START, isTyPhuProperty, rentOf, typhuCellPos, stationRent, utilityRent, suggestSales } from '../../shared/src/typhu';
 import { simulateThrow } from '../src/games/dice3d';
 import { DICE_DEFAULT_IMPULSE, DICE_FACES, DICE_FRAME_STRIDE, TRAY_HX, TRAY_HZ, sanitizeImpulse } from '../../shared/src/dice';
 import { smallDict } from './helpers';
@@ -132,13 +132,15 @@ describe('Cờ tỷ phú V2', () => {
   g.action('p0',{type:'roll'});settle();
   expect(v().pos.p0).toBe(11);expect(v().step).toBe('upgrade');expect(v().pendingBuy).toBe(11);
  });
- it('Sân bay flies to a random cell (never itself) and handles that cell', () => {
-  const {g,v,pl,settle}=make(['An','Bình'],[1,2,{card:7.99}]);pl(0).pos=17;
+ it('Sân bay pre-reveals a random property destination and flies directly there', () => {
+  const {g,v,pl,settle}=make(['An','Bình'],[1,2]);pl(0).pos=17;
+  const preDest = v().airportDest!;
+  expect(isTyPhuProperty(TYPHU_BOARD[preDest])).toBe(true);
   g.action('p0',{type:'roll'});
   vi.advanceTimersByTime(v().movement!.endsAt-Date.now());
   expect(v().movement?.kind).toBe('fly');
   settle();
-  expect(v().pos.p0).toBe(39);expect(v().step).toBe('buy');
+  expect(v().pos.p0).toBe(preDest);expect(v().step).toBe('buy');
  });
  it('passes start, charges tax and sends players to jail', () => {
   const a=make(['An','Bình'],[2,3]);a.pl(0).pos=36;a.g.action('p0',{type:'roll'});a.settle();expect(a.v().cash.p0).toBe(1500+TYPHU_PASS_START);

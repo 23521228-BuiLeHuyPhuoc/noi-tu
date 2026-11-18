@@ -27,7 +27,8 @@ export interface TyPhuCellProps {
   onPress: (i: number) => void;
   /** phóng chữ tên (hàng ô phía xa của bàn 3D bị bóp nhỏ khi chiếu) */
   boost?: number;
-  /** hũ tiền (chỉ ô Xuất phát) */
+  /** tên điểm đến hiện tại của ô Sân Bay (chỉ truyền ở ô 20) */
+  airportDestName?: string | null;
 }
 
 const BOARD_BG = '#CDE6D0';
@@ -131,7 +132,7 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
   const isLand = c.kind === 'land';
   const price = isTyPhuProperty(c) ? c.price : c.kind === 'tax' ? c.amount : null;
   const name = shortCellName(c.name).toUpperCase();
-  const label = `${p.index + 1}. ${c.name}${p.ownerName ? `, thuộc ${p.ownerName}` : ''}${price !== null ? `, ${c.kind === 'tax' ? 'mất' : 'giá'} ${price}$` : ''}`;
+  const label = `${p.index + 1}. ${c.name}${p.airportDestName ? `, bay tới ${p.airportDestName}` : ''}${p.ownerName ? `, thuộc ${p.ownerName}` : ''}${price !== null ? `, ${c.kind === 'tax' ? 'mất' : 'giá'} ${price}$` : ''}`;
   const frame = [
     styles.cell,
     { left: p.x, top: p.y, width: p.w, height: p.h, backgroundColor: owned ? p.ownerLight! : BOARD_BG },
@@ -149,16 +150,29 @@ export const TyPhuCell = memo(function TyPhuCell(p: TyPhuCellProps) {
 
   if (p.side === 'corner') {
     const pr = priceTxt !== '';
-    const fit = fitCellName(name, p.w - 8, p.h * 0.3, clamp(p.h * 0.17, 8, 20), 7);
-    const prFs = clamp(Math.min(p.h * 0.17, p.w / 6), 7, 19);
+    const hasFlight = !!p.airportDestName;
+    const fit = fitCellName(name, p.w - 8, p.h * 0.26, clamp(p.h * 0.155, 7, 18), 6.5);
+    const prFs = clamp(Math.min(p.h * 0.16, p.w / 6), 7, 18);
+    const flightFs = clamp(Math.min(p.h * 0.135, p.w / 6.8), 6.5, 12.5);
+    const bottomReserve = pr ? prFs * 1.2 : hasFlight ? flightFs * 1.55 + 4 : 0;
     const nameH = fit.lh * fit.lines;
-    const icon = clamp(Math.min(p.w * 0.6, p.h - nameH - (pr ? prFs * 1.2 : 0) - 8), 7, 200);
+    const icon = clamp(Math.min(p.w * 0.56, p.h - nameH - bottomReserve - 6), 8, 200);
     return (
       <Pressable testID={`cell-${p.index}`} accessibilityRole="button" accessibilityLabel={label} onPress={() => p.onPress(p.index)} style={frame}>
         <View style={styles.corner}>
           <T style={[styles.cornerName, { fontSize: fit.fs, lineHeight: fit.lh }, WRAP]}>{name}</T>
           <Image source={{ uri: ICON_BY_CELL[p.index] }} style={{ width: icon, height: icon }} resizeMode="contain" />
           {pr && <T numberOfLines={1} style={[styles.price, styles.plus, { fontSize: prFs, lineHeight: Math.round(prFs * 1.2) }]}>{priceTxt}</T>}
+          {hasFlight && (
+            <View
+              testID="typhu-airport-dest"
+              style={styles.flightPill}
+            >
+              <T numberOfLines={1} style={[styles.flightTxt, { fontSize: flightFs, lineHeight: Math.round(flightFs * 1.22) }]}>
+                → {p.airportDestName}
+              </T>
+            </View>
+          )}
         </View>
         {overlay}
       </Pressable>
@@ -267,4 +281,18 @@ const styles = StyleSheet.create({
   ownerFace: { backgroundColor: '#fff', borderWidth: 1.5 },
   corner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1, padding: 2 },
   cornerName: { color: INK, fontWeight: '800', textAlign: 'center' },
+  flightPill: {
+    backgroundColor: '#0369A1',
+    borderRadius: 4,
+    paddingHorizontal: 3.5,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+    maxWidth: '96%',
+  },
+  flightTxt: {
+    fontWeight: '900',
+    color: '#FEF08A',
+    textAlign: 'center',
+  },
 });

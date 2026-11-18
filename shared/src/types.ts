@@ -5,10 +5,11 @@ import type { GianDiepView } from './giandiep';
 import type { VeDoanStroke, VeDoanView } from './vedoan';
 import type { BomTuView } from './bomtu';
 import type { DoVuiView } from './dovui';
-import type { CahView } from './cah';
-import type { CashGunsView } from './cashnguns';
+import type { CaSauAction, CaSauView } from './casau';
+import type { TinhMatAction, TinhMatView } from './tinhmat';
+import type { DenDoAction, DenDoView } from './dendo';
 import type { LotoView } from './loto';
-import type { CaroView } from './caro';
+import type { CaroSizeMode, CaroView } from './caro';
 import type { CroakInput, CroakSquadView, CroakTickPayload } from './croaksquad';
 import type { WordChainDifficulty, WordChainRule } from './pos';
 import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
@@ -29,8 +30,9 @@ export type GameType =
   | 've_doan'
   | 'bom_tu'
   | 'do_vui'
-  | 'cah'
-  | 'cashnguns'
+  | 'ca_sau'
+  | 'tinh_mat'
+  | 'den_do'
   | 'loto'
   | 'caro'
   | 'croaksquad';
@@ -46,8 +48,9 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
   ve_doan: { name: 'Vẽ & Đoán', min: 2, max: 12 },
   bom_tu: { name: 'Bom chữ', min: 2, max: 12 },
   do_vui: { name: 'Đố vui', min: 1, max: 12 },
-  cah: { name: 'Hội bàn tròn', min: 3, max: 12 },
-  cashnguns: { name: 'Chia chác giang hồ', min: 3, max: 12 },
+  ca_sau: { name: 'Khám răng cá sấu', min: 2, max: 12 },
+  tinh_mat: { name: 'Tinh mắt đập nhanh', min: 2, max: 12 },
+  den_do: { name: 'Đèn đỏ đèn xanh', min: 2, max: 12 },
   loto: { name: 'Lô tô hội chợ', min: 2, max: 12 },
   caro: { name: 'Cờ caro', min: 2, max: 4 },
   croaksquad: { name: 'Đầm lầy quái chiêu', min: 2, max: 6 },
@@ -78,14 +81,22 @@ export interface RoomSettings {
   veDoanRounds?: number;
   /** Đố vui: số lượng câu hỏi */
   doVuiQuestions?: 5 | 10 | 15;
-  /** Đố vui: chủ đề chuyên sâu CNTT / Tiếng Anh */
+  /** Đố vui: chủ đề CNTT / Tiếng Anh */
   doVuiTopic?: 'all' | 'oop' | 'dsa' | 'js_ts' | 'node_backend' | 'mobile_fe' | 'fullstack_it' | 'english_adv';
-  /** Hội bàn tròn vô tri: số vòng chơi */
-  cahRounds?: 5 | 8 | 12;
+  /** Đố vui: độ khó (Intern 16s / Fresher 22s / Junior 30s / Tăng dần) */
+  doVuiDifficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
+  /** Khám răng cá sấu: số hiệp */
+  caSauRounds?: number;
+  /** Tinh mắt đập nhanh: số vòng */
+  tinhMatRounds?: number;
+  /** Đèn đỏ đèn xanh: số nhịp đèn tối đa */
+  denDoRounds?: number;
   /** Lô tô: tự động chấm số hay để người chơi tự dò kịch tính */
   lotoAutoMark?: boolean;
   /** Cờ caro: luật chặn 2 đầu */
   caroBlockTwoEnds?: boolean;
+  /** Cờ caro: chế độ kích thước bàn cờ (`auto` tự mở rộng theo số phe, `mega` siêu đại chiến) */
+  caroSizeMode?: CaroSizeMode;
   /** Đầm lầy quái chiêu: màn xuất phát (0..2) */
   croakStage?: 0 | 1 | 2;
   /** @deprecated tương thích ngược */
@@ -331,8 +342,9 @@ export type GameView =
   | VeDoanView
   | BomTuView
   | DoVuiView
-  | CahView
-  | CashGunsView
+  | CaSauView
+  | TinhMatView
+  | DenDoView
   | LotoView
   | CaroView
   | CroakSquadView;
@@ -512,6 +524,8 @@ export interface TyPhuView {
   jackpotPool?: number;
   /** đề nghị Mua Đứt đất đối thủ với giá 160% khi vừa trả xong tiền thuê */
   buyoutOffer?: { cell: number; ownerId: string; price: number } | null;
+  /** điểm đến hiện tại của ô Sân Bay (hiện trước ngay trên bàn cờ để người chơi tính chiến thuật) */
+  airportDest?: number;
 }
 
 // ================= Hành động trong game =================
@@ -556,12 +570,9 @@ export type GameAction =
   | { type: 'vd_guess'; text: string }
   | { type: 'bt_submit'; word: string }
   | { type: 'dv_answer'; choice: 0 | 1 | 2 | 3 }
-  | { type: 'cah_pick'; card: string }
-  | { type: 'cah_mulligan' }
-  | { type: 'cah_vote'; slotId: string }
-  | { type: 'cg_plan'; bulletIndex: number; targetId: string }
-  | { type: 'cg_standoff'; decision: 'stand' | 'surrender' }
-  | { type: 'cg_godfather'; targetId: string; newAimId: string }
+  | CaSauAction
+  | TinhMatAction
+  | DenDoAction
   | { type: 'loto_mark'; num: number }
   | { type: 'loto_kinh'; row: 0 | 1 | 2 }
   | { type: 'caro_move'; row: number; col: number }

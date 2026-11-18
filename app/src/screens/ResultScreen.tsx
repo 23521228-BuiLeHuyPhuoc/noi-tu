@@ -17,7 +17,7 @@ import { MotionSurface } from '../components/MotionPrimitives';
 const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
-  'cah', 'cashnguns', 'loto', 'caro', 'croaksquad',
+  'ca_sau', 'tinh_mat', 'den_do', 'loto', 'caro', 'croaksquad',
 ];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
@@ -107,7 +107,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <EmojiIcon emoji="🎮" size={18} />
-            <T style={{ fontSize: 14.5, fontWeight: '900', color: C.ink }}>Đổi nhanh sang trò chơi khác (13 game)</T>
+            <T style={{ fontSize: 14.5, fontWeight: '900', color: C.ink }}>Đổi nhanh sang trò chơi khác (14 game)</T>
           </View>
           <View style={styles.row}>
             {GAMES.filter((g) => g !== room.gameType).map((g) => (

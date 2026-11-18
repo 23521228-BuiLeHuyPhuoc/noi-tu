@@ -571,6 +571,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 isStepTarget={activeMovementState?.stepCell === i}
                 onPress={setDetail}
                 boost={viewMode === 'tilt' && geo.side[i] === 'bottom' ? 1.3 : 1}
+                airportDestName={
+                  TYPHU_BOARD[i].kind === 'airport' && g.airportDest !== undefined && TYPHU_BOARD[g.airportDest]
+                    ? TYPHU_BOARD[g.airportDest].name.replace(/^Ga\s+/i, '').toUpperCase()
+                    : null
+                }
               />
             );
           })}
@@ -811,7 +816,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
             <T style={{ color: C.muted }}>
               {d.kind === 'start' && `Đi vượt qua ô này được nhận ${fmt(TYPHU_PASS_START)}$. Dừng đúng ô này thì không được đồng nào.`}
               {d.kind === 'jail' && `Bị giam: phải trả ${fmt(TYPHU_JAIL_FINE)}$ (hoặc dùng vé ra tù) mới được đổ xúc xắc. Được ở lại tối đa ${TYPHU_JAIL_MAX} lượt, hết lượt thì bắt buộc trả (thiếu thì tự chọn bán tài sản). Đang ngồi tù thì đất của mình không thu được tiền thuê. Chỉ đi ngang qua thì không sao.`}
-              {d.kind === 'airport' && 'Dừng ở đây là lên máy bay, bay tới một ô ngẫu nhiên trên bàn rồi xử lý ô đó (mua đất, trả thuê, rút thẻ…). Bay thì không tính qua Xuất phát.'}
+              {d.kind === 'airport' && (
+                `Dừng ở đây là lên máy bay bay thẳng tới ô đang mở chuyến hiện tại: «${
+                  g.airportDest !== undefined && TYPHU_BOARD[g.airportDest] ? TYPHU_BOARD[g.airportDest].name : 'ngẫu nhiên'
+                }» rồi xử lý ô đó (mua đất, trả thuê, rút thẻ…). Ngay sau khi bay xong, sân bay sẽ mở chuyến ngẫu nhiên mới cho lượt tiếp theo! (Bay không tính thưởng qua Xuất phát).`
+              )}
               {d.kind === 'gotojail' && 'Dừng ở đây là vào tù ngay.'}
               {d.kind === 'community' && 'Rút thẻ Rủi ro, luôn xấu: nộp phạt, lùi lại, vào tù, sửa nhà hoặc bị gọi lên Cục thuế.'}
               {d.kind === 'chance' && `Rút thẻ Cơ hội, luôn tốt: nhận tiền, được mừng sinh nhật, tiến tới đất của mình để nâng cấp, hoặc được mua vé ra tù nửa giá (${fmt(TYPHU_JAIL_TICKET)}$).`}

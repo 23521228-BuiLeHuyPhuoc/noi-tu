@@ -125,6 +125,8 @@ export class TyPhuGame implements GameEngine {
   private festivalCell: number | null = null;
   private jackpotPool = 0;
   private buyoutOffer: { cell: number; ownerId: string; price: number } | null = null;
+  private airportDest = 1;
+  private readonly flightRng: () => number = Math.random;
   private over = false;
   private readonly timer = new Timer();
   private readonly turnMs: number;
@@ -138,6 +140,7 @@ export class TyPhuGame implements GameEngine {
     this.players = players.map((p) => ({ ...p, cash: TYPHU_START_CASH, pos: 0, jail: null, bankrupt: false, doubles: 0 }));
     this.names = Object.fromEntries(players.map((p) => [p.id, p.name]));
     this.current = 0;
+    this.airportDest = this.pickFlight();
     if (this.mode === 'chaos_festival') {
       this.jackpotPool = 200;
       this.rotateFestival();
@@ -374,6 +377,7 @@ export class TyPhuGame implements GameEngine {
       festivalCell: this.festivalCell,
       jackpotPool: this.jackpotPool,
       buyoutOffer: this.step === 'buyout' ? this.buyoutOffer : null,
+      airportDest: this.airportDest,
     };
   }
 
@@ -668,7 +672,8 @@ export class TyPhuGame implements GameEngine {
         }
         break;
       case 'airport': {
-        const dest = this.pickFlight();
+        const dest = this.airportDest;
+        this.airportDest = this.pickFlight();
         this.addLog('info', `${me.name} lên máy bay ✈️ bay tới ${TYPHU_BOARD[dest].name}`);
         return this.flyTo(dest, true);
       }
@@ -685,10 +690,12 @@ export class TyPhuGame implements GameEngine {
     this.afterLanding();
   }
 
-  /** ô ngẫu nhiên cho chuyến bay ở Sân bay (mọi ô trừ chính Sân bay) */
+  /** nhà / đất ngẫu nhiên cho chuyến bay ở Sân bay (hiện sẵn tên trên bàn cờ trước khi bay, đổi điểm mới sau mỗi chuyến) */
   private pickFlight(): number {
-    const k = Math.min(TYPHU_SIZE - 2, Math.max(0, Math.floor(this.ctx.rng() * (TYPHU_SIZE - 1))));
-    return k >= TYPHU_AIRPORT ? k + 1 : k;
+    const props = TYPHU_BOARD.flatMap((c, i) => (isTyPhuProperty(c) ? [i] : []));
+    const pool = props.filter((i) => i !== this.airportDest);
+    const pickFrom = pool.length > 0 ? pool : props;
+    return pickFrom[Math.floor(this.flightRng() * pickFrom.length) % pickFrom.length];
   }
 
   /** Rút thẻ: `good` = ô Cơ hội (thẻ luôn tốt), không thì ô Rủi ro (thẻ luôn xấu). */

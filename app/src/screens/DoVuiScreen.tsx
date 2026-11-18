@@ -97,8 +97,33 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
             </T>
           </View>
           {view.difficulty && (
-            <View style={[styles.diffChip, view.difficulty === 'extreme' ? styles.diffExtreme : styles.diffHard]}>
-              <T style={styles.diffTxt}>{view.difficulty === 'extreme' ? '💀 CỰC KHÓ' : '🔥 KHÓ'}</T>
+            <View
+              testID={`dv-level-${view.difficulty}`}
+              style={[
+                styles.diffChip,
+                view.difficulty === 'easy'
+                  ? styles.diffEasy
+                  : view.difficulty === 'hard'
+                    ? styles.diffHard
+                    : styles.diffMedium,
+              ]}
+            >
+              <T
+                style={[
+                  styles.diffTxt,
+                  view.difficulty === 'easy'
+                    ? { color: '#065F46' }
+                    : view.difficulty === 'medium'
+                      ? { color: '#1D4ED8' }
+                      : { color: '#B45309' },
+                ]}
+              >
+                {view.difficulty === 'easy'
+                  ? '🌱 DỄ · INTERN (16s)'
+                  : view.difficulty === 'medium'
+                    ? '⚡ VỪA · FRESHER (22s)'
+                    : '🔥 KHÓ · JUNIOR (30s)'}
+              </T>
             </View>
           )}
           {view.doublePoints && (
@@ -211,9 +236,10 @@ const styles = StyleSheet.create({
   catChip: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#E0E7FF', borderWidth: 1, borderColor: 'rgba(67,56,202,0.2)' },
   catTxt: { fontSize: 11, fontWeight: '800', color: '#1E1B4B' },
   diffChip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
+  diffEasy: { backgroundColor: '#DCFCE7', borderWidth: 1, borderColor: '#22C55E' },
+  diffMedium: { backgroundColor: '#DBEAFE', borderWidth: 1, borderColor: '#3B82F6' },
   diffHard: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#D97706' },
-  diffExtreme: { backgroundColor: '#450A0A', borderWidth: 1, borderColor: '#EF4444' },
-  diffTxt: { fontSize: 10.5, fontWeight: '900', color: '#F59E0B' },
+  diffTxt: { fontSize: 10.5, fontWeight: '900', color: '#B45309' },
   x2Chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#DC2626' },
   x2Txt: { fontSize: 11, fontWeight: '900', color: '#FEF08A' },
   qText: { fontSize: 18, fontWeight: '900', color: C.ink, lineHeight: 25, fontFamily: FONT },

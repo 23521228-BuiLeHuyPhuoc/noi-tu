@@ -20,8 +20,22 @@ const gameIcons = require('@iconify-json/game-icons/icons.json');
 const FLUENT_VB = `0 0 ${fluentRich.width ?? 32} ${fluentRich.height ?? 32}`;
 const GAME_VB = `0 0 ${gameIcons.width ?? 512} ${gameIcons.height ?? 512}`;
 
+function resolvePackDef(pack, key) {
+  if (pack.icons[key]) return pack.icons[key];
+  const alias = pack.aliases?.[key];
+  if (alias && pack.icons[alias.parent]) {
+    const parent = pack.icons[alias.parent];
+    const w = parent.width ?? pack.width ?? 32;
+    const body = alias.hFlip
+      ? `<g transform="translate(${w},0) scale(-1,1)">${parent.body}</g>`
+      : parent.body;
+    return { ...parent, body };
+  }
+  return null;
+}
+
 function getFluentDef(key) {
-  return fluentRich.icons[key] ?? fluentFlat.icons[key] ?? null;
+  return resolvePackDef(fluentRich, key) ?? resolvePackDef(fluentFlat, key) ?? null;
 }
 
 /** Ánh xạ tường minh cho chuỗi ghép, ký tự đặc biệt hoặc icon cần bản sắc đẹp hơn */
@@ -56,7 +70,7 @@ const FLUENT_OVERRIDES = {
   '✔': 'check-mark-button',
   '▶': 'play-button',
   '◀': 'reverse-button',
-  '👉': 'backhand-index-pointing-right-default',
+  '👉': 'backhand-index-pointing-right',
   '❤': 'red-heart',
   '❤️': 'red-heart',
   '❤️‍🔥': 'heart-on-fire',
@@ -215,6 +229,21 @@ const CURATED_GAME_ICONS = [
   'lily-pads',
   'tic-tac-toe',
   'police-badge',
+  'police-officer-head',
+  'prisoner',
+  'window-bars',
+  'handcuffs',
+  'locked-fortress',
+  'padlock',
+  'shark-jaws',
+  'croc-jaws',
+  'tooth',
+  'fangs',
+  'imprisoned',
+  'run',
+  'sprint',
+  'traffic-lights-red',
+  'traffic-lights-green',
   'hammer-drop',
   'lightning-storm',
   'crowned-skull',
@@ -295,8 +324,16 @@ for (const em of [...discovered].sort()) {
   }
 }
 
-// Thêm các biểu tượng cơ bản bổ sung phòng fallback
-for (const extra of ['sparkles', 'star', 'crown', 'gem-stone', 'coin', 'trophy', 'game-die', 'frog', 'water-pistol', 'joker', 'pool-8-ball']) {
+// Thêm các biểu tượng cơ bản & đặc thù game từ Fluent Emoji 3D
+for (const extra of [
+  'sparkles', 'star', 'crown', 'gem-stone', 'coin', 'trophy', 'game-die',
+  'frog', 'water-pistol', 'joker', 'pool-8-ball',
+  'police-officer', 'man-police-officer', 'oncoming-police-car', 'police-car-light', 'police-car', 'airplane-departure', 'airplane',
+  'warning', 'chains', 'locked', 'locked-with-key',
+  'crocodile', 'tooth', 'bone', 'eyes', 'vertical-traffic-light', 'horizontal-traffic-light',
+  'banana', 'person-running', 'person-running-facing-right', 'chequered-flag', 'stop-sign', 'loudspeaker', 'megaphone',
+  'mushroom', 'key', 'triangular-flag', 'lotus', 'water-wave', 'soap', 'dizzy',
+]) {
   if (getFluentDef(extra)) usedFluentKeys.add(extra);
 }
 

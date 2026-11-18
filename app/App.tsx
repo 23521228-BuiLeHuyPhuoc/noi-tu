@@ -22,31 +22,51 @@ import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
 import { UiIcon } from './src/components/Icons';
 
-// Tách chunk theo từng trò chơi để màn hình chính tải nhanh và nhẹ bộ nhớ hơn trên di động
-const WordChainScreen = lazy(() => import('./src/screens/WordChainScreen').then((m) => ({ default: m.WordChainScreen })));
-const BauCuaScreen = lazy(() => import('./src/screens/BauCuaScreen').then((m) => ({ default: m.BauCuaScreen })));
-const TyPhuScreen = lazy(() => import('./src/screens/TyPhuScreen').then((m) => ({ default: m.TyPhuScreen })));
-const MaSoiScreen = lazy(() => import('./src/screens/MaSoiScreen').then((m) => ({ default: m.MaSoiScreen })));
-const GianDiepScreen = lazy(() => import('./src/screens/GianDiepScreen').then((m) => ({ default: m.GianDiepScreen })));
-const VeDoanScreen = lazy(() => import('./src/screens/VeDoanScreen').then((m) => ({ default: m.VeDoanScreen })));
-const BomTuScreen = lazy(() => import('./src/screens/BomTuScreen').then((m) => ({ default: m.BomTuScreen })));
-const DoVuiScreen = lazy(() => import('./src/screens/DoVuiScreen').then((m) => ({ default: m.DoVuiScreen })));
-const CahScreen = lazy(() => import('./src/screens/CahScreen').then((m) => ({ default: m.CahScreen })));
-const CashGunsScreen = lazy(() => import('./src/screens/CashGunsScreen').then((m) => ({ default: m.CashGunsScreen })));
-const LotoScreen = lazy(() => import('./src/screens/LotoScreen').then((m) => ({ default: m.LotoScreen })));
-const CaroScreen = lazy(() => import('./src/screens/CaroScreen').then((m) => ({ default: m.CaroScreen })));
-const CroakSquadScreen = lazy(() => import('./src/screens/CroakSquadScreen').then((m) => ({ default: m.CroakSquadScreen })));
+// Tách chunk (code-splitting) cho toàn bộ 15 màn chơi để giảm dung lượng JS khởi động trên di động!
+const WordChainScreen = lazy(() =>
+  import('./src/screens/WordChainScreen').then((m) => ({ default: m.WordChainScreen })),
+);
+const BauCuaScreen = lazy(() =>
+  import('./src/screens/BauCuaScreen').then((m) => ({ default: m.BauCuaScreen })),
+);
+const TyPhuScreen = lazy(() =>
+  import('./src/screens/TyPhuScreen').then((m) => ({ default: m.TyPhuScreen })),
+);
+const MaSoiScreen = lazy(() =>
+  import('./src/screens/MaSoiScreen').then((m) => ({ default: m.MaSoiScreen })),
+);
+const GianDiepScreen = lazy(() =>
+  import('./src/screens/GianDiepScreen').then((m) => ({ default: m.GianDiepScreen })),
+);
+const VeDoanScreen = lazy(() =>
+  import('./src/screens/VeDoanScreen').then((m) => ({ default: m.VeDoanScreen })),
+);
+const BomTuScreen = lazy(() =>
+  import('./src/screens/BomTuScreen').then((m) => ({ default: m.BomTuScreen })),
+);
+const DoVuiScreen = lazy(() =>
+  import('./src/screens/DoVuiScreen').then((m) => ({ default: m.DoVuiScreen })),
+);
+const CaSauScreen = lazy(() =>
+  import('./src/screens/CaSauScreen').then((m) => ({ default: m.CaSauScreen })),
+);
+const TinhMatScreen = lazy(() =>
+  import('./src/screens/TinhMatScreen').then((m) => ({ default: m.TinhMatScreen })),
+);
+const DenDoScreen = lazy(() =>
+  import('./src/screens/DenDoScreen').then((m) => ({ default: m.DenDoScreen })),
+);
+const LotoScreen = lazy(() =>
+  import('./src/screens/LotoScreen').then((m) => ({ default: m.LotoScreen })),
+);
+const CaroScreen = lazy(() =>
+  import('./src/screens/CaroScreen').then((m) => ({ default: m.CaroScreen })),
+);
+const CroakSquadScreen = lazy(() =>
+  import('./src/screens/CroakSquadScreen').then((m) => ({ default: m.CroakSquadScreen })),
+);
 
 const Screen = Platform.OS === 'web' ? View : SafeAreaView;
-
-function GameLoadingFallback() {
-  return (
-    <View style={styles.loading}>
-      <ActivityIndicator size="large" color={C.gold} />
-      <T style={styles.loadingText}>Đang mở bàn chơi…</T>
-    </View>
-  );
-}
 
 export default function App() {
   useFonts({
@@ -71,8 +91,9 @@ export default function App() {
   else if (room.game?.type === 've_doan') body = <VeDoanScreen game={game} room={room} />;
   else if (room.game?.type === 'bom_tu') body = <BomTuScreen game={game} room={room} />;
   else if (room.game?.type === 'do_vui') body = <DoVuiScreen game={game} room={room} />;
-  else if (room.game?.type === 'cah') body = <CahScreen game={game} room={room} />;
-  else if (room.game?.type === 'cashnguns') body = <CashGunsScreen game={game} room={room} />;
+  else if (room.game?.type === 'ca_sau') body = <CaSauScreen game={game} room={room} />;
+  else if (room.game?.type === 'tinh_mat') body = <TinhMatScreen game={game} room={room} />;
+  else if (room.game?.type === 'den_do') body = <DenDoScreen game={game} room={room} />;
   else if (room.game?.type === 'loto') body = <LotoScreen game={game} room={room} />;
   else if (room.game?.type === 'caro') body = <CaroScreen game={game} room={room} />;
   else if (room.game?.type === 'croaksquad') body = <CroakSquadScreen game={game} room={room} />;
@@ -93,7 +114,15 @@ export default function App() {
                   <T style={styles.offlineText}>Mất kết nối, đang nối lại…</T>
                 </View>
               )}
-              <Suspense fallback={<GameLoadingFallback />}>{body}</Suspense>
+              <Suspense
+                fallback={
+                  <View style={styles.loadingWrap}>
+                    <ActivityIndicator size="large" color={C.gold} />
+                  </View>
+                }
+              >
+                {body}
+              </Suspense>
               <WalletNoticeLayer game={game} />
             </ShakeProvider>
           </FeedProvider>
@@ -105,12 +134,14 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.son },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.son },
   offline: {
-    backgroundColor: C.ink, padding: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: C.ink,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   offlineText: { color: C.gold, textAlign: 'center', fontWeight: '700', fontSize: 13 },
-  loading: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24,
-  },
-  loadingText: { color: C.gold, fontWeight: '700', fontSize: 14 },
 });
