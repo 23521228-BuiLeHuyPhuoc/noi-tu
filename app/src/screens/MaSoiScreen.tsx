@@ -1,23 +1,29 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
-  MASOI_QUICK_CHAT, MASOI_ROLES,
-  type MaSoiRole, type MaSoiView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  MASOI_ROLES,
+  type MaSoiLogItem,
+  type MaSoiPhase,
+  type MaSoiRole,
+  type MaSoiView,
 } from '../../../shared/src/masoi';
-import { themeById } from '../../../shared/src/themes';
 import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { useStableWindow } from '../hooks';
-import { C, FONT, sticker } from '../theme';
+import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
+import { FONT } from '../theme';
 import { actionText } from '../messages';
-import { Button, Card, T } from '../ui';
-import { Shell, type StripOptions } from '../components/Shell';
-import { Sheet } from '../components/Sheet';
-import { CountdownBar } from '../components/TimerBar';
+import { play } from '../sound';
+import { T } from '../ui';
+import { Shell } from '../components/Shell';
 import { Portrait } from '../components/Avatar';
-import { NameText } from '../components/Cosmetics';
-import { EmojiIcon, GameIcon, UiIcon, type UiIconName } from '../components/Icons';
-import { FlipCard } from '../components/MotionPrimitives';
+import { EmojiIcon, GameIcon, UiIcon } from '../components/Icons';
 
 const ROLE_GAME_ICON: Record<MaSoiRole, string> = {
   soi: 'wolf-head',
@@ -32,7 +38,6 @@ const ROLE_GAME_ICON: Record<MaSoiRole, string> = {
 };
 
 type SuspectMark = 'none' | 'wolf' | 'trust' | 'jester';
-
 const NEXT_MARK: Record<SuspectMark, SuspectMark> = {
   none: 'wolf',
   wolf: 'trust',
@@ -40,62 +45,66 @@ const NEXT_MARK: Record<SuspectMark, SuspectMark> = {
   jester: 'none',
 };
 
-const MARK_META: Record<SuspectMark, { label: string; bg: string; fg: string; border: string }> = {
-  none: { label: 'Ghim?', bg: 'rgba(148,163,184,0.16)', fg: '#94A3B8', border: 'rgba(148,163,184,0.35)' },
-  wolf: { label: 'Nghi Sói', bg: '#7F1D1D', fg: '#FECACA', border: '#EF4444' },
-  trust: { label: 'Tin tưởng', bg: '#064E3B', fg: '#A7F3D0', border: '#10B981' },
-  jester: { label: 'Nghi Ngố', bg: '#713F12', fg: '#FEF08A', border: '#FACC15' },
-};
+const NIGHT_PHASES = new Set<MaSoiPhase>([
+  'role_reveal',
+  'night_cupid',
+  'night_active',
+  'night_witch',
+]);
 
-const SPEED_LABELS: Record<'slow' | 'normal' | 'fast', string> = {
-  slow: 'Thong thả',
-  normal: 'Chuẩn',
-  fast: 'Nhanh',
-};
-
-const PHASE_META: Record<MaSoiView['phase'], { title: string; emoji: string; uiIcon: UiIconName; night: boolean; hint: string }> = {
-  role_reveal: { title: 'Nhận Thân Phận Bí Mật', emoji: '🃏', uiIcon: 'Eye', night: true, hint: 'Đọc kỹ cách chơi vai trò của bạn bên dưới trước khi màn đêm bắt đầu!' },
-  night_cupid: { title: 'Đêm Se Duyên Định Mệnh', emoji: '💘', uiIcon: 'Heart', night: true, hint: 'Thần Tình Yêu đang chọn 2 cư dân để nối dây tơ hồng...' },
-  night_active: { title: 'Đêm Huyết Nguyệt', emoji: '🌙', uiIcon: 'Moon', night: true, hint: 'Ma Sói săn mồi, Tiên Tri soi thấu, Bảo Vệ canh gác, Thám Tử điều tra...' },
-  night_witch: { title: 'Canh Ba Phù Thủy', emoji: '🧪', uiIcon: 'Sparkles', night: true, hint: 'Phù Thủy đang cân nhắc bình Thuốc Cứu và Thuốc Độc...' },
-  hunter_shot: { title: 'Phát Đạn Phục Hận', emoji: '🏹', uiIcon: 'Swords', night: false, hint: 'Thợ Săn ngã xuống và đang nhắm bắn 1 kẻ phải đi theo!' },
-  day_discuss: { title: 'Bình Minh Thảo Luận', emoji: '☀️', uiIcon: 'Sun', night: false, hint: 'Chat trực tiếp ngay bên dưới, đối chiếu phiếu bầu và ghim kẻ tình nghi!' },
-  day_vote: { title: 'Phiên Tòa Treo Cổ', emoji: '⚖️', uiIcon: 'ShieldAlert', night: false, hint: 'Chạm chọn 1 avatar đáng nghi để bỏ phiếu treo cổ hoặc bỏ phiếu trắng.' },
-};
-
-function fmtTime(ts: number): string {
+function fmtShortTime(ts: number): string {
   const d = new Date(ts);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${hh}:${mm}:${ss}`;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+type UnifiedFeedItem =
+  | {
+      key: string;
+      kind: 'log';
+      at: number;
+      log: MaSoiLogItem;
+    }
+  | {
+      key: string;
+      kind: 'chat';
+      at: number;
+      id: number;
+      from: string;
+      name: string;
+      text: string;
+      isSticker: boolean;
+      stickerId?: string;
+    };
 
 export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as MaSoiView;
-  const [roleVisible, setRoleVisible] = useState(true);
+  const me = game.me ?? '';
+  const { width, height } = useStableWindow();
+  const wide = width >= 900 && height >= 540;
+  const compactMobile = height < 720;
+
+  const [roleHidden, setRoleHidden] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [pickedTwo, setPickedTwo] = useState<string[]>([]);
   const [witchSave, setWitchSave] = useState(false);
   const [witchPoison, setWitchPoison] = useState<string | null>(null);
+  const [lastFocusSeatId, setLastFocusSeatId] = useState<string | null>(null);
 
-  const [commsTab, setCommsTab] = useState<'village' | 'wolf' | 'log'>('village');
+  const [commsTab, setCommsTab] = useState<'village' | 'wolf' | 'role'>('village');
   const [villageInput, setVillageInput] = useState('');
   const [wolfInput, setWolfInput] = useState('');
   const [suspectMarks, setSuspectMarks] = useState<Record<string, SuspectMark>>({});
-  const [guideOpen, setGuideOpen] = useState(false);
-  const [focusGuideRole, setFocusGuideRole] = useState<MaSoiRole | null>(null);
-
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [logOrderStamps, setLogOrderStamps] = useState<Record<number, number>>({});
 
-  const { width } = useStableWindow();
-  const wide = width >= 840;
+  const feedScrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
+  const wolfScrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
 
-  const me = game.me ?? '';
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
   const myRole = view.myRole;
   const roleMeta = myRole ? MASOI_ROLES[myRole] : null;
+  const isNight = NIGHT_PHASES.has(view.phase);
+
   const aliveSet = useMemo(() => new Set(view.alive), [view.alive]);
   const iAlive = aliveSet.has(me);
   const deadMap = useMemo(() => new Map(view.dead.map((d) => [d.id, d])), [view.dead]);
@@ -107,7 +116,6 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     return m;
   }, [view.order]);
 
-  // Kết quả Tiên Tri được ghim trực tiếp lên từng avatar cho dễ theo dõi!
   const seerBadgeMap = useMemo(() => {
     const m = new Map<string, boolean>();
     for (const h of view.seerHistory ?? []) {
@@ -116,7 +124,6 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     return m;
   }, [view.seerHistory]);
 
-  // Đếm số lượng từng role đã lộ diện khi chết để theo dõi bộ bài còn lại
   const revealedDeadRoleCounts = useMemo(() => {
     const c: Partial<Record<MaSoiRole, number>> = {};
     for (const d of view.dead) {
@@ -125,9 +132,91 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     return c;
   }, [view.dead]);
 
-  const phaseInfo = PHASE_META[view.phase];
-  const isNight = phaseInfo.night;
-  const canChatVillage = iAlive && !isNight;
+  // Live 1s countdown ticker for compact Wolvesville header
+  const secLeft = useSecondsLeft(view.phaseEndsAt, game.clockOffset ?? 0, view.phaseSeconds);
+  const timerRatio = view.phaseSeconds > 0 ? Math.min(1, secLeft / view.phaseSeconds) : 0;
+
+  // Gắn mốc thời gian nhận từng dòng log công khai để gộp chuẩn xác theo thứ tự với Chat Làng
+  const lastLogId = view.publicLog.at(-1)?.id ?? 0;
+  useOnChange(lastLogId, () => {
+    const baseAt = game.chat.at(-1)?.at ?? 1;
+    setLogOrderStamps((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      view.publicLog.forEach((entry, idx) => {
+        if (next[entry.id] === undefined) {
+          next[entry.id] = baseAt + idx + 1;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  });
+
+  // Reset transient selections & auto-channel switch for Wolves between Night and Day
+  useOnChange(view.phase, (ph) => {
+    setErr(null);
+    setSelected(null);
+    setPickedTwo([]);
+    setWitchSave(false);
+    setWitchPoison(null);
+    play('pop');
+
+    const nightNow = NIGHT_PHASES.has(ph);
+    if (myRole === 'soi' && iAlive) {
+      if (ph === 'night_active') {
+        setCommsTab('wolf');
+      } else if (!nightNow) {
+        setCommsTab((prev) => (prev === 'wolf' ? 'village' : prev));
+      }
+    } else if (!nightNow && commsTab === 'wolf') {
+      setCommsTab('village');
+    }
+  });
+
+  // Merge publicLog banners chronologically with village chat (100% pure render)
+  const unifiedVillageFeed = useMemo<UnifiedFeedItem[]>(() => {
+    const items: UnifiedFeedItem[] = [];
+    for (let i = 0; i < view.publicLog.length; i++) {
+      const log = view.publicLog[i];
+      items.push({
+        key: `log-${log.id}`,
+        kind: 'log',
+        at: logOrderStamps[log.id] ?? i,
+        log,
+      });
+    }
+    for (const m of game.chat) {
+      items.push({
+        key: `chat-${m.id}`,
+        kind: 'chat',
+        at: m.at,
+        id: m.id,
+        from: m.from,
+        name: m.name,
+        text: m.text ?? '',
+        isSticker: m.kind === 'sticker',
+        stickerId: m.stickerId,
+      });
+    }
+    items.sort((a, b) => (a.at !== b.at ? a.at - b.at : a.key.localeCompare(b.key)));
+    return items;
+  }, [view.publicLog, game.chat, logOrderStamps]);
+
+  // Auto-scroll active chat stream on new messages/events
+  useEffect(() => {
+    if (commsTab === 'village') {
+      const t = setTimeout(() => feedScrollRef.current?.scrollToEnd({ animated: true }), 60);
+      return () => clearTimeout(t);
+    }
+  }, [unifiedVillageFeed.length, commsTab]);
+
+  useEffect(() => {
+    if (commsTab === 'wolf') {
+      const t = setTimeout(() => wolfScrollRef.current?.scrollToEnd({ animated: true }), 60);
+      return () => clearTimeout(t);
+    }
+  }, [view.wolfChat?.length, commsTab]);
 
   const dayTally = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -145,17 +234,25 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     return counts;
   }, [view.wolfVotes]);
 
-  const needsTwo =
-    (view.phase === 'night_cupid' && myRole === 'cupid' && !view.myNightSubmitted) ||
-    (view.phase === 'night_active' && myRole === 'thamtu' && !view.myNightSubmitted);
-
-  const canSelectOne =
-    (view.phase === 'hunter_shot' && view.hunterId === me) ||
-    (iAlive &&
-      ((view.phase === 'day_vote') ||
-        (view.phase === 'night_active' && myRole === 'soi') ||
-        (view.phase === 'night_active' && (myRole === 'tientri' || myRole === 'baove') && !view.myNightSubmitted) ||
-        (view.phase === 'night_witch' && myRole === 'phuthuy' && !view.myNightSubmitted && !!view.witchState?.poisonLeft)));
+  const act = async (payload: Parameters<Game['act']>[0], resetSelection = false) => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    const res = await game.act(payload);
+    setBusy(false);
+    if (!res.ok) {
+      play('error');
+      setErr(actionText[res.reason] ?? 'Không thực hiện được');
+    } else {
+      play('stamp');
+      if (resetSelection) {
+        setSelected(null);
+        setPickedTwo([]);
+        setWitchSave(false);
+        setWitchPoison(null);
+      }
+    }
+  };
 
   const toggleSuspect = (id: string) => {
     if (id === me) return;
@@ -165,8 +262,41 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     });
   };
 
-  const onSeatPress = (id: string) => {
+  const needsTwo =
+    iAlive &&
+    ((view.phase === 'night_cupid' && myRole === 'cupid' && !view.myNightSubmitted) ||
+      (view.phase === 'night_active' && myRole === 'thamtu' && !view.myNightSubmitted));
+
+  // Direct Wolvesville Tap-on-Plot Interaction!
+  const onPlotPress = (id: string) => {
+    if (id !== me) setLastFocusSeatId(id);
     if (!aliveSet.has(id)) return;
+
+    // 1. Hunter Revenge: immediate 1-tap shot on plot
+    if (view.phase === 'hunter_shot' && view.hunterId === me) {
+      if (id === me) return;
+      void act({ type: 'ms_hunter', target: id }, true);
+      return;
+    }
+
+    if (!iAlive) return;
+
+    // 2. Day Voting: immediate Wolvesville 1-tap vote on plot (tap same again -> skip)
+    if (view.phase === 'day_vote') {
+      if (id === me) return;
+      const myCurrentVote = view.dayVotes[me];
+      const nextTarget = myCurrentVote === id ? 'skip' : id;
+      void act({ type: 'ms_vote', target: nextTarget }, true);
+      return;
+    }
+
+    // 3. Night — Wolf Pack: immediate 1-tap target selection / update
+    if (view.phase === 'night_active' && myRole === 'soi') {
+      void act({ type: 'ms_night', target: id });
+      return;
+    }
+
+    // 4. Night — Cupid / Detective: pick 2 plots
     if (needsTwo) {
       setPickedTwo((prev) => {
         if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -176,40 +306,50 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       setErr(null);
       return;
     }
-    if (!canSelectOne) {
-      // Khi đang ở pha thảo luận/chờ mà bấm vào người khác: xoay vòng ghim nghi vấn luôn cho tiện!
-      if (id !== me) toggleSuspect(id);
-      return;
-    }
-    if (view.phase === 'night_witch' && myRole === 'phuthuy') {
-      setWitchPoison((prev) => (prev === id ? null : id));
+
+    // 5. Night — Seer / Guard: tap once to lock sights, tap confirm pill (or tap same plot 2nd time) to fire!
+    if (
+      view.phase === 'night_active' &&
+      (myRole === 'tientri' || myRole === 'baove') &&
+      !view.myNightSubmitted
+    ) {
+      if (myRole === 'tientri' && id === me) return;
+      if (myRole === 'baove' && id === view.guardLastId) {
+        setErr('Không được bảo vệ cùng 1 người 2 đêm liên tiếp!');
+        return;
+      }
       setErr(null);
+      if (selected === id) {
+        void act({ type: 'ms_night', target: id }, true);
+      } else {
+        setSelected(id);
+      }
       return;
     }
-    if ((view.phase === 'day_vote' || view.phase === 'hunter_shot' || myRole === 'tientri') && id === me) {
+
+    // 6. Night — Witch: tap bitten victim to toggle Save, or tap another alive plot to toggle Poison!
+    if (view.phase === 'night_witch' && myRole === 'phuthuy' && !view.myNightSubmitted) {
+      const ws = view.witchState;
+      setErr(null);
+      if (ws?.victimId === id && ws.healLeft) {
+        setWitchSave((v) => !v);
+        return;
+      }
+      if (ws?.poisonLeft && id !== me) {
+        setWitchPoison((prev) => (prev === id ? null : id));
+        return;
+      }
       return;
     }
-    if (view.phase === 'night_active' && myRole === 'baove' && id === view.guardLastId) {
-      setErr('Bảo Vệ không được bảo vệ cùng 1 người 2 đêm liên tiếp!');
-      return;
+
+    // 7. Discussion / Idle: cycle personal suspect mark on plot
+    if (id !== me) {
+      toggleSuspect(id);
     }
-    setSelected((prev) => (prev === id ? null : id));
-    setErr(null);
   };
 
-  const act = async (payload: Parameters<Game['act']>[0], resetSelection = false) => {
-    setBusy(true);
-    setErr(null);
-    const res = await game.act(payload);
-    setBusy(false);
-    if (!res.ok) setErr(actionText[res.reason] ?? 'Không thực hiện được');
-    else if (resetSelection) {
-      setSelected(null);
-      setPickedTwo([]);
-      setWitchSave(false);
-      setWitchPoison(null);
-    }
-  };
+  const canChatVillage = iAlive && !isNight;
+  const canChatWolf = iAlive && myRole === 'soi' && !!view.wolfChat;
 
   const sendVillageChat = async (textOverride?: string) => {
     const clean = (textOverride ?? villageInput).trim();
@@ -218,500 +358,553 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     await game.sendChat(clean);
   };
 
-  const sendWolfChat = async () => {
-    const clean = wolfInput.trim();
-    if (!clean) return;
-    setWolfInput('');
+  const sendWolfChat = async (textOverride?: string) => {
+    const clean = (textOverride ?? wolfInput).trim();
+    if (!clean || !canChatWolf) return;
+    if (!textOverride) setWolfInput('');
     await act({ type: 'ms_wolfChat', text: clean });
   };
 
-  const openGuideFor = (r: MaSoiRole | null) => {
-    setFocusGuideRole(r);
-    setGuideOpen(true);
-  };
+  // Context-aware Quick Wolvesville Deduction Chips (auto-inserting #X!)
+  const quickDeductionChips = useMemo(() => {
+    const focusNum = lastFocusSeatId ? seatNumber.get(lastFocusSeatId) : undefined;
+    if (commsTab === 'wolf' && canChatWolf) {
+      const chips: string[] = [];
+      if (focusNum) chips.push(`🐾 Đêm nay cắn #${focusNum} đi!`);
+      chips.push('🐺 Ai giả Tiên Tri sáng mai nhảy ra?');
+      chips.push('🤫 Chia phiếu ban ngày tránh lộ bầy!');
+      chips.push('👀 Tìm Tiên Tri / Bảo Vệ thịt trước!');
+      return chips;
+    }
 
-  // Giữ strip của Shell gọn gàng nhưng tắt hiển thị trùng lặp vì bàn Làng đã có lưới Avatar siêu chi tiết!
-  const strip: StripOptions = useMemo(() => ({ order: view.order }), [view.order]);
+    const chips: string[] = [];
+    const lastSeer = view.seerHistory?.[view.seerHistory.length - 1];
+    if (myRole === 'tientri' && lastSeer) {
+      const sNum = seatNumber.get(lastSeer.targetId);
+      if (sNum) {
+        chips.push(
+          lastSeer.isWolf
+            ? `🔮 Tui Tiên Tri! Đêm qua soi #${sNum} là SÓI!`
+            : `🔮 Tui Tiên Tri! Đã soi #${sNum} phe Dân tốt!`,
+        );
+      }
+    }
+    if (focusNum) {
+      chips.push(`🤔 Nghi #${focusNum} lắm nha!`);
+      chips.push(`⚖️ Vote #${focusNum} đi mọi người!`);
+    }
+    chips.push('Ai có thông tin gì không?');
+    chips.push('Tui dân thường nha');
+    chips.push('Tiên tri lộ diện đi!');
+    chips.push('Vote bỏ qua lượt này?');
+    return chips;
+  }, [commsTab, canChatWolf, lastFocusSeatId, seatNumber, myRole, view.seerHistory]);
 
-  const renderBottom = () => {
+  // Concise Phase Header Label & Instruction
+  const headerInstruction = useMemo(() => {
+    if (err) return `⚠️ ${err}`;
     if (view.phase === 'hunter_shot') {
-      if (view.hunterId === me) {
-        return (
-          <View style={styles.dock}>
-            <T style={[styles.dockNote, { color: '#FDBA74' }]}>
-              Chọn 1 cư dân trên bàn để bắn kéo theo hoặc cất súng!
-            </T>
-            {err && <T style={styles.err}>{err}</T>}
-            <View style={styles.dockRow}>
-              <Button
-                testID="masoi-hunter-shoot"
-                disabled={!selected || busy}
-                icon={selected ? '💥' : undefined}
-                title={selected ? `Bắn #${seatNumber.get(selected)} ${view.names[selected]}` : 'Chạm mục tiêu trên bàn'}
-                onPress={() => selected && act({ type: 'ms_hunter', target: selected }, true)}
-                style={{ flex: 2 }}
-              />
-              <Button
-                testID="masoi-hunter-skip"
-                variant="paper"
-                disabled={busy}
-                title="Cất súng"
-                onPress={() => act({ type: 'ms_hunter', target: 'skip' }, true)}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        );
-      }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Thợ Săn {view.names[view.hunterId ?? ''] ?? ''} đang ngắm bắn…</T>;
+      return view.hunterId === me
+        ? '🏹 Chạm ô người chơi để bắn kéo theo!'
+        : `🏹 Thợ Săn #${seatNumber.get(view.hunterId ?? '') ?? '?'} đang ngắm bắn…`;
     }
-
-    if (!iAlive) {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Bạn đã hy sinh — vẫn xem trọn lịch sử chat & diễn biến của làng!</T>;
-    }
-
-    if (view.phase === 'day_discuss') {
-      const myReady = view.readySkip.includes(me);
-      const aliveCount = view.alive.length;
-      const needReady = Math.max(1, Math.ceil(aliveCount / 2));
-      return (
-        <View style={styles.dock}>
-          {err && <T style={styles.err}>{err}</T>}
-          <Button
-            testID="masoi-ready-btn"
-            variant={myReady ? 'jade' : 'ink'}
-            disabled={busy || myReady}
-            iconNode={<UiIcon name={myReady ? 'CheckCircle2' : 'Zap'} size={17} color={myReady ? '#FFFFFF' : C.gold} />}
-            title={
-              myReady
-                ? `Đã sẵn sàng bỏ phiếu (${view.readySkip.length}/${needReady})`
-                : `Chuyển sang Bỏ Phiếu (${view.readySkip.length}/${needReady})`
-            }
-            onPress={() => act({ type: 'ms_ready' })}
-          />
-        </View>
-      );
-    }
-
     if (view.phase === 'day_vote') {
-      const myVote = view.dayVotes[me];
-      const votedLabel = myVote === 'skip'
-        ? 'Đang bỏ phiếu trắng'
-        : myVote
-          ? `Đang bầu treo cổ: #${seatNumber.get(myVote)} ${view.names[myVote]}`
-          : null;
-      return (
-        <View style={styles.dock}>
-          {votedLabel && <T style={[styles.dockNote, { color: '#6EE7B7' }]}>{votedLabel} (đổi được trước khi hết giờ)</T>}
-          {err && <T style={styles.err}>{err}</T>}
-          <View style={styles.dockRow}>
-            <Button
-              testID="masoi-vote-btn"
-              disabled={!selected || busy}
-              icon={selected ? '⚖️' : undefined}
-              title={selected ? `Treo cổ #${seatNumber.get(selected)} ${view.names[selected]}` : 'Chạm avatar ở trên để vote'}
-              onPress={() => selected && act({ type: 'ms_vote', target: selected }, true)}
-              style={{ flex: 2 }}
-            />
-            <Button
-              testID="masoi-skip-vote"
-              variant="paper"
-              disabled={busy}
-              icon="🏳️"
-              title="Phiếu trắng"
-              onPress={() => act({ type: 'ms_vote', target: 'skip' }, true)}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </View>
-      );
+      const myV = view.dayVotes[me];
+      if (!iAlive) return '⚖️ Làng đang bỏ phiếu treo cổ';
+      if (myV === 'skip') return '🏳️ Đã bỏ phiếu trắng (chạm ô để đổi)';
+      if (myV) return `🗳️ Đã bầu #${seatNumber.get(myV)} (chạm ô khác để đổi)`;
+      return 'Chạm vào ô người chơi để bỏ phiếu';
     }
-
-    if (view.phase === 'night_cupid' && myRole === 'cupid' && !view.myNightSubmitted) {
-      return (
-        <View style={styles.dock}>
-          <T style={styles.dockNote}>
-            Đã chọn: {pickedTwo.map((id) => `#${seatNumber.get(id)} ${view.names[id]}`).join(' & ') || 'Chạm chọn 2 người trên bàn'}
-          </T>
-          {err && <T style={styles.err}>{err}</T>}
-          <Button
-            testID="masoi-night-submit"
-            disabled={pickedTwo.length !== 2 || busy}
-            icon="💘"
-            title="Ghép Đôi Định Mệnh"
-            onPress={() => act({ type: 'ms_night', target: pickedTwo[0], target2: pickedTwo[1] }, true)}
-          />
-        </View>
-      );
+    if (view.phase === 'day_discuss') {
+      return '☀️ Thảo luận bên dưới · Ghim nghi vấn trên ô';
     }
-
-    if (view.phase === 'night_active') {
-      if (myRole === 'soi') {
-        const currentTarget = view.wolfVotes?.[me];
-        return (
-          <View style={styles.dock}>
-            <T style={[styles.dockNote, { color: '#FCA5A5' }]}>
-              {currentTarget
-                ? `Đang chốt cắn: #${seatNumber.get(currentTarget)} ${view.names[currentTarget]} (chạm người khác để đổi)`
-                : 'Chọn 1 nạn nhân trên bàn để cả bầy Sói tấn công'}
-            </T>
-            {err && <T style={styles.err}>{err}</T>}
-            <Button
-              testID="masoi-night-submit"
-              disabled={!selected || busy}
-              icon={selected ? '🩸' : undefined}
-              title={selected ? `Cắn #${seatNumber.get(selected)} ${view.names[selected]}` : 'Chạm mục tiêu trên bàn'}
-              onPress={() => selected && act({ type: 'ms_night', target: selected }, true)}
-            />
-          </View>
-        );
-      }
-
-      if ((myRole === 'tientri' || myRole === 'baove') && !view.myNightSubmitted) {
-        const label = myRole === 'tientri' ? 'Soi thân phận' : 'Giương khiên bảo vệ';
-        return (
-          <View style={styles.dock}>
-            {myRole === 'baove' && view.guardLastId && (
-              <T style={styles.dockNote}>Không được bảo vệ lại #{seatNumber.get(view.guardLastId)} {view.names[view.guardLastId]}</T>
-            )}
-            {err && <T style={styles.err}>{err}</T>}
-            <Button
-              testID="masoi-night-submit"
-              disabled={!selected || busy}
-              icon={myRole === 'tientri' ? '🔮' : '🛡️'}
-              title={selected ? `${label}: #${seatNumber.get(selected)} ${view.names[selected]}` : 'Chạm 1 cư dân trên bàn'}
-              onPress={() => selected && act({ type: 'ms_night', target: selected }, true)}
-            />
-          </View>
-        );
-      }
-
-      if (myRole === 'thamtu' && !view.myNightSubmitted) {
-        return (
-          <View style={styles.dock}>
-            <T style={styles.dockNote}>
-              Đối chiếu 2 người: {pickedTwo.map((id) => `#${seatNumber.get(id)} ${view.names[id]}`).join(' & ') || 'Chạm chọn 2 avatar'}
-            </T>
-            {err && <T style={styles.err}>{err}</T>}
-            <Button
-              testID="masoi-night-submit"
-              disabled={pickedTwo.length !== 2 || busy}
-              icon="🕵️"
-              title="Điều Tra Cùng Phe / Khác Phe"
-              onPress={() => act({ type: 'ms_night', target: pickedTwo[0], target2: pickedTwo[1] }, true)}
-            />
-          </View>
-        );
-      }
-
-      if (view.myNightSubmitted) {
-        return <T style={[styles.waitNote, { color: theme.onBg }]}>Đã thực hiện xong kỹ năng đêm nay — chờ bình minh hé rạng…</T>;
-      }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đêm khuya thanh vắng… Bạn có thể xem lại Lịch sử chat & Ghim nghi vấn!</T>;
+    if (view.phase === 'role_reveal') {
+      return roleMeta
+        ? `🃏 Bạn là ${roleMeta.emoji} ${roleMeta.name} (${roleMeta.teamLabel})`
+        : '🃏 Nhận vai trò bí mật trước khi đêm xuống';
     }
-
-    if (view.phase === 'night_witch' && myRole === 'phuthuy' && !view.myNightSubmitted) {
-      const ws = view.witchState;
-      const victimName = ws?.victimId ? `#${seatNumber.get(ws.victimId)} ${view.names[ws.victimId]}` : null;
-      return (
-        <View style={styles.dock}>
-          <T style={[styles.dockNote, { color: theme.onBg }]}>
-            {victimName ? `Đêm nay Sói vừa cắn ${victimName}!` : 'Đêm nay không ai bị Sói cắn.'}
-          </T>
-          {err && <T style={styles.err}>{err}</T>}
-          <View style={styles.dockRow}>
-            {ws?.healLeft && ws?.victimId && (
-              <Button
-                testID="masoi-witch-save"
-                variant={witchSave ? 'jade' : 'paper'}
-                icon="💚"
-                title={witchSave ? 'Đã bật Bình Cứu!' : 'Dùng Bình Cứu'}
-                onPress={() => setWitchSave((v) => !v)}
-                style={{ flex: 1 }}
-              />
-            )}
-            <Button
-              testID="masoi-night-submit"
-              disabled={busy}
-              icon={witchPoison ? '☠️' : witchSave ? '💚' : '⏭️'}
-              title={witchPoison ? `Độc ${view.names[witchPoison]} & Xong` : witchSave ? 'Cứu & Kết thúc đêm' : 'Không dùng bình'}
-              onPress={() => act({ type: 'ms_night', save: witchSave, poison: witchPoison }, true)}
-              style={{ flex: 1.5 }}
-            />
-          </View>
-        </View>
-      );
+    if (view.phase === 'night_cupid') {
+      return myRole === 'cupid' && iAlive && !view.myNightSubmitted
+        ? '💘 Chạm chọn 2 ô cư dân để ghép đôi'
+        : '💘 Thần Tình Yêu đang se duyên…';
     }
-
-    return <T style={[styles.waitNote, { color: theme.onBg }]}>{phaseInfo.hint}</T>;
-  };
+    if (view.phase === 'night_witch') {
+      if (myRole === 'phuthuy' && iAlive && !view.myNightSubmitted) {
+        const vNum = view.witchState?.victimId ? seatNumber.get(view.witchState.victimId) : null;
+        return vNum ? `🧪 #${vNum} bị Sói cắn — Cứu hoặc quăng Độc!` : '🧪 Đêm bình yên — dùng Độc hoặc bỏ qua';
+      }
+      return '🧪 Phù Thủy đang pha chế bình thuốc…';
+    }
+    // night_active
+    if (!iAlive) return '👻 Bạn đã hy sinh — theo dõi ván đấu';
+    if (myRole === 'soi') {
+      const cur = view.wolfVotes?.[me];
+      return cur
+        ? `🐾 Đang chọn cắn #${seatNumber.get(cur)} (chạm ô khác để đổi)`
+        : '🐾 Chạm mục tiêu để Sói cắn';
+    }
+    if (view.myNightSubmitted) return '✓ Đã xong kỹ năng đêm — chờ trời sáng…';
+    if (myRole === 'tientri') return '🔮 Chạm 1 ô để Tiên Tri soi thân phận';
+    if (myRole === 'baove') return '🛡️ Chạm 1 ô để giương khiên bảo vệ';
+    if (myRole === 'thamtu') return '🕵️ Chạm 2 ô để điều tra cùng/khác phe';
+    return '🌙 Màn đêm buông xuống… hãy giữ im lặng';
+  }, [
+    err,
+    view.phase,
+    view.hunterId,
+    view.dayVotes,
+    view.myNightSubmitted,
+    view.witchState,
+    view.wolfVotes,
+    seatNumber,
+    me,
+    iAlive,
+    roleMeta,
+    myRole,
+  ]);
 
   const deckEntries = useMemo(
     () => Object.entries(view.roleCounts) as [MaSoiRole, number][],
     [view.roleCounts],
   );
 
-  return (
-    <Shell game={game} room={room} strip={strip} hideStrip wide={wide} bottom={renderBottom()}>
-      {/* 1. Banner Pha Đêm Huyết Nguyệt / Bình Minh Vàng + Thanh Bộ Bài & Cẩm Nang Vai Trò */}
-      <View style={[styles.phaseBanner, sticker(3), isNight ? styles.nightBanner : styles.dayBanner]}>
-        <View style={styles.phaseHead}>
-          <View style={[styles.phaseIconWrap, { backgroundColor: isNight ? 'rgba(239,68,68,0.24)' : '#FDE68A' }]}>
-            <EmojiIcon emoji={phaseInfo.emoji} size={22} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <T style={[styles.phaseTitle, isNight && { color: '#F8FAFC' }]}>
-              {phaseInfo.title} · Ngày {view.day}
-            </T>
-            <T style={[styles.phaseSubMeta, isNight && { color: '#94A3B8' }]}>
-              Sống {view.alive.length}/{view.order.length} · Nhịp {SPEED_LABELS[view.speed ?? 'normal']}
-            </T>
-          </View>
+  const rowCount = Math.max(1, Math.ceil(view.order.length / 4));
+  const avatarSize = compactMobile ? (rowCount >= 3 ? 31 : 35) : rowCount >= 3 ? 37 : 42;
+
+  const readyCount = view.readySkip.length;
+  const needReady = Math.max(1, Math.ceil(view.alive.length / 2));
+  const myReady = view.readySkip.includes(me);
+
+  // Render floating 1-line Night / Confirm Action Strip right under the 4-col grid when an action needs confirmation
+  const renderGridActionStrip = () => {
+    if (!iAlive) return null;
+
+    if (
+      view.phase === 'night_active' &&
+      (myRole === 'tientri' || myRole === 'baove') &&
+      !view.myNightSubmitted
+    ) {
+      const sNum = selected ? seatNumber.get(selected) : null;
+      return (
+        <View style={styles.actionStripNight}>
+          <T numberOfLines={1} style={styles.actionStripTxt}>
+            {selected
+              ? `${myRole === 'tientri' ? '🔮 Soi' : '🛡️ Bảo vệ'} #${sNum} ${view.names[selected]}?`
+              : myRole === 'baove' && view.guardLastId
+                ? `🛡️ Chạm 1 ô (trừ #${seatNumber.get(view.guardLastId)} đêm trước)`
+                : `Chạm 1 ô người chơi ở trên để ${myRole === 'tientri' ? 'soi' : 'bảo vệ'}`}
+          </T>
           <Pressable
-            testID="masoi-guide-open"
-            onPress={() => openGuideFor(myRole)}
-            style={[styles.guideBtn, isNight && styles.guideBtnNight]}
+            testID="masoi-night-submit"
+            disabled={!selected || busy}
+            onPress={() => selected && void act({ type: 'ms_night', target: selected }, true)}
+            style={[styles.confirmPill, (!selected || busy) && styles.confirmPillDisabled]}
           >
-            <UiIcon name="BookOpen" size={14} color={isNight ? '#FDE047' : '#92400E'} />
-            <T style={[styles.guideBtnTxt, isNight && { color: '#FDE047' }]}>Sổ Tay Vai</T>
+            <T style={styles.confirmPillTxt}>Xác nhận</T>
           </Pressable>
         </View>
+      );
+    }
 
-        <T style={[styles.phaseHint, isNight && { color: '#CBD5E1' }]}>{phaseInfo.hint}</T>
-        <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="masoi-timer" lightText={isNight} />
+    if (needsTwo) {
+      const label = pickedTwo.map((id) => `#${seatNumber.get(id)}`).join(' & ');
+      return (
+        <View style={styles.actionStripNight}>
+          <T numberOfLines={1} style={styles.actionStripTxt}>
+            {myRole === 'cupid' ? '💘 Ghép đôi: ' : '🕵️ Điều tra: '}
+            {label || 'Chạm chọn đủ 2 ô trên lưới'}
+          </T>
+          <Pressable
+            testID="masoi-night-submit"
+            disabled={pickedTwo.length !== 2 || busy}
+            onPress={() =>
+              pickedTwo.length === 2 &&
+              void act({ type: 'ms_night', target: pickedTwo[0], target2: pickedTwo[1] }, true)
+            }
+            style={[styles.confirmPill, (pickedTwo.length !== 2 || busy) && styles.confirmPillDisabled]}
+          >
+            <T style={styles.confirmPillTxt}>Xác nhận ({pickedTwo.length}/2)</T>
+          </Pressable>
+        </View>
+      );
+    }
 
-        {/* Thanh Theo Dõi Bộ Vai Trò Trong Ván (bấm vào role bất kỳ để đọc chi tiết cách hoạt động!) */}
-        <View style={styles.deckRow}>
-          {deckEntries.map(([r, totalCnt]) => {
-            const m = MASOI_ROLES[r];
-            const deadCnt = revealedDeadRoleCounts[r] ?? 0;
-            const remain = Math.max(0, totalCnt - deadCnt);
-            return (
+    if (view.phase === 'night_witch' && myRole === 'phuthuy' && !view.myNightSubmitted) {
+      const ws = view.witchState;
+      const vNum = ws?.victimId ? seatNumber.get(ws.victimId) : null;
+      const pNum = witchPoison ? seatNumber.get(witchPoison) : null;
+      return (
+        <View style={styles.actionStripNight}>
+          {ws?.healLeft && ws.victimId ? (
+            <Pressable
+              testID="masoi-witch-save"
+              onPress={() => setWitchSave((v) => !v)}
+              style={[styles.witchPill, witchSave && styles.witchPillSaveActive]}
+            >
+              <T style={styles.witchPillTxt}>
+                {witchSave ? `💚 Đã cứu #${vNum}` : `💚 Cứu #${vNum}`}
+              </T>
+            </Pressable>
+          ) : (
+            <T numberOfLines={1} style={styles.actionStripTxt}>
+              {ws?.poisonLeft ? '🧪 Chạm ô để quăng Độc' : '🧪 Hết bình phép'}
+            </T>
+          )}
+
+          {pNum && (
+            <Pressable onPress={() => setWitchPoison(null)} style={styles.witchPillPoisonActive}>
+              <T style={styles.witchPillTxt}>☠️ Độc #{pNum} ✕</T>
+            </Pressable>
+          )}
+
+          <Pressable
+            testID="masoi-night-submit"
+            disabled={busy}
+            onPress={() => void act({ type: 'ms_night', save: witchSave, poison: witchPoison }, true)}
+            style={styles.confirmPill}
+          >
+            <T style={styles.confirmPillTxt}>
+              {witchSave || witchPoison ? '✓ Dùng bình' : '⏭️ Bỏ qua'}
+            </T>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (view.phase === 'role_reveal' && roleMeta) {
+      return (
+        <View style={[styles.actionStripNight, { borderColor: roleMeta.color }]}>
+          <T numberOfLines={1} style={styles.actionStripTxt}>
+            {roleHidden
+              ? '🃏 Đã ẩn vai trò trên màn hình'
+              : `${roleMeta.emoji} ${roleMeta.name}: ${roleMeta.shortDesc}`}
+          </T>
+          <Pressable onPress={() => setRoleHidden((v) => !v)} style={styles.subtleMiniBtn}>
+            <T style={styles.subtleMiniBtnTxt}>{roleHidden ? 'Hiện' : 'Ẩn'}</T>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <Shell game={game} room={room} scroll={false} hideStrip wide={wide}>
+      <View style={styles.wolvesvilleRoot}>
+        {/* ZONE 1: COMPACT WOLVESVILLE DAY / NIGHT TOP HEADER (~44px) */}
+        <View style={[styles.topHeader, isNight ? styles.topHeaderNight : styles.topHeaderDay]}>
+          <View style={styles.topHeaderRow}>
+            {/* Phase Pill */}
+            <View style={[styles.phasePill, isNight ? styles.phasePillNight : styles.phasePillDay]}>
+              <EmojiIcon emoji={isNight ? '🌙' : view.phase === 'hunter_shot' ? '🏹' : '☀️'} size={14} />
+              <T style={[styles.phasePillTxt, isNight ? styles.txtLight : styles.txtAmberInk]}>
+                {isNight ? `Đêm ${view.day}` : `Ngày ${view.day}`}
+              </T>
+            </View>
+
+            {/* Concise Live Instruction */}
+            <T
+              numberOfLines={1}
+              style={[
+                styles.headerHintTxt,
+                isNight ? styles.headerHintNight : styles.headerHintDay,
+                err ? { color: '#F87171' } : null,
+              ]}
+            >
+              {headerInstruction}
+            </T>
+
+            {/* Live Countdown Seconds */}
+            <View
+              testID="masoi-timer"
+              style={[
+                styles.timerBadge,
+                secLeft <= 8 && styles.timerBadgeUrgent,
+              ]}
+            >
+              <T style={styles.timerBadgeTxt}>{secLeft}s</T>
+            </View>
+
+            {/* Alive Counter */}
+            <View style={[styles.aliveBadge, !isNight && styles.aliveBadgeDay]}>
+              <T style={[styles.aliveBadgeTxt, !isNight && styles.txtAmberInk]}>
+                👤{view.alive.length}/{view.order.length}
+              </T>
+            </View>
+
+            {/* Contextual 1-Tap Action Pill (Ready / Skip Vote / Skip Shot / Role Peek) */}
+            {view.phase === 'day_discuss' && iAlive ? (
               <Pressable
-                key={r}
-                testID={`masoi-deck-${r}`}
-                onPress={() => openGuideFor(r)}
-                style={[
-                  styles.deckChip,
-                  isNight && styles.deckChipNight,
-                  remain === 0 && { opacity: 0.45 },
-                ]}
+                testID="masoi-ready-btn"
+                disabled={busy || myReady}
+                onPress={() => void act({ type: 'ms_ready' })}
+                style={[styles.headerActBtn, myReady && styles.headerActBtnDone]}
               >
-                <View style={[styles.deckRoleDot, { backgroundColor: m.color }]}>
-                  <GameIcon name={ROLE_GAME_ICON[r]} size={11} color="#FFFFFF" />
-                </View>
-                <T style={[styles.deckChipTxt, isNight && { color: '#F1F5F9' }]}>
-                  {m.name} {deadCnt > 0 ? `${remain}/${totalCnt}` : `×${totalCnt}`}
+                <T style={styles.headerActBtnTxt}>
+                  {myReady ? `✓ ${readyCount}/${needReady}` : `Sẵn sàng ${readyCount}/${needReady}`}
                 </T>
               </Pressable>
-            );
-          })}
-        </View>
-      </View>
+            ) : view.phase === 'day_vote' && iAlive ? (
+              <Pressable
+                testID="masoi-skip-vote"
+                disabled={busy}
+                onPress={() => void act({ type: 'ms_vote', target: 'skip' }, true)}
+                style={[
+                  styles.headerActBtn,
+                  styles.headerActBtnSkip,
+                  view.dayVotes[me] === 'skip' && styles.headerActBtnDone,
+                ]}
+              >
+                <T style={styles.headerActBtnTxt}>🏳️ Trắng</T>
+              </Pressable>
+            ) : view.phase === 'hunter_shot' && view.hunterId === me ? (
+              <Pressable
+                testID="masoi-hunter-skip"
+                disabled={busy}
+                onPress={() => void act({ type: 'ms_hunter', target: 'skip' }, true)}
+                style={[styles.headerActBtn, styles.headerActBtnSkip]}
+              >
+                <T style={styles.headerActBtnTxt}>Cất súng</T>
+              </Pressable>
+            ) : roleMeta ? (
+              <Pressable
+                testID="masoi-guide-open"
+                onPress={() => setCommsTab((t) => (t === 'role' ? 'village' : 'role'))}
+                style={[styles.roleMiniChip, { backgroundColor: roleMeta.color }]}
+              >
+                <T style={styles.roleMiniChipTxt}>
+                  {roleHidden ? '🃏' : roleMeta.emoji}
+                </T>
+              </Pressable>
+            ) : null}
+          </View>
 
-      {/* Bố cục 2 cột trên màn rộng hoặc xếp dọc gọn gàng trên điện thoại */}
-      <View style={wide ? styles.splitWrap : styles.stackWrap}>
-        {/* CỘT TRÁI: Thẻ Vai Trò + Bàn Ghế Làng Có Ghim Theo Dõi */}
-        <View style={wide ? styles.leftCol : styles.fullCol}>
-          <FlipCard flipped={!roleVisible}>
-            <Pressable
-              testID="masoi-role-card"
-              onPress={() => setRoleVisible((v) => !v)}
-              style={[styles.roleCard, sticker(3), isNight && styles.roleCardNight]}
-            >
-              {roleVisible && roleMeta && myRole ? (
-                <View style={{ gap: 7 }}>
-                  <View style={styles.roleTop}>
-                    <View style={[styles.rolePill, { backgroundColor: roleMeta.color }]}>
-                      <GameIcon name={ROLE_GAME_ICON[myRole]} size={18} color="#FFFFFF" />
-                      <T style={styles.rolePillTxt}>
-                        {roleMeta.name} · {roleMeta.teamLabel}
-                      </T>
-                    </View>
-                    <View style={styles.hideHintRow}>
-                      <UiIcon name="EyeOff" size={13} color={isNight ? '#94A3B8' : C.muted} />
-                      <T style={[styles.tapHide, isNight && { color: '#94A3B8' }]}>Úp thẻ</T>
-                    </View>
-                  </View>
-                  <T style={[styles.roleDesc, isNight && { color: '#F8FAFC' }]}>{roleMeta.shortDesc}</T>
-                  <View style={[styles.roleHowBox, isNight && styles.roleHowBoxNight]}>
-                    <T style={[styles.roleHowTxt, isNight && { color: '#CBD5E1' }]}>
-                      💡 {roleMeta.howToPlay}
-                    </T>
-                  </View>
-                  {view.myPartnerId && (
-                    <View style={styles.secretRow}>
-                      <UiIcon name="Heart" size={14} color="#F472B6" />
-                      <T style={styles.loverInfo}>
-                        Cặp đôi định mệnh với #{seatNumber.get(view.myPartnerId)} {view.names[view.myPartnerId]}
-                      </T>
-                    </View>
-                  )}
-                  {view.wolfPackIds && view.wolfPackIds.length > 0 && (
-                    <View style={styles.secretRow}>
-                      <GameIcon name="wolf-head" size={15} color="#F87171" />
-                      <T style={styles.wolfInfo}>
-                        Bầy Sói: {view.wolfPackIds.map((id) => `#${seatNumber.get(id)} ${view.names[id]}`).join(', ')}
-                      </T>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.hiddenRole}>
-                  <EmojiIcon emoji="🃏" size={26} />
-                  <T style={[styles.hiddenTitle, isNight && { color: '#F8FAFC' }]}>Thẻ Vai Trò Đang Úp Kín</T>
-                  <T style={[styles.tapHide, isNight && { color: '#94A3B8' }]}>Chạm để lật xem vai trò & hướng dẫn</T>
-                </View>
-              )}
-            </Pressable>
-          </FlipCard>
-
-          {/* Lưới 4–12 Cư Dân Làng Với Đầy Đủ Huy Hiệu Track Avatar */}
-          <View style={styles.grid}>
-            {view.order.map((id) => {
-              const num = seatNumber.get(id) ?? 0;
-              const player = playerMap.get(id);
-              const alive = aliveSet.has(id);
-              const deadEntry = deadMap.get(id);
-              const isPicked = selected === id || pickedTwo.includes(id) || witchPoison === id;
-              const isWolfAlly = view.wolfPackIds?.includes(id);
-              const isPartner = view.myPartnerId === id;
-              const votes = dayTally[id] ?? 0;
-              const wolfMark = wolfTally[id] ?? 0;
-              const votedWho = view.dayVotes[id];
-              const guardLocked = view.phase === 'night_active' && myRole === 'baove' && id === view.guardLastId;
-              const guardActive = view.guardCurrentTargetId === id;
-              const seerResult = seerBadgeMap.has(id) ? seerBadgeMap.get(id) : undefined;
-              const suspect = suspectMarks[id] ?? 'none';
-              const markInfo = MARK_META[suspect];
-
-              return (
-                <Pressable
-                  key={id}
-                  testID={`masoi-seat-${id}`}
-                  onPress={() => onSeatPress(id)}
-                  style={[
-                    styles.seat,
-                    { flexBasis: wide ? '23.5%' : '31.5%' },
-                    isNight && styles.seatNight,
-                    !alive && styles.seatDead,
-                    suspect === 'wolf' && alive && styles.seatSuspectWolf,
-                    suspect === 'trust' && alive && styles.seatSuspectTrust,
-                    isPicked && styles.seatPicked,
-                    guardLocked && { opacity: 0.55 },
-                  ]}
-                >
-                  {/* Số ghế #1..#12 góc trên trái */}
-                  <View style={[styles.seatNumPill, id === me && { backgroundColor: '#FACC15' }]}>
-                    <T style={[styles.seatNumTxt, id === me && { color: '#0F172A' }]}>#{num}</T>
-                  </View>
-
-                  {/* Nút Ghim Nghi Vấn cá nhân góc trên phải */}
-                  {id !== me && alive && (
-                    <Pressable
-                      testID={`masoi-note-${id}`}
-                      onPress={(e) => {
-                        e.stopPropagation?.();
-                        toggleSuspect(id);
-                      }}
-                      hitSlop={6}
-                      style={[styles.notePin, { backgroundColor: markInfo.bg, borderColor: markInfo.border }]}
-                    >
-                      <T style={[styles.notePinTxt, { color: markInfo.fg }]}>{markInfo.label}</T>
-                    </Pressable>
-                  )}
-
-                  {/* Huy hiệu bí mật (Cặp đôi / Đồng bọn Sói / Kết quả Tiên Tri / Khiên Bảo Vệ) */}
-                  <View style={styles.avatarWrap}>
-                    {player ? (
-                      <Portrait p={player} size={48} frame={player.cosmetics?.frame} pet={player.cosmetics?.pet} />
-                    ) : (
-                      <UiIcon name={alive ? 'User' : 'Skull'} size={30} color={alive ? C.muted : '#94A3B8'} />
-                    )}
-                    {isPartner && (
-                      <View style={styles.badgeBottomLeft}>
-                        <EmojiIcon emoji="💘" size={14} />
-                      </View>
-                    )}
-                    {isWolfAlly && (
-                      <View style={styles.badgeBottomRight}>
-                        <GameIcon name="wolf-head" size={14} color="#FFFFFF" />
-                      </View>
-                    )}
-                    {guardActive && (
-                      <View style={[styles.badgeBottomRight, { backgroundColor: '#0284C7' }]}>
-                        <UiIcon name="Shield" size={12} color="#FFFFFF" />
-                      </View>
-                    )}
-                  </View>
-
-                  <NameText
-                    fx={player?.cosmetics?.nameFx}
-                    numberOfLines={1}
-                    style={[styles.seatName, isNight && { color: '#F1F5F9' }, !alive && styles.deadName]}
-                  >
-                    {view.names[id] ?? id}
-                  </NameText>
-
-                  {/* Kết quả Tiên Tri ghim thẳng dưới tên */}
-                  {seerResult !== undefined && alive && (
-                    <View style={[styles.intelPill, { backgroundColor: seerResult ? '#991B1B' : '#065F46' }]}>
-                      <T style={styles.intelPillTxt}>{seerResult ? '🔮 LÀ SÓI!' : '🔮 PHE DÂN'}</T>
-                    </View>
-                  )}
-
-                  {/* Trạng thái Sống / Chết / Số phiếu / Đã vote ai */}
-                  {!alive ? (
-                    <View style={styles.deadRow}>
-                      <GameIcon
-                        name={deadEntry?.revealedRole ? ROLE_GAME_ICON[deadEntry.revealedRole] : 'tombstone'}
-                        size={12}
-                        color="#FCA5A5"
-                      />
-                      <T style={styles.deadTag} numberOfLines={1}>
-                        {deadEntry?.revealedRole ? MASOI_ROLES[deadEntry.revealedRole].name : 'Đã mất'}
-                      </T>
-                    </View>
-                  ) : votes > 0 ? (
-                    <View style={styles.votePill}>
-                      <EmojiIcon emoji="⚖️" size={11} />
-                      <T style={styles.votePillTxt}>{votes} phiếu</T>
-                    </View>
-                  ) : wolfMark > 0 ? (
-                    <View style={[styles.votePill, { backgroundColor: '#991B1B' }]}>
-                      <EmojiIcon emoji="🩸" size={11} />
-                      <T style={styles.votePillTxt}>{wolfMark} Sói</T>
-                    </View>
-                  ) : view.phase === 'day_vote' && votedWho ? (
-                    <T style={styles.votedWhoTxt} numberOfLines={1}>
-                      {votedWho === 'skip' ? '🏳️ Phiếu trắng' : `👉 Bầu #${seatNumber.get(votedWho)}`}
-                    </T>
-                  ) : view.phase === 'day_discuss' && view.readySkip.includes(id) ? (
-                    <T style={styles.readyTxt}>✓ Xong thảo luận</T>
-                  ) : guardLocked ? (
-                    <T style={styles.lockTag}>🛡️ Đêm trước</T>
-                  ) : id === me ? (
-                    <T style={[styles.meTag, isNight && { color: '#FDE047' }]}>★ Bạn</T>
-                  ) : null}
-                </Pressable>
-              );
-            })}
+          {/* Sleek 3px Bottom Timer Progress Bar */}
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${Math.round(timerRatio * 100)}%`,
+                  backgroundColor: secLeft <= 8 ? '#EF4444' : isNight ? '#818CF8' : '#F59E0B',
+                },
+              ]}
+            />
           </View>
         </View>
 
-        {/* CỘT PHẢI (hoặc phần dưới trên Mobile): TRUNG TÂM CHAT LÀNG, KÊNH SÓI & LỊCH SỬ TRỌN VẸN */}
-        <View style={wide ? styles.rightCol : styles.fullCol} testID="masoi-comms-card">
-          <Card style={[styles.commsCard, isNight && styles.darkInfoCard]}>
-            {/* Thanh chuyển Tab Chat Làng / Kênh Sói / Nhật Ký Ván */}
-            <View style={styles.tabBar}>
+        {/* MAIN SPLIT: Vertical 3-Zone on Mobile, 2-Column Side-by-Side on Wide Desktop */}
+        <View style={[styles.mainBody, wide && styles.mainBodyWide]}>
+          {/* ZONE 2: WOLVESVILLE NUMBERED 4-COLUMN VILLAGE GRID */}
+          <View style={[styles.villageZone, wide && styles.villageZoneWide]}>
+            <View style={styles.grid4Col}>
+              {view.order.map((id) => {
+                const num = seatNumber.get(id) ?? 0;
+                const player = playerMap.get(id);
+                const alive = aliveSet.has(id);
+                const deadEntry = deadMap.get(id);
+                const isMePlot = id === me;
+
+                const myVotedThis = view.phase === 'day_vote' && view.dayVotes[me] === id;
+                const myWolfBitThis = view.phase === 'night_active' && myRole === 'soi' && view.wolfVotes?.[me] === id;
+                const isPicked =
+                  selected === id ||
+                  pickedTwo.includes(id) ||
+                  witchPoison === id ||
+                  myVotedThis ||
+                  myWolfBitThis;
+
+                const isWolfAlly = id !== me && !!view.wolfPackIds?.includes(id);
+                const isLover = view.myPartnerId === id || (isMePlot && !!view.myPartnerId);
+                const seerResult = seerBadgeMap.has(id) ? seerBadgeMap.get(id) : undefined;
+                const isWitchVictim =
+                  view.phase === 'night_witch' &&
+                  myRole === 'phuthuy' &&
+                  view.witchState?.victimId === id;
+                const isGuarded = view.guardCurrentTargetId === id;
+                const guardLocked =
+                  view.phase === 'night_active' && myRole === 'baove' && id === view.guardLastId;
+
+                const votes = dayTally[id] ?? 0;
+                const wolfClaws = wolfTally[id] ?? 0;
+                const votedWho = view.dayVotes[id];
+                const suspect = suspectMarks[id] ?? 'none';
+
+                return (
+                  <Pressable
+                    key={id}
+                    testID={`masoi-seat-${id}`}
+                    onPress={() => onPlotPress(id)}
+                    onLongPress={() => toggleSuspect(id)}
+                    style={({ pressed }) => [
+                      styles.plotCard,
+                      compactMobile && rowCount >= 3 && styles.plotCardCompact,
+                      isNight ? styles.plotCardNight : styles.plotCardDay,
+                      !alive && (isNight ? styles.plotCardDeadNight : styles.plotCardDeadDay),
+                      suspect === 'wolf' && alive && styles.plotSuspectWolf,
+                      suspect === 'trust' && alive && styles.plotSuspectTrust,
+                      suspect === 'jester' && alive && styles.plotSuspectJester,
+                      isPicked && styles.plotCardSelected,
+                      isWitchVictim && alive && styles.plotCardVictim,
+                      guardLocked && { opacity: 0.52 },
+                      pressed && alive && { transform: [{ scale: 0.96 }] },
+                    ]}
+                  >
+                    {/* Top-Left #Seat Number Badge (#1..#12) */}
+                    <View
+                      style={[
+                        styles.seatBadge,
+                        isMePlot ? styles.seatBadgeMe : isNight ? styles.seatBadgeNight : styles.seatBadgeDay,
+                      ]}
+                    >
+                      <T style={[styles.seatBadgeTxt, isMePlot && styles.seatBadgeTxtMe]}>
+                        #{num}
+                      </T>
+                    </View>
+
+                    {/* Top-Right Role / Intel / Dead / Lover Badges */}
+                    <View style={styles.topRightBadges}>
+                      {isLover && (
+                        <View style={styles.intelDotLover}>
+                          <T style={styles.intelDotEmoji}>💘</T>
+                        </View>
+                      )}
+                      {!alive ? (
+                        <View style={styles.intelDotDead}>
+                          <T style={styles.intelDotEmoji}>
+                            {deadEntry?.revealedRole ? MASOI_ROLES[deadEntry.revealedRole].emoji : '🪦'}
+                          </T>
+                        </View>
+                      ) : isMePlot && roleMeta ? (
+                        <View style={[styles.intelDotRole, { backgroundColor: roleMeta.color }]}>
+                          <T style={styles.intelDotEmoji}>{roleHidden ? '🃏' : roleMeta.emoji}</T>
+                        </View>
+                      ) : isWolfAlly ? (
+                        <View style={styles.intelDotWolf}>
+                          <T style={styles.intelDotEmoji}>🐺</T>
+                        </View>
+                      ) : seerResult !== undefined ? (
+                        <View
+                          style={seerResult ? styles.intelDotWolf : styles.intelDotGood}
+                        >
+                          <T style={styles.intelDotEmoji}>{seerResult ? '🐺' : '🧑'}</T>
+                        </View>
+                      ) : isWitchVictim ? (
+                        <View style={styles.intelDotWolf}>
+                          <T style={styles.intelDotEmoji}>🩸</T>
+                        </View>
+                      ) : isGuarded ? (
+                        <View style={styles.intelDotGuard}>
+                          <T style={styles.intelDotEmoji}>🛡️</T>
+                        </View>
+                      ) : suspect !== 'none' ? (
+                        <Pressable
+                          testID={`masoi-note-${id}`}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            toggleSuspect(id);
+                          }}
+                          style={styles.intelDotSuspect}
+                        >
+                          <T style={styles.intelDotEmoji}>
+                            {suspect === 'wolf' ? '❓' : suspect === 'trust' ? '✓' : '🤡'}
+                          </T>
+                        </Pressable>
+                      ) : null}
+                    </View>
+
+                    {/* Center Avatar with Gravestone Overlay or Target Ring */}
+                    <View
+                      style={[
+                        styles.plotAvatarWrap,
+                        isPicked && styles.plotAvatarTargeted,
+                      ]}
+                    >
+                      {player ? (
+                        <View style={!alive ? styles.deadAvatarDim : undefined}>
+                          <Portrait p={player} size={avatarSize} border={isPicked ? 2.5 : 1.5} />
+                        </View>
+                      ) : (
+                        <UiIcon
+                          name={alive ? 'User' : 'Skull'}
+                          size={Math.round(avatarSize * 0.7)}
+                          color="#94A3B8"
+                        />
+                      )}
+
+                      {!alive && (
+                        <View pointerEvents="none" style={styles.tombstoneOverlay}>
+                          <T style={styles.tombstoneEmoji}>🪦</T>
+                        </View>
+                      )}
+
+                      {/* Live Vote Tally Pill (🗳️ X) or Wolf Pack Claws (🐾 X) */}
+                      {alive && votes > 0 && (
+                        <View style={styles.tallyOverlayVote}>
+                          <T style={styles.tallyOverlayTxt}>🗳️{votes}</T>
+                        </View>
+                      )}
+                      {alive && wolfClaws > 0 && (
+                        <View style={styles.tallyOverlayWolf}>
+                          <T style={styles.tallyOverlayTxt}>🐾{wolfClaws}</T>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Bottom 1-Line Truncated Name / Status */}
+                    <T
+                      numberOfLines={1}
+                      style={[
+                        styles.plotName,
+                        isNight ? styles.plotNameNight : styles.plotNameDay,
+                        !alive && styles.plotNameDead,
+                      ]}
+                    >
+                      {!alive && deadEntry?.revealedRole
+                        ? `${MASOI_ROLES[deadEntry.revealedRole].name}`
+                        : view.phase === 'day_vote' && alive && votedWho
+                          ? votedWho === 'skip'
+                            ? `${view.names[id] ?? id} ·🏳️`
+                            : `${view.names[id] ?? id} →#${seatNumber.get(votedWho)}`
+                          : view.names[id] ?? id}
+                    </T>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Optional 1-Line Confirm Bar for Seer / Guard / Cupid / Detective / Witch */}
+            {renderGridActionStrip()}
+          </View>
+
+          {/* ZONE 3: ALWAYS-VISIBLE WOLVESVILLE CHAT & VILLAGE LOG (flex: 1, Pinned Input) */}
+          <View
+            testID="masoi-comms-card"
+            style={[
+              styles.chatZone,
+              isNight ? styles.chatZoneNight : styles.chatZoneDay,
+            ]}
+          >
+            {/* Channel Tabs Bar */}
+            <View style={[styles.channelBar, !isNight && styles.channelBarDay]}>
               <Pressable
                 testID="masoi-tab-village"
                 onPress={() => setCommsTab('village')}
-                style={[styles.tabBtn, commsTab === 'village' && styles.tabBtnActive]}
+                style={[
+                  styles.channelTab,
+                  commsTab === 'village' &&
+                    (isNight ? styles.channelTabActiveNight : styles.channelTabActiveDay),
+                ]}
               >
-                <EmojiIcon emoji="💬" size={14} />
-                <T style={[styles.tabBtnTxt, commsTab === 'village' && styles.tabBtnTxtActive]}>
-                  Chat Làng ({game.chat.length})
+                <T
+                  style={[
+                    styles.channelTabTxt,
+                    commsTab === 'village' &&
+                      (isNight ? styles.channelTabTxtActiveNight : styles.channelTabTxtActiveDay),
+                  ]}
+                >
+                  💬 Chat Làng
                 </T>
               </Pressable>
 
@@ -719,109 +912,227 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 <Pressable
                   testID="masoi-tab-wolf"
                   onPress={() => setCommsTab('wolf')}
-                  style={[styles.tabBtn, commsTab === 'wolf' && styles.tabBtnWolfActive]}
+                  style={[
+                    styles.channelTab,
+                    commsTab === 'wolf' && styles.channelTabWolfActive,
+                  ]}
                 >
-                  <GameIcon name="wolf-head" size={14} color={commsTab === 'wolf' ? '#FFFFFF' : '#F87171'} />
-                  <T style={[styles.tabBtnTxt, { color: '#F87171' }, commsTab === 'wolf' && { color: '#FFFFFF' }]}>
-                    Kênh Sói ({view.wolfChat.length})
+                  <T
+                    style={[
+                      styles.channelTabTxt,
+                      { color: '#F87171' },
+                      commsTab === 'wolf' && { color: '#FFFFFF' },
+                    ]}
+                  >
+                    🐺 Kênh Sói ({view.wolfChat.length})
                   </T>
                 </Pressable>
               )}
 
               <Pressable
                 testID="masoi-tab-log"
-                onPress={() => setCommsTab('log')}
-                style={[styles.tabBtn, commsTab === 'log' && styles.tabBtnActive]}
+                onPress={() => setCommsTab('role')}
+                style={[
+                  styles.channelTab,
+                  commsTab === 'role' &&
+                    (isNight ? styles.channelTabActiveNight : styles.channelTabActiveDay),
+                ]}
               >
-                <EmojiIcon emoji="📜" size={14} />
-                <T style={[styles.tabBtnTxt, commsTab === 'log' && styles.tabBtnTxtActive]}>
-                  Nhật Ký ({view.publicLog.length})
+                <T
+                  style={[
+                    styles.channelTabTxt,
+                    commsTab === 'role' &&
+                      (isNight ? styles.channelTabTxtActiveNight : styles.channelTabTxtActiveDay),
+                  ]}
+                >
+                  📜 Vai & Luật
                 </T>
               </Pressable>
             </View>
 
-            {/* NỘI DUNG TAB 1: CHAT LÀNG TRỰC TIẾP + CÂU HỎI NHANH + LỊCH SỬ CUỘN */}
+            {/* TAB 1: UNIFIED VILLAGE CHAT + SYSTEM EVENT BANNERS */}
             {commsTab === 'village' && (
-              <View style={{ gap: 8 }}>
-                <ScrollView style={styles.historyScroll} nestedScrollEnabled>
-                  {game.chat.length === 0 ? (
-                    <T style={[styles.emptyChatTxt, isNight && { color: '#94A3B8' }]}>
-                      Chưa có tin nhắn nào. Khi trời sáng, cả làng chat tranh luận trực tiếp ngay tại đây!
+              <View style={styles.chatContentFill}>
+                <ScrollView
+                  ref={feedScrollRef}
+                  style={styles.feedScroll}
+                  contentContainerStyle={styles.feedScrollContent}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {unifiedVillageFeed.length === 0 ? (
+                    <T style={[styles.emptyFeedTxt, !isNight && { color: '#64748B' }]}>
+                      Chưa có thông báo. Khi bình minh lên, hãy dùng #SốGhế để suy luận cùng dân làng!
                     </T>
                   ) : (
-                    game.chat.map((m) => {
-                      const sNum = seatNumber.get(m.from);
-                      const isDeadSender = !aliveSet.has(m.from);
-                      return (
-                        <View key={m.id} style={[styles.chatRow, m.from === me && styles.chatRowMine]}>
-                          <View style={styles.chatHeader}>
-                            <T style={[styles.chatSender, isNight && { color: '#FDE047' }]}>
-                              {sNum ? `#${sNum} ` : ''}{m.name}{isDeadSender ? ' (👻)' : ''}
+                    unifiedVillageFeed.map((item) => {
+                      if (item.kind === 'log') {
+                        const isDawn = item.log.kind === 'dawn';
+                        const isHunter = item.log.kind === 'hunter';
+                        return (
+                          <View
+                            key={item.key}
+                            style={[
+                              styles.sysBanner,
+                              isDawn
+                                ? styles.sysBannerDawn
+                                : isHunter
+                                  ? styles.sysBannerHunter
+                                  : isNight
+                                    ? styles.sysBannerNight
+                                    : styles.sysBannerDay,
+                            ]}
+                          >
+                            <T
+                              style={[
+                                styles.sysBannerTxt,
+                                !isNight && !isDawn && !isHunter && { color: '#334155' },
+                              ]}
+                            >
+                              {isDawn ? '☀️ ' : isHunter ? '🏹 ' : item.log.kind === 'vote' ? '⚖️ ' : '📢 '}
+                              [Ngày {item.log.day}] {item.log.text}
                             </T>
-                            <T style={styles.chatTime}>{fmtTime(m.at)}</T>
                           </View>
-                          <T style={[styles.chatBody, isNight && { color: '#F1F5F9' }]}>
-                            {m.kind === 'sticker' ? `[Nhãn dán ${m.stickerId}]` : m.text}
+                        );
+                      }
+
+                      const sNum = seatNumber.get(item.from);
+                      const isMine = item.from === me;
+                      const senderDead = !aliveSet.has(item.from);
+                      return (
+                        <View
+                          key={item.key}
+                          style={[
+                            styles.msgRow,
+                            isNight ? styles.msgRowNight : styles.msgRowDay,
+                            isMine && (isNight ? styles.msgRowMineNight : styles.msgRowMineDay),
+                          ]}
+                        >
+                          <T numberOfLines={4} style={isNight ? styles.msgLineNight : styles.msgLineDay}>
+                            <T
+                              style={[
+                                styles.msgAuthor,
+                                isMine
+                                  ? styles.msgAuthorMe
+                                  : isNight
+                                    ? styles.msgAuthorNight
+                                    : styles.msgAuthorDay,
+                              ]}
+                            >
+                              {sNum ? `#${sNum} ` : ''}
+                              {item.name}
+                              {senderDead ? '👻' : ''}:{' '}
+                            </T>
+                            {item.isSticker ? `[Nhãn dán ${item.stickerId}]` : item.text}
                           </T>
+                          <T style={styles.msgTime}>{fmtShortTime(item.at)}</T>
                         </View>
                       );
                     })
                   )}
                 </ScrollView>
 
-                {canChatVillage ? (
-                  <>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
-                      {MASOI_QUICK_CHAT.map((q, idx) => (
+                {/* 1-Line Quick Wolvesville Deduction Chips */}
+                {canChatVillage && (
+                  <View style={styles.quickStripWrap}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={styles.quickStripScroll}
+                    >
+                      {quickDeductionChips.map((q, idx) => (
                         <Pressable
-                          key={idx}
+                          key={`vq-${idx}`}
                           testID={`masoi-quick-${idx}`}
                           onPress={() => void sendVillageChat(q)}
-                          style={styles.quickChip}
+                          style={[styles.quickChip, isNight && styles.quickChipNight]}
                         >
-                          <T style={styles.quickChipTxt}>{q}</T>
+                          <T style={[styles.quickChipTxt, isNight && { color: '#FDE68A' }]}>{q}</T>
                         </Pressable>
                       ))}
                     </ScrollView>
-                    <View style={styles.inputRow}>
-                      <TextInput
-                        testID="masoi-village-input"
-                        value={villageInput}
-                        onChangeText={setVillageInput}
-                        onSubmitEditing={() => void sendVillageChat()}
-                        placeholder="Nhập lập luận của bạn cho cả làng..."
-                        placeholderTextColor="#94A3B8"
-                        maxLength={200}
-                        style={[styles.chatInput, isNight && styles.chatInputDark]}
-                      />
-                      <Button testID="masoi-village-send" small title="Gửi" onPress={() => void sendVillageChat()} />
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.lockedChatNote}>
-                    <T style={styles.lockedChatTxt}>
-                      {!iAlive
-                        ? '👻 Người đã hy sinh giữ im lặng để đảm bảo công bằng — bạn vẫn xem trọn lịch sử chat!'
-                        : '🌙 Ban đêm cả làng giữ im lặng (Sói dùng tab Kênh Sói) — chờ trời sáng để tranh luận tiếp!'}
+                  </View>
+                )}
+
+                {/* Pinned Bottom Input Row */}
+                {!iAlive ? (
+                  <View style={styles.pinnedStatusRow}>
+                    <T style={styles.pinnedStatusTxt}>
+                      👻 Bạn đã hy sinh — đang xem làng suy luận
                     </T>
+                  </View>
+                ) : isNight ? (
+                  myRole === 'soi' && view.wolfChat ? (
+                    <Pressable
+                      onPress={() => setCommsTab('wolf')}
+                      style={[styles.pinnedStatusRow, styles.pinnedWolfJump]}
+                    >
+                      <T style={[styles.pinnedStatusTxt, { color: '#FECACA' }]}>
+                        🐺 Đang là ban đêm — chạm mở Kênh Sói để bàn mưu!
+                      </T>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.pinnedStatusRow}>
+                      <T style={styles.pinnedStatusTxt}>
+                        🌙 Ban đêm cả làng giữ im lặng — chờ trời sáng để chat
+                      </T>
+                    </View>
+                  )
+                ) : (
+                  <View style={styles.pinnedInputRow}>
+                    <TextInput
+                      testID="masoi-village-input"
+                      value={villageInput}
+                      onChangeText={setVillageInput}
+                      onSubmitEditing={() => void sendVillageChat()}
+                      placeholder="Chat suy luận với làng (vd: Nghi #3 là Sói)..."
+                      placeholderTextColor="#94A3B8"
+                      maxLength={200}
+                      returnKeyType="send"
+                      style={[styles.chatInput, !isNight && styles.chatInputDay]}
+                    />
+                    <Pressable
+                      testID="masoi-village-send"
+                      onPress={() => void sendVillageChat()}
+                      style={styles.sendBtn}
+                    >
+                      <UiIcon name="Send" size={15} color="#0F172A" />
+                    </Pressable>
                   </View>
                 )}
               </View>
             )}
 
-            {/* NỘI DUNG TAB 2: KÊNH RADIO BÍ MẬT BẦY SÓI */}
+            {/* TAB 2: WOLF PACK SECRET CHANNEL */}
             {commsTab === 'wolf' && myRole === 'soi' && view.wolfChat && (
-              <View style={{ gap: 8 }}>
-                <ScrollView style={styles.historyScroll} nestedScrollEnabled>
+              <View style={styles.chatContentFill}>
+                {view.wolfPackIds && view.wolfPackIds.length > 0 && (
+                  <View style={styles.wolfPackStrip}>
+                    <GameIcon name="wolf-head" size={13} color="#FCA5A5" />
+                    <T numberOfLines={1} style={styles.wolfPackStripTxt}>
+                      Bầy Sói:{' '}
+                      {view.wolfPackIds
+                        .map((id) => `#${seatNumber.get(id)} ${view.names[id]}`)
+                        .join(', ')}
+                    </T>
+                  </View>
+                )}
+
+                <ScrollView
+                  ref={wolfScrollRef}
+                  style={styles.feedScroll}
+                  contentContainerStyle={styles.feedScrollContent}
+                  keyboardShouldPersistTaps="handled"
+                >
                   {view.wolfChat.length === 0 ? (
-                    <T style={{ color: '#FCA5A5', fontSize: 12.5, fontWeight: '700' }}>
-                      Chưa có mật thư Sói… Bàn nhau cắn ai hoặc thống nhất kịch bản giả danh đi!
+                    <T style={styles.emptyWolfTxt}>
+                      🐺 Kênh bí mật của bầy Sói! Bàn nhau chọn mồi hoặc giả danh Tiên Tri ngay tại đây.
                     </T>
                   ) : (
                     view.wolfChat.map((m) => (
-                      <View key={m.id} style={styles.wolfMsgBox}>
-                        <T style={styles.wolfMsg}>
-                          <T style={{ fontWeight: '900', color: '#FCA5A5' }}>
+                      <View key={`wm-${m.id}`} style={styles.wolfMsgRow}>
+                        <T style={styles.wolfMsgTxt}>
+                          <T style={styles.wolfMsgAuthor}>
                             #{seatNumber.get(m.from) ?? '?'} {m.name}:{' '}
                           </T>
                           {m.text}
@@ -830,363 +1141,1025 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     ))
                   )}
                 </ScrollView>
-                {iAlive && (
-                  <View style={styles.inputRow}>
+
+                {canChatWolf && (
+                  <View style={styles.quickStripWrap}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={styles.quickStripScroll}
+                    >
+                      {quickDeductionChips.map((q, idx) => (
+                        <Pressable
+                          key={`wq-${idx}`}
+                          onPress={() => void sendWolfChat(q)}
+                          style={styles.quickChipWolf}
+                        >
+                          <T style={styles.quickChipWolfTxt}>{q}</T>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {iAlive ? (
+                  <View style={styles.pinnedInputRow}>
                     <TextInput
                       testID="masoi-wolf-chat-input"
                       value={wolfInput}
                       onChangeText={setWolfInput}
                       onSubmitEditing={() => void sendWolfChat()}
-                      placeholder="Nhắn bí mật cho bầy Sói..."
-                      placeholderTextColor="#94A3B8"
-                      maxLength={120}
-                      style={[styles.chatInput, styles.chatInputDark, { borderColor: '#EF4444' }]}
+                      placeholder="Nhắn mật cho đồng bọn Sói..."
+                      placeholderTextColor="#FCA5A5"
+                      maxLength={140}
+                      returnKeyType="send"
+                      style={[styles.chatInput, styles.chatInputWolf]}
                     />
-                    <Button testID="masoi-wolf-chat-send" small title="Gửi" onPress={() => void sendWolfChat()} />
+                    <Pressable
+                      testID="masoi-wolf-chat-send"
+                      onPress={() => void sendWolfChat()}
+                      style={[styles.sendBtn, { backgroundColor: '#EF4444' }]}
+                    >
+                      <UiIcon name="Send" size={15} color="#FFFFFF" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.pinnedStatusRow}>
+                    <T style={styles.pinnedStatusTxt}>
+                      👻 Bạn đã hy sinh — chỉ xem lại mật thư bầy Sói
+                    </T>
                   </View>
                 )}
               </View>
             )}
 
-            {/* NỘI DUNG TAB 3: NHẬT KÝ SỰ KIỆN ĐẦY ĐỦ + HỒ SƠ TIÊN TRI / THÁM TỬ */}
-            {commsTab === 'log' && (
-              <ScrollView style={styles.historyScroll} nestedScrollEnabled>
+            {/* TAB 3: COMPACT ROLE, PRIVATE INTEL & DECK REFERENCE */}
+            {commsTab === 'role' && (
+              <ScrollView
+                style={styles.feedScroll}
+                contentContainerStyle={styles.roleTabContent}
+              >
+                {/* My Role Summary Card */}
+                {roleMeta && myRole && (
+                  <View
+                    style={[
+                      styles.myRoleRefCard,
+                      !isNight && styles.myRoleRefCardDay,
+                      { borderColor: roleMeta.color },
+                    ]}
+                  >
+                    <View style={styles.myRoleRefHead}>
+                      <View style={[styles.myRoleBadge, { backgroundColor: roleMeta.color }]}>
+                        <GameIcon name={ROLE_GAME_ICON[myRole]} size={15} color="#FFFFFF" />
+                        <T style={styles.myRoleBadgeTxt}>
+                          {roleMeta.name} · {roleMeta.teamLabel}
+                        </T>
+                      </View>
+                      <Pressable
+                        onPress={() => setRoleHidden((v) => !v)}
+                        style={styles.subtleMiniBtn}
+                      >
+                        <T style={styles.subtleMiniBtnTxt}>
+                          {roleHidden ? 'Hiện huy hiệu' : 'Ẩn huy hiệu'}
+                        </T>
+                      </Pressable>
+                    </View>
+                    <T style={[styles.myRoleHow, !isNight && { color: '#1E293B' }]}>
+                      {roleMeta.howToPlay}
+                    </T>
+                    <T style={styles.myRoleWin}>🏆 {roleMeta.winCond}</T>
+                    {view.myPartnerId && (
+                      <T style={styles.loverLine}>
+                        💘 Cặp đôi định mệnh với #{seatNumber.get(view.myPartnerId)}{' '}
+                        {view.names[view.myPartnerId]}
+                      </T>
+                    )}
+                  </View>
+                )}
+
+                {/* Seer Inspection History */}
                 {view.seerHistory && view.seerHistory.length > 0 && (
-                  <View style={styles.privateLogBox}>
-                    <T style={styles.privateLogTitle}>🔮 Sổ Tay Tiên Tri Của Bạn</T>
+                  <View style={styles.intelHistoryCard}>
+                    <T style={styles.intelHistoryTitle}>🔮 Lịch Sử Tiên Tri Soi</T>
                     {view.seerHistory.map((h, i) => (
-                      <T key={i} style={styles.privateLogLine}>
+                      <T key={`sh-${i}`} style={styles.intelHistoryItem}>
                         • Đêm {h.day}: #{seatNumber.get(h.targetId)} {view.names[h.targetId]} →{' '}
-                        {h.isWolf ? '🐺 CHÍNH LÀ MA SÓI!' : '🧑‍🌾 Phe Dân Làng'}
+                        {h.isWolf ? '🐺 MA SÓI!' : '🧑 Phe Dân Làng'}
                       </T>
                     ))}
                   </View>
                 )}
+
+                {/* Detective History */}
                 {view.detectiveHistory && view.detectiveHistory.length > 0 && (
-                  <View style={[styles.privateLogBox, { borderColor: '#10B981' }]}>
-                    <T style={[styles.privateLogTitle, { color: '#6EE7B7' }]}>🕵️ Hồ Sơ Thám Tử Của Bạn</T>
+                  <View style={[styles.intelHistoryCard, { borderColor: '#10B981' }]}>
+                    <T style={[styles.intelHistoryTitle, { color: '#6EE7B7' }]}>
+                      🕵️ Hồ Sơ Thám Tử
+                    </T>
                     {view.detectiveHistory.map((h, i) => (
-                      <T key={i} style={styles.privateLogLine}>
-                        • Đêm {h.day}: #{seatNumber.get(h.a)} {view.names[h.a]} & #{seatNumber.get(h.b)} {view.names[h.b]} →{' '}
+                      <T key={`dh-${i}`} style={styles.intelHistoryItem}>
+                        • Đêm {h.day}: #{seatNumber.get(h.a)} & #{seatNumber.get(h.b)} →{' '}
                         {h.sameTeam ? 'CÙNG PHE' : 'KHÁC PHE'}
                       </T>
                     ))}
                   </View>
                 )}
-                <View style={{ gap: 6 }}>
-                  {[...view.publicLog].reverse().map((entry) => (
-                    <View key={entry.id} style={[styles.logItemRow, isNight && { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                      <T style={styles.logDayPill}>Ngày {entry.day}</T>
-                      <T style={[styles.logLine, isNight && { color: '#E2E8F0' }]}>{entry.text}</T>
-                    </View>
-                  ))}
+
+                {/* Room Role Deck */}
+                <T style={[styles.deckSectionTitle, !isNight && { color: '#475569' }]}>
+                  Bộ vai trò trong phòng ({view.order.length} người):
+                </T>
+                <View style={styles.deckGrid}>
+                  {deckEntries.map(([r, cnt]) => {
+                    const m = MASOI_ROLES[r];
+                    const deadCnt = revealedDeadRoleCounts[r] ?? 0;
+                    const remain = Math.max(0, cnt - deadCnt);
+                    return (
+                      <View
+                        key={`dk-${r}`}
+                        testID={`masoi-deck-${r}`}
+                        style={[
+                          styles.deckCard,
+                          !isNight && styles.deckCardDay,
+                          remain === 0 && { opacity: 0.48 },
+                        ]}
+                      >
+                        <View style={styles.deckCardHead}>
+                          <T style={[styles.deckCardName, { color: m.color }]}>
+                            {m.emoji} {m.name} {deadCnt > 0 ? `(${remain}/${cnt})` : `×${cnt}`}
+                          </T>
+                        </View>
+                        <T
+                          numberOfLines={2}
+                          style={[styles.deckCardDesc, !isNight && { color: '#334155' }]}
+                        >
+                          {m.shortDesc}
+                        </T>
+                      </View>
+                    );
+                  })}
                 </View>
               </ScrollView>
             )}
-          </Card>
+          </View>
         </View>
       </View>
-
-      {/* SỔ TAY CẨM NANG VAI TRÒ CHI TIẾT */}
-      {guideOpen && (
-        <Sheet onClose={() => setGuideOpen(false)} title="📖 Cẩm Nang Vai Trò Ma Sói">
-          <View style={{ gap: 10 }}>
-            <T style={{ fontSize: 12.5, color: C.muted, fontWeight: '700' }}>
-              Danh sách các vai trò xuất hiện trong ván ({view.order.length} người chơi) — chạm để nắm rõ kỹ năng & mẹo suy luận:
-            </T>
-            {deckEntries.map(([r, cnt]) => {
-              const m = MASOI_ROLES[r];
-              const highlighted = focusGuideRole === r;
-              return (
-                <View
-                  key={r}
-                  style={[
-                    styles.guideRoleCard,
-                    highlighted && { borderColor: m.color, borderWidth: 2.5, backgroundColor: '#FFFBEB' },
-                  ]}
-                >
-                  <View style={styles.guideRoleHead}>
-                    <View style={[styles.rolePill, { backgroundColor: m.color }]}>
-                      <GameIcon name={ROLE_GAME_ICON[r]} size={16} color="#FFFFFF" />
-                      <T style={styles.rolePillTxt}>
-                        {m.name} ×{cnt}
-                      </T>
-                    </View>
-                    <T style={[styles.guideTeamTag, { color: m.color }]}>{m.teamLabel}</T>
-                  </View>
-                  <T style={styles.guideLine}><T style={styles.guideBold}>Cách hoạt động: </T>{m.howToPlay}</T>
-                  <T style={styles.guideLine}><T style={styles.guideBold}>Điều kiện thắng: </T>{m.winCond}</T>
-                  <T style={styles.guideTip}>💡 Mẹo: {m.tips}</T>
-                </View>
-              );
-            })}
-          </View>
-        </Sheet>
-      )}
     </Shell>
   );
 }
 
 const styles = StyleSheet.create({
-  phaseBanner: { borderRadius: 20, padding: 12, gap: 7 },
-  nightBanner: { backgroundColor: '#111633', borderColor: '#6366F1' },
-  dayBanner: { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
-  phaseHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  phaseIconWrap: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  phaseTitle: { fontSize: 15.5, fontWeight: '900', fontFamily: FONT, color: C.ink },
-  phaseSubMeta: { fontSize: 11.5, fontWeight: '800', color: '#78350F' },
-  guideBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#FDE68A',
-    borderWidth: 1.5,
-    borderColor: '#D97706',
+  wolvesvilleRoot: {
+    flex: 1,
+    minHeight: 0,
+    gap: 6,
+    marginHorizontal: -6,
   },
-  guideBtnNight: { backgroundColor: 'rgba(250, 204, 21, 0.16)', borderColor: '#FACC15' },
-  guideBtnTxt: { fontSize: 11.5, fontWeight: '900', color: '#92400E' },
-  phaseHint: { fontSize: 12, fontWeight: '700', color: '#78350F' },
 
-  deckRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
-  deckChip: {
+  /* ZONE 1: TOP HEADER (~44px) */
+  topHeader: {
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 4,
+    gap: 5,
+    borderWidth: 1.5,
+  },
+  topHeaderNight: {
+    backgroundColor: '#111827',
+    borderColor: '#4F46E5',
+  },
+  topHeaderDay: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  topHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+  },
+  phasePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  phasePillNight: {
+    backgroundColor: '#1E1B4B',
+    borderWidth: 1,
+    borderColor: '#6366F1',
+  },
+  phasePillDay: {
+    backgroundColor: '#FDE68A',
+    borderWidth: 1,
+    borderColor: '#D97706',
+  },
+  phasePillTxt: {
+    fontSize: 11,
+    fontWeight: '900',
+    fontFamily: FONT,
+  },
+  txtLight: {
+    color: '#F8FAFC',
+  },
+  txtAmberInk: {
+    color: '#78350F',
+  },
+  headerHintTxt: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    minWidth: 0,
+  },
+  headerHintNight: {
+    color: '#CBD5E1',
+  },
+  headerHintDay: {
+    color: '#78350F',
+  },
+  timerBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+  },
+  timerBadgeUrgent: {
+    backgroundColor: '#DC2626',
+  },
+  timerBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FEF08A',
+  },
+  aliveBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+  },
+  aliveBadgeDay: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  aliveBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#E2E8F0',
+  },
+  headerActBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.14)',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#2563EB',
   },
-  deckChipNight: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)' },
-  deckRoleDot: { width: 18, height: 18, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  deckChipTxt: { fontSize: 11, fontWeight: '800', color: C.ink },
-
-  splitWrap: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  stackWrap: { gap: 10 },
-  leftCol: { flex: 1.15, gap: 10 },
-  rightCol: { flex: 0.95, gap: 10 },
-  fullCol: { gap: 10 },
-
-  roleCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 13, gap: 8 },
-  roleCardNight: { backgroundColor: '#192242', borderColor: '#4F46E5' },
-  roleTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rolePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
-  rolePillTxt: { color: '#FFFFFF', fontWeight: '900', fontSize: 12.5 },
-  hideHintRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tapHide: { fontSize: 11, fontWeight: '700', color: C.muted },
-  roleDesc: { fontSize: 13, fontWeight: '800', color: C.ink },
-  roleHowBox: { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: '#FDE68A' },
-  roleHowBoxNight: { backgroundColor: 'rgba(15,23,42,0.55)', borderColor: 'rgba(148,163,184,0.24)' },
-  roleHowTxt: { fontSize: 11.5, fontWeight: '700', color: '#78350F', lineHeight: 16 },
-  secretRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  loverInfo: { fontSize: 12.5, fontWeight: '800', color: '#F472B6' },
-  wolfInfo: { fontSize: 12.5, fontWeight: '800', color: '#F87171' },
-  hiddenRole: { alignItems: 'center', paddingVertical: 8, gap: 4 },
-  hiddenTitle: { fontSize: 15, fontWeight: '900', color: C.ink },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
-  seat: {
-    flexGrow: 1,
-    minWidth: 96,
-    maxWidth: '48.5%',
-    alignItems: 'center',
-    gap: 4,
-    paddingTop: 24,
-    paddingBottom: 9,
-    paddingHorizontal: 6,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: 'rgba(15,23,42,0.15)',
-    position: 'relative',
+  headerActBtnSkip: {
+    backgroundColor: '#475569',
   },
-  seatNight: { backgroundColor: '#161E3B', borderColor: 'rgba(148,163,184,0.28)' },
-  seatDead: { opacity: 0.56, backgroundColor: '#334155', borderColor: '#64748B' },
-  seatSuspectWolf: { borderColor: '#EF4444', backgroundColor: 'rgba(127, 29, 29, 0.16)' },
-  seatSuspectTrust: { borderColor: '#10B981', backgroundColor: 'rgba(6, 78, 59, 0.14)' },
-  seatPicked: { borderColor: '#FACC15', borderWidth: 3, transform: [{ translateY: -2 }] },
-
-  seatNumPill: {
-    position: 'absolute',
-    top: 5,
-    left: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(15,23,42,0.75)',
+  headerActBtnDone: {
+    backgroundColor: '#059669',
   },
-  seatNumTxt: { fontSize: 10, fontWeight: '900', color: '#F8FAFC' },
-
-  notePin: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-    borderWidth: 1,
+  headerActBtnTxt: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
-  notePinTxt: { fontSize: 9.5, fontWeight: '900' },
-
-  avatarWrap: { position: 'relative', marginVertical: 2 },
-  badgeBottomLeft: {
-    position: 'absolute',
-    bottom: -2,
-    left: -4,
-    backgroundColor: '#831843',
-    borderRadius: 999,
-    padding: 2,
-  },
-  badgeBottomRight: {
-    position: 'absolute',
-    bottom: -2,
-    right: -4,
-    backgroundColor: '#B91C1C',
-    borderRadius: 999,
-    padding: 3,
-  },
-
-  seatName: { fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'center', maxWidth: '100%' },
-  deadName: { textDecorationLine: 'line-through', color: '#CBD5E1' },
-  intelPill: { paddingHorizontal: 7, paddingVertical: 1.5, borderRadius: 999 },
-  intelPillTxt: { fontSize: 9.5, fontWeight: '900', color: '#FFFFFF' },
-  deadRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  deadTag: { fontSize: 10.5, fontWeight: '800', color: '#FCA5A5' },
-  votePill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: C.ink },
-  votePillTxt: { color: '#FACC15', fontSize: 10.5, fontWeight: '900' },
-  votedWhoTxt: { fontSize: 10, fontWeight: '800', color: '#38BDF8' },
-  readyTxt: { fontSize: 10, fontWeight: '800', color: '#22C55E' },
-  lockTag: { fontSize: 10, fontWeight: '800', color: '#FBBF24' },
-  meTag: { fontSize: 10.5, fontWeight: '900', color: C.jade },
-
-  commsCard: { padding: 11, gap: 9 },
-  darkInfoCard: { backgroundColor: '#151D38', borderColor: 'rgba(129, 140, 248, 0.35)' },
-  tabBar: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  tabBtn: {
-    flex: 1,
-    minWidth: 92,
-    flexDirection: 'row',
+  roleMiniChip: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  roleMiniChipTxt: {
+    fontSize: 13,
+  },
+  progressTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(148, 163, 184, 0.24)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  /* MAIN SPLIT */
+  mainBody: {
+    flex: 1,
+    minHeight: 0,
+    gap: 6,
+  },
+  mainBodyWide: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+  },
+
+  /* ZONE 2: WOLVESVILLE 4-COLUMN NUMBERED VILLAGE GRID */
+  villageZone: {
     gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 8,
+    flexShrink: 0,
+  },
+  villageZoneWide: {
+    width: '49%',
+    justifyContent: 'flex-start',
+  },
+  grid4Col: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    justifyContent: 'flex-start',
+  },
+  plotCard: {
+    width: '23.6%',
+    flexGrow: 1,
+    maxWidth: '24.6%',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 14,
+    paddingBottom: 4,
+    paddingHorizontal: 3,
     borderRadius: 12,
-    backgroundColor: 'rgba(148,163,184,0.14)',
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    position: 'relative',
+    ...(Platform.OS === 'web'
+      ? ({
+          cursor: 'pointer',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+        } as object)
+      : null),
   },
-  tabBtnActive: { backgroundColor: '#FACC15', borderColor: '#CA8A04' },
-  tabBtnWolfActive: { backgroundColor: '#B91C1C', borderColor: '#F87171' },
-  tabBtnTxt: { fontSize: 11.5, fontWeight: '900', color: '#94A3B8' },
-  tabBtnTxtActive: { color: '#0F172A' },
+  plotCardCompact: {
+    paddingTop: 11,
+    paddingBottom: 3,
+    borderRadius: 10,
+  },
+  plotCardNight: {
+    backgroundColor: '#162038',
+    borderColor: '#2D3F66',
+  },
+  plotCardDay: {
+    backgroundColor: '#FFFDF7',
+    borderColor: '#D6D3D1',
+  },
+  plotCardDeadNight: {
+    backgroundColor: '#111625',
+    borderColor: '#334155',
+    opacity: 0.64,
+  },
+  plotCardDeadDay: {
+    backgroundColor: '#E2E8F0',
+    borderColor: '#94A3B8',
+    opacity: 0.72,
+  },
+  plotSuspectWolf: {
+    borderColor: '#EF4444',
+  },
+  plotSuspectTrust: {
+    borderColor: '#10B981',
+  },
+  plotSuspectJester: {
+    borderColor: '#EAB308',
+  },
+  plotCardSelected: {
+    borderColor: '#FACC15',
+    borderWidth: 2.5,
+  },
+  plotCardVictim: {
+    borderColor: '#F43F5E',
+    borderWidth: 2,
+  },
 
-  historyScroll: { maxHeight: 220, minHeight: 125 },
-  emptyChatTxt: { fontSize: 12.5, fontWeight: '700', color: C.muted, textAlign: 'center', paddingVertical: 20 },
-  chatRow: {
+  seatBadge: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    paddingHorizontal: 4.5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    zIndex: 2,
+  },
+  seatBadgeMe: {
+    backgroundColor: '#F59E0B',
+  },
+  seatBadgeNight: {
+    backgroundColor: '#1E293B',
+  },
+  seatBadgeDay: {
+    backgroundColor: '#334155',
+  },
+  seatBadgeTxt: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#F8FAFC',
+  },
+  seatBadgeTxtMe: {
+    color: '#0F172A',
+  },
+
+  topRightBadges: {
+    position: 'absolute',
+    top: 2,
+    right: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    zIndex: 2,
+  },
+  intelDotRole: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+  },
+  intelDotWolf: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: '#991B1B',
+  },
+  intelDotGood: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: '#065F46',
+  },
+  intelDotGuard: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: '#0369A1',
+  },
+  intelDotLover: {
+    paddingHorizontal: 3,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: '#831843',
+  },
+  intelDotDead: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: '#334155',
+  },
+  intelDotSuspect: {
+    paddingHorizontal: 3.5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  },
+  intelDotEmoji: {
+    fontSize: 10,
+  },
+
+  plotAvatarWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 1,
+  },
+  plotAvatarTargeted: {
+    borderRadius: 999,
+  },
+  deadAvatarDim: {
+    opacity: 0.42,
+  },
+  tombstoneOverlay: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tombstoneEmoji: {
+    fontSize: 16,
+  },
+  tallyOverlayVote: {
+    position: 'absolute',
+    bottom: -3,
+    right: -8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#FACC15',
+  },
+  tallyOverlayWolf: {
+    position: 'absolute',
+    bottom: -3,
+    right: -8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: '#991B1B',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  tallyOverlayTxt: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#FEF08A',
+  },
+
+  plotName: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    textAlign: 'center',
+    maxWidth: '100%',
+    marginTop: 1,
+  },
+  plotNameNight: {
+    color: '#F1F5F9',
+  },
+  plotNameDay: {
+    color: '#1E293B',
+  },
+  plotNameDead: {
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+  },
+
+  /* 1-Line Floating Night Action Bar inside Zone 2 */
+  actionStripNight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
     paddingVertical: 5,
-    paddingHorizontal: 8,
-    marginBottom: 5,
     borderRadius: 11,
-    backgroundColor: 'rgba(148,163,184,0.12)',
+    backgroundColor: '#1E1B4B',
+    borderWidth: 1.5,
+    borderColor: '#6366F1',
   },
-  chatRowMine: { backgroundColor: 'rgba(56, 189, 248, 0.16)', borderLeftWidth: 3, borderLeftColor: '#38BDF8' },
-  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 1 },
-  chatSender: { fontSize: 11.5, fontWeight: '900', color: '#B45309' },
-  chatTime: { fontSize: 10, fontWeight: '700', color: '#94A3B8' },
-  chatBody: { fontSize: 13, fontWeight: '700', color: C.ink, lineHeight: 18 },
-
-  quickRow: { gap: 6, paddingVertical: 2 },
-  quickChip: {
+  actionStripTxt: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#E0E7FF',
+  },
+  confirmPill: {
     paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 999,
+    backgroundColor: '#FACC15',
+  },
+  confirmPillDisabled: {
+    opacity: 0.4,
+  },
+  confirmPillTxt: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  witchPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  witchPillSaveActive: {
+    backgroundColor: '#059669',
+  },
+  witchPillPoisonActive: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#991B1B',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  witchPillTxt: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  subtleMiniBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(148, 163, 184, 0.22)',
+  },
+  subtleMiniBtnTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#CBD5E1',
+  },
+
+  /* ZONE 3: ALWAYS-VISIBLE CHAT & VILLAGE LOG (flex: 1) */
+  chatZone: {
+    flex: 1,
+    minHeight: 0,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  chatZoneNight: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+  },
+  chatZoneDay: {
+    backgroundColor: '#FFFDF9',
+    borderColor: '#CBD5E1',
+  },
+  channelBar: {
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
     paddingVertical: 5,
+    backgroundColor: '#1E293B',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.2)',
+  },
+  channelBarDay: {
+    backgroundColor: '#F1F5F9',
+    borderBottomColor: '#E2E8F0',
+  },
+  channelTab: {
+    flex: 1,
+    paddingVertical: 4.5,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  channelTabActiveNight: {
+    backgroundColor: '#FACC15',
+  },
+  channelTabActiveDay: {
+    backgroundColor: '#0F172A',
+  },
+  channelTabWolfActive: {
+    backgroundColor: '#B91C1C',
+  },
+  channelTabTxt: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748B',
+  },
+  channelTabTxtActiveNight: {
+    color: '#0F172A',
+  },
+  channelTabTxtActiveDay: {
+    color: '#FFFFFF',
+  },
+
+  chatContentFill: {
+    flex: 1,
+    minHeight: 0,
+  },
+  feedScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  feedScrollContent: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  emptyFeedTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+
+  sysBanner: {
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
+    borderRadius: 9,
+    borderLeftWidth: 3,
+  },
+  sysBannerDawn: {
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    borderLeftColor: '#F59E0B',
+  },
+  sysBannerHunter: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderLeftColor: '#EF4444',
+  },
+  sysBannerNight: {
+    backgroundColor: 'rgba(99, 102, 241, 0.18)',
+    borderLeftColor: '#818CF8',
+  },
+  sysBannerDay: {
+    backgroundColor: '#FEF3C7',
+    borderLeftColor: '#D97706',
+  },
+  sysBannerTxt: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FDE68A',
+    lineHeight: 16,
+  },
+
+  msgRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+  },
+  msgRowNight: {
+    backgroundColor: 'rgba(30, 41, 59, 0.72)',
+  },
+  msgRowDay: {
+    backgroundColor: '#F1F5F9',
+  },
+  msgRowMineNight: {
+    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+    borderLeftWidth: 2.5,
+    borderLeftColor: '#38BDF8',
+  },
+  msgRowMineDay: {
+    backgroundColor: '#E0F2FE',
+    borderLeftWidth: 2.5,
+    borderLeftColor: '#0284C7',
+  },
+  msgLineNight: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F1F5F9',
+    lineHeight: 16,
+  },
+  msgLineDay: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 16,
+  },
+  msgAuthor: {
+    fontWeight: '900',
+  },
+  msgAuthorMe: {
+    color: '#0284C7',
+  },
+  msgAuthorNight: {
+    color: '#FACC15',
+  },
+  msgAuthorDay: {
+    color: '#B45309',
+  },
+  msgTime: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+
+  quickStripWrap: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.16)',
+    paddingVertical: 3.5,
+  },
+  quickStripScroll: {
+    paddingHorizontal: 6,
+    gap: 5,
+    alignItems: 'center',
+  },
+  quickChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
     borderRadius: 999,
     backgroundColor: '#FEF3C7',
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
-  quickChipTxt: { fontSize: 11.5, fontWeight: '800', color: '#78350F' },
+  quickChipNight: {
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+  },
+  quickChipTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#78350F',
+  },
+  quickChipWolf: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(185, 28, 28, 0.26)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  quickChipWolfTxt: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#FECACA',
+  },
 
-  inputRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  pinnedInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.2)',
+  },
   chatInput: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CBD5E1',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    color: C.ink,
-    fontSize: 13,
+    height: 34,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#475569',
+    color: '#F8FAFC',
+    fontSize: 12.5,
     fontWeight: '700',
   },
-  chatInputDark: { backgroundColor: '#0F172A', borderColor: '#475569', color: '#FFFFFF' },
-  lockedChatNote: {
+  chatInputDay: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD5E1',
+    color: '#0F172A',
+  },
+  chatInputWolf: {
+    backgroundColor: '#2A0A0E',
+    borderColor: '#EF4444',
+    color: '#FEE2E2',
+  },
+  sendBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  pinnedStatusRow: {
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(30, 41, 59, 0.5)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.2)',
+    alignItems: 'center',
+  },
+  pinnedWolfJump: {
+    backgroundColor: 'rgba(153, 27, 27, 0.45)',
+  },
+  pinnedStatusTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+
+  /* WOLF CHANNEL */
+  wolfPackStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(153, 27, 27, 0.35)',
+  },
+  wolfPackStripTxt: {
+    flex: 1,
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#FECACA',
+  },
+  emptyWolfTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FCA5A5',
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+  wolfMsgRow: {
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
+    borderRadius: 9,
+    backgroundColor: 'rgba(185, 28, 28, 0.24)',
+    borderLeftWidth: 2.5,
+    borderLeftColor: '#EF4444',
+  },
+  wolfMsgTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FEE2E2',
+  },
+  wolfMsgAuthor: {
+    fontWeight: '900',
+    color: '#FCA5A5',
+  },
+
+  /* ROLE & RULES REFERENCE TAB */
+  roleTabContent: {
+    padding: 8,
+    gap: 7,
+  },
+  myRoleRefCard: {
+    padding: 9,
+    borderRadius: 11,
+    backgroundColor: 'rgba(30, 41, 59, 0.72)',
+    borderWidth: 1.5,
+    gap: 4,
+  },
+  myRoleRefCardDay: {
+    backgroundColor: '#F8FAFC',
+  },
+  myRoleRefHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  myRoleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+  },
+  myRoleBadgeTxt: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  myRoleHow: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#E2E8F0',
+    lineHeight: 16,
+  },
+  myRoleWin: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#F59E0B',
+  },
+  loverLine: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#F472B6',
+  },
+
+  intelHistoryCard: {
     padding: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(99, 102, 241, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.3)',
-  },
-  lockedChatTxt: { fontSize: 11.5, fontWeight: '700', color: '#C7D2FE', textAlign: 'center' },
-
-  wolfMsgBox: { paddingVertical: 4, paddingHorizontal: 8, marginBottom: 4, borderRadius: 10, backgroundColor: 'rgba(185, 28, 28, 0.22)' },
-  wolfMsg: { fontSize: 12.5, color: '#FEE2E2', fontWeight: '700' },
-
-  privateLogBox: {
-    padding: 9,
-    marginBottom: 8,
-    borderRadius: 12,
     backgroundColor: 'rgba(139, 92, 246, 0.16)',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#8B5CF6',
-    gap: 3,
+    gap: 2,
   },
-  privateLogTitle: { fontSize: 12.5, fontWeight: '900', color: '#DDD6FE' },
-  privateLogLine: { fontSize: 12, fontWeight: '800', color: '#F8FAFC' },
-  logItemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 7,
-    paddingVertical: 5,
-    paddingHorizontal: 7,
-    marginBottom: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(15,23,42,0.05)',
-  },
-  logDayPill: {
-    fontSize: 10,
+  intelHistoryTitle: {
+    fontSize: 11.5,
     fontWeight: '900',
-    color: '#92400E',
-    backgroundColor: '#FDE68A',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    color: '#C4B5FD',
   },
-  logLine: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink, lineHeight: 17 },
+  intelHistoryItem: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
 
-  guideRoleCard: {
-    padding: 11,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+  deckSectionTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  deckGrid: {
     gap: 5,
   },
-  guideRoleHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  guideTeamTag: { fontSize: 11.5, fontWeight: '900' },
-  guideLine: { fontSize: 12.5, fontWeight: '600', color: C.ink, lineHeight: 18 },
-  guideBold: { fontWeight: '900', color: C.ink },
-  guideTip: { fontSize: 12, fontWeight: '800', color: '#B45309', marginTop: 2 },
-
-  dock: { gap: 8 },
-  dockRow: { flexDirection: 'row', gap: 8 },
-  dockNote: { fontSize: 12.5, fontWeight: '800', textAlign: 'center', color: '#F8FAFC' },
-  waitNote: { fontSize: 12.5, fontWeight: '800', textAlign: 'center', color: '#F8FAFC', paddingVertical: 5 },
-  err: { fontSize: 12, fontWeight: '800', color: '#FCA5A5', textAlign: 'center' },
+  deckCard: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: 'rgba(30, 41, 59, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+    gap: 2,
+  },
+  deckCardDay: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  deckCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  deckCardName: {
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  deckCardDesc: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#CBD5E1',
+    lineHeight: 15,
+  },
 });

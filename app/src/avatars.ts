@@ -131,9 +131,15 @@ export const BUILD_OPTIONS: { id: CharacterBuild; label: string }[] = [
 
 export const EYE_OPTIONS: { id: CharacterEyes; label: string }[] = [
   { id: 'macdinh', label: 'Mặc định' },
-  { id: 'hip', label: 'Mắt híp' },
-  { id: 'to', label: 'Mắt to tròn' },
-  { id: 'motmi', label: 'Một mí' },
+  { id: 'nhaybua', label: '😜 Nháy mắt bựa' },
+  { id: 'tronnguoc', label: '🙄 Trợn trắng mắt' },
+  { id: 'xoan', label: '😵 Mắt xoắn ngáo' },
+  { id: 'traitim', label: '😍 Mắt trái tim' },
+  { id: 'khoc', label: '😭 Khóc ăn vạ' },
+  { id: 'luon', label: '😒 Liếc lươn lẹo' },
+  { id: 'to', label: '😳 Trố mắt to' },
+  { id: 'hip', label: '😆 Cười tít mắt' },
+  { id: 'motmi', label: '😑 Một mí ngầu' },
 ];
 
 export const BROW_OPTIONS: { id: CharacterBrows; label: string }[] = [
@@ -172,6 +178,10 @@ export const ACCESSORY_OPTIONS: { id: CharacterAccessory; label: string; icon: s
   { id: 'keomut', label: 'Kẹo mút', icon: '🍭' },
   { id: 'matnaho', label: 'Mặt nạ hổ', icon: '🐯' },
   { id: 'docnhan', label: 'Bịt mắt hải tặc', icon: '🏴‍☠️' },
+  { id: 'kinhthug', label: 'Kính Thug Life', icon: '🕶️' },
+  { id: 'nuocmui', label: 'Bóng nước mũi', icon: '😪' },
+  { id: 'noncamap', label: 'Cá mập đớp đầu', icon: '🦈' },
+  { id: 'mathe', label: 'Kính mũi hề bựa', icon: '🥸' },
 ];
 
 export const DETAIL_OPTIONS: { id: CharacterDetail; label: string; icon: string }[] = [
@@ -404,8 +414,58 @@ function customVectorOverlays(c: CharacterConfig, accentHex: string): string {
         `<path d="M187 195 Q192 205 197 195" stroke="#FFFFFF" stroke-width="2.2" fill="none"/>`,
       );
       break;
+    case 'kinhthug':
+      // Kính pixel 8-bit "DEAL WITH IT / THUG LIFE" huyền thoại
+      parts.push(
+        `<g shape-rendering="crispEdges">`,
+        `<rect x="82" y="102" width="116" height="6" fill="#09090B"/>`,
+        `<rect x="90" y="108" width="44" height="18" fill="#09090B"/>`,
+        `<rect x="146" y="108" width="44" height="18" fill="#09090B"/>`,
+        `<rect x="96" y="126" width="32" height="6" fill="#09090B"/>`,
+        `<rect x="152" y="126" width="32" height="6" fill="#09090B"/>`,
+        `<rect x="96" y="110" width="6" height="6" fill="#FFFFFF"/><rect x="102" y="116" width="6" height="6" fill="#FFFFFF"/><rect x="108" y="110" width="6" height="6" fill="#FFFFFF"/>`,
+        `<rect x="152" y="110" width="6" height="6" fill="#FFFFFF"/><rect x="158" y="116" width="6" height="6" fill="#FFFFFF"/><rect x="164" y="110" width="6" height="6" fill="#FFFFFF"/>`,
+        `</g>`,
+      );
+      break;
+    case 'nuocmui':
+      // Bong bóng nước mũi ngáo ngơ + giọt dãi anime siêu lầy
+      parts.push(
+        `<circle cx="164" cy="138" r="18" fill="rgba(125,211,252,0.52)" stroke="#0284C7" stroke-width="2.6"/>`,
+        `<ellipse cx="157" cy="131" rx="5.5" ry="3.2" transform="rotate(-25 157 131)" fill="#FFFFFF" opacity="0.88"/>`,
+        `<path d="M148 164 Q146 178 151 180 Q156 178 153 164 Z" fill="#38BDF8" stroke="#0369A1" stroke-width="1.6"/>`,
+      );
+      break;
+    case 'noncamap':
+      // Mũ cá mập xanh há mồm đớp trọn đỉnh đầu nhân vật
+      parts.push(
+        `<path d="M74 84 C74 26, 206 26, 206 84 Q188 64 140 64 Q92 64 74 84 Z" fill="#0284C7" stroke="#0C4A6E" stroke-width="3.5" stroke-linejoin="round"/>`,
+        `<path d="M132 32 L144 6 L158 34 Z" fill="#0369A1" stroke="#0C4A6E" stroke-width="3" stroke-linejoin="round"/>`,
+        `<path d="M88 76 L98 90 L108 74 L118 90 L128 73 L140 90 L152 73 L162 90 L172 74 L182 90 L192 76" fill="#FFFFFF" stroke="#0C4A6E" stroke-width="2.2" stroke-linejoin="round"/>`,
+        `<circle cx="102" cy="52" r="6" fill="#FFFFFF" stroke="#0C4A6E" stroke-width="2"/><circle cx="103" cy="53" r="2.8" fill="#09090B"/>`,
+        `<circle cx="178" cy="52" r="6" fill="#FFFFFF" stroke="#0C4A6E" stroke-width="2"/><circle cx="177" cy="53" r="2.8" fill="#09090B"/>`,
+      );
+      break;
+    case 'mathe':
+      // Kính hóa trang mắt xoắn + mũi chú hề + ria vểnh trêu ngươi
+      parts.push(
+        `<circle cx="114" cy="112" r="20" fill="rgba(254,240,138,0.88)" stroke="#CA8A04" stroke-width="3.5"/>`,
+        `<circle cx="166" cy="112" r="20" fill="rgba(254,240,138,0.88)" stroke="#CA8A04" stroke-width="3.5"/>`,
+        `<line x1="134" y1="112" x2="146" y2="112" stroke="#CA8A04" stroke-width="4"/>`,
+        `<circle cx="111" cy="114" r="5.5" fill="#09090B"/><circle cx="170" cy="109" r="5.5" fill="#09090B"/>`,
+        `<circle cx="140" cy="134" r="12" fill="#EF4444" stroke="#7F1D1D" stroke-width="2.6"/><circle cx="136" cy="130" r="3.5" fill="#FFFFFF" opacity="0.85"/>`,
+      );
+      break;
     default:
       break;
+  }
+
+  if (c.detail === 'ranghe') {
+    // Hai chiếc răng thỏ / răng sún chìa ra siêu hài
+    parts.push(
+      `<rect x="131" y="156" width="8.5" height="11" rx="2" fill="#FFFFFF" stroke="#1E293B" stroke-width="2"/>`,
+      `<rect x="140.5" y="156" width="8.5" height="11" rx="2" fill="#FFFFFF" stroke="#1E293B" stroke-width="2"/>`,
+    );
   }
 
   if (c.outfit === 'hoangbao') {
@@ -489,12 +549,11 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
   const clothing = c.outfit && c.outfit !== 'none' ? outfitSpec.clothing : ageClothing;
   const clothesColor = stripHex(outfitSpec.color ?? col.hex);
 
-  // Kính / râu tự nhiên từ DiceBear
+  // Kính / râu tự nhiên từ DiceBear (bỏ tự gán kính công sở cho trung niên để giữ nét mặt biểu cảm bựa)
   let diceAcc: AccKey | undefined;
   if (c.accessory === 'kinhden' || c.accessory === 'kinhdiepvien') diceAcc = 'sunglasses';
   else if (c.accessory === 'docnhan') diceAcc = 'eyepatch';
   else if (c.accessory === 'bangdo') diceAcc = 'kurt';
-  else if (c.age === 'trung') diceAcc = 'prescription02';
 
   let facialHair: BeardKey | undefined;
   if (c.accessory === 'raukem' || look?.raucam) facialHair = 'beardLight';
@@ -504,11 +563,55 @@ export function characterSvgUri(cfg?: CharacterConfig, mood: Mood = 'normal'): s
 
   const moodSet = MOOD_FACE[mood];
   const baseEyes: EyesKey =
-    c.eyes === 'hip' ? 'squint' : c.eyes === 'to' ? 'surprised' : c.eyes === 'motmi' ? 'side' : 'default';
+    c.eyes === 'xoan'
+      ? 'xDizzy'
+      : c.eyes === 'tronnguoc'
+        ? 'eyeRoll'
+        : c.eyes === 'nhaybua'
+          ? 'winkWacky'
+          : c.eyes === 'traitim'
+            ? 'hearts'
+            : c.eyes === 'khoc'
+              ? 'cry'
+              : c.eyes === 'luon'
+                ? 'side'
+                : c.eyes === 'hip'
+                  ? 'happy'
+                  : c.eyes === 'to'
+                    ? 'surprised'
+                    : c.eyes === 'motmi'
+                      ? 'squint'
+                      : 'default';
+
   const baseBrows: BrowsKey =
-    c.brows === 'ray' || c.detail === 'longmay' ? 'default' : c.brows === 'lieu' ? 'raisedExcitedNatural' : 'defaultNatural';
+    c.detail === 'longmay'
+      ? 'unibrowNatural'
+      : look?.browshape === 'gap'
+        ? 'upDownNatural'
+        : c.brows === 'ray'
+          ? 'angryNatural'
+          : c.brows === 'lieu'
+            ? 'raisedExcitedNatural'
+            : 'defaultNatural';
+
   const baseMouth: MouthKey =
-    look?.mouth === 'cuoitu' ? 'twinkle' : look?.mouth === 'he' ? 'tongue' : look?.mouth === 'khep' ? 'default' : 'smile';
+    look?.mouth === 'oicauvong'
+      ? 'vomit'
+      : look?.mouth === 'rangsun'
+        ? 'grimace'
+        : look?.mouth === 'hetlon'
+          ? 'screamOpen'
+          : look?.mouth === 'leluoi' || look?.mouth === 'he'
+            ? 'tongue'
+            : look?.mouth === 'nhai'
+              ? 'eating'
+              : look?.mouth === 'hahoc'
+                ? 'disbelief'
+                : look?.mouth === 'cuoitu'
+                  ? 'twinkle'
+                  : look?.mouth === 'khep'
+                    ? 'default'
+                    : 'smile';
 
   const rawSvg = createAvatar(avataaars, {
     seed: key,

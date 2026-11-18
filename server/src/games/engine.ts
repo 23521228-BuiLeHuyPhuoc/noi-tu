@@ -1,5 +1,6 @@
 import type { ActionResult, GameAction, GameResult, GameView, RoomSettings } from '../../../shared/src/types';
 import type { CroakTickPayload } from '../../../shared/src/croaksquad';
+import type { BoomTickPayload } from '../../../shared/src/boom';
 import type { Dictionary, Rng } from '../dictionary';
 import type { ThrowImpulse } from '../../../shared/src/dice';
 
@@ -25,6 +26,10 @@ export interface EngineContext {
   changed: () => void;
   /** phát nhanh trạng thái vật lý 30Hz cho Đầm Lầy Quái Chiêu (`croaksquad`) */
   emitCroakTick?: (payload: CroakTickPayload) => void;
+  /** phát nhanh trạng thái vật lý 20Hz cho Đặt Bom Tử Chiến (`boom_online`) */
+  emitBoomTick?: (payload: BoomTickPayload) => void;
+  /** lấy bảng màu nhân vật trong phòng để đồng bộ màu quân / ếch / nhân vật đặt bom */
+  playerColor?: (playerId: string) => number;
   /** kết thúc ván */
   finish: (result: GameResult) => void;
   /** thay thế bộ mô phỏng xúc xắc 3D (test dùng để cho ra mặt xác định) */

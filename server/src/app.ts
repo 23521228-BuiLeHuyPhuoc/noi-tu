@@ -132,6 +132,10 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         if (payload.events.length > 0) io.to(room.code).emit('croak:tick', payload);
         else io.volatile.to(room.code).emit('croak:tick', payload);
       },
+      onBoomTick: (room, payload) => {
+        if (payload.events.length > 0) io.to(room.code).emit('boom:tick', payload);
+        else io.volatile.to(room.code).emit('boom:tick', payload);
+      },
     },
     onRoomChange: (room) => broadcastRoom(io, room),
   });

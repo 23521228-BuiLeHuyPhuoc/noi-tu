@@ -17,7 +17,7 @@ import { MotionSurface } from '../components/MotionPrimitives';
 const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
-  'ca_sau', 'tinh_mat', 'den_do', 'loto', 'caro', 'croaksquad',
+  'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
 ];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {

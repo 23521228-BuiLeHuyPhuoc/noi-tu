@@ -1,6 +1,13 @@
 import {
-  BOT_SKETCHES, VE_DOAN_COLORS, VE_DOAN_WIDTHS, VE_DOAN_WORDS,
-  type VeDoanGuessEntry, type VeDoanPhase, type VeDoanStroke, type VeDoanView,
+  BOT_SKETCHES,
+  getBotSketch,
+  VE_DOAN_COLORS,
+  VE_DOAN_WIDTHS,
+  VE_DOAN_WORDS,
+  type VeDoanGuessEntry,
+  type VeDoanPhase,
+  type VeDoanStroke,
+  type VeDoanView,
 } from '../../../shared/src/vedoan';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
@@ -57,13 +64,14 @@ export class VeDoanGame implements GameEngine {
   private secretWord = '';
   private revealedIdx = new Set<number>();
   private strokes: VeDoanStroke[] = [];
-  private botStrokeCursor = 0;
+  private botTargetSketch: VeDoanStroke[] = [];
   private guessed = new Set<string>();
   private feed: VeDoanGuessEntry[] = [];
   private feedSeq = 0;
   private finished = false;
 
   private readonly timer = new Timer();
+  private readonly botDrawTimer = new Timer();
   private hintTimers: ReturnType<typeof setTimeout>[] = [];
 
   constructor(private readonly ctx: EngineContext) {}
@@ -74,8 +82,55 @@ export class VeDoanGame implements GameEngine {
   }
 
   private clearHints(): void {
+    this.botDrawTimer.clear();
     for (const t of this.hintTimers) clearTimeout(t);
     this.hintTimers = [];
+  }
+
+  private shuffleArray<T>(items: readonly T[]): T[] {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const raw = this.ctx.rng();
+      const r = raw >= 1 ? 0.999999999 : raw < 0 ? 0 : raw;
+      const j = Math.floor(r * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  private pickWordChoices(drawerIsBot: boolean): string[] {
+    if (drawerIsBot) {
+      const sketchPool = this.shuffleArray(Object.keys(BOT_SKETCHES));
+      if (sketchPool.length >= 3) return sketchPool.slice(0, 3);
+      const rest = this.shuffleArray(VE_DOAN_WORDS.filter((w) => !(w in BOT_SKETCHES)));
+      return [...sketchPool, ...rest].slice(0, 3);
+    }
+    return this.shuffleArray(VE_DOAN_WORDS).slice(0, 3);
+  }
+
+  private botStrokeIntervalMs(): number {
+    const count = Math.max(4, this.botTargetSketch.length + 2);
+    if (this.ctx.turnMs) {
+      return Math.max(35, Math.min(420, Math.floor(this.phaseMs / count)));
+    }
+    return 420;
+  }
+
+  private scheduleNextBotStroke(): void {
+    this.botDrawTimer.clear();
+    if (this.finished || this.phase !== 'drawing' || !this.ctx.isBot?.(this.drawerId)) return;
+    if (this.strokes.length >= this.botTargetSketch.length || this.strokes.length >= 80) return;
+
+    this.botDrawTimer.set(this.botStrokeIntervalMs(), () => {
+      if (this.finished || this.phase !== 'drawing' || !this.ctx.isBot?.(this.drawerId)) return;
+      const next = this.botTargetSketch[this.strokes.length];
+      if (!next || this.strokes.length >= 80) return;
+      if (!this.strokes.some((s) => this.isSameStroke(s, next))) {
+        this.strokes.push(next);
+      }
+      this.scheduleNextBotStroke();
+      this.ctx.changed();
+    });
   }
 
   start(players: EnginePlayer[]): void {
@@ -111,20 +166,14 @@ export class VeDoanGame implements GameEngine {
     this.round = Math.floor(this.turnIndex / this.order.length) + 1;
     this.drawerId = this.order[this.turnIndex % this.order.length];
     this.strokes = [];
-    this.botStrokeCursor = 0;
+    this.botTargetSketch = [];
     this.guessed.clear();
     this.revealedIdx.clear();
     this.secretWord = '';
     this.feed = [];
 
-    const sketchWords = Object.keys(BOT_SKETCHES);
     const drawerIsBot = !!this.ctx.isBot?.(this.drawerId);
-    const shuffled = [...(drawerIsBot ? sketchWords : VE_DOAN_WORDS)];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(this.ctx.rng() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    this.wordOptions = shuffled.slice(0, 3);
+    this.wordOptions = this.pickWordChoices(drawerIsBot);
 
     this.enterPhase('pick_word', () => {
       this.beginDrawing(this.wordOptions[0] ?? 'mặt trời');
@@ -138,9 +187,13 @@ export class VeDoanGame implements GameEngine {
     this.secretWord = word;
     this.revealedIdx.clear();
     this.strokes = [];
-    this.botStrokeCursor = 0;
+    this.botTargetSketch = getBotSketch(word).map((s) => this.sanitizeStroke(s));
     this.guessed.clear();
     this.enterPhase('drawing', () => this.endTurn());
+
+    if (this.ctx.isBot?.(this.drawerId)) {
+      this.scheduleNextBotStroke();
+    }
 
     // Mở dần 2 ký tự gợi ý ở 40% và 72% thời gian vẽ
     const letterIndices = [...word].map((ch, idx) => (ch !== ' ' ? idx : -1)).filter((i) => i >= 0);
@@ -206,6 +259,21 @@ export class VeDoanGame implements GameEngine {
     return Math.max(0, Math.min(1000, Math.round(Number.isFinite(v) ? v : 0)));
   }
 
+  private sanitizeStroke(raw: VeDoanStroke): VeDoanStroke {
+    const color = (VE_DOAN_COLORS as readonly string[]).includes(raw.color) ? raw.color : '#111827';
+    const width = (VE_DOAN_WIDTHS as readonly number[]).includes(raw.width) ? raw.width : 9;
+    const points = raw.points.slice(0, 160).map(([x, y]): [number, number] => [this.clampPt(x), this.clampPt(y)]);
+    return { color, width, points };
+  }
+
+  private isSameStroke(a: VeDoanStroke, b: VeDoanStroke): boolean {
+    if (a.color !== b.color || a.width !== b.width || a.points.length !== b.points.length) return false;
+    for (let i = 0; i < a.points.length; i++) {
+      if (a.points[i][0] !== b.points[i][0] || a.points[i][1] !== b.points[i][1]) return false;
+    }
+    return true;
+  }
+
   action(playerId: string, action: GameAction): ActionResult {
     if (this.finished) return { ok: false, reason: 'not_playing' };
     if (!this.order.includes(playerId)) return { ok: false, reason: 'bad_action' };
@@ -221,10 +289,15 @@ export class VeDoanGame implements GameEngine {
     if (action.type === 'vd_stroke') {
       if (this.phase !== 'drawing' || playerId !== this.drawerId) return { ok: false, reason: 'not_your_turn' };
       if (this.strokes.length >= 80 || !action.stroke?.points?.length) return { ok: false, reason: 'bad_action' };
-      const color = (VE_DOAN_COLORS as readonly string[]).includes(action.stroke.color) ? action.stroke.color : '#111827';
-      const width = (VE_DOAN_WIDTHS as readonly number[]).includes(action.stroke.width) ? action.stroke.width : 9;
-      const pts = action.stroke.points.slice(0, 160).map(([x, y]): [number, number] => [this.clampPt(x), this.clampPt(y)]);
-      this.strokes.push({ color, width, points: pts });
+      const cleanStroke = this.sanitizeStroke(action.stroke);
+      if (this.ctx.isBot?.(playerId) && this.strokes.some((s) => this.isSameStroke(s, cleanStroke))) {
+        this.scheduleNextBotStroke();
+        return { ok: true };
+      }
+      this.strokes.push(cleanStroke);
+      if (this.ctx.isBot?.(playerId)) {
+        this.scheduleNextBotStroke();
+      }
       this.ctx.changed();
       return { ok: true };
     }
@@ -322,6 +395,10 @@ export class VeDoanGame implements GameEngine {
     if (this.names.has(playerId)) this.names.set(playerId, name);
   }
 
+  /**
+   * Thuần khiết 100% (không biến đổi trạng thái nội bộ) để an toàn khi `Room.scheduleBots()`
+   * gọi `botAction` cả lúc kiểm tra `.find()` lẫn bên trong `setTimeout`.
+   */
   botAction(playerId: string): GameAction | null {
     if (this.finished) return null;
     if (this.phase === 'pick_word' && playerId === this.drawerId) {
@@ -330,18 +407,20 @@ export class VeDoanGame implements GameEngine {
     }
     if (this.phase === 'drawing') {
       if (playerId === this.drawerId) {
-        const sketch = BOT_SKETCHES[this.secretWord];
-        if (sketch && this.botStrokeCursor < sketch.length) {
-          return { type: 'vd_stroke', stroke: sketch[this.botStrokeCursor++] };
+        const sketch = this.botTargetSketch.length > 0 ? this.botTargetSketch : getBotSketch(this.secretWord);
+        if (this.strokes.length < sketch.length) {
+          return { type: 'vd_stroke', stroke: sketch[this.strokes.length] };
         }
         return null;
       }
       if (!this.guessed.has(playerId) && this.strokes.length >= 1) {
         const elapsed = Date.now() - this.phaseStartedAt;
-        if (elapsed >= this.phaseMs * 0.35 && this.ctx.rng() < 0.55) {
-          if (this.ctx.rng() < 0.52) return { type: 'vd_guess', text: this.secretWord };
-          const wrong = VE_DOAN_WORDS[Math.floor(this.ctx.rng() * VE_DOAN_WORDS.length) % VE_DOAN_WORDS.length];
-          if (wrong && wrong !== this.secretWord) return { type: 'vd_guess', text: wrong };
+        if (elapsed >= this.phaseMs * 0.35) {
+          const hitChance = elapsed >= this.phaseMs * 0.65 ? 0.62 : 0.38;
+          if (this.ctx.rng() < hitChance) return { type: 'vd_guess', text: this.secretWord };
+          const pool = VE_DOAN_WORDS.filter((w) => w !== this.secretWord);
+          const wrong = pool[Math.floor(this.ctx.rng() * pool.length) % pool.length];
+          if (wrong) return { type: 'vd_guess', text: wrong };
         }
       }
     }

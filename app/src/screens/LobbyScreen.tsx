@@ -12,8 +12,6 @@ import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import { DO_VUI_DIFFICULTIES, DO_VUI_TOPICS, type DoVuiDifficulty } from '../../../shared/src/dovui';
 import { caroSizeForPlayers } from '../../../shared/src/caro';
 import { CA_SAU_ROUND_OPTIONS } from '../../../shared/src/casau';
-import { TINH_MAT_ROUND_OPTIONS } from '../../../shared/src/tinhmat';
-import { DEN_DO_ROUND_OPTIONS } from '../../../shared/src/dendo';
 import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES, type WordChainDifficulty, type WordChainRule } from '../../../shared/src/pos';
 import { CROAK_STAGES } from '../../../shared/src/croaksquad';
 import type { Game } from '../useGame';
@@ -31,9 +29,9 @@ import { Shell } from '../components/Shell';
 import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji } from '../components/Icons';
 
 const GAMES: GameType[] = [
-  'croaksquad', 'ca_sau', 'tinh_mat', 'den_do', 'loto', 'caro',
-  'masoi', 'do_vui', 'giandiep', 've_doan', 'bom_tu',
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
+  'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
+  'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
 ];
 
 const PRESET_ORDER: number[] = [
@@ -148,18 +146,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       <RoomManageCard game={game} room={room} />
 
-      {/* Đầm Lầy Quái Chiêu: Co-op người thật 100% không dùng máy; các game khác cho thêm máy */}
-      {room.gameType === 'croaksquad' ? (
-        <Card style={{ gap: 6, backgroundColor: '#ECFDF5', borderColor: '#10B981' }}>
-          <View testID="croak-coop-notice" style={styles.headIconRow}>
-            <EmojiIcon emoji="🐸" size={20} />
-            <T style={[styles.h3, { color: '#065F46' }]}>Co-op Người Thật 2–6 Người</T>
-          </View>
-          <T style={{ fontSize: 12.5, fontWeight: '700', color: '#047857', lineHeight: 18 }}>
-            Đầm Lầy Quái Chiêu không dùng máy giả — hãy gửi mã phòng <T style={{ fontWeight: '900' }}>{room.code}</T> cho bạn bè cùng vào phối hợp nuốt & bắn nhau qua vực!
-          </T>
-        </Card>
-      ) : (isHost || room.players.some((p) => p.bot)) && (
+      {/* Hỗ trợ thêm máy chơi cùng trên toàn bộ 15 game (kể cả Đầm Lầy Quái Chiêu, Đặt Bom & UNO!) */}
+      {(isHost || room.players.some((p) => p.bot)) && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
             <UiIcon name="Bot" size={18} color={C.ink} />
@@ -177,8 +165,8 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               small
               variant="gold"
               iconNode={<UiIcon name="Plus" size={15} color="#271400" />}
-              title={n >= room.maxPlayers ? 'Phòng đã đủ người' : 'Thêm máy chơi cùng'}
-              disabled={n >= room.maxPlayers}
+              title={n >= Math.min(room.maxPlayers, info.max) ? `Đã đủ tối đa ${Math.min(room.maxPlayers, info.max)} người` : 'Thêm máy chơi cùng'}
+              disabled={n >= Math.min(room.maxPlayers, info.max)}
               onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); }}
             />
           )}
@@ -550,46 +538,43 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      {room.gameType === 'tinh_mat' && (
+      {room.gameType === 'boom_online' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <EmojiIcon emoji="👀" size={18} />
-            <T style={styles.h3}>Số vòng Tinh Mắt Đập Nhanh</T>
+            <EmojiIcon emoji="💣" size={18} />
+            <T style={styles.h3}>Chế độ Đặt Bom Tử Chiến — Bản Vòng Bo</T>
           </View>
           <View style={styles.roundRow}>
-            {TINH_MAT_ROUND_OPTIONS.map((r) => (
-              <Button
-                key={r}
-                testID={`tinh-mat-rounds-${r}`}
-                small
-                variant={(room.settings.tinhMatRounds ?? 12) === r ? 'ink' : 'paper'}
-                title={`${r} vòng`}
-                disabled={!isHost}
-                style={{ flex: 1 }}
-                onPress={() => game.configure({ settings: { tinhMatRounds: r } })}
-              />
-            ))}
-          </View>
-        </Card>
-      )}
-
-      {room.gameType === 'den_do' && (
-        <Card style={{ gap: 8 }}>
-          <View style={styles.headIconRow}>
-            <EmojiIcon emoji="🚦" size={18} />
-            <T style={styles.h3}>Số nhịp Đèn Đỏ Đèn Xanh (Đích 100m)</T>
+            {[
+              { mode: 'ffa' as const, label: '🔥 Đấu Đơn Sinh Tồn' },
+              { mode: 'teams' as const, label: '🛡️ Đấu Đội (Đỏ vs Xanh)' },
+            ].map((opt) => {
+              const active = (room.settings.boomMode ?? 'ffa') === opt.mode;
+              return (
+                <Button
+                  key={opt.mode}
+                  testID={`boom-mode-${opt.mode}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={opt.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { boomMode: opt.mode } })}
+                />
+              );
+            })}
           </View>
           <View style={styles.roundRow}>
-            {DEN_DO_ROUND_OPTIONS.map((r) => (
+            {([1, 3, 5] as const).map((r) => (
               <Button
                 key={r}
-                testID={`den-do-rounds-${r}`}
+                testID={`boom-rounds-${r}`}
                 small
-                variant={(room.settings.denDoRounds ?? 14) === r ? 'ink' : 'paper'}
-                title={`${r} nhịp đèn`}
+                variant={(room.settings.boomRounds ?? 3) === r ? 'ink' : 'paper'}
+                title={`${r} hiệp`}
                 disabled={!isHost}
                 style={{ flex: 1 }}
-                onPress={() => game.configure({ settings: { denDoRounds: r } })}
+                onPress={() => game.configure({ settings: { boomRounds: r } })}
               />
             ))}
           </View>
@@ -1156,10 +1141,15 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
             value={myLook.mouth ?? 'khep'}
             color={myColor.hex}
             options={[
-              { id: 'khep', label: 'Mỉm cười khép môi' },
-              { id: 'cuoirang', label: 'Cười lộ răng' },
-              { id: 'cuoitu', label: 'Cười tươi rộng' },
-              { id: 'he', label: 'Môi hé nhẹ' },
+              { id: 'oicauvong', label: '🤮 Ói cầu vồng' },
+              { id: 'rangsun', label: '😬 Nhe răng khịa' },
+              { id: 'leluoi', label: '😛 Lè lưỡi trêu' },
+              { id: 'hetlon', label: '😱 Hét toáng' },
+              { id: 'nhai', label: '😋 Nhai nhồm nhoàm' },
+              { id: 'hahoc', label: '😮 Há hốc mồm' },
+              { id: 'cuoitu', label: '😁 Cười gian tà' },
+              { id: 'cuoirang', label: '😄 Cười lộ răng' },
+              { id: 'khep', label: '🙂 Khép môi' },
             ]}
             onPick={(v) => updateLook('mouth', v)}
           />

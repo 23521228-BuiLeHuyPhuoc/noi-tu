@@ -19,6 +19,7 @@ export class DoVuiGame implements GameEngine {
   private streaks = new Map<string, number>();
 
   private questions: DoVuiQuestion[] = [];
+  private currentQ: DoVuiQuestion | null = null;
   private index = 0;
   private phase: DoVuiPhase = 'question';
   private phaseEndsAt: number | null = null;
@@ -31,12 +32,30 @@ export class DoVuiGame implements GameEngine {
 
   constructor(private readonly ctx: EngineContext) {}
 
+  private shuffleQuestionOptions(q: DoVuiQuestion): DoVuiQuestion {
+    const perm: [0 | 1 | 2 | 3, 0 | 1 | 2 | 3, 0 | 1 | 2 | 3, 0 | 1 | 2 | 3] = [0, 1, 2, 3];
+    for (let i = perm.length - 1; i > 0; i--) {
+      const raw = this.ctx.rng();
+      const r = raw >= 1 ? 0.999999999 : raw < 0 ? 0 : raw;
+      const j = Math.floor(r * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    const options: [string, string, string, string] = [
+      q.options[perm[0]],
+      q.options[perm[1]],
+      q.options[perm[2]],
+      q.options[perm[3]],
+    ];
+    const correct = perm.indexOf(q.correct) as 0 | 1 | 2 | 3;
+    return { ...q, options, correct };
+  }
+
   private msFor(p: DoVuiPhase): number {
     if (p === 'reveal') {
       const def = REVEAL_SEC * 1000;
       return this.ctx.turnMs ? Math.min(def, Math.max(250, this.ctx.turnMs)) : def;
     }
-    const q = this.questions[this.index];
+    const q = this.currentQ ?? this.questions[this.index];
     const sec = q ? secondsForDoVuiLevel(q.difficulty) : 22;
     const def = sec * 1000;
     return this.ctx.turnMs ? Math.min(def, Math.max(250, this.ctx.turnMs)) : def;
@@ -57,6 +76,7 @@ export class DoVuiGame implements GameEngine {
       this.ctx.settings.doVuiDifficulty ?? 'mixed',
     );
     this.index = 0;
+    this.currentQ = null;
     this.startQuestion();
   }
 
@@ -76,6 +96,9 @@ export class DoVuiGame implements GameEngine {
       this.finishAll();
       return;
     }
+    const shuffled = this.shuffleQuestionOptions(this.questions[this.index]);
+    this.questions[this.index] = shuffled;
+    this.currentQ = shuffled;
     this.answers.clear();
     this.enterPhase('question', () => this.enterReveal());
     this.ctx.changed();
@@ -83,7 +106,7 @@ export class DoVuiGame implements GameEngine {
 
   private enterReveal(): void {
     if (this.finished) return;
-    const q = this.questions[this.index];
+    const q = this.currentQ ?? this.questions[this.index];
     const x2 = this.index >= Math.max(1, this.questions.length - 2);
     const endsAt = this.phaseEndsAt ?? Date.now();
 
@@ -165,7 +188,7 @@ export class DoVuiGame implements GameEngine {
 
   botAction(playerId: string): GameAction | null {
     if (this.finished || this.phase !== 'question' || this.answers.has(playerId)) return null;
-    const q = this.questions[this.index];
+    const q = this.currentQ ?? this.questions[this.index];
     if (!q) return null;
     // 65% chọn đáp án đúng, 35% chọn ngẫu nhiên để đua điểm vui vẻ
     const choice = this.ctx.rng() < 0.65 ? q.correct : Math.floor(this.ctx.rng() * 4) % 4;
@@ -173,7 +196,7 @@ export class DoVuiGame implements GameEngine {
   }
 
   view(viewerId?: string): DoVuiView {
-    const q = this.questions[Math.min(this.index, Math.max(0, this.questions.length - 1))];
+    const q = this.currentQ ?? this.questions[Math.min(this.index, Math.max(0, this.questions.length - 1))];
     const doublePoints = this.index >= Math.max(1, this.questions.length - 2);
     const isReveal = this.phase === 'reveal';
     const picks = isReveal
@@ -192,7 +215,7 @@ export class DoVuiGame implements GameEngine {
       selectedDifficulty: this.ctx.settings.doVuiDifficulty ?? 'mixed',
       difficulty: q?.difficulty,
       question: q?.q ?? '',
-      options: q?.options ?? ['', '', '', ''],
+      options: q ? ([...q.options] as [string, string, string, string]) : ['', '', '', ''],
       doublePoints,
       order: [...this.order],
       names: Object.fromEntries(this.names),

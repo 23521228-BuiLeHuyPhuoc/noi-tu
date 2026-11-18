@@ -1,64 +1,414 @@
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
-import { GIAN_DIEP_ROLE_META, type GianDiepRole, type GianDiepView } from '../../../shared/src/giandiep';
-import { themeById } from '../../../shared/src/themes';
-import type { PublicPlayer, RoomState } from '../../../shared/src/types';
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  GIAN_DIEP_ROLE_META,
+  type GianDiepFeedItem,
+  type GianDiepView,
+} from '../../../shared/src/giandiep';
+import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
-import { Button, Card, T } from '../ui';
-import { Shell, type StripOptions } from '../components/Shell';
+import { Button, T } from '../ui';
+import { useStableWindow } from '../hooks';
+import { Shell, useShellTools } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { EmojiIcon, UiIcon } from '../components/Icons';
-import { FlipCard } from '../components/MotionPrimitives';
 
-const PHASE_META: Record<GianDiepView['phase'], { title: string; emoji: string; hint: string }> = {
-  word_reveal: { title: 'Nhận Từ Khóa Bí Mật', emoji: '🔐', hint: 'Ghi nhớ từ khóa của bạn và giữ kín màn hình!' },
-  clue_turn: { title: 'Vòng Khai Gợi Ý', emoji: '🎤', hint: 'Lần lượt từng người mô tả 1 câu về từ khóa (không được nhắc trực tiếp từ đó).' },
-  discussion: { title: 'Thảo Luận Truy Tìm', emoji: '💬', hint: 'Ai nói trật khớp nhất? Trao đổi nhanh trước khi bỏ phiếu!' },
-  vote: { title: 'Bỏ Phiếu Loại Gián Điệp', emoji: '⚖️', hint: 'Chạm chọn người đáng nghi nhất để bỏ phiếu loại!' },
-  mrwhite_guess: { title: 'Cơ Hội Cuối Của Mr. White', emoji: '🤍', hint: 'Mr. White vừa bị loại! Nếu đoán đúng từ của Dân Thường, Mr. White sẽ lật kèo thắng!' },
+const PHASE_META: Record<GianDiepView['phase'], { title: string; emoji: string; accent: string; hint: string }> = {
+  word_reveal: {
+    title: 'Nhận Từ Khóa',
+    emoji: '🔐',
+    accent: '#0284C7',
+    hint: 'Ghi nhớ từ khóa ở góc phải trên (chạm để che khi ngồi cạnh bạn bè)!',
+  },
+  clue_turn: {
+    title: 'Khai Gợi Ý',
+    emoji: '🎤',
+    accent: '#16A34A',
+    hint: 'Lần lượt mô tả 1 câu về từ khóa — cấm nhắc trực tiếp từ bí mật!',
+  },
+  discussion: {
+    title: 'Thảo Luận',
+    emoji: '💬',
+    accent: '#2563EB',
+    hint: 'Đối chiếu lời khai & chat chất vấn ngay bên dưới trước khi bỏ phiếu!',
+  },
+  vote: {
+    title: 'Bỏ Phiếu Nghi Phạm',
+    emoji: '🗳️',
+    accent: '#D97706',
+    hint: 'Chạm trực tiếp vào Avatar nghi phạm ở hàng trên để bầu!',
+  },
+  defense: {
+    title: 'Pha Biện Minh',
+    emoji: '⚖️',
+    accent: '#DC2626',
+    hint: 'Nghi phạm cao phiếu nhất lên tiếng tự bào chữa trước cả phòng!',
+  },
+  final_vote: {
+    title: 'Phán Quyết Cuối',
+    emoji: '🔨',
+    accent: '#9333EA',
+    hint: 'Nghe biện minh xong — quyết định Trục Xuất hay Tha Bổng!',
+  },
+  mrwhite_guess: {
+    title: 'Mr. White Lật Kèo',
+    emoji: '🤍',
+    accent: '#475569',
+    hint: 'Mr. White đoán đúng từ của Dân Thường sẽ thắng ngược ngay lập tức!',
+  },
+  reveal_end: {
+    title: 'Lật Mở Từ Khóa',
+    emoji: '🔓',
+    accent: '#EAB308',
+    hint: 'Công bố toàn bộ thân phận & cặp từ khóa bí mật của cả bàn!',
+  },
 };
 
-export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) {
-  const view = room.game as GianDiepView;
-  const [wordVisible, setWordVisible] = useState(true);
-  const [clueText, setClueText] = useState('');
-  const [guessText, setGuessText] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+const QUICK_CHATS = [
+  'Ai mô tả chung chung quá vậy? 👀',
+  'Câu của bạn lệch hẳn chủ đề nha!',
+  'Coi chừng loại nhầm Dân Thường!',
+  'Nghi có Mr. White đang chép bài!',
+];
 
-  const { width } = useWindowDimensions();
-  const wide = width >= 720;
+function GianDiepBody({ game, room }: { game: Game; room: RoomState }) {
+  const view = room.game as GianDiepView;
+  const tools = useShellTools();
+  const { width, height } = useStableWindow();
+  const compact = height < 720 || width < 380;
+
+  const [wordVisible, setWordVisible] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const feedScrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
 
   const me = game.me ?? '';
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
   const aliveSet = useMemo(() => new Set(view.alive), [view.alive]);
+  const defSet = useMemo(() => new Set(view.defendants ?? []), [view.defendants]);
   const iAlive = aliveSet.has(me);
   const elimMap = useMemo(() => new Map(view.eliminated.map((e) => [e.id, e])), [view.eliminated]);
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);
+  const seatIndexMap = useMemo(() => new Map(view.order.map((id, idx) => [id, idx + 1])), [view.order]);
 
   const voteTally = useMemo(() => {
     const map: Record<string, number> = {};
+    if (view.phase === 'final_vote' && (view.defendants?.length ?? 0) > 1) {
+      for (const target of Object.values(view.finalVotes ?? {})) {
+        if (target !== 'skip') map[target] = (map[target] ?? 0) + 1;
+      }
+      return map;
+    }
     for (const target of Object.values(view.votes)) {
       if (target !== 'skip') map[target] = (map[target] ?? 0) + 1;
     }
     return map;
-  }, [view.votes]);
+  }, [view.votes, view.finalVotes, view.phase, view.defendants]);
 
-  const roundCluesByPlayer = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const c of view.clues) {
-      if (c.round === view.round) map[c.playerId] = c.text;
+  const timeline: GianDiepFeedItem[] = useMemo(() => {
+    if (view.timeline && view.timeline.length > 0) return view.timeline;
+    return view.clues.map((c) => ({
+      id: c.id,
+      round: c.round,
+      kind: 'clue' as const,
+      playerId: c.playerId,
+      name: c.name,
+      text: c.text,
+    }));
+  }, [view.timeline, view.clues]);
+
+  useEffect(() => {
+    const t = setTimeout(() => feedScrollRef.current?.scrollToEnd({ animated: true }), 60);
+    return () => clearTimeout(t);
+  }, [timeline.length, view.phase]);
+
+  const meta = PHASE_META[view.phase] ?? PHASE_META.discussion;
+
+  const act = async (payload: Parameters<Game['act']>[0]) => {
+    setBusy(true);
+    const res = await game.act(payload);
+    setBusy(false);
+    return res.ok;
+  };
+
+  const handleTapSuspect = async (targetId: string) => {
+    if (busy) return;
+    if (view.phase === 'vote' && iAlive && aliveSet.has(targetId) && targetId !== me) {
+      await act({ type: 'gd_vote', target: targetId });
+      return;
     }
-    return map;
-  }, [view.clues, view.round]);
+    if (
+      view.phase === 'final_vote' &&
+      (view.defendants?.length ?? 0) > 1 &&
+      iAlive &&
+      defSet.has(targetId) &&
+      targetId !== me
+    ) {
+      await act({ type: 'gd_verdict', verdict: targetId });
+      return;
+    }
+    if (targetId !== me) tools?.openPlayer(targetId);
+  };
 
-  const meta = PHASE_META[view.phase];
+  // Màn Lật Mở Toàn Bộ Từ Khóa cuối ván (Phase 33 yêu cầu đặc biệt)
+  if (view.phase === 'reveal_end' && view.revealedAll) {
+    return (
+      <View style={styles.root}>
+        <View style={[styles.revealHeader, sticker(3)]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <EmojiIcon emoji="🔓" size={22} />
+            <T style={styles.revealHeadline}>{view.wordPairReveal?.winnerHeadline ?? 'Kết quả ván đấu'}</T>
+          </View>
+          <View style={styles.wordCompareRow}>
+            <View style={[styles.wordBox, { backgroundColor: '#DCFCE7', borderColor: '#22C55E' }]}>
+              <T style={[styles.wordBoxRole, { color: '#15803D' }]}>🧑 TỪ DÂN THƯỜNG</T>
+              <T style={[styles.wordBoxVal, { color: '#14532D' }]}>{view.wordPairReveal?.wordA ?? '---'}</T>
+            </View>
+            <View style={[styles.wordBox, { backgroundColor: '#FFEDD5', borderColor: '#F97316' }]}>
+              <T style={[styles.wordBoxRole, { color: '#C2410C' }]}>🕵️ TỪ GIÁN ĐIỆP</T>
+              <T style={[styles.wordBoxVal, { color: '#7C2D12' }]}>{view.wordPairReveal?.wordB ?? '---'}</T>
+            </View>
+          </View>
+          <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} />
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.revealList}>
+          {view.revealedAll.map((item, idx) => {
+            const pl = playerMap.get(item.id);
+            const rMeta = GIAN_DIEP_ROLE_META[item.role];
+            return (
+              <View
+                key={item.id}
+                testID={`gd-reveal-${item.id}`}
+                style={[
+                  styles.revealRow,
+                  item.role === 'giandiep' && { borderColor: '#F97316', backgroundColor: '#FFF7ED' },
+                  item.role === 'mrwhite' && { borderColor: '#64748B', backgroundColor: '#F8FAFC' },
+                ]}
+              >
+                <View style={styles.seatNumBadge}>
+                  <T style={styles.seatNumTxt}>#{idx + 1}</T>
+                </View>
+                {pl && <Portrait p={pl} size={36} frame={pl.cosmetics?.frame} />}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T numberOfLines={1} style={styles.revealName}>{item.name}</T>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <EmojiIcon emoji={rMeta.emoji} size={13} />
+                    <T style={[styles.revealRoleTxt, { color: rMeta.color }]}>{rMeta.name}</T>
+                  </View>
+                </View>
+                <View style={styles.revealWordPill}>
+                  <T style={styles.revealWordTxt}>{item.word ? `«${item.word}»` : 'Giấy trắng'}</T>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        <Button
+          testID="gd-finish-reveal-btn"
+          variant="gold"
+          icon="🏆"
+          title="Sang bảng tổng kết ngay"
+          onPress={() => void act({ type: 'gd_ready' })}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      {/* 1. Thanh Đỉnh Gọn Nhẹ + Thẻ Từ Khóa Bí Mật 1 chạm */}
+      <View style={[styles.topCard, compact && { paddingVertical: 7, paddingHorizontal: 10 }]}>
+        <View style={styles.topRow}>
+          <View style={[styles.phasePill, { backgroundColor: meta.accent }]}>
+            <EmojiIcon emoji={meta.emoji} size={14} />
+            <T style={styles.phasePillTxt}>V{view.round} · {meta.title}</T>
+          </View>
+          <View style={styles.catBadge}>
+            <T numberOfLines={1} style={styles.catTxt}>🏷️ {view.category}</T>
+          </View>
+
+          <Pressable
+            testID="gd-secret-card"
+            onPress={() => setWordVisible((v) => !v)}
+            style={[styles.secretPill, !wordVisible && styles.secretPillHidden]}
+          >
+            <UiIcon name={wordVisible ? 'Eye' : 'Lock'} size={13} color="#FDE047" />
+            {wordVisible ? (
+              <T testID="gd-secret-word" numberOfLines={1} style={styles.secretPillWord}>
+                {view.myRole === 'mrwhite' ? 'MR. WHITE' : (view.myWord ?? '---')}
+              </T>
+            ) : (
+              <T style={styles.secretPillMask}>Đã che từ</T>
+            )}
+          </Pressable>
+        </View>
+        <T numberOfLines={1} style={styles.hintTxt}>{meta.hint}</T>
+        <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="gd-timer" />
+      </View>
+
+      {/* 2. DUY NHẤT 1 Hàng Avatar Nghi Phạm Đánh Số #1..#N (Bỏ hoàn toàn lặp 2 hàng avatar!) */}
+      <View style={styles.suspectWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suspectScroll}>
+          {view.order.map((id, idx) => {
+            const pl = playerMap.get(id);
+            const alive = aliveSet.has(id);
+            const elim = elimMap.get(id);
+            const isSpeaking = view.currentSpeakerId === id;
+            const isDef = defSet.has(id);
+            const myVotedThis =
+              (view.phase === 'vote' && view.votes[me] === id) ||
+              (view.phase === 'final_vote' && view.finalVotes?.[me] === id);
+            const votes = voteTally[id] ?? 0;
+            const votable =
+              (view.phase === 'vote' && iAlive && alive && id !== me) ||
+              (view.phase === 'final_vote' && (view.defendants?.length ?? 0) > 1 && iAlive && isDef && id !== me);
+
+            return (
+              <Pressable
+                key={id}
+                testID={`gd-seat-${id}`}
+                onPress={() => void handleTapSuspect(id)}
+                style={[
+                  styles.suspectTile,
+                  compact && { width: 68, paddingVertical: 5 },
+                  isSpeaking && styles.suspectSpeaking,
+                  isDef && styles.suspectDefendant,
+                  myVotedThis && styles.suspectVoted,
+                  votable && !myVotedThis && styles.suspectVotable,
+                  !alive && styles.suspectDead,
+                ]}
+              >
+                <View style={[styles.seatBadge, id === me && { backgroundColor: C.gold }]}>
+                  <T style={[styles.seatBadgeTxt, id === me && { color: '#1E293B' }]}>#{idx + 1}</T>
+                </View>
+
+                {votes > 0 && alive && (
+                  <View style={styles.voteCountBadge}>
+                    <T style={styles.voteCountTxt}>🗳️{votes}</T>
+                  </View>
+                )}
+
+                {pl ? (
+                  <Portrait p={pl} size={compact ? 32 : 36} border={2} />
+                ) : (
+                  <UiIcon name="User" size={26} color={C.muted} />
+                )}
+
+                <NameText
+                  fx={pl?.cosmetics?.nameFx}
+                  numberOfLines={1}
+                  style={[styles.suspectName, !alive && styles.deadName]}
+                >
+                  {view.names[id] ?? id}
+                </NameText>
+
+                <T numberOfLines={1} style={[
+                  styles.suspectSub,
+                  isDef ? { color: '#DC2626' } : isSpeaking ? { color: '#15803D' } : undefined,
+                ]}>
+                  {!alive && elim
+                    ? `${GIAN_DIEP_ROLE_META[elim.role].emoji} ${GIAN_DIEP_ROLE_META[elim.role].name}`
+                    : isDef
+                      ? '⚖️ Bị cáo'
+                      : isSpeaking
+                        ? '🎤 Đang khai'
+                        : votable
+                          ? (myVotedThis ? '✓ Đã bầu' : 'Chạm bầu')
+                          : id === me
+                            ? 'Bạn'
+                            : 'Đang nghe'}
+                </T>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* 3. Khung Lịch Sử Hợp Nhất (Miêu Tả + Biện Minh + Chat Suy Luận) — Luôn hiện giữa màn hình! */}
+      <View style={styles.feedContainer}>
+        <View style={styles.feedHeader}>
+          <EmojiIcon emoji="🕵️" size={14} />
+          <T style={styles.feedHeaderTitle}>Hồ Sơ Lời Khai & Thảo Luận Trực Tiếp</T>
+          <T style={styles.feedCountTxt}>{view.alive.length}/{view.order.length} còn lại</T>
+        </View>
+
+        <ScrollView
+          ref={feedScrollRef}
+          style={styles.feedScroll}
+          contentContainerStyle={styles.feedContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {timeline.map((item) => {
+            if (item.kind === 'system') {
+              return (
+                <View key={item.id} style={styles.sysRow}>
+                  <T style={styles.sysTxt}>{item.text}</T>
+                </View>
+              );
+            }
+            const seatNo = item.playerId ? seatIndexMap.get(item.playerId) : undefined;
+            const isMine = item.playerId === me;
+            const isClue = item.kind === 'clue';
+            const isDef = item.kind === 'defense';
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.msgCard,
+                  isClue && styles.msgClue,
+                  isDef && styles.msgDefense,
+                  !isClue && !isDef && (isMine ? styles.msgChatMine : styles.msgChat),
+                ]}
+              >
+                <View style={styles.msgMetaRow}>
+                  <T style={[
+                    styles.msgTag,
+                    isClue ? { color: '#15803D' } : isDef ? { color: '#B91C1C' } : { color: '#1D4ED8' },
+                  ]}>
+                    {isClue ? `🎤 GỢI Ý V${item.round}` : isDef ? '⚖️ BIỆN MINH' : '💬 THẢO LUẬN'}
+                  </T>
+                  <T numberOfLines={1} style={styles.msgAuthor}>
+                    {seatNo ? `#${seatNo} ` : ''}{item.name}
+                  </T>
+                </View>
+                <T style={[styles.msgBody, isClue && { fontWeight: '800' }]}>
+                  {isClue ? `«${item.text}»` : item.text}
+                </T>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+
+  // Ghi chú: Thanh điều khiển đáy ghim qua `bottom` của `<Shell>` bên ngoài để tự nâng khi bật bàn phím
+}
+
+export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) {
+  const view = room.game as GianDiepView;
+  const me = game.me ?? '';
+  const aliveSet = useMemo(() => new Set(view.alive), [view.alive]);
+  const defSet = useMemo(() => new Set(view.defendants ?? []), [view.defendants]);
+  const iAlive = aliveSet.has(me);
+  const iAmDefendant = defSet.has(me);
+
+  const [inputVal, setInputVal] = useState('');
+  const [guessVal, setGuessVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [phaseKey, setPhaseKey] = useState('');
+
+  const curPhaseKey = `${view.phase}:${view.currentSpeakerId ?? ''}`;
+  if (phaseKey !== curPhaseKey) {
+    setPhaseKey(curPhaseKey);
+    if (err !== null) setErr(null);
+  }
 
   const act = async (payload: Parameters<Game['act']>[0]) => {
     setBusy(true);
@@ -69,359 +419,496 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
     return res.ok;
   };
 
-  const submitClue = async () => {
-    const clean = clueText.trim();
-    if (!clean || busy) return;
-    const ok = await act({ type: 'gd_clue', text: clean });
-    if (ok) setClueText('');
-  };
-
-  const submitGuess = async () => {
-    const clean = guessText.trim();
-    if (!clean || busy) return;
-    const ok = await act({ type: 'gd_guess', word: clean });
-    if (ok) setGuessText('');
-  };
-
-  const strip: StripOptions = useMemo(
-    () => ({
-      order: view.order,
-      active: view.currentSpeakerId,
-      dim: (p: PublicPlayer) => !aliveSet.has(p.id),
-      ring: (p: PublicPlayer) => (view.votes[me] === p.id ? C.gold : !aliveSet.has(p.id) ? '#64748B' : undefined),
-      sub: (p: PublicPlayer) => {
-        if (!aliveSet.has(p.id)) return 'Đã loại';
-        if (view.phase === 'vote' && voteTally[p.id]) return `${voteTally[p.id]} phiếu`;
-        if (view.currentSpeakerId === p.id) return 'Đang nói';
-        if (roundCluesByPlayer[p.id]) return 'Đã khai';
-        return undefined;
-      },
-    }),
-    [view.order, view.currentSpeakerId, view.phase, view.votes, aliveSet, voteTally, roundCluesByPlayer, me],
-  );
-
   const renderBottom = () => {
+    if (view.phase === 'reveal_end') return undefined;
+
     if (view.phase === 'mrwhite_guess') {
       if (view.mrWhiteId === me) {
+        const submitGuess = async () => {
+          const clean = guessVal.trim();
+          if (!clean || busy) return;
+          if (await act({ type: 'gd_guess', word: clean })) setGuessVal('');
+        };
         return (
           <KeyboardLift>
             <View style={styles.dock}>
-              <T style={[styles.dockNote, { color: theme.onBg }]}>Đoán đúng từ khóa của phe Dân Thường để THẮNG NGƯỢC!</T>
-              {err && <T style={styles.err}>{err}</T>}
+              <T style={[styles.dockStatus, { color: '#FDE047' }]}>
+                🤍 Cơ hội cuối! Đoán đúng từ của Dân Thường để LẬT KÈO THẮNG!
+              </T>
+              {err && <T style={styles.errTxt}>{err}</T>}
               <View style={styles.inputRow}>
                 <TextInput
                   testID="gd-mrwhite-input"
-                  value={guessText}
-                  onChangeText={setGuessText}
+                  value={guessVal}
+                  onChangeText={setGuessVal}
                   onSubmitEditing={submitGuess}
-                  placeholder="Nhập từ khóa của Dân Thường..."
+                  placeholder="Nhập từ khóa phe Dân Thường..."
                   placeholderTextColor={C.muted}
                   maxLength={50}
                   style={styles.input}
                 />
-                <Button testID="gd-mrwhite-submit" disabled={busy || !guessText.trim()} title="Chốt!" onPress={submitGuess} />
+                <Button testID="gd-mrwhite-submit" disabled={busy || !guessVal.trim()} title="Chốt!" onPress={submitGuess} />
               </View>
             </View>
           </KeyboardLift>
         );
       }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đang chờ Mr. White {view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ…</T>;
+      return (
+        <T style={styles.waitTxt}>
+          🤍 Đang hồi hộp chờ Mr. White {view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ khóa…
+        </T>
+      );
     }
 
     if (!iAlive) {
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Bạn đã bị loại khỏi vòng suy luận. Theo dõi xem ai là Gián Điệp nhé!</T>;
+      return (
+        <T style={styles.waitTxt}>
+          👻 Bạn đã rời vòng suy luận — cùng xem mọi người đấu trí nhé!
+        </T>
+      );
     }
 
-    if (view.phase === 'clue_turn') {
-      if (view.currentSpeakerId === me) {
-        return (
-          <KeyboardLift>
-            <View style={styles.dock}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <EmojiIcon emoji="🎤" size={16} />
-                <T style={[styles.dockNote, { color: '#4ADE80' }]}>
-                  Tới lượt bạn mô tả! (Tránh nhắc thẳng «{view.myWord ?? '...'}»)
-                </T>
-              </View>
-              {err && (
-                <View style={styles.errBanner}>
-                  <UiIcon name="ShieldAlert" size={15} color="#FFFFFF" />
-                  <T style={styles.errBannerTxt}>{err}</T>
-                </View>
-              )}
-              <View style={styles.inputRow}>
-                <TextInput
-                  testID="gd-clue-input"
-                  value={clueText}
-                  onChangeText={(t) => { setClueText(t); if (err) setErr(null); }}
-                  onSubmitEditing={submitClue}
-                  placeholder="Nhập gợi ý ngắn gọn..."
-                  placeholderTextColor={C.muted}
-                  maxLength={80}
-                  style={styles.input}
-                />
-                <Button testID="gd-clue-submit" disabled={busy || !clueText.trim()} iconNode={<UiIcon name="Send" size={15} color="#271400" />} title="Gửi" onPress={submitClue} />
-              </View>
+    // Pha 1: Tới lượt mình khai gợi ý
+    if (view.phase === 'clue_turn' && view.currentSpeakerId === me) {
+      const submitClue = async () => {
+        const clean = inputVal.trim();
+        if (!clean || busy) return;
+        if (await act({ type: 'gd_clue', text: clean })) setInputVal('');
+      };
+      return (
+        <KeyboardLift>
+          <View style={styles.dock}>
+            <T style={[styles.dockStatus, { color: '#4ADE80' }]}>
+              🎤 Tới lượt bạn khai! (Cấm gõ thẳng từ «{view.myWord ?? '...'}»)
+            </T>
+            {err && <T style={styles.errTxt}>{err}</T>}
+            <View style={styles.inputRow}>
+              <TextInput
+                testID="gd-clue-input"
+                value={inputVal}
+                onChangeText={(t) => { setInputVal(t); if (err) setErr(null); }}
+                onSubmitEditing={submitClue}
+                placeholder="Nhập câu mô tả khéo léo..."
+                placeholderTextColor={C.muted}
+                maxLength={80}
+                style={styles.input}
+              />
+              <Button testID="gd-clue-submit" disabled={busy || !inputVal.trim()} title="Khai" onPress={submitClue} />
             </View>
-          </KeyboardLift>
+          </View>
+        </KeyboardLift>
+      );
+    }
+
+    // Pha Biện Minh: nếu mình là Bị cáo
+    if (view.phase === 'defense' && iAmDefendant) {
+      const myReady = view.readySkip.includes(me);
+      const submitDef = async () => {
+        const clean = inputVal.trim();
+        if (!clean || busy) return;
+        if (await act({ type: 'gd_defense', text: clean })) setInputVal('');
+      };
+      return (
+        <KeyboardLift>
+          <View style={styles.dock}>
+            <T style={[styles.dockStatus, { color: '#FCA5A5' }]}>
+              ⚖️ BẠN ĐANG BỊ NGHI NGỜ CAO NHẤT! Hãy biện minh tự cứu mình:
+            </T>
+            {err && <T style={styles.errTxt}>{err}</T>}
+            <View style={styles.inputRow}>
+              <TextInput
+                testID="gd-defense-input"
+                value={inputVal}
+                onChangeText={(t) => { setInputVal(t); if (err) setErr(null); }}
+                onSubmitEditing={submitDef}
+                placeholder="Nhập lời bào chữa thuyết phục cả phòng..."
+                placeholderTextColor={C.muted}
+                maxLength={120}
+                style={styles.input}
+              />
+              <Button testID="gd-defense-submit" disabled={busy || !inputVal.trim()} title="Nói" onPress={submitDef} />
+              <Button
+                testID="gd-defense-done"
+                variant="paper"
+                disabled={busy || myReady}
+                title={myReady ? 'Đã xong' : 'Xong'}
+                onPress={() => void act({ type: 'gd_ready' })}
+              />
+            </View>
+          </View>
+        </KeyboardLift>
+      );
+    }
+
+    // Pha Phán Quyết cuối cùng (sau Biện Minh)
+    if (view.phase === 'final_vote') {
+      const defs = view.defendants ?? [];
+      const myVerdict = view.finalVotes?.[me];
+      if (defs.length === 1) {
+        const accId = defs[0];
+        const accName = view.names[accId] ?? accId;
+        if (accId === me && view.alive.length > 2) {
+          return (
+            <T style={styles.waitTxt}>
+              ⚖️ Cả phòng đang bỏ phiếu phán quyết số phận của bạn…
+            </T>
+          );
+        }
+        return (
+          <View style={styles.dock}>
+            <T style={[styles.dockStatus, { color: '#E9D5FF' }]}>
+              🔨 Phán quyết cho {accName}: {myVerdict === 'banish' ? 'Đã chọn TRỤC XUẤT' : myVerdict === 'forgive' ? 'Đã chọn THA BỔNG' : 'Hãy ra quyết định!'}
+            </T>
+            {err && <T style={styles.errTxt}>{err}</T>}
+            <View style={styles.inputRow}>
+              <Button
+                testID="gd-verdict-banish"
+                variant="danger"
+                disabled={busy}
+                icon="👎"
+                title={`Trục xuất ${accName}`}
+                onPress={() => void act({ type: 'gd_verdict', verdict: 'banish' })}
+                style={{ flex: 1 }}
+              />
+              <Button
+                testID="gd-verdict-forgive"
+                variant="jade"
+                disabled={busy}
+                icon="👍"
+                title="Tha bổng"
+                onPress={() => void act({ type: 'gd_verdict', verdict: 'forgive' })}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
         );
       }
-      return <T style={[styles.waitNote, { color: theme.onBg }]}>Đang nghe {view.names[view.currentSpeakerId ?? ''] ?? 'bạn chơi'} mô tả từ khóa…</T>;
-    }
 
-    if (view.phase === 'discussion') {
-      const myReady = view.readySkip.includes(me);
-      const needReady = Math.max(1, Math.ceil(view.alive.length / 2));
       return (
         <View style={styles.dock}>
-          {err && <T style={styles.err}>{err}</T>}
+          <T style={[styles.dockStatus, { color: '#E9D5FF' }]}>
+            🔨 Chạm vào 1 trong các bị cáo đồng phiếu ở hàng trên để loại!
+          </T>
           <Button
-            testID="gd-ready-btn"
-            variant={myReady ? 'jade' : 'ink'}
-            disabled={busy || myReady}
-            iconNode={<UiIcon name={myReady ? 'CheckCircle2' : 'Zap'} size={17} color={myReady ? '#FFFFFF' : C.gold} />}
-            title={
-              myReady
-                ? `Đã sẵn sàng bỏ phiếu (${view.readySkip.length}/${needReady})`
-                : `Vào bỏ phiếu ngay (${view.readySkip.length}/${needReady})`
-            }
-            onPress={() => act({ type: 'gd_ready' })}
+            testID="gd-verdict-skip"
+            variant="paper"
+            disabled={busy}
+            icon="🏳️"
+            title={myVerdict === 'skip' ? 'Đã chọn Tha cả hai' : 'Tha bổng (Phiếu trắng)'}
+            onPress={() => void act({ type: 'gd_verdict', verdict: 'skip' })}
           />
         </View>
       );
     }
 
-    if (view.phase === 'vote') {
-      const myVote = view.votes[me];
-      const votedText = myVote === 'skip' ? 'Đã bỏ phiếu trắng' : myVote ? `Đang chọn loại: ${view.names[myVote]}` : null;
-      return (
+    // Mặc định (Đang nghe người khác khai / Thảo luận / Bỏ phiếu / Nghe biện minh): Luôn có ô Chat thảo luận trực tiếp!
+    const sendChatLine = async (raw?: string) => {
+      const clean = (raw ?? inputVal).trim();
+      if (!clean || busy) return;
+      if (await act({ type: 'gd_chat', text: clean })) {
+        if (!raw) setInputVal('');
+      }
+    };
+
+    const myReady = view.readySkip.includes(me);
+    const needReady = Math.max(1, Math.ceil(view.alive.length / 2));
+    const myVote = view.votes[me];
+
+    return (
+      <KeyboardLift>
         <View style={styles.dock}>
-          {votedText && <T style={[styles.dockNote, { color: '#6EE7B7' }]}>{votedText}</T>}
-          {err && <T style={styles.err}>{err}</T>}
-          <View style={styles.inputRow}>
-            <Button
-              testID="gd-vote-btn"
-              disabled={!selected || busy}
-              icon={selected ? '⚖️' : undefined}
-              title={selected ? `Loại ${view.names[selected]}` : 'Chạm chọn 1 người ở trên'}
-              onPress={async () => {
-                if (selected && (await act({ type: 'gd_vote', target: selected }))) setSelected(null);
-              }}
-              style={{ flex: 2 }}
-            />
-            <Button
-              testID="gd-skip-vote"
-              variant="paper"
-              disabled={busy}
-              icon="🏳️"
-              title="Bỏ qua"
-              onPress={async () => {
-                await act({ type: 'gd_vote', target: 'skip' });
-                setSelected(null);
-              }}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </View>
-      );
-    }
+          {err && <T style={styles.errTxt}>{err}</T>}
 
-    return <T style={[styles.waitNote, { color: theme.onBg }]}>{meta.hint}</T>;
-  };
+          {view.phase === 'discussion' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
+              {QUICK_CHATS.map((q) => (
+                <Pressable key={q} onPress={() => void sendChatLine(q)} style={styles.quickChip}>
+                  <T style={styles.quickChipTxt}>{q}</T>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
 
-  const roleBadge = (r: GianDiepRole | null) => {
-    if (!r) return null;
-    if (r === 'mrwhite') return GIAN_DIEP_ROLE_META.mrwhite;
-    return { name: 'Người giữ từ khóa', emoji: '🃏', color: '#1E293B', desc: GIAN_DIEP_ROLE_META[r].desc };
-  };
-  const shownMeta = roleBadge(view.myRole);
-
-  return (
-    <Shell game={game} room={room} strip={strip} bottom={renderBottom()}>
-      <View style={[styles.phaseBanner, sticker(3)]}>
-        <View style={styles.phaseTop}>
-          <EmojiIcon emoji={meta.emoji} size={20} />
-          <T style={styles.phaseTitle}>{meta.title} · Vòng {view.round}</T>
-          <View style={styles.catBadge}>
-            <EmojiIcon emoji="🏷️" size={13} />
-            <T style={styles.catTxt}>{view.category}</T>
-          </View>
-        </View>
-        <T style={styles.phaseHint}>{meta.hint}</T>
-        <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="gd-timer" />
-      </View>
-
-      <FlipCard flipped={!wordVisible}>
-        <Pressable testID="gd-secret-card" onPress={() => setWordVisible((v) => !v)} style={[styles.secretCard, sticker(3)]}>
-          <View style={styles.secretHead}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <UiIcon name="Fingerprint" size={14} color="#94A3B8" />
-              <T style={styles.secretLabel}>TỪ KHÓA BÍ MẬT CỦA BẠN</T>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <UiIcon name={wordVisible ? 'EyeOff' : 'Eye'} size={13} color="#CBD5E1" />
-              <T style={styles.tapHint}>{wordVisible ? 'Chạm để che' : 'Chạm để xem'}</T>
-            </View>
-          </View>
-          {wordVisible ? (
-            <View style={styles.secretBody}>
-              {view.myRole === 'mrwhite' ? (
-                <>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <EmojiIcon emoji="🤍" size={24} />
-                    <T testID="gd-secret-word" style={[styles.secretWord, { color: '#FDE047' }]}>BẠN LÀ MR. WHITE</T>
-                  </View>
-                  <T style={styles.secretSub}>Không có từ khóa! Hãy nghe lời khai của mọi người để suy luận nhé.</T>
-                </>
-              ) : (
-                <>
-                  <T testID="gd-secret-word" style={styles.secretWord}>{view.myWord ?? '---'}</T>
-                  <T style={styles.secretSub}>
-                    {shownMeta?.desc ?? 'Mô tả khéo léo để đồng đội nhận ra nhau, đừng để Gián Điệp chép bài!'}
-                  </T>
-                </>
-              )}
-            </View>
-          ) : (
-            <View style={styles.secretHidden}>
-              <UiIcon name="Lock" size={20} color="#CBD5E1" />
-              <T style={styles.secretHiddenTxt}>Đang che từ khóa (chạm để mở lại)</T>
+          {view.phase === 'vote' && (
+            <View style={styles.voteActionRow}>
+              <T numberOfLines={1} style={[styles.dockStatus, { flex: 1, textAlign: 'left', color: '#FDE047' }]}>
+                {myVote === 'skip'
+                  ? '🏳️ Đã bỏ phiếu trắng'
+                  : myVote
+                    ? `🗳️ Đang bầu loại: ${view.names[myVote]}`
+                    : '👆 Chạm nghi phạm ở hàng trên để bầu!'}
+              </T>
+              <Button
+                testID="gd-skip-vote"
+                variant="paper"
+                disabled={busy}
+                icon="🏳️"
+                title="Bỏ qua"
+                onPress={() => void act({ type: 'gd_vote', target: 'skip' })}
+              />
             </View>
           )}
-        </Pressable>
-      </FlipCard>
 
-      <View style={styles.grid}>
-        {view.order.map((id) => {
-          const player = playerMap.get(id);
-          const alive = aliveSet.has(id);
-          const elim = elimMap.get(id);
-          const isTurn = view.currentSpeakerId === id;
-          const picked = selected === id;
-          const votes = voteTally[id] ?? 0;
-          const clue = roundCluesByPlayer[id];
-          const clickable = view.phase === 'vote' && iAlive && alive && id !== me;
-
-          return (
-            <Pressable
-              key={id}
-              testID={`gd-seat-${id}`}
-              onPress={() => clickable && setSelected((p) => (p === id ? null : id))}
-              style={[
-                styles.seat,
-                { flexBasis: wide ? '31.5%' : '48%' },
-                isTurn && styles.seatSpeaking,
-                picked && styles.seatPicked,
-                !alive && styles.seatDead,
-              ]}
-            >
-              <View style={styles.seatTop}>
-                {player ? (
-                  <Portrait p={player} size={38} frame={player.cosmetics?.frame} pet={player.cosmetics?.pet} />
-                ) : (
-                  <UiIcon name={alive ? 'User' : 'XCircle'} size={24} color={alive ? C.muted : C.danger} />
-                )}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <NameText fx={player?.cosmetics?.nameFx} style={[styles.seatName, !alive && styles.deadName]}>
-                    {view.names[id] ?? id}
-                  </NameText>
-                  {!alive && elim ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <EmojiIcon emoji={GIAN_DIEP_ROLE_META[elim.role].emoji} size={12} />
-                      <T style={styles.elimTag}>{GIAN_DIEP_ROLE_META[elim.role].name}</T>
-                    </View>
-                  ) : isTurn ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <EmojiIcon emoji="🎤" size={12} />
-                      <T style={styles.turnTag}>Đang khai…</T>
-                    </View>
-                  ) : votes > 0 ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <EmojiIcon emoji="🗳️" size={12} />
-                      <T style={styles.voteTag}>{votes} phiếu</T>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-              <View style={styles.clueBubble}>
-                <T style={styles.clueBubbleTxt}>
-                  {clue ? `"${clue}"` : alive ? (isTurn ? 'Đang suy nghĩ câu mô tả…' : 'Chưa tới lượt nói') : 'Đã dừng cuộc chơi'}
-                </T>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {view.clues.length > 0 && (
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <EmojiIcon emoji="🗒️" size={16} />
-            <T style={styles.secTitle}>Biên Bản Các Vòng</T>
+          <View style={styles.inputRow}>
+            <TextInput
+              testID="gd-chat-input"
+              value={inputVal}
+              onChangeText={(t) => { setInputVal(t); if (err) setErr(null); }}
+              onSubmitEditing={() => void sendChatLine()}
+              placeholder={
+                view.phase === 'clue_turn'
+                  ? `Đang nghe ${view.names[view.currentSpeakerId ?? ''] ?? ''} khai — chat bàn luận...`
+                  : 'Chat suy luận trực tiếp với cả phòng...'
+              }
+              placeholderTextColor={C.muted}
+              maxLength={120}
+              style={styles.input}
+            />
+            <Button
+              testID="gd-chat-send"
+              disabled={busy || !inputVal.trim()}
+              iconNode={<UiIcon name="Send" size={14} color="#271400" />}
+              title="Gửi"
+              onPress={() => void sendChatLine()}
+            />
+            {view.phase === 'discussion' && (
+              <Button
+                testID="gd-ready-btn"
+                variant={myReady ? 'jade' : 'ink'}
+                disabled={busy || myReady}
+                title={myReady ? `✓ ${view.readySkip.length}/${needReady}` : `Vote (${view.readySkip.length}/${needReady})`}
+                onPress={() => void act({ type: 'gd_ready' })}
+              />
+            )}
           </View>
-          <View style={{ gap: 4 }}>
-            {view.clues.slice(-12).reverse().map((c) => (
-              <T key={c.id} style={styles.histLine}>
-                <T style={{ fontWeight: '900' }}>[V{c.round}] {c.name}: </T>«{c.text}»
-              </T>
-            ))}
-          </View>
-        </Card>
-      )}
+        </View>
+      </KeyboardLift>
+    );
+  };
+
+  return (
+    <Shell game={game} room={room} scroll={false} hideStrip bottom={renderBottom()}>
+      <GianDiepBody game={game} room={room} />
     </Shell>
   );
 }
 
 const styles = StyleSheet.create({
-  phaseBanner: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 13, gap: 6 },
-  phaseTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  phaseTitle: { fontSize: 16, fontWeight: '900', fontFamily: FONT, color: C.ink, flex: 1 },
-  catBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: 'rgba(217,119,6,0.28)' },
-  catTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
-  phaseHint: { fontSize: 12, fontWeight: '700', color: C.muted },
+  root: { flex: 1, gap: 8, minHeight: 0 },
 
-  secretCard: { backgroundColor: '#1E293B', borderRadius: 20, padding: 14, gap: 6 },
-  secretHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  secretLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.7, color: '#94A3B8' },
-  tapHint: { fontSize: 11, fontWeight: '700', color: '#CBD5E1' },
-  secretBody: { alignItems: 'center', paddingVertical: 4, gap: 4 },
-  secretWord: { fontSize: 24, fontWeight: '900', color: '#FDE047', textAlign: 'center', fontFamily: FONT },
-  secretSub: { fontSize: 12, color: '#E2E8F0', textAlign: 'center', fontWeight: '600' },
-  secretHidden: { paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  secretHiddenTxt: { color: '#CBD5E1', fontWeight: '800', fontSize: 13 },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' },
-  seat: {
-    flexGrow: 1, minWidth: 138, maxWidth: '49%', backgroundColor: '#FFFFFF',
-    borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.14)', padding: 10, gap: 6,
+  topCard: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 16,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    gap: 5,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.14)',
   },
-  seatSpeaking: { borderColor: C.jade, borderWidth: 2.5, backgroundColor: '#F0FDF4' },
-  seatPicked: { borderColor: C.gold, borderWidth: 2.5, backgroundColor: '#FEFCE8' },
-  seatDead: { opacity: 0.58, backgroundColor: '#E2E8F0' },
-  seatTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  seatName: { fontSize: 13, fontWeight: '900', color: C.ink },
-  deadName: { textDecorationLine: 'line-through', color: C.muted },
-  elimTag: { fontSize: 11, fontWeight: '800', color: '#DC2626' },
-  turnTag: { fontSize: 11, fontWeight: '900', color: C.jadeDeep },
-  voteTag: { fontSize: 11, fontWeight: '900', color: '#B45309' },
-  clueBubble: { backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, borderWidth: 1, borderColor: '#E2E8F0' },
-  clueBubbleTxt: { fontSize: 12, fontWeight: '700', color: '#334155', fontStyle: 'italic' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'nowrap' },
+  phasePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  phasePillTxt: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', fontFamily: FONT },
+  catBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: 'rgba(217,119,6,0.3)',
+    maxWidth: 110,
+  },
+  catTxt: { fontSize: 11, fontWeight: '800', color: '#92400E' },
 
-  secTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
-  histLine: { fontSize: 12, fontWeight: '600', color: C.ink },
+  secretPill: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#FACC15',
+    maxWidth: 155,
+  },
+  secretPillHidden: { borderColor: '#64748B', backgroundColor: '#1E293B' },
+  secretPillWord: { color: '#FDE047', fontSize: 12, fontWeight: '900', fontFamily: FONT },
+  secretPillMask: { color: '#CBD5E1', fontSize: 11, fontWeight: '800' },
+  hintTxt: { fontSize: 11.5, fontWeight: '700', color: '#475569' },
 
-  dock: { gap: 8 },
-  dockNote: { fontSize: 13, fontWeight: '800', textAlign: 'center', color: C.ink },
-  waitNote: { fontSize: 13, fontWeight: '800', textAlign: 'center', color: C.muted, paddingVertical: 6 },
-  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  suspectWrap: {
+    backgroundColor: 'rgba(15,23,42,0.28)',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  suspectScroll: { gap: 6, paddingHorizontal: 4 },
+  suspectTile: {
+    width: 74,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    gap: 2,
+    borderWidth: 2,
+    borderColor: 'rgba(15,23,42,0.12)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  suspectSpeaking: { borderColor: '#16A34A', backgroundColor: '#F0FDF4' },
+  suspectDefendant: { borderColor: '#DC2626', backgroundColor: '#FEF2F2' },
+  suspectVoted: { borderColor: '#EAB308', backgroundColor: '#FEFCE8' },
+  suspectVotable: { borderColor: '#60A5FA' },
+  suspectDead: { opacity: 0.52, backgroundColor: '#CBD5E1' },
+
+  seatBadge: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    zIndex: 3,
+    backgroundColor: '#1E293B',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  seatBadgeTxt: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '900' },
+  voteCountBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    zIndex: 3,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  voteCountTxt: { color: '#92400E', fontSize: 9.5, fontWeight: '900' },
+  suspectName: { fontSize: 11, fontWeight: '900', color: C.ink, maxWidth: '100%' },
+  deadName: { textDecorationLine: 'line-through', color: '#64748B' },
+  suspectSub: { fontSize: 9.5, fontWeight: '800', color: '#64748B' },
+
+  feedContainer: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.14)',
+    overflow: 'hidden',
+  },
+  feedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: '#F1F5F9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  feedHeaderTitle: { flex: 1, fontSize: 12, fontWeight: '900', color: '#1E293B' },
+  feedCountTxt: { fontSize: 11, fontWeight: '800', color: '#64748B' },
+  feedScroll: { flex: 1 },
+  feedContent: { padding: 10, gap: 6 },
+
+  sysRow: {
+    alignSelf: 'center',
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginVertical: 2,
+  },
+  sysTxt: { fontSize: 11, fontWeight: '800', color: '#334155', textAlign: 'center' },
+
+  msgCard: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 2,
+    borderWidth: 1,
+  },
+  msgClue: { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+  msgDefense: { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1.5 },
+  msgChat: { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+  msgChatMine: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  msgMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  msgTag: { fontSize: 10, fontWeight: '900', letterSpacing: 0.3 },
+  msgAuthor: { fontSize: 11.5, fontWeight: '900', color: '#0F172A', flex: 1 },
+  msgBody: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
+
+  dock: { gap: 6 },
+  dockStatus: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
+  waitTxt: { fontSize: 12.5, fontWeight: '800', textAlign: 'center', color: '#E2E8F0', paddingVertical: 4 },
+  errTxt: { fontSize: 11.5, fontWeight: '800', color: '#FCA5A5', textAlign: 'center' },
+  quickRow: { gap: 6, paddingBottom: 2 },
+  quickChip: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.16)',
+  },
+  quickChipTxt: { fontSize: 11, fontWeight: '800', color: '#1E293B' },
+  voteActionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   input: {
-    flex: 1, backgroundColor: '#FFFFFF', borderColor: 'rgba(28,32,36,0.22)', borderWidth: 1.5,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, color: C.ink, fontSize: 14, fontWeight: '700',
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(28,32,36,0.22)',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    color: C.ink,
+    fontSize: 13.5,
+    fontWeight: '700',
   },
-  err: { fontSize: 12, fontWeight: '800', color: '#FCA5A5', textAlign: 'center' },
-  errBanner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: C.danger, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+
+  revealHeader: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    gap: 8,
   },
-  errBannerTxt: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  revealHeadline: { flex: 1, fontSize: 14, fontWeight: '900', color: C.ink, fontFamily: FONT },
+  wordCompareRow: { flexDirection: 'row', gap: 8 },
+  wordBox: { flex: 1, borderRadius: 12, padding: 8, borderWidth: 1.5, alignItems: 'center', gap: 2 },
+  wordBoxRole: { fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
+  wordBoxVal: { fontSize: 16, fontWeight: '900', fontFamily: FONT, textAlign: 'center' },
+  revealList: { gap: 6, paddingVertical: 4 },
+  revealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.12)',
+  },
+  seatNumBadge: { backgroundColor: '#1E293B', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  seatNumTxt: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  revealName: { fontSize: 13, fontWeight: '900', color: C.ink },
+  revealRoleTxt: { fontSize: 11.5, fontWeight: '800' },
+  revealWordPill: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  revealWordTxt: { color: '#FDE047', fontSize: 12.5, fontWeight: '900' },
 });

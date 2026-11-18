@@ -6,8 +6,8 @@ import type { VeDoanStroke, VeDoanView } from './vedoan';
 import type { BomTuView } from './bomtu';
 import type { DoVuiView } from './dovui';
 import type { CaSauAction, CaSauView } from './casau';
-import type { TinhMatAction, TinhMatView } from './tinhmat';
-import type { DenDoAction, DenDoView } from './dendo';
+import type { BoomAction, BoomMode, BoomTickPayload, BoomView } from './boom';
+import type { UnoMercyAction, UnoMercyView } from './unomercy';
 import type { LotoView } from './loto';
 import type { CaroSizeMode, CaroView } from './caro';
 import type { CroakInput, CroakSquadView, CroakTickPayload } from './croaksquad';
@@ -30,12 +30,12 @@ export type GameType =
   | 've_doan'
   | 'bom_tu'
   | 'do_vui'
-  | 'ca_sau'
-  | 'tinh_mat'
-  | 'den_do'
   | 'loto'
   | 'caro'
-  | 'croaksquad';
+  | 'croaksquad'
+  | 'ca_sau'
+  | 'boom_online'
+  | 'uno_mercy';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
@@ -48,12 +48,12 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
   ve_doan: { name: 'Vẽ & Đoán', min: 2, max: 12 },
   bom_tu: { name: 'Bom chữ', min: 2, max: 12 },
   do_vui: { name: 'Đố vui', min: 1, max: 12 },
-  ca_sau: { name: 'Khám răng cá sấu', min: 2, max: 12 },
-  tinh_mat: { name: 'Tinh mắt đập nhanh', min: 2, max: 12 },
-  den_do: { name: 'Đèn đỏ đèn xanh', min: 2, max: 12 },
   loto: { name: 'Lô tô hội chợ', min: 2, max: 12 },
   caro: { name: 'Cờ caro', min: 2, max: 4 },
   croaksquad: { name: 'Đầm lầy quái chiêu', min: 2, max: 6 },
+  ca_sau: { name: 'Khám răng cá sấu', min: 2, max: 12 },
+  boom_online: { name: 'Đặt bom tử chiến', min: 2, max: 12 },
+  uno_mercy: { name: 'UNO Tàn nhẫn', min: 2, max: 12 },
 };
 
 export interface RoomSettings {
@@ -87,10 +87,10 @@ export interface RoomSettings {
   doVuiDifficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
   /** Khám răng cá sấu: số hiệp */
   caSauRounds?: number;
-  /** Tinh mắt đập nhanh: số vòng */
-  tinhMatRounds?: number;
-  /** Đèn đỏ đèn xanh: số nhịp đèn tối đa */
-  denDoRounds?: number;
+  /** Đặt bom tử chiến: chế độ Đấu Đơn (FFA) hoặc Đấu Đội (Đỏ vs Xanh) */
+  boomMode?: BoomMode;
+  /** Đặt bom tử chiến: số hiệp thắng trước / tổng số hiệp */
+  boomRounds?: 1 | 3 | 5;
   /** Lô tô: tự động chấm số hay để người chơi tự dò kịch tính */
   lotoAutoMark?: boolean;
   /** Cờ caro: luật chặn 2 đầu */
@@ -131,9 +131,9 @@ export const CHARACTER_FACES: CharacterFace[] = ['tron', 'ovalngan', 'oval', 'ov
 /** dáng người ở vai: gầy, vừa, mũm mĩm, vai rộng cơ bắp */
 export type CharacterBuild = 'gay' | 'vua' | 'mum' | 'khoe';
 export const CHARACTER_BUILDS: CharacterBuild[] = ['gay', 'vua', 'mum', 'khoe'];
-/** kiểu mắt: mặc định theo giới, híp, to tròn, một mí */
-export type CharacterEyes = 'macdinh' | 'hip' | 'to' | 'motmi';
-export const CHARACTER_EYES: CharacterEyes[] = ['macdinh', 'hip', 'to', 'motmi'];
+/** kiểu mắt: mặc định theo giới, híp, to tròn, một mí + kho mắt bựa meme (xoắn ốc, trợn ngược, nháy bựa, trái tim, khóc ròng, lươn lẹo) */
+export type CharacterEyes = 'macdinh' | 'hip' | 'to' | 'xoan' | 'tronnguoc' | 'nhaybua' | 'traitim' | 'khoc' | 'luon' | 'motmi';
+export const CHARACTER_EYES: CharacterEyes[] = ['macdinh', 'hip', 'to', 'xoan', 'tronnguoc', 'nhaybua', 'traitim', 'khoc', 'luon', 'motmi'];
 /** kiểu lông mày: mặc định, rậm, lá liễu */
 export type CharacterBrows = 'macdinh' | 'ray' | 'lieu';
 export const CHARACTER_BROWS: CharacterBrows[] = ['macdinh', 'ray', 'lieu'];
@@ -146,13 +146,16 @@ export type CharacterAccessory =
   | 'prideghim' | 'prideco' | 'pridetoc' | 'pridebang'
   // thêm: vương miện, kính cyber, tai mèo, sừng quỷ, vòng thiên thần, mặt nạ sói, kính điệp viên, hoa cài tóc, tai nghe gaming, kẹo mút, mặt nạ hổ, bịt mắt hải tặc
   | 'vuongmien' | 'kinhcyber' | 'taimeo' | 'sungquy' | 'vongthienthan' | 'matnasoi'
-  | 'kinhdiepvien' | 'hoacaitoc' | 'tainghe' | 'keomut' | 'matnaho' | 'docnhan';
+  | 'kinhdiepvien' | 'hoacaitoc' | 'tainghe' | 'keomut' | 'matnaho' | 'docnhan'
+  // phụ kiện meme bựa: kính Thug Life pixel, bong bóng nước mũi, mũ cá mập đớp đầu, kính mắt lò xo hề
+  | 'kinhthug' | 'nuocmui' | 'noncamap' | 'mathe';
 export const CHARACTER_ACCESSORIES: CharacterAccessory[] = [
   'none', 'kinhden', 'raukem', 'ria', 'nonla', 'nonbh', 'bangdo',
   'khautrang', 'muihe', 'taitho', 'bangcanhan', 'troc', 'mahong',
   'prideghim', 'prideco', 'pridetoc', 'pridebang',
   'vuongmien', 'kinhcyber', 'taimeo', 'sungquy', 'vongthienthan', 'matnasoi',
   'kinhdiepvien', 'hoacaitoc', 'tainghe', 'keomut', 'matnaho', 'docnhan',
+  'kinhthug', 'nuocmui', 'noncamap', 'mathe',
 ];
 
 /** chi tiết khuôn mặt: nốt ruồi, tàn nhang, lông mày rậm, răng hô, má lúm */
@@ -187,7 +190,8 @@ export const LOOK_OPTIONS = {
   browshape: ['ngang', 'cong', 'mem', 'gap', 'lieu'], browthick: ['mong', 'vua', 'day'],
   // mũi & miệng
   nose: ['thap', 'vua', 'ro'], nosetip: ['nho', 'tron', 'day'], nostril: ['hep', 'vua', 'rong'],
-  lipthick: ['mong', 'duoi', 'day'], lipcolor: ['hongnau', 'cam', 'do'], mouth: ['khep', 'cuoirang', 'cuoitu', 'he'],
+  lipthick: ['mong', 'duoi', 'day'], lipcolor: ['hongnau', 'cam', 'do'],
+  mouth: ['khep', 'cuoirang', 'cuoitu', 'he', 'oicauvong', 'rangsun', 'hetlon', 'leluoi', 'nhai', 'hahoc'],
   molepos: ['moi', 'ma', 'cam'],
   // tóc
   haircolor: ['den', 'nauden', 'nau', 'highlight'], part: ['lech', 'khong'], volume: ['sat', 'vua', 'cao'], sides: ['gon', 'sat'], babyhair: ['khong', 'co'],
@@ -343,8 +347,8 @@ export type GameView =
   | BomTuView
   | DoVuiView
   | CaSauView
-  | TinhMatView
-  | DenDoView
+  | BoomView
+  | UnoMercyView
   | LotoView
   | CaroView
   | CroakSquadView;
@@ -560,8 +564,11 @@ export type GameAction =
   | { type: 'ms_vote'; target: string | 'skip' }
   | { type: 'ms_hunter'; target: string | 'skip' }
   | { type: 'gd_clue'; text: string }
+  | { type: 'gd_chat'; text: string }
+  | { type: 'gd_defense'; text: string }
   | { type: 'gd_ready' }
   | { type: 'gd_vote'; target: string | 'skip' }
+  | { type: 'gd_verdict'; verdict: string }
   | { type: 'gd_guess'; word: string }
   | { type: 'vd_pick'; word: string }
   | { type: 'vd_stroke'; stroke: VeDoanStroke }
@@ -571,8 +578,8 @@ export type GameAction =
   | { type: 'bt_submit'; word: string }
   | { type: 'dv_answer'; choice: 0 | 1 | 2 | 3 }
   | CaSauAction
-  | TinhMatAction
-  | DenDoAction
+  | BoomAction
+  | UnoMercyAction
   | { type: 'loto_mark'; num: number }
   | { type: 'loto_kinh'; row: 0 | 1 | 2 }
   | { type: 'caro_move'; row: number; col: number }
@@ -923,6 +930,8 @@ export interface ServerToClientEvents {
   'room:state': (s: RoomState) => void;
   /** đồng bộ vật lý 30Hz nhẹ cho Đầm Lầy Quái Chiêu (`croaksquad`) */
   'croak:tick': (p: CroakTickPayload) => void;
+  /** đồng bộ vật lý 20Hz nhẹ cho Đặt Bom Tử Chiến (`boom_online`) */
+  'boom:tick': (p: BoomTickPayload) => void;
   'fun:event': (e: FunEvent) => void;
   'chat:msg': (m: ChatMsg) => void;
   'chat:history': (ms: ChatMsg[]) => void;

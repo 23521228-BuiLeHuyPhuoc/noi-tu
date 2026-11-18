@@ -23,22 +23,23 @@ import { useLocalTheme, useSmoothMode } from '../smoothMode';
 import { EmojiIcon, RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
 import { MotionSurface } from '../components/MotionPrimitives';
 
+// Sắp xếp chuẩn theo thứ tự thời gian ra mắt: Game Cũ ở trên → Game Mới ở dưới!
 const GAMES: GameType[] = [
-  'croaksquad',
-  'ca_sau',
-  'tinh_mat',
-  'den_do',
-  'loto',
-  'caro',
-  'masoi',
-  'do_vui',
-  'giandiep',
-  've_doan',
-  'bom_tu',
   'wordchain',
   'wordchain_en',
   'baucua',
   'typhu',
+  'masoi',
+  'giandiep',
+  've_doan',
+  'bom_tu',
+  'do_vui',
+  'loto',
+  'caro',
+  'croaksquad',
+  'ca_sau',
+  'boom_online',
+  'uno_mercy',
 ];
 
 type HomeFragment = 'games' | 'rooms' | 'shop' | 'profile';
@@ -53,42 +54,43 @@ const FRAGMENTS: { id: HomeFragment; label: string; emoji: string }[] = [
 type Category = 'all' | 'party' | 'hidden' | 'coop' | 'word' | 'classic';
 const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[] }[] = [
   { id: 'all', label: 'Tất cả (15)', icon: 'LayoutGrid' },
-  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['ca_sau', 'tinh_mat', 'den_do', 've_doan', 'bom_tu', 'do_vui'] },
+  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui', 'ca_sau', 'boom_online', 'uno_mercy'] },
   { id: 'hidden', label: 'Ẩn Vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
-  { id: 'coop', label: 'Co-op & Cờ', icon: 'Swords', games: ['croaksquad', 'caro'] },
-  { id: 'classic', label: 'Hội Chợ', icon: 'Dices', games: ['loto', 'baucua', 'typhu'] },
+  { id: 'coop', label: 'Co-op & Cờ', icon: 'Swords', games: ['caro', 'croaksquad', 'boom_online'] },
+  { id: 'classic', label: 'Hội Chợ', icon: 'Dices', games: ['baucua', 'typhu', 'loto', 'uno_mercy'] },
   { id: 'word', label: 'Từ Vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
 ];
 
 const BADGE_FOR: Partial<Record<GameType, { text: string; grad: readonly [string, string] }>> = {
-  croaksquad: { text: '60FPS 2D', grad: ['#10B981', '#047857'] },
-  ca_sau: { text: 'CỰC CĂNG', grad: ['#16A34A', '#14532D'] },
-  tinh_mat: { text: 'PHẢN XẠ', grad: ['#0284C7', '#1E3A8A'] },
-  den_do: { text: 'HOT TREND', grad: ['#E11D48', '#881337'] },
+  boom_online: { text: 'MỚI · VÒNG BO', grad: ['#EF4444', '#991B1B'] },
+  uno_mercy: { text: 'MỚI · NO MERCY', grad: ['#EA580C', '#7C2D12'] },
+  croaksquad: { text: 'CO-OP + BOT', grad: ['#10B981', '#047857'] },
+  ca_sau: { text: 'HÀM 3D MỚI', grad: ['#16A34A', '#14532D'] },
   loto: { text: 'HỘI CHỢ', grad: ['#F59E0B', '#B45309'] },
   caro: { text: 'BÀN KHỦNG', grad: ['#06B6D4', '#0E7490'] },
-  masoi: { text: 'BẢN 2.0', grad: ['#7C3AED', '#4C1D95'] },
+  masoi: { text: 'WOLVESVILLE', grad: ['#7C3AED', '#4C1D95'] },
+  giandiep: { text: 'BIỆN MINH', grad: ['#4F46E5', '#312E81'] },
   do_vui: { text: 'IT QUIZ', grad: ['#2563EB', '#1E3A8A'] },
   baucua: { text: 'LỘC x3', grad: ['#EA580C', '#9A3412'] },
   typhu: { text: 'MUA ĐỨT', grad: ['#16A34A', '#14532D'] },
 };
 
 const GAME_TILE_GRAD: Record<GameType, readonly [string, string]> = {
-  croaksquad: ['#A7F3D0', '#34D399'],
-  ca_sau: ['#BBF7D0', '#22C55E'],
-  tinh_mat: ['#BAE6FD', '#38BDF8'],
-  den_do: ['#FECDD3', '#FB7185'],
-  loto: ['#FDE68A', '#FBBF24'],
-  caro: ['#99F6E4', '#2DD4BF'],
+  wordchain: ['#FEF08A', '#FACC15'],
+  wordchain_en: ['#E0E7FF', '#818CF8'],
+  baucua: ['#FED7AA', '#F97316'],
+  typhu: ['#A7F3D0', '#10B981'],
   masoi: ['#DDD6FE', '#A78BFA'],
   giandiep: ['#C7D2FE', '#818CF8'],
   ve_doan: ['#F5D0FE', '#E879F9'],
   bom_tu: ['#FED7AA', '#FB923C'],
   do_vui: ['#BFDBFE', '#60A5FA'],
-  wordchain: ['#FEF08A', '#FACC15'],
-  wordchain_en: ['#E0E7FF', '#818CF8'],
-  baucua: ['#FED7AA', '#F97316'],
-  typhu: ['#A7F3D0', '#10B981'],
+  loto: ['#FDE68A', '#FBBF24'],
+  caro: ['#99F6E4', '#2DD4BF'],
+  croaksquad: ['#A7F3D0', '#34D399'],
+  ca_sau: ['#BBF7D0', '#22C55E'],
+  boom_online: ['#BAE6FD', '#0284C7'],
+  uno_mercy: ['#FECACA', '#EF4444'],
 };
 
 export function HomeScreen({ game }: { game: Game }) {

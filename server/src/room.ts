@@ -23,12 +23,13 @@ import { VeDoanGame } from './games/vedoan';
 import { BomTuGame } from './games/bomtu';
 import { DoVuiGame } from './games/dovui';
 import { CaSauGame } from './games/casau';
-import { TinhMatGame } from './games/tinhmat';
-import { DenDoGame } from './games/dendo';
+import { BoomOnlineGame } from './games/boom';
+import { UnoMercyGame } from './games/unomercy';
 import { LotoGame } from './games/loto';
 import { CaroGame } from './games/caro';
 import { CroakSquadGame } from './games/croaksquad';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
+import type { BoomTickPayload } from '../../shared/src/boom';
 
 export interface RoomOptions {
   /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
@@ -38,6 +39,8 @@ export interface RoomOptions {
   onChange?: (room: Room) => void;
   /** phát khung vật lý 30Hz cho Đầm Lầy Quái Chiêu */
   onCroakTick?: (room: Room, payload: CroakTickPayload) => void;
+  /** phát khung vật lý 20Hz cho Đặt Bom Tử Chiến */
+  onBoomTick?: (room: Room, payload: BoomTickPayload) => void;
   /** ván vừa kết thúc (để cộng thành tích cho tài khoản) */
   onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null; winnerIds?: string[] }) => void;
   /** cả phòng duyệt một từ mới */
@@ -81,8 +84,8 @@ const BOT_THINK_MS: Record<GameType, [number, number]> = {
   wordchain: [1500, 3200], wordchain_en: [1500, 3200], baucua: [700, 2200], typhu: [900, 1700],
   masoi: [300, 700], giandiep: [350, 750],
   ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
-  ca_sau: [450, 950], tinh_mat: [420, 900], den_do: [300, 680],
   loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
+  ca_sau: [450, 950], boom_online: [999999, 999999], uno_mercy: [620, 1250],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -139,11 +142,10 @@ export class Room {
 
   // ---------- máy chơi ----------
 
-  /** Chủ phòng thêm một người chơi máy (chỉ ở phòng chờ; Đầm lầy quái chiêu chỉ cho người thật co-op). */
+  /** Chủ phòng thêm một người chơi máy (hỗ trợ toàn bộ 15 game, kể cả Đầm Lầy Quái Chiêu & Đặt Bom!). */
   addBot(byId: string): Result<{ playerId: string }> {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
     if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
-    if (this.gameType === 'croaksquad') return { ok: false, error: 'bad_request' };
     if (this.players.length >= MAX_PLAYERS) return { ok: false, error: 'room_full' };
     if (this.phase === 'finished') this.backToLobby();
     const used = new Set(this.players.map((p) => p.name.toLowerCase()));
@@ -241,9 +243,15 @@ export class Room {
   private spreadCharacter(): CharacterConfig {
     const n = this.players.length;
     const r = this.spreadSeed;
-    const accs = CHARACTER_ACCESSORIES.filter((a) => !a.startsWith('pride') && a !== 'khautrang');
-    const mouths = ['khep', 'cuoirang', 'cuoitu', 'he'] as const;
-    const brows = ['ngang', 'cong', 'mem', 'gap', 'lieu'] as const;
+    const goofyAccs: CharacterAccessory[] = [
+      'kinhthug', 'nuocmui', 'noncamap', 'mathe', 'muihe', 'bangcanhan',
+      'taitho', 'taimeo', 'sungquy', 'vuongmien', 'kinhcyber', 'keomut',
+    ];
+    const goofyEyes: CharacterEyes[] = [
+      'nhaybua', 'tronnguoc', 'xoan', 'traitim', 'luon', 'khoc', 'to', 'hip',
+    ];
+    const mouths = ['leluoi', 'rangsun', 'oicauvong', 'hetlon', 'nhai', 'hahoc', 'cuoitu', 'cuoirang'] as const;
+    const brows = ['gap', 'cong', 'ngang', 'mem', 'lieu'] as const;
     const noses = ['thap', 'vua', 'ro'] as const;
     const vols = ['sat', 'vua', 'cao'] as const;
     const tilts = ['thang', 'trai', 'phai'] as const;
@@ -255,10 +263,10 @@ export class Room {
       skin: (n * 3 + r) % SKIN_TONES,
       face: CHARACTER_FACES[(n * 3 + r) % CHARACTER_FACES.length],
       build: CHARACTER_BUILDS[(n + r) % CHARACTER_BUILDS.length],
-      eyes: CHARACTER_EYES[(n * 3 + r) % CHARACTER_EYES.length],
+      eyes: goofyEyes[(n * 3 + r) % goofyEyes.length],
       brows: CHARACTER_BROWS[(n * 2 + r) % CHARACTER_BROWS.length],
-      accessory: accs[(n * 7 + r) % accs.length],
-      detail: CHARACTER_DETAILS[(n + r) % CHARACTER_DETAILS.length],
+      accessory: goofyAccs[(n * 5 + r) % goofyAccs.length],
+      detail: CHARACTER_DETAILS[(n * 2 + r) % CHARACTER_DETAILS.length],
       outfit: CHARACTER_OUTFITS[(n * 2 + r) % CHARACTER_OUTFITS.length],
       look: {
         mouth: mouths[(n * 3 + r) % mouths.length],
@@ -577,13 +585,13 @@ export class Room {
       if (settings.caSauRounds !== 3 && settings.caSauRounds !== 4 && settings.caSauRounds !== 6) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, caSauRounds: settings.caSauRounds };
     }
-    if (settings?.tinhMatRounds !== undefined) {
-      if (settings.tinhMatRounds !== 8 && settings.tinhMatRounds !== 12 && settings.tinhMatRounds !== 16) return { ok: false, error: 'bad_request' };
-      this.settings = { ...this.settings, tinhMatRounds: settings.tinhMatRounds };
+    if (settings?.boomMode !== undefined) {
+      if (settings.boomMode !== 'ffa' && settings.boomMode !== 'teams') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, boomMode: settings.boomMode };
     }
-    if (settings?.denDoRounds !== undefined) {
-      if (settings.denDoRounds !== 10 && settings.denDoRounds !== 14 && settings.denDoRounds !== 18) return { ok: false, error: 'bad_request' };
-      this.settings = { ...this.settings, denDoRounds: settings.denDoRounds };
+    if (settings?.boomRounds !== undefined) {
+      if (settings.boomRounds !== 1 && settings.boomRounds !== 3 && settings.boomRounds !== 5) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, boomRounds: settings.boomRounds };
     }
     if (settings?.lotoAutoMark !== undefined) {
       if (typeof settings.lotoAutoMark !== 'boolean') return { ok: false, error: 'bad_request' };
@@ -607,11 +615,6 @@ export class Room {
       }
       this.settings = { ...this.settings, roomTheme: settings.roomTheme };
     }
-    // đổi sang Đầm lầy quái chiêu: tự dọn các máy chơi để chỉ giữ người thật co-op
-    if (this.gameType === 'croaksquad' && this.phase !== 'playing') {
-      const botIds = this.players.filter((p) => p.bot).map((p) => p.id);
-      for (const bid of botIds) this.players = this.players.filter((x) => x.id !== bid);
-    }
     // đổi game sau khi kết thúc thì quay về phòng chờ (riêng đổi map thì giữ nguyên màn hiện tại)
     if (!themeOnly && this.phase === 'finished') this.backToLobby();
     this.changed();
@@ -621,9 +624,6 @@ export class Room {
   start(byId: string): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
     if (this.phase !== 'lobby') return { ok: false, error: 'bad_request' };
-    if (this.gameType === 'croaksquad' && this.players.some((p) => p.bot)) {
-      this.players = this.players.filter((p) => !p.bot);
-    }
     const info = GAME_INFO[this.gameType];
     if (this.players.length < info.min) return { ok: false, error: 'too_few_players' };
     if (this.players.length > info.max) return { ok: false, error: 'too_many_players' };
@@ -741,6 +741,8 @@ export class Room {
       finish: (result: GameResult) => this.finish(result),
       learnWord: (word: string, byName: string) => this.opts.learnWord?.(word, byName),
       emitCroakTick: (payload: CroakTickPayload) => this.opts.onCroakTick?.(this, payload),
+      emitBoomTick: (payload: BoomTickPayload) => this.opts.onBoomTick?.(this, payload),
+      playerColor: (id: string) => this.find(id)?.character.color ?? 0,
     };
     switch (this.gameType) {
       case 'wordchain_en':
@@ -761,10 +763,10 @@ export class Room {
         return new DoVuiGame(ctx);
       case 'ca_sau':
         return new CaSauGame(ctx);
-      case 'tinh_mat':
-        return new TinhMatGame(ctx);
-      case 'den_do':
-        return new DenDoGame(ctx);
+      case 'boom_online':
+        return new BoomOnlineGame(ctx);
+      case 'uno_mercy':
+        return new UnoMercyGame(ctx);
       case 'loto':
         return new LotoGame(ctx);
       case 'caro':

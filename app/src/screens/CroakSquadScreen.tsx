@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import {
   CROAK_CARRY_MULT,
@@ -22,13 +22,14 @@ import {
   type CroakTickPayload,
   type FrogState,
 } from '../../../shared/src/croaksquad';
-import { PLAYER_COLORS, type PublicPlayer, type RoomState } from '../../../shared/src/types';
+import { PLAYER_COLORS, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { isMuted } from '../sound';
-import { useStableWindow } from '../hooks';
+import { ViewportContext, useStableWindow } from '../hooks';
 import { C, FONT, sticker } from '../theme';
-import { Button, T } from '../ui';
-import { Shell, type StripOptions } from '../components/Shell';
+import { T } from '../ui';
+import { Shell } from '../components/Shell';
+import { Rotator } from '../components/Rotator';
 import { EmojiIcon, UiIcon, emojiSvgUri } from '../components/Icons';
 import { Confetti } from '../components/Fun';
 
@@ -462,14 +463,17 @@ function stepPredictedFrog(
   }
 }
 
-export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }) {
+function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
   const baseView = room.game as CroakSquadView;
+  const vp = useContext(ViewportContext);
+  const rotated = !!vp?.rotated;
   const { width } = useStableWindow();
-  const wide = width >= 760;
+  const wide = width >= 720;
   const me = game.me ?? '';
   const isHost = room.hostId === me;
 
   const [fullMap, setFullMap] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const [aimAngle, setAimAngle] = useState<number>(-Math.PI * 0.32);
   const [aimPower, setAimPower] = useState<number>(0.86);
   const [toastText, setToastText] = useState<string | null>(null);
@@ -526,6 +530,9 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
 
   const lastEventIdRef = useRef<number>(0);
   const moveDirRef = useRef<-1 | 0 | 1>(0);
+  const lastJumpAtRef = useRef<number>(0);
+  const jumpBufferUntilRef = useRef<number>(0);
+  const srvTargetRef = useRef<{ x: number; y: number; vx: number; vy: number; onGround: boolean } | null>(null);
   const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const seqRef = useRef<number>(1);
   const aimRef = useRef<{ angle: number; power: number }>({ angle: aimAngle, power: aimPower });
@@ -598,10 +605,17 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
         currAt: now,
       };
 
-      // Hòa giải (reconcile) vị trí dự đoán của bản thân với vị trí trọng tài Server
+      // Hòa giải (reconcile) mềm mại vị trí dự đoán với trọng tài Server (không kéo giật ngược khi đang chạy/nhảy!)
       const srvMe = payload.frogs.find((f) => f.id === me);
       if (srvMe) {
         const pr = predRef.current;
+        srvTargetRef.current = {
+          x: srvMe.x,
+          y: srvMe.y,
+          vx: srvMe.vx,
+          vy: srvMe.vy,
+          onGround: srvMe.onGround,
+        };
         const hardSync =
           !pr.initialized ||
           pr.stageIndex !== payload.stageIndex ||
@@ -610,7 +624,7 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
           srvMe.state === 'dead' ||
           srvMe.state === 'finished';
         const dist = Math.hypot(srvMe.x - pr.x, srvMe.y - pr.y);
-        if (hardSync || dist > 95) {
+        if (hardSync || dist > 125) {
           pr.stageIndex = payload.stageIndex;
           pr.initialized = true;
           pr.x = srvMe.x;
@@ -619,11 +633,10 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
           pr.vy = srvMe.vy;
           pr.facing = srvMe.facing;
           pr.onGround = srvMe.onGround;
-        } else {
-          pr.x += (srvMe.x - pr.x) * 0.32;
-          pr.y += (srvMe.y - pr.y) * 0.32;
-          if (Math.abs(srvMe.vy - pr.vy) > 180) pr.vy = srvMe.vy;
-          pr.onGround = srvMe.onGround;
+        } else if (srvMe.vy < -600 && pr.vy > -450) {
+          // Bật trúng nấm lò xo trên server -> đồng bộ lực nảy tức thì
+          pr.vy = srvMe.vy;
+          pr.onGround = false;
         }
       }
 
@@ -707,10 +720,18 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
 
   const sendInput = useCallback(
     (patch: Partial<CroakInput>) => {
-      if (patch.jump && predRef.current.onGround && hud.myState !== 'swallowed') {
-        predRef.current.vy = CROAK_JUMP_VY;
-        predRef.current.onGround = false;
-        playCroakSfx('jump');
+      if (patch.jump && hud.myState !== 'swallowed') {
+        const now = performance.now();
+        if (predRef.current.onGround) {
+          predRef.current.vy = CROAK_JUMP_VY;
+          predRef.current.onGround = false;
+          lastJumpAtRef.current = now;
+          jumpBufferUntilRef.current = 0;
+          playCroakSfx('jump');
+        } else {
+          // Đệm nhảy (Jump Buffer 130ms): bấm nhảy sát mặt đất sẽ tự bật ngay khi chân vừa chạm đất!
+          jumpBufferUntilRef.current = now + 130;
+        }
       }
       const curAim = aimRef.current;
       const payload: CroakInput = {
@@ -842,27 +863,51 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
       const interpTick = prev ? prev.tick + (curr.tick - prev.tick) * Math.min(1, alpha) : curr.tick;
       const elapsedSec = interpTick * CROAK_DT;
 
-      // Bước dự đoán Client-Side Prediction mượt 60fps cho nhân vật của tôi
+      // Bước dự đoán Client-Side Prediction mượt 60fps + hòa giải mềm không giật ngược!
       const srvMe = curr.frogs.find((f) => f.id === env.me);
       if (
         srvMe &&
         predRef.current.initialized &&
         (srvMe.state === 'normal' || srvMe.state === 'carrying' || srvMe.state === 'tongue')
       ) {
+        const pr = predRef.current;
         const solids = getSolidRects(stg, curr.switchesOn, curr.keysCollected, elapsedSec);
         stepPredictedFrog(
-          predRef.current,
+          pr,
           moveDirRef.current,
           srvMe.state === 'carrying',
           solids,
           rawDt,
         );
+
+        // Kích hoạt đệm nhảy ngay khi chân chạm đất
+        if (pr.onGround && jumpBufferUntilRef.current > now) {
+          pr.vy = CROAK_JUMP_VY;
+          pr.onGround = false;
+          lastJumpAtRef.current = now;
+          jumpBufferUntilRef.current = 0;
+          playCroakSfx('jump');
+        }
+
+        const tgt = srvTargetRef.current;
+        if (tgt) {
+          const errX = tgt.x - pr.x;
+          const errY = tgt.y - pr.y;
+          const moving = moveDirRef.current !== 0;
+          // Khi đang chạy liên tục trên mobile, server trễ ~1-2 tick tự nhiên -> chỉ kéo nhẹ nếu lệch > 14px
+          if (!moving || Math.abs(errX) > 14) {
+            pr.x += errX * Math.min(1, rawDt * (moving ? 5.5 : 13));
+          }
+          const recentlyJumped = now - lastJumpAtRef.current < 190;
+          if (!recentlyJumped && Math.abs(errY) > (pr.onGround ? 2 : 16)) {
+            pr.y += errY * Math.min(1, rawDt * 9);
+          }
+        }
       }
 
-      // Chuẩn hóa kích thước Canvas theo DPR sắc nét (tối đa 2x để siêu mượt trên điện thoại)
-      const rect = canvas.getBoundingClientRect();
-      const cssW = Math.max(300, Math.round(rect.width || 640));
-      const cssH = Math.max(220, Math.round(rect.height || (env.wide ? 390 : 280)));
+      // Chuẩn hóa kích thước Canvas theo layout thực (`clientWidth`/`clientHeight` chuẩn 100% cả khi xoay 90° bằng Rotator!)
+      const cssW = Math.max(320, Math.round(canvas.clientWidth || 640));
+      const cssH = Math.max(200, Math.round(canvas.clientHeight || 340));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const targetW = Math.round(cssW * dpr);
       const targetH = Math.round(cssH * dpr);
@@ -1310,33 +1355,42 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
   }, []);
 
   // ============================================================================
-  // TAY CẦM CẢM ỨNG TRƯỢT MƯỢT KIỂU NIPPLEJS (KHÔNG BÔI ĐEN LABEL!)
+  // TAY CẦM CẢM ỨNG TRƯỢT MƯỢT CHUẨN CẢ KHI AUTO-LANDSCAPE ROTATOR XOAY 90°!
   // ============================================================================
-  const updateThumbpadFromClientX = useCallback(
-    (clientX: number, rect: DOMRect) => {
-      const rel = (clientX - rect.left) / Math.max(1, rect.width);
-      if (rel < 0.46) setMoveDir(-1);
-      else if (rel > 0.54) setMoveDir(1);
+  const updateThumbpadFromPoint = useCallback(
+    (clientX: number, clientY: number, rect: DOMRect) => {
+      // Khi Rotator xoay 90deg trên điện thoại dọc: trục ngang của nút nằm dọc theo màn hình vật lý (clientY)!
+      const rel = rotated
+        ? (clientY - rect.top) / Math.max(1, rect.height)
+        : (clientX - rect.left) / Math.max(1, rect.width);
+      if (rel < 0.45) setMoveDir(-1);
+      else if (rel > 0.55) setMoveDir(1);
       else setMoveDir(0);
     },
-    [setMoveDir],
+    [rotated, setMoveDir],
   );
 
   // Kéo trực tiếp trên màn hình Canvas để căn góc bắn 360 độ khi đang ngậm bạn!
   const aimFromCanvasClientPoint = useCallback(
     (clientX: number, clientY: number) => {
       if (hud.myState !== 'carrying' || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
+      const el = canvasRef.current;
+      const rect = el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
+      const cssW = Math.max(1, el.clientWidth || rect.width);
+      const cssH = Math.max(1, el.clientHeight || rect.height);
+      const normX = rotated ? (clientY - rect.top) / rect.height : (clientX - rect.left) / rect.width;
+      const normY = rotated ? (rect.right - clientX) / rect.width : (clientY - rect.top) / rect.height;
+
       const stg = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, hud.stageIndex))];
-      const aspect = rect.width / rect.height;
+      const aspect = cssW / cssH;
       const camH = fullMap ? stg.height : wide ? Math.min(stg.height, 560) : Math.min(stg.height, 470);
       const camW = fullMap ? stg.width : Math.min(stg.width, Math.round(camH * aspect));
       const camX = fullMap ? 0 : camSmoothRef.current.x;
       const camY = fullMap ? 0 : camSmoothRef.current.y;
 
-      const worldX = camX + ((clientX - rect.left) / rect.width) * camW;
-      const worldY = camY + ((clientY - rect.top) / rect.height) * camH;
+      const worldX = camX + normX * camW;
+      const worldY = camY + normY * camH;
       const mx = predRef.current.x + CROAK_FROG_W * 0.5;
       const my = predRef.current.y + CROAK_FROG_H * 0.5;
       const dx = worldX - mx;
@@ -1353,7 +1407,7 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
         input: { seq: seqRef.current++, moveX: moveDirRef.current, aimAngle: ang, aimPower: pwr },
       });
     },
-    [fullMap, game, hud.myState, hud.stageIndex, wide],
+    [fullMap, game, hud.myState, hud.stageIndex, rotated, wide],
   );
 
   const applyAimPreset = (p: (typeof AIM_PRESETS)[number]) => {
@@ -1367,31 +1421,6 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
     });
   };
 
-  const strip: StripOptions = useMemo(
-    () => ({
-      order: baseView.order,
-      dim: (p: PublicPlayer) => !p.connected,
-      ring: (p: PublicPlayer) => {
-        const f = snapRef.current.curr.frogs.find((x) => x.id === p.id);
-        if (f?.state === 'finished') return '#FACC15';
-        if (f?.state === 'carrying') return '#EC4899';
-        return undefined;
-      },
-      sub: (p: PublicPlayer) => {
-        const f = snapRef.current.curr.frogs.find((x) => x.id === p.id);
-        if (!f) return undefined;
-        if (f.state === 'finished') return 'Về đích!';
-        if (f.state === 'carrying') return 'Ngậm bạn';
-        if (f.state === 'swallowed') return 'Trong bụng';
-        if (f.state === 'dead') return 'Bong bóng';
-        return f.spits > 0 ? `${f.spits} nhổ` : undefined;
-      },
-    }),
-    // Chỉ phụ thuộc các mốc trạng thái HUD lớn để không làm re-render Shell mỗi tick!
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseView.order, hud.stageIndex, hud.finishedCount, hud.myState, hud.myBellyId],
-  );
-
   const triggerActionImmediate = (fn: () => void) => {
     lastPointerActionAtRef.current = performance.now();
     fn();
@@ -1403,47 +1432,11 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
   };
 
   return (
-    <Shell game={game} room={room} strip={strip} wide>
+    <Shell game={game} room={room} scroll={false} hideStrip fullscreen>
       {hud.finishedCount > 0 && hud.finishedCount >= hud.connectedCount && <Confetti />}
 
-      {/* Thanh tiêu đề Màn chơi & Gợi ý phối hợp */}
-      <View style={[styles.stageBar, sticker(3)]} testID="croak-stage-bar">
-        <View style={styles.stageTop}>
-          <View style={styles.stageBadge}>
-            <EmojiIcon emoji="🐸" size={18} />
-            <T style={styles.stageBadgeTxt}>
-              MÀN {hud.stageIndex + 1}/{CROAK_STAGES.length}
-            </T>
-          </View>
-          <T style={styles.stageTitle} numberOfLines={1}>
-            {stage.name.replace(/^Màn \d+:\s*/, '')}
-          </T>
-          <View style={styles.goalCounter}>
-            <EmojiIcon emoji="🪷" size={14} />
-            <T style={styles.goalCounterTxt}>
-              {hud.finishedCount}/{hud.connectedCount}
-            </T>
-          </View>
-          <Pressable
-            testID="croak-fullmap-toggle"
-            onPress={() => setFullMap((v) => !v)}
-            style={[styles.mapToggle, fullMap && styles.mapToggleActive]}
-          >
-            <UiIcon
-              name={fullMap ? 'Minimize2' : 'Maximize2'}
-              size={14}
-              color={fullMap ? '#0F172A' : '#E2E8F0'}
-            />
-            <T style={[styles.mapToggleTxt, fullMap && { color: '#0F172A' }]}>
-              {fullMap ? 'Cận cảnh' : 'Toàn cảnh'}
-            </T>
-          </Pressable>
-        </View>
-        <T style={styles.stageHint}>{toastText ?? stage.hint}</T>
-      </View>
-
-      {/* Khung Thế Giới Vật Lý 2D Đầm Lầy 60FPS HiDPI Canvas */}
-      <View style={[styles.viewportWrap, sticker(4)]} testID="croak-viewport">
+      <View style={styles.landscapeStage} testID="croak-viewport">
+        {/* Toàn màn hình Ngang 60FPS HiDPI Canvas */}
         {Platform.OS === 'web' ? (
           <canvas
             ref={canvasRef}
@@ -1462,302 +1455,384 @@ export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }
             style={{
               display: 'block',
               width: '100%',
-              height: wide ? 332 : 268,
-              touchAction: hud.myState === 'carrying' ? 'none' : 'pan-y',
+              height: '100%',
+              touchAction: 'none',
               userSelect: 'none',
               WebkitUserSelect: 'none',
               cursor: hud.myState === 'carrying' ? 'crosshair' : 'default',
             }}
           />
         ) : (
-          <View style={{ height: 268 }} />
+          <View style={{ flex: 1 }} />
         )}
-      </View>
 
-      {/* Thanh chọn nhanh góc bắn (hoặc chạm kéo trực tiếp lên bản đồ!) khi đang ngậm đồng đội */}
-      {hud.myState === 'carrying' && (
-        <View style={[styles.aimBar, sticker(2)]} testID="croak-aim-bar">
-          <T style={styles.aimTitle}>
-            🎯 Đang ngậm {baseView.names[hud.myBellyId ?? ''] ?? 'đồng đội'} — Chạm bản đồ kéo góc hoặc chọn nhanh:
-          </T>
-          <View style={styles.aimChips}>
-            {AIM_PRESETS.map((p) => (
-              <Pressable
-                key={p.id}
-                testID={`croak-aim-${p.id}`}
-                onPress={() => applyAimPreset(p)}
-                style={styles.aimChip}
-              >
-                <T selectable={false} style={styles.aimChipTxt}>
-                  {p.label}
-                </T>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Bộ Tay Cầm Cảm Ứng Trượt Mượt Mobile-First (Chống Copy Nhãn 100%) */}
-      {!isSpectator ? (
-        <View
-          style={[
-            styles.padWrap,
-            sticker(3),
-            Platform.OS === 'web'
-              ? ({
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  WebkitTouchCallout: 'none',
-                  touchAction: 'none',
-                } as object)
-              : null,
-          ]}
-          testID="croak-controls"
-          // @ts-expect-error chặn menu chuột phải / nhấn giữ copy trên mobile web
-          onContextMenu={(e: Event) => e.preventDefault()}
-        >
-          {/* Bàn trượt Thumbpad liên hoàn Trái <-> Phải kiểu nipplejs */}
-          <View
-            style={styles.thumbTrack}
-            onPointerDown={(e: unknown) => {
-              const pe = e as PointerEvent;
-              pe.preventDefault?.();
-              const el = pe.currentTarget as HTMLElement;
-              el.setPointerCapture?.(pe.pointerId);
-              updateThumbpadFromClientX(pe.clientX, el.getBoundingClientRect());
-            }}
-            onPointerMove={(e: unknown) => {
-              const pe = e as PointerEvent;
-              if (pe.buttons === 0 && pe.pressure === 0) return;
-              const el = pe.currentTarget as HTMLElement;
-              updateThumbpadFromClientX(pe.clientX, el.getBoundingClientRect());
-            }}
-            onPointerUp={() => setMoveDir(0)}
-            onPointerCancel={() => setMoveDir(0)}
-            onLostPointerCapture={() => setMoveDir(0)}
-          >
-            <Pressable
-              testID="croak-left"
-              onPressIn={() => setMoveDir(-1)}
-              onPressOut={() => setMoveDir(0)}
-              style={[styles.thumbHalf, thumbDir === -1 && styles.thumbHalfActive]}
-            >
-              <UiIcon
-                name="ChevronLeft"
-                size={28}
-                color={thumbDir === -1 ? '#042F2E' : '#F8FAFC'}
-                strokeWidth={2.8}
-              />
-            </Pressable>
-
-            <View pointerEvents="none" style={styles.thumbDivider}>
-              <View
-                style={[
-                  styles.thumbPuck,
-                  thumbDir === -1 && { transform: [{ translateX: -26 }] },
-                  thumbDir === 1 && { transform: [{ translateX: 26 }] },
-                ]}
-              />
+        {/* Thanh HUD siêu gọn 1 dòng nổi phía trên (Bỏ hẳn hộp hướng dẫn to choán màn hình!) */}
+        <View pointerEvents="box-none" style={styles.hudTopOverlay} testID="croak-stage-bar">
+          <View style={styles.hudPill}>
+            <View style={styles.stageBadge}>
+              <EmojiIcon emoji="🐸" size={14} />
+              <T style={styles.stageBadgeTxt}>
+                MÀN {hud.stageIndex + 1}/{CROAK_STAGES.length}
+              </T>
             </View>
-
+            <T style={styles.stageTitle} numberOfLines={1}>
+              {stage.name.replace(/^Màn \d+:\s*/, '')}
+            </T>
+            <View style={styles.goalCounter}>
+              <EmojiIcon emoji="🪷" size={13} />
+              <T style={styles.goalCounterTxt}>
+                {hud.finishedCount}/{hud.connectedCount}
+              </T>
+            </View>
             <Pressable
-              testID="croak-right"
-              onPressIn={() => setMoveDir(1)}
-              onPressOut={() => setMoveDir(0)}
-              style={[styles.thumbHalf, thumbDir === 1 && styles.thumbHalfActive]}
+              testID="croak-fullmap-toggle"
+              onPress={() => setFullMap((v) => !v)}
+              style={[styles.mapToggle, fullMap && styles.mapToggleActive]}
             >
-              <UiIcon
-                name="ChevronRight"
-                size={28}
-                color={thumbDir === 1 ? '#042F2E' : '#F8FAFC'}
-                strokeWidth={2.8}
-              />
-            </Pressable>
-          </View>
-
-          {/* Cụm nút Hành Động Nhảy + Nuốt / Bắn siêu nhạy ngay khi chạm ngón tay */}
-          <View style={styles.actionCluster}>
-            <Pressable
-              testID="croak-jump"
-              // @ts-expect-error phản hồi 0ms ngay khi ngón tay chạm xuống màn hình
-              onPointerDown={(e: PointerEvent) => {
-                e.preventDefault();
-                triggerActionImmediate(() => sendInput({ jump: true }));
-              }}
-              onPress={() => triggerActionFallbackPress(() => sendInput({ jump: true }))}
-              style={({ pressed }) => [styles.jumpBtn, pressed && styles.btnPressed]}
-            >
-              <EmojiIcon emoji="🐸" size={20} />
-              <T selectable={false} style={styles.actionBtnTxt}>
-                {hud.myState === 'swallowed' ? 'GIÃY!' : 'NHẢY'}
+              <UiIcon name={fullMap ? 'Minimize2' : 'Maximize2'} size={12} color={fullMap ? '#0F172A' : '#E2E8F0'} />
+              <T style={[styles.mapToggleTxt, fullMap && { color: '#0F172A' }]}>
+                {fullMap ? 'Gần' : 'Bản đồ'}
               </T>
             </Pressable>
-
-            {hud.myState === 'carrying' ? (
-              <Pressable
-                testID="croak-spit"
-                // @ts-expect-error phản hồi 0ms ngay khi chạm
-                onPointerDown={(e: PointerEvent) => {
-                  e.preventDefault();
-                  triggerActionImmediate(() => sendInput({ spit: true }));
-                }}
-                onPress={() => triggerActionFallbackPress(() => sendInput({ spit: true }))}
-                style={({ pressed }) => [styles.spitBtn, pressed && styles.btnPressed]}
-              >
-                <EmojiIcon emoji="🚀" size={20} />
-                <T selectable={false} style={[styles.actionBtnTxt, { color: '#0F172A' }]}>
-                  BẮN BẠN!
-                </T>
-              </Pressable>
-            ) : (
-              <Pressable
-                testID="croak-tongue"
-                // @ts-expect-error phản hồi 0ms ngay khi chạm
-                onPointerDown={(e: PointerEvent) => {
-                  e.preventDefault();
-                  triggerActionImmediate(() => sendInput({ tongue: true }));
-                }}
-                onPress={() => triggerActionFallbackPress(() => sendInput({ tongue: true }))}
-                style={({ pressed }) => [styles.tongueBtn, pressed && styles.btnPressed]}
-              >
-                <EmojiIcon emoji="👅" size={20} />
-                <T selectable={false} style={styles.actionBtnTxt}>
-                  NUỐT BẠN
-                </T>
-              </Pressable>
+            <Pressable
+              testID="croak-hint-toggle"
+              onPress={() => setShowHint((v) => !v)}
+              style={[styles.mapToggle, showHint && styles.mapToggleActive]}
+            >
+              <T style={[styles.mapToggleTxt, showHint && { color: '#0F172A' }]}>?</T>
+            </Pressable>
+            {isHost && (
+              <>
+                <Pressable
+                  testID="croak-reset-stage"
+                  onPress={() => void game.act({ type: 'cs_reset_stage' })}
+                  style={styles.mapToggle}
+                >
+                  <T style={styles.mapToggleTxt}>🔄</T>
+                </Pressable>
+                <Pressable
+                  testID="croak-end"
+                  onPress={() => void game.act({ type: 'end' })}
+                  style={styles.mapToggle}
+                >
+                  <T style={styles.mapToggleTxt}>Kết thúc</T>
+                </Pressable>
+              </>
             )}
           </View>
-        </View>
-      ) : (
-        <View style={[styles.spectatorBanner, sticker(2)]}>
-          <T style={styles.spectatorTxt}>
-            Bạn đang theo dõi đội Ếch vượt đầm lầy ở chế độ Khán Giả.
-          </T>
-        </View>
-      )}
 
-      {/* Tiện ích Chủ Phòng: Chơi lại màn hiện tại nếu kẹt / Kết thúc sớm */}
-      {isHost && (
-        <View style={styles.hostRow}>
-          <Button
-            testID="croak-reset-stage"
-            small
-            variant="paper"
-            icon="🔄"
-            title="Đặt lại màn này"
-            onPress={() => void game.act({ type: 'cs_reset_stage' })}
-          />
-          <Button
-            testID="croak-end"
-            small
-            variant="ghost"
-            title="Tổng kết ván"
-            onPress={() => void game.act({ type: 'end' })}
-          />
+          {(toastText || showHint) && (
+            <View style={styles.toastPill}>
+              <T numberOfLines={2} style={styles.stageHint}>
+                {toastText ?? stage.subtitle}
+              </T>
+            </View>
+          )}
+
+          {hud.myState === 'carrying' && (
+            <View style={styles.aimBar} testID="croak-aim-bar">
+              <T style={styles.aimTitle}>🎯 Ngắm bắn:</T>
+              {AIM_PRESETS.map((p) => (
+                <Pressable
+                  key={p.id}
+                  testID={`croak-aim-${p.id}`}
+                  onPress={() => applyAimPreset(p)}
+                  style={styles.aimChip}
+                >
+                  <T selectable={false} style={styles.aimChipTxt}>
+                    {p.label}
+                  </T>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
-      )}
+
+        {/* Bộ Tay Cầm Cảm Ứng Ngang Gọn Hai Góc Màn Hình (Không Xung Đột Sự Kiện Trượt Ngón Tay!) */}
+        {!isSpectator ? (
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.arcadeOverlay,
+              Platform.OS === 'web'
+                ? ({
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                  } as object)
+                : null,
+            ]}
+            testID="croak-controls"
+          >
+            {/* Bàn trượt Thumbpad liên hoàn Trái <-> Phải siêu mượt */}
+            <View
+              style={styles.thumbTrack}
+              // @ts-expect-error chặn menu chuột phải trên mobile web
+              onContextMenu={(e: Event) => e.preventDefault()}
+              onPointerDown={(e: unknown) => {
+                const pe = e as PointerEvent;
+                pe.preventDefault?.();
+                const el = pe.currentTarget as HTMLElement;
+                el.setPointerCapture?.(pe.pointerId);
+                updateThumbpadFromPoint(pe.clientX, pe.clientY, el.getBoundingClientRect());
+              }}
+              onPointerMove={(e: unknown) => {
+                const pe = e as PointerEvent;
+                if (pe.buttons === 0 && pe.pressure === 0) return;
+                const el = pe.currentTarget as HTMLElement;
+                updateThumbpadFromPoint(pe.clientX, pe.clientY, el.getBoundingClientRect());
+              }}
+              onPointerUp={() => setMoveDir(0)}
+              onPointerCancel={() => setMoveDir(0)}
+              onLostPointerCapture={() => setMoveDir(0)}
+            >
+              <Pressable
+                testID="croak-left"
+                onPress={() => {
+                  // Fallback cho kiểm thử click đơn lẻ không giữ pointer
+                  if (moveDirRef.current === 0) {
+                    setMoveDir(-1);
+                    setTimeout(() => setMoveDir(0), 160);
+                  }
+                }}
+                style={[styles.thumbHalf, thumbDir === -1 && styles.thumbHalfActive]}
+              >
+                <UiIcon
+                  name="ChevronLeft"
+                  size={28}
+                  color={thumbDir === -1 ? '#042F2E' : '#F8FAFC'}
+                  strokeWidth={3}
+                />
+              </Pressable>
+
+              <View pointerEvents="none" style={styles.thumbDivider}>
+                <View
+                  style={[
+                    styles.thumbPuck,
+                    thumbDir === -1 && { transform: [{ translateX: -28 }] },
+                    thumbDir === 1 && { transform: [{ translateX: 28 }] },
+                  ]}
+                />
+              </View>
+
+              <Pressable
+                testID="croak-right"
+                onPress={() => {
+                  if (moveDirRef.current === 0) {
+                    setMoveDir(1);
+                    setTimeout(() => setMoveDir(0), 160);
+                  }
+                }}
+                style={[styles.thumbHalf, thumbDir === 1 && styles.thumbHalfActive]}
+              >
+                <UiIcon
+                  name="ChevronRight"
+                  size={28}
+                  color={thumbDir === 1 ? '#042F2E' : '#F8FAFC'}
+                  strokeWidth={3}
+                />
+              </Pressable>
+            </View>
+
+            {/* Cụm nút Hành Động Nhảy + Nuốt / Bắn ở góc phải dưới */}
+            <View style={styles.actionCluster}>
+              {hud.myState === 'carrying' ? (
+                <Pressable
+                  testID="croak-spit"
+                  // @ts-expect-error phản hồi 0ms ngay khi chạm
+                  onPointerDown={(e: PointerEvent) => {
+                    e.preventDefault();
+                    triggerActionImmediate(() => sendInput({ spit: true }));
+                  }}
+                  onPress={() => triggerActionFallbackPress(() => sendInput({ spit: true }))}
+                  style={({ pressed }) => [styles.spitBtn, pressed && styles.btnPressed]}
+                >
+                  <EmojiIcon emoji="🚀" size={20} />
+                  <T selectable={false} style={[styles.actionBtnTxt, { color: '#0F172A' }]}>
+                    BẮN!
+                  </T>
+                </Pressable>
+              ) : (
+                <Pressable
+                  testID="croak-tongue"
+                  // @ts-expect-error phản hồi 0ms ngay khi chạm
+                  onPointerDown={(e: PointerEvent) => {
+                    e.preventDefault();
+                    triggerActionImmediate(() => sendInput({ tongue: true }));
+                  }}
+                  onPress={() => triggerActionFallbackPress(() => sendInput({ tongue: true }))}
+                  style={({ pressed }) => [styles.tongueBtn, pressed && styles.btnPressed]}
+                >
+                  <EmojiIcon emoji="👅" size={20} />
+                  <T selectable={false} style={styles.actionBtnTxt}>
+                    NUỐT
+                  </T>
+                </Pressable>
+              )}
+
+              <Pressable
+                testID="croak-jump"
+                // @ts-expect-error phản hồi 0ms ngay khi ngón tay chạm xuống màn hình
+                onPointerDown={(e: PointerEvent) => {
+                  e.preventDefault();
+                  triggerActionImmediate(() => sendInput({ jump: true }));
+                }}
+                onPress={() => triggerActionFallbackPress(() => sendInput({ jump: true }))}
+                style={({ pressed }) => [styles.jumpBtn, pressed && styles.btnPressed]}
+              >
+                <EmojiIcon emoji="🐸" size={22} />
+                <T selectable={false} style={styles.actionBtnTxt}>
+                  {hud.myState === 'swallowed' ? 'GIÃY!' : 'NHẢY'}
+                </T>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.spectatorBanner, sticker(2)]}>
+            <T style={styles.spectatorTxt}>
+              Đang xem đội Ếch vượt đầm lầy ở chế độ Khán Giả.
+            </T>
+          </View>
+        )}
+      </View>
     </Shell>
   );
 }
 
+export function CroakSquadScreen({ game, room }: { game: Game; room: RoomState }) {
+  return (
+    <Rotator>
+      <CroakSquadLandscape game={game} room={room} />
+    </Rotator>
+  );
+}
+
 const styles = StyleSheet.create({
-  stageBar: {
-    backgroundColor: '#0F292E',
-    borderColor: '#2DD4BF',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    gap: 4,
+  landscapeStage: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: '#051523',
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: 'rgba(52, 211, 153, 0.5)',
   },
-  stageTop: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  hudTopOverlay: {
+    position: 'absolute',
+    top: 6,
+    left: 8,
+    right: 8,
+    alignItems: 'center',
+    gap: 5,
+    zIndex: 10,
+  },
+  hudPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(6, 28, 36, 0.84)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(45, 212, 191, 0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    maxWidth: '100%',
+  },
   stageBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: '#14B8A6',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 999,
   },
-  stageBadgeTxt: { fontSize: 11.5, fontWeight: '900', color: '#042F2E', fontFamily: FONT },
+  stageBadgeTxt: { fontSize: 11, fontWeight: '900', color: '#042F2E', fontFamily: FONT },
   stageTitle: {
-    fontSize: 15,
+    fontSize: 12.5,
     fontWeight: '900',
     color: '#F0FDFA',
-    flex: 1,
-    minWidth: 110,
+    maxWidth: 180,
     fontFamily: FONT,
   },
   goalCounter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(250, 204, 21, 0.18)',
+    backgroundColor: 'rgba(250, 204, 21, 0.2)',
     borderWidth: 1,
     borderColor: '#FACC15',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 999,
   },
-  goalCounterTxt: { fontSize: 12, fontWeight: '900', color: '#FEF08A' },
+  goalCounterTxt: { fontSize: 11, fontWeight: '900', color: '#FEF08A' },
   mapToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    gap: 3,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   mapToggleActive: { backgroundColor: '#FACC15', borderColor: '#FEF08A' },
-  mapToggleTxt: { fontSize: 11, fontWeight: '800', color: '#E2E8F0' },
-  stageHint: { fontSize: 12, fontWeight: '700', color: '#99F6E4', lineHeight: 16 },
-
-  viewportWrap: {
-    backgroundColor: '#051523',
-    borderColor: '#34D399',
-    borderRadius: 20,
-    overflow: 'hidden',
+  mapToggleTxt: { fontSize: 10.5, fontWeight: '800', color: '#E2E8F0' },
+  toastPill: {
+    backgroundColor: 'rgba(6, 28, 36, 0.88)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.45)',
+    maxWidth: '92%',
   },
+  stageHint: { fontSize: 11.5, fontWeight: '800', color: '#99F6E4', textAlign: 'center' },
 
   aimBar: {
-    backgroundColor: '#31102F',
-    borderColor: '#F472B6',
-    borderRadius: 16,
-    padding: 10,
-    gap: 7,
-  },
-  aimTitle: { fontSize: 12, fontWeight: '900', color: '#FBCFE8' },
-  aimChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  aimChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(244, 114, 182, 0.22)',
-    borderWidth: 1.5,
-    borderColor: '#F472B6',
-  },
-  aimChipTxt: { fontSize: 12, fontWeight: '900', color: '#FDF2F8' },
-
-  padWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(49, 16, 47, 0.88)',
+    borderWidth: 1.5,
+    borderColor: '#F472B6',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  aimTitle: { fontSize: 11, fontWeight: '900', color: '#FBCFE8' },
+  aimChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(244, 114, 182, 0.28)',
+    borderWidth: 1,
+    borderColor: '#F472B6',
+  },
+  aimChipTxt: { fontSize: 11, fontWeight: '900', color: '#FDF2F8' },
+
+  arcadeOverlay: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    gap: 10,
-    backgroundColor: '#0B1324',
-    borderColor: '#38BDF8',
-    borderRadius: 22,
-    padding: 9,
+    zIndex: 12,
   },
   thumbTrack: {
-    width: 154,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#1E293B',
+    width: 158,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: 'rgba(15, 23, 42, 0.76)',
     borderWidth: 2,
-    borderColor: '#475569',
+    borderColor: 'rgba(148, 163, 184, 0.65)',
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1771,7 +1846,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   thumbHalfActive: {
-    backgroundColor: '#2DD4BF',
+    backgroundColor: 'rgba(45, 212, 191, 0.88)',
   },
   thumbDivider: {
     position: 'absolute',
@@ -1787,58 +1862,57 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(148, 163, 184, 0.28)',
+    backgroundColor: 'rgba(226, 232, 240, 0.32)',
     borderWidth: 1.5,
-    borderColor: 'rgba(226, 232, 240, 0.45)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
 
-  actionCluster: { flexDirection: 'row', gap: 8, flex: 1, justifyContent: 'flex-end' },
+  actionCluster: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   jumpBtn: {
-    flex: 1,
-    maxWidth: 112,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#16A34A',
-    borderWidth: 2,
+    width: 78,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: 'rgba(22, 163, 74, 0.9)',
+    borderWidth: 2.2,
     borderColor: '#86EFAC',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
   tongueBtn: {
-    flex: 1,
-    maxWidth: 122,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#DB2777',
+    width: 74,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: 'rgba(219, 39, 119, 0.88)',
     borderWidth: 2,
     borderColor: '#F9A8D4',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
   spitBtn: {
-    flex: 1,
-    maxWidth: 128,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#FACC15',
+    width: 82,
+    height: 66,
+    borderRadius: 20,
+    backgroundColor: 'rgba(250, 204, 21, 0.95)',
     borderWidth: 2.5,
     borderColor: '#FEF9C3',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
-  btnPressed: { transform: [{ scale: 0.95 }], opacity: 0.92 },
-  actionBtnTxt: { fontSize: 11.5, fontWeight: '900', color: '#FFFFFF', fontFamily: FONT },
+  btnPressed: { transform: [{ scale: 0.94 }], opacity: 0.92 },
+  actionBtnTxt: { fontSize: 11, fontWeight: '900', color: '#FFFFFF', fontFamily: FONT },
 
   spectatorBanner: {
-    backgroundColor: '#1E293B',
+    position: 'absolute',
+    bottom: 10,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(30, 41, 59, 0.88)',
     borderColor: '#64748B',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
-  spectatorTxt: { fontSize: 13, fontWeight: '800', color: C.paper, textAlign: 'center' },
-  hostRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  spectatorTxt: { fontSize: 12, fontWeight: '800', color: C.paper, textAlign: 'center' },
 });

@@ -6,22 +6,22 @@ import type { CharacterConfig } from './types';
  * Người chơi chưa tự chọn nhân vật/ảnh thì mọi nơi đều vẽ đúng chân dung này.
  */
 export const AVATAR_PRESETS: readonly CharacterConfig[] = [
-  { gender: 'nam', age: 'tre', hair: 'han', color: 1, accessory: 'kinhden', skin: 1, face: 'xoan', build: 'vua', look: { mouth: 'cuoirang', browshape: 'ngang', nose: 'ro' } },
-  { gender: 'nu', age: 'tre', hair: 'dai', color: 7, accessory: 'bangdo', skin: 3, face: 'tron', build: 'gay', eyes: 'to', brows: 'lieu', look: { mouth: 'cuoitu', liner: 'co', earring: 'hoa', maphan: 'co' } },
-  { gender: 'nam', age: 'nhi', hair: 'dinh', color: 3, accessory: 'muihe', skin: 0, face: 'bau', build: 'mum', eyes: 'hip', look: { mouth: 'cuoitu', cheek: 'phinh' } },
-  { gender: 'nu', age: 'nhi', hair: 'buicu', color: 5, accessory: 'taitho', skin: 2, face: 'ovalngan', build: 'vua', brows: 'ray', look: { mouth: 'he', babyhair: 'co' } },
-  { gender: 'nam', age: 'trung', hair: 'undercut', color: 2, accessory: 'ria', skin: 4, face: 'vuong', build: 'khoe', eyes: 'motmi', look: { jaw: 'ro', chin: 'rong', rauham: 'vua' } },
-  { gender: 'nu', age: 'trung', hair: 'ngan', color: 4, accessory: 'prideghim', skin: 8, face: 'nhon', build: 'gay', brows: 'lieu', look: { mouth: 'khep', liner: 'co', earring: 'da' } },
-  { gender: 'nam', age: 'lao', hair: 'ngan', color: 0, accessory: 'raukem', skin: 5, face: 'dai', build: 'gay', eyes: 'hip', brows: 'ray', look: { nepcuoi: 'co', raucam: 'vua', nose: 'ro' } },
-  { gender: 'nu', age: 'lao', hair: 'bui', color: 6, accessory: 'nonla', skin: 9, face: 'oval', build: 'mum', look: { nepcuoi: 'co', mouth: 'cuoirang', cheek: 'day' } },
-  { gender: 'khac', age: 'tre', hair: 'highlight', color: 4, accessory: 'nonbh', skin: 10, face: 'ovalvuong', build: 'vua', eyes: 'to', look: { tilt: 'trai', mouth: 'cuoirang', tattoo: 'co', tattooside: 'trai' } },
-  { gender: 'nu', age: 'tre', hair: 'xoan', color: 3, accessory: 'mahong', skin: 6, face: 'ovaldai', build: 'mum', brows: 'lieu', look: { lipcolor: 'do', lipthick: 'day', mouth: 'cuoitu' } },
-  { gender: 'nam', age: 'tre', hair: 'mohican', color: 5, accessory: 'bangcanhan', skin: 7, face: 'vuong', build: 'khoe', eyes: 'motmi', brows: 'ray', look: { jaw: 'ro', ria: 'manh', tattoo: 'co', tattoosize: 'vaibap' } },
-  { gender: 'nu', age: 'tre', hair: 'han', color: 2, accessory: 'kinhden', skin: 1, face: 'xoan', build: 'vua', look: { haircolor: 'nau', part: 'lech', mouth: 'khep' } },
-  { gender: 'nam', age: 'trung', hair: 'nam', color: 0, accessory: 'troc', skin: 4, face: 'tron', build: 'mum', eyes: 'hip', look: { cheek: 'phinh', chin: 'bo', mouth: 'cuoitu' } },
-  { gender: 'khac', age: 'nhi', hair: 'maibang', color: 7, accessory: 'bangdo', skin: 2, face: 'nhon', build: 'gay', eyes: 'to', brows: 'lieu', look: { gaze: 'phai', mouth: 'he' } },
-  { gender: 'nam', age: 'nhi', hair: 'afro', color: 6, accessory: 'bangcanhan', skin: 5, face: 'bau', build: 'mum', look: { volume: 'cao', mouth: 'cuoirang' } },
-  { gender: 'khac', age: 'trung', hair: 'buicu', color: 1, accessory: 'ria', skin: 0, face: 'dai', build: 'vua', eyes: 'motmi', brows: 'ray', look: { asym: 'co', gaze: 'trai' } },
+  { gender: 'nam', age: 'tre', hair: 'han', color: 1, accessory: 'kinhthug', skin: 1, face: 'xoan', build: 'vua', eyes: 'nhaybua', look: { mouth: 'leluoi', browshape: 'gap', nose: 'ro' } },
+  { gender: 'nu', age: 'tre', hair: 'dai', color: 7, accessory: 'bangdo', skin: 3, face: 'tron', build: 'gay', eyes: 'traitim', brows: 'lieu', look: { mouth: 'leluoi', liner: 'co', earring: 'hoa', maphan: 'co' } },
+  { gender: 'nam', age: 'nhi', hair: 'dinh', color: 3, accessory: 'muihe', skin: 0, face: 'bau', build: 'mum', eyes: 'xoan', detail: 'ranghe', look: { mouth: 'oicauvong', cheek: 'phinh' } },
+  { gender: 'nu', age: 'nhi', hair: 'buicu', color: 5, accessory: 'noncamap', skin: 2, face: 'ovalngan', build: 'vua', eyes: 'to', brows: 'ray', look: { mouth: 'hetlon', babyhair: 'co' } },
+  { gender: 'nam', age: 'trung', hair: 'undercut', color: 2, accessory: 'ria', skin: 4, face: 'vuong', build: 'khoe', eyes: 'tronnguoc', look: { jaw: 'ro', chin: 'rong', rauham: 'vua', mouth: 'rangsun' } },
+  { gender: 'nu', age: 'trung', hair: 'ngan', color: 4, accessory: 'prideghim', skin: 8, face: 'nhon', build: 'gay', eyes: 'tronnguoc', brows: 'lieu', look: { mouth: 'hahoc', liner: 'co', earring: 'da' } },
+  { gender: 'nam', age: 'lao', hair: 'ngan', color: 0, accessory: 'nuocmui', skin: 5, face: 'dai', build: 'gay', eyes: 'luon', brows: 'ray', detail: 'ranghe', look: { nepcuoi: 'co', raucam: 'vua', nose: 'ro', mouth: 'cuoitu' } },
+  { gender: 'nu', age: 'lao', hair: 'bui', color: 6, accessory: 'nonla', skin: 9, face: 'oval', build: 'mum', eyes: 'nhaybua', look: { nepcuoi: 'co', mouth: 'nhai', cheek: 'day' } },
+  { gender: 'khac', age: 'tre', hair: 'highlight', color: 4, accessory: 'mathe', skin: 10, face: 'ovalvuong', build: 'vua', eyes: 'xoan', look: { tilt: 'trai', mouth: 'rangsun', tattoo: 'co', tattooside: 'trai' } },
+  { gender: 'nu', age: 'tre', hair: 'xoan', color: 3, accessory: 'mahong', skin: 6, face: 'ovaldai', build: 'mum', eyes: 'traitim', brows: 'lieu', look: { lipcolor: 'do', lipthick: 'day', mouth: 'leluoi' } },
+  { gender: 'nam', age: 'tre', hair: 'mohican', color: 5, accessory: 'bangcanhan', skin: 7, face: 'vuong', build: 'khoe', eyes: 'luon', brows: 'ray', look: { jaw: 'ro', ria: 'manh', mouth: 'rangsun', tattoo: 'co', tattoosize: 'vaibap' } },
+  { gender: 'nu', age: 'tre', hair: 'han', color: 2, accessory: 'kinhthug', skin: 1, face: 'xoan', build: 'vua', eyes: 'tronnguoc', look: { haircolor: 'nau', part: 'lech', mouth: 'cuoitu' } },
+  { gender: 'nam', age: 'trung', hair: 'nam', color: 0, accessory: 'troc', skin: 4, face: 'tron', build: 'mum', eyes: 'khoc', detail: 'ranghe', look: { cheek: 'phinh', chin: 'bo', mouth: 'hetlon' } },
+  { gender: 'khac', age: 'nhi', hair: 'maibang', color: 7, accessory: 'nuocmui', skin: 2, face: 'nhon', build: 'gay', eyes: 'xoan', brows: 'lieu', look: { gaze: 'phai', mouth: 'hahoc' } },
+  { gender: 'nam', age: 'nhi', hair: 'afro', color: 6, accessory: 'noncamap', skin: 5, face: 'bau', build: 'mum', eyes: 'nhaybua', look: { volume: 'cao', mouth: 'oicauvong' } },
+  { gender: 'khac', age: 'trung', hair: 'buicu', color: 1, accessory: 'mathe', skin: 0, face: 'dai', build: 'vua', eyes: 'tronnguoc', brows: 'ray', look: { asym: 'co', gaze: 'trai', mouth: 'leluoi' } },
   // 16..25: 10 nhân vật thực tế & idol mạng đặc sắc (Cô Phương Hằng, Chị Phiến, Thầy Huấn, Khá Bảnh, Lộc Fuho, Bà Tân Vlog, Thông Soái Ca...)
   {
     // 16: Cô Phương Hằng — áo trắng cổ bèo, tóc buộc thấp có tóc con, bông tai kim cương to, nhẫn hoa kim cương, đồng hồ bạc, hai tay đan trước ngực
@@ -110,10 +110,10 @@ export const AVATAR_PRESETS: readonly CharacterConfig[] = [
   {
     // 24: Thánh Mukbang — má phính hồng hào, tóc nấm, đeo găng tay nilon chuẩn bị chén sạch bàn tiệc
     gender: 'nam', age: 'tre', hair: 'nam', color: 5, accessory: 'mahong', outfit: 'dongphuc', detail: 'tannhang',
-    skin: 1, face: 'bau', build: 'mum', eyes: 'to',
+    skin: 1, face: 'bau', build: 'mum', eyes: 'traitim',
     look: {
       cheek: 'phinh', chin: 'bo', neck: 'day',
-      mouth: 'cuoirang', lipcolor: 'cam', lipthick: 'day', nosetip: 'tron',
+      mouth: 'nhai', lipcolor: 'cam', lipthick: 'day', nosetip: 'tron',
       glove: 'co', pose: 'chumnguc',
     },
   },
@@ -191,8 +191,8 @@ export const AVATAR_PRESETS: readonly CharacterConfig[] = [
 
 /** Tên gọi của từng chân dung mẫu (cho chú thích) */
 export const AVATAR_PRESET_NAMES: readonly string[] = [
-  'Anh Kính Đen', 'Nàng Băng Đô', 'Cu Mũi Hề', 'Bé Tai Thỏ', 'Chú Ria', 'Chị Cài Áo', 'Ông Râu Kẽm', 'Bà Nón Lá',
-  'Phượt Thủ Nón Sơn', 'Cô Má Hồng', 'Giang Hồ Băng Keo', 'Chị Kính Râm', 'Sếp Đầu Trọc', 'Bé Mái Bằng', 'Cu Tóc Xù', 'Chú Ria Lệch',
+  'Thánh Thug Life', 'Nàng Mê Trai', 'Cu Ói Cầu Vồng', 'Bé Cá Mập Đớp', 'Chú Trợn Ngược', 'Chị Cạn Lời', 'Ông Ngủ Gật', 'Bà Nhai Nhồm Nhoàm',
+  'Dân Chơi Kính Hề', 'Cô Lè Lưỡi', 'Giang Hồ Nhe Răng', 'Chị Ngầu Lòi', 'Sếp Ăn Vạ', 'Bé Nước Mũi', 'Cu Tóc Xù Ói', 'Chú Mắt Xoắn',
   'Cô Phương Hằng', 'Chị Phiến', 'Thầy Huấn', 'Khá Bảnh', 'Lộc Fuho', 'Bà Tân Vlog', 'Thông Soái Ca', 'Chị Đại Chợ Lớn',
   'Thánh Mukbang', 'Idol Cầu Vồng',
   'Thám Tử Lừng Danh', 'Sói Đầu Đàn', 'Tiên Tri Vũ Trụ', 'Phú Bà Kim Cương', 'Pháp Sư Hắc Ám',

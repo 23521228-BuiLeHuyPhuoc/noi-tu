@@ -7,6 +7,7 @@ import type {
 } from '../../shared/src/types';
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
+import type { BoomTickPayload } from '../../shared/src/boom';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
 import { authText, errorText, shopText, walletText } from './messages';
@@ -73,6 +74,8 @@ export interface Game {
   onFun(cb: (e: FunEvent) => void): () => void;
   /** đăng ký nghe khung vật lý 30Hz của Đầm Lầy Quái Chiêu */
   onCroakTick(cb: (p: CroakTickPayload) => void): () => void;
+  /** đăng ký nghe khung vật lý 20Hz của Đặt Bom Tử Chiến */
+  onBoomTick(cb: (p: BoomTickPayload) => void): () => void;
   /** tài khoản đang đăng nhập (null = chơi khách) */
   user: PublicUser | null;
   /** đã thử khôi phục phiên đăng nhập xong chưa */
@@ -141,6 +144,7 @@ export function useGame(): Game {
   const roomCodeRef = useRef<string | null>(null);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
   const croakListeners = useRef(new Set<(p: CroakTickPayload) => void>());
+  const boomListeners = useRef(new Set<(p: BoomTickPayload) => void>());
   const walletListeners = useRef(new Set<(n: WalletNotice) => void>());
   // ví gắn với tài khoản đang đăng nhập: đổi tài khoản thì ví cũ tự bỏ
   const [walletState, setWalletState] = useState<{ uid: string; info: WalletInfo } | null>(null);
@@ -235,6 +239,9 @@ export function useGame(): Game {
     });
     socket.on('croak:tick', (p) => {
       for (const cb of croakListeners.current) cb(p);
+    });
+    socket.on('boom:tick', (p) => {
+      for (const cb of boomListeners.current) cb(p);
     });
     socket.on('chat:history', (ms) => setChat(ms));
     // bị chủ phòng mời ra: về trang chủ, không tự vào lại phòng đó nữa
@@ -522,8 +529,8 @@ export function useGame(): Game {
   const restart = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')), [simple]);
   const act = useCallback(
     async (a: GameAction): Promise<ActionResult> => {
-      // input vật lý liên tục (Croak Squad): bắn một chiều không chờ ACK để triệt tiêu độ trễ khứ hồi
-      if (a.type === 'cs_input') {
+      // input vật lý liên tục (Croak Squad & Boom Online): bắn một chiều không chờ ACK để triệt tiêu độ trễ khứ hồi
+      if (a.type === 'cs_input' || a.type === 'bm_input') {
         const s = socketRef.current;
         if (!s || !s.connected) return { ok: false, reason: 'not_playing' };
         s.emit('game:input', a);
@@ -567,6 +574,12 @@ export function useGame(): Game {
     croakListeners.current.add(cb);
     return () => {
       croakListeners.current.delete(cb);
+    };
+  }, []);
+  const onBoomTick = useCallback((cb: (p: BoomTickPayload) => void) => {
+    boomListeners.current.add(cb);
+    return () => {
+      boomListeners.current.delete(cb);
     };
   }, []);
   const onWallet = useCallback((cb: (n: WalletNotice) => void) => {
@@ -711,6 +724,7 @@ export function useGame(): Game {
       sendChaos,
       onFun,
       onCroakTick,
+      onBoomTick,
       user,
       authReady,
       ...authFns,
@@ -755,6 +769,7 @@ export function useGame(): Game {
       sendChaos,
       onFun,
       onCroakTick,
+      onBoomTick,
       user,
       authReady,
       authFns,

@@ -9,7 +9,10 @@ export type GianDiepPhase =
   | 'clue_turn'
   | 'discussion'
   | 'vote'
-  | 'mrwhite_guess';
+  | 'defense'
+  | 'final_vote'
+  | 'mrwhite_guess'
+  | 'reveal_end';
 
 export interface GianDiepWordPair {
   category: string;
@@ -27,6 +30,25 @@ export interface GianDiepClue {
   text: string;
 }
 
+export type GianDiepFeedKind = 'clue' | 'chat' | 'defense' | 'system';
+
+export interface GianDiepFeedItem {
+  id: number;
+  round: number;
+  kind: GianDiepFeedKind;
+  playerId?: string;
+  name?: string;
+  text: string;
+}
+
+export interface GianDiepRevealPlayer {
+  id: string;
+  name: string;
+  role: GianDiepRole;
+  word: string | null;
+  alive: boolean;
+}
+
 export interface GianDiepView {
   type: 'giandiep';
   round: number;
@@ -37,13 +59,22 @@ export interface GianDiepView {
   order: string[];
   names: Record<string, string>;
   alive: string[];
-  eliminated: { id: string; role: GianDiepRole; round: number }[];
+  eliminated: { id: string; role: GianDiepRole; round: number; word?: string | null }[];
   currentSpeakerId: string | null;
   speakerOrder: string[];
   clues: GianDiepClue[];
+  /** Luồng lịch sử hợp nhất (Miêu tả + Biện minh + Thảo luận + Sự kiện hệ thống) */
+  timeline: GianDiepFeedItem[];
   readySkip: string[];
   votes: Record<string, string | 'skip'>;
+  /** Danh sách nghi phạm cao phiếu nhất bước vào Pha Biện Minh (`defense`) & Phán Quyết (`final_vote`) */
+  defendants: string[];
+  /** Phiếu Phán Quyết cuối cùng: 'banish' | 'forgive' (nếu 1 bị cáo) hoặc id bị cáo / 'skip' (nếu nhiều bị cáo đồng phiếu) */
+  finalVotes: Record<string, string>;
   mrWhiteId: string | null;
+  /** Mở toàn bộ vai trò & từ khóa của từng người ở cuối ván (`reveal_end`) để cả phòng đối chiếu */
+  revealedAll: GianDiepRevealPlayer[] | null;
+  wordPairReveal: { wordA: string; wordB: string; winnerHeadline: string } | null;
   /** Chỉ gửi riêng cho đúng viewerId */
   myRole: GianDiepRole | null;
   myWord: string | null;

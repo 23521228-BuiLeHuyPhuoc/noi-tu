@@ -1,21 +1,26 @@
 /**
- * Server Engine cho Đầm Lầy Quái Chiêu (`croaksquad`, 2–6 người chơi thật, KHÔNG dùng Bot giả):
+ * Server Engine cho Đầm Lầy Quái Chiêu (`croaksquad`, 2–6 người chơi — hỗ trợ cả Co-op người thật lẫn AI Đồng Đội Máy thông minh!):
  * Chạy vòng lặp vật lý tất định 30Hz (`CROAK_DT = 1/30s`) từ `shared/src/croaksquad.ts`,
  * phát gói nhẹ `'croak:tick'` tới cả phòng để mọi máy thấy cùng một kết quả va chạm / công tắc / nuốt nhả.
  */
 import {
   CROAK_DT,
   CROAK_FPS,
+  CROAK_FROG_H,
+  CROAK_FROG_W,
   CROAK_STAGES,
   createCroakWorld,
   loadCroakStage,
+  platformRectAt,
   removeCroakPlayer,
   setCroakConnection,
   stepCroakWorld,
   toCroakTickPayload,
   type CroakInput,
   type CroakSquadView,
+  type CroakStageDef,
   type CroakWorld,
+  type FrogEntity,
 } from '../../../shared/src/croaksquad';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import type { EngineContext, EnginePlayer, GameEngine } from './engine';
@@ -27,6 +32,8 @@ export class CroakSquadGame implements GameEngine {
   private latestInputs: Record<string, CroakInput> = {};
   /** Các phím nhấp 1 lần (nhảy, phóng lưỡi, nhả) được giữ tới tick vật lý kế tiếp rồi xóa */
   private pendingEdges: Record<string, { jump?: boolean; tongue?: boolean; spit?: boolean }> = {};
+  /** Bộ nhớ trạng thái AI cho từng chú ếch máy (đếm nhịp ngắm bắn, chống kẹt địa hình) */
+  private botMem: Record<string, { holdAimTicks: number; lastX: number; stuckTicks: number; tongueCd: number }> = {};
   private loop?: ReturnType<typeof setInterval>;
   private finished = false;
 
@@ -37,11 +44,16 @@ export class CroakSquadGame implements GameEngine {
     this.names = Object.fromEntries(players.map((p) => [p.id, p.name]));
     const startStage = this.ctx.settings.croakStage ?? 0;
     this.world = createCroakWorld(
-      players.map((p, idx) => ({ id: p.id, name: p.name, colorIndex: idx })),
+      players.map((p, idx) => ({
+        id: p.id,
+        name: p.name,
+        colorIndex: this.ctx.playerColor ? this.ctx.playerColor(p.id) : idx,
+      })),
       startStage,
     );
     for (const p of players) {
-      setCroakConnection(this.world, p.id, this.ctx.isConnected(p.id));
+      const isBot = !!this.ctx.isBot?.(p.id);
+      setCroakConnection(this.world, p.id, isBot || this.ctx.isConnected(p.id));
     }
     const intervalMs = Math.round(1000 / CROAK_FPS);
     this.loop = setInterval(() => this.tickOnce(), intervalMs);
@@ -54,13 +66,211 @@ export class CroakSquadGame implements GameEngine {
     }
   }
 
+  /**
+   * AI Đồng Đội Co-op Thông Minh cho ếch máy (`isBot`):
+   * Biết phối hợp nuốt-bắn lấy công tắc/chìa khóa trên cao, nhảy qua gai/vực, đạp nấm lò xo,
+   * đợi bệ gỗ di động và tiến vào Đài Sen Vàng cùng người chơi!
+   */
+  private computeBotInput(bot: FrogEntity, stage: CroakStageDef): CroakInput {
+    const mem = (this.botMem[bot.id] ??= { holdAimTicks: 0, lastX: bot.x, stuckTicks: 0, tongueCd: 0 });
+    if (mem.tongueCd > 0) mem.tongueCd--;
+
+    // Đang ở trong bụng người chơi thật -> nằm ngoan để đồng đội căn góc bắn mình lên bệ cao!
+    if (bot.state === 'swallowed') {
+      const carrier = this.world.frogs.find((f) => f.id === bot.carrierId);
+      const heldTooLong = carrier && !this.ctx.isBot?.(carrier.id) ? bot.carryTicks > 240 : bot.carryTicks > 90;
+      return { moveX: 0, jump: heldTooLong && this.world.tick % 6 === 0 };
+    }
+    if (bot.state === 'dead' || bot.state === 'finished') {
+      return { moveX: 0 };
+    }
+
+    const cx = bot.x + CROAK_FROG_W * 0.5;
+    const cy = bot.y + CROAK_FROG_H * 0.5;
+
+    // Nếu đang ngậm đồng đội trong bụng -> căn góc chuẩn xác tới mục tiêu trên cao rồi BẮN!
+    if (bot.state === 'carrying' && bot.bellyId) {
+      let aimAngle = -0.95;
+      let aimPower = 0.88;
+      if (stage.index === 0 && !this.world.switchesOn['sw_bridge']) {
+        // Bắn lên vách đá p_high_sw (x ~ 600, y ~ 295)
+        aimAngle = cx < 300 ? -0.92 : -1.08;
+        aimPower = 0.9;
+      } else if (stage.index === 0 && !this.world.switchesOn['sw_final'] && cx > 900) {
+        aimAngle = -1.12;
+        aimPower = 0.92;
+      } else if (stage.index === 1 && !this.world.keysCollected['key_tower'] && cx < 420) {
+        // Bắn lên tháp chìa khóa (x ~ 235, y ~ 300)
+        aimAngle = cx <= 210 ? -1.16 : -(Math.PI - 1.16);
+        aimPower = 0.86;
+      } else if (stage.index === 1 && !this.world.switchesOn['sw2_bridge'] && cx > 1220) {
+        aimAngle = -1.24;
+        aimPower = 0.9;
+      } else if (stage.index === 2 && !this.world.switchesOn['sw3_wall_gate'] && cx < 560) {
+        // Bắn vượt đỉnh tường thành Đền Cổ (x: 560, y: 300)
+        aimAngle = -1.12;
+        aimPower = 0.98;
+      }
+      mem.holdAimTicks++;
+      if (mem.holdAimTicks >= 12) {
+        mem.holdAimTicks = 0;
+        mem.tongueCd = 75;
+        return { moveX: 0, aimAngle, aimPower, spit: true };
+      }
+      return { moveX: 0, aimAngle, aimPower };
+    }
+    mem.holdAimTicks = 0;
+
+    // Xác định mục tiêu tọa độ X kế tiếp tùy theo tiến độ giải đố của màn hiện tại
+    let targetX = stage.goal.x + stage.goal.w * 0.5;
+    let wantCoopLaunch = false;
+    let launchStandX = cx;
+
+    if (stage.index === 0) {
+      if (!this.world.switchesOn['sw_bridge']) {
+        // Nếu mình đã được bắn lên vách cao p_high_sw -> chạy thẳng vào công tắc sw_bridge!
+        if (cy < 380 && cx > 480 && cx < 760) {
+          targetX = 617;
+        } else {
+          // Đứng ở bậc đá p_step1 phối hợp phóng đồng đội lên mở cầu
+          launchStandX = 325;
+          targetX = launchStandX;
+          wantCoopLaunch = this.world.elapsedSec > 2.8;
+        }
+      } else if (!this.world.switchesOn['sw_final']) {
+        if (cy < 300 && cx > 1110) {
+          // Đang ở trên mỏm p_upper_gate -> giẫm công tắc Cổng Sen!
+          targetX = 1224;
+        } else if (bot.vy < -360 && cx > 980 && cx < 1160) {
+          // Vừa bật nấm lò xo -> nghiêng phải để đáp lên mỏm đá cao p_upper_gate
+          targetX = 1210;
+        } else {
+          // Nhảy vào nấm nhún p_shroom1 (x: 1044)
+          targetX = 1044;
+        }
+      }
+    } else if (stage.index === 1) {
+      if (!this.world.keysCollected['key_tower']) {
+        if (cy < 400 && cx > 120 && cx < 360) {
+          targetX = 235;
+        } else {
+          launchStandX = 135;
+          targetX = launchStandX;
+          wantCoopLaunch = this.world.elapsedSec > 2.5;
+        }
+      } else if (!this.world.switchesOn['sw2_bridge']) {
+        if (cy < 320 && cx > 1230) {
+          targetX = 1340;
+        } else if (cx < 905) {
+          // Đợi bệ gỗ di động p2_mover1 áp sát bờ trái trước khi nhảy sang
+          const mover = platformRectAt(stage.platforms[3], this.world.elapsedSec);
+          targetX = mover.x < 1015 ? mover.x + mover.w * 0.5 : 885;
+        } else if (cx >= 905 && cx < 1290) {
+          const mover = platformRectAt(stage.platforms[3], this.world.elapsedSec);
+          targetX = mover.x + mover.w > 1215 ? 1345 : mover.x + mover.w * 0.5;
+        } else {
+          launchStandX = 1335;
+          targetX = launchStandX;
+          wantCoopLaunch = true;
+        }
+      }
+    } else if (stage.index === 2) {
+      if (!this.world.switchesOn['sw3_wall_gate']) {
+        if (cx > 605) {
+          targetX = 708;
+        } else {
+          launchStandX = 395;
+          targetX = launchStandX;
+          wantCoopLaunch = this.world.elapsedSec > 2.5;
+        }
+      } else if (!this.world.keysCollected['key_sanctum']) {
+        if (cy < 420 && cx > 1350) {
+          targetX = 1475;
+        } else if (cx < 1145) {
+          const elev = platformRectAt(stage.platforms[4], this.world.elapsedSec);
+          targetX = elev.y > 560 ? elev.x + elev.w * 0.5 : 1120;
+        } else if (cx >= 1145 && cx < 1375) {
+          const elev = platformRectAt(stage.platforms[4], this.world.elapsedSec);
+          targetX = elev.y < 435 ? 1450 : elev.x + elev.w * 0.5;
+        }
+      } else if (cx > 1370 && cx < 1755) {
+        const moverEnd = platformRectAt(stage.platforms[6], this.world.elapsedSec);
+        if (cx < 1410 && moverEnd.x > 1470) {
+          targetX = 1395;
+        } else if (moverEnd.x + moverEnd.w < 1690 && cx < 1740) {
+          targetX = moverEnd.x + moverEnd.w * 0.5;
+        }
+      }
+    }
+
+    const dx = targetX - cx;
+    let moveX: -1 | 0 | 1 = Math.abs(dx) > 12 ? (dx > 0 ? 1 : -1) : 0;
+
+    // Phối hợp nuốt-bắn đồng đội khi đứng tại điểm bệ phóng và có bạn ở ngay cạnh
+    if (wantCoopLaunch && mem.tongueCd === 0 && Math.abs(cx - launchStandX) < 55 && bot.onGround) {
+      const partner = this.world.frogs.find(
+        (o) =>
+          o.id !== bot.id &&
+          o.connected &&
+          o.state === 'normal' &&
+          Math.abs(o.x - bot.x) < 92 &&
+          Math.abs(o.y - bot.y) < 48,
+      );
+      if (partner) {
+        const faceDir: -1 | 1 = partner.x >= bot.x ? 1 : -1;
+        if (bot.facing !== faceDir) {
+          return { moveX: faceDir };
+        }
+        mem.tongueCd = 45;
+        return { moveX: 0, tongue: true };
+      }
+    }
+
+    // Tự động nhảy qua chông gai, mép vực sâu, bậc đá hoặc khi bị kẹt tường
+    let jump = false;
+    if (bot.onGround && moveX !== 0) {
+      const lookAheadX = cx + moveX * 36;
+      const hazardAhead = stage.hazards.some(
+        (hz) => lookAheadX >= hz.x - 18 && lookAheadX <= hz.x + hz.w + 18 && Math.abs(hz.y - (bot.y + CROAK_FROG_H)) < 170,
+      );
+      const stepAhead = stage.platforms.some(
+        (pl) =>
+          (!pl.activeWhenSwitch || this.world.switchesOn[pl.activeWhenSwitch]) &&
+          lookAheadX >= pl.x - 8 &&
+          lookAheadX <= pl.x + pl.w + 8 &&
+          pl.y < bot.y + CROAK_FROG_H - 6 &&
+          pl.y > bot.y - 115,
+      );
+      if (hazardAhead || stepAhead) jump = true;
+    }
+
+    if (Math.abs(bot.x - mem.lastX) < 1.5 && moveX !== 0) {
+      mem.stuckTicks++;
+      if (mem.stuckTicks >= 16 && bot.onGround) {
+        jump = true;
+        mem.stuckTicks = 0;
+      }
+    } else {
+      mem.stuckTicks = 0;
+    }
+    mem.lastX = bot.x;
+
+    return { moveX, ...(jump ? { jump: true } : {}) };
+  }
+
   private tickOnce(): void {
     if (this.finished || !this.world) return;
     const prevStage = this.world.stageIndex;
     const prevCleared = this.world.stageClearedTicks > 0;
+    const stg = CROAK_STAGES[this.world.stageIndex] ?? CROAK_STAGES[0];
 
     const merged: Record<string, CroakInput | undefined> = {};
     for (const id of this.order) {
+      if (this.ctx.isBot?.(id)) {
+        const botFrog = this.world.frogs.find((f) => f.id === id);
+        if (botFrog) merged[id] = this.computeBotInput(botFrog, stg);
+        continue;
+      }
       const base = this.latestInputs[id];
       const edges = this.pendingEdges[id];
       if (base || edges) {
@@ -148,8 +358,10 @@ export class CroakSquadGame implements GameEngine {
     this.order = this.order.filter((id) => id !== playerId);
     delete this.latestInputs[playerId];
     delete this.pendingEdges[playerId];
+    delete this.botMem[playerId];
     removeCroakPlayer(this.world, playerId);
-    if (this.order.length === 0) {
+    const anyHumanLeft = this.order.some((id) => !this.ctx.isBot?.(id));
+    if (this.order.length === 0 || !anyHumanLeft) {
       this.finishAll(false);
       return;
     }
@@ -158,6 +370,7 @@ export class CroakSquadGame implements GameEngine {
 
   onPlayerConnection(playerId: string, connected: boolean): void {
     if (this.finished || !this.world) return;
+    if (this.ctx.isBot?.(playerId)) return;
     setCroakConnection(this.world, playerId, connected);
     if (!connected) {
       delete this.latestInputs[playerId];

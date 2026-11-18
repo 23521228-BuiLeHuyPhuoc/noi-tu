@@ -50,11 +50,11 @@ const DoVuiScreen = lazy(() =>
 const CaSauScreen = lazy(() =>
   import('./src/screens/CaSauScreen').then((m) => ({ default: m.CaSauScreen })),
 );
-const TinhMatScreen = lazy(() =>
-  import('./src/screens/TinhMatScreen').then((m) => ({ default: m.TinhMatScreen })),
+const BoomOnlineScreen = lazy(() =>
+  import('./src/screens/BoomOnlineScreen').then((m) => ({ default: m.BoomOnlineScreen })),
 );
-const DenDoScreen = lazy(() =>
-  import('./src/screens/DenDoScreen').then((m) => ({ default: m.DenDoScreen })),
+const UnoMercyScreen = lazy(() =>
+  import('./src/screens/UnoMercyScreen').then((m) => ({ default: m.UnoMercyScreen })),
 );
 const LotoScreen = lazy(() =>
   import('./src/screens/LotoScreen').then((m) => ({ default: m.LotoScreen })),
@@ -92,8 +92,8 @@ export default function App() {
   else if (room.game?.type === 'bom_tu') body = <BomTuScreen game={game} room={room} />;
   else if (room.game?.type === 'do_vui') body = <DoVuiScreen game={game} room={room} />;
   else if (room.game?.type === 'ca_sau') body = <CaSauScreen game={game} room={room} />;
-  else if (room.game?.type === 'tinh_mat') body = <TinhMatScreen game={game} room={room} />;
-  else if (room.game?.type === 'den_do') body = <DenDoScreen game={game} room={room} />;
+  else if (room.game?.type === 'boom_online') body = <BoomOnlineScreen game={game} />;
+  else if (room.game?.type === 'uno_mercy') body = <UnoMercyScreen game={game} />;
   else if (room.game?.type === 'loto') body = <LotoScreen game={game} room={room} />;
   else if (room.game?.type === 'caro') body = <CaroScreen game={game} room={room} />;
   else if (room.game?.type === 'croaksquad') body = <CroakSquadScreen game={game} room={room} />;

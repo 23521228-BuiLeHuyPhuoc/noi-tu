@@ -180,7 +180,7 @@ export function Shell({
   const ownedSet = new Set(game.user?.owned ?? []);
 
   const content = (
-    <View style={[styles.content, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen]}>
+    <View style={[styles.content, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen, !scroll && styles.contentNoScroll]}>
       {children}
     </View>
   );
@@ -250,7 +250,7 @@ export function Shell({
               </T>
             </View>
           )}
-          {inlineStrip && (
+          {!hideStrip && inlineStrip && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
               {stripItems}
             </ScrollView>
@@ -291,7 +291,7 @@ export function Shell({
           <IconButton testID="leave-open" icon="🚪" iconNode={<UiIcon name="LogOut" size={iconOnly ? 16 : 18} color={C.son} />} label="Rời phòng" style={iconOnly && styles.iconTight} onPress={() => setLeaving(true)} />
         </View>
 
-        {!compactLandscape && (
+        {!hideStrip && !compactLandscape && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
             {stripItems}
           </ScrollView>
@@ -316,7 +316,7 @@ export function Shell({
             {content}
           </ScrollView>
         ) : (
-          <View style={{ flex: 1 }}>{content}</View>
+          <View style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{content}</View>
         )}
 
         {bottom ? (
@@ -473,6 +473,7 @@ const styles = StyleSheet.create({
   avatarRow: { transform: [{ scale: 0.78 }], marginHorizontal: -7, marginVertical: -9 },
   avatarCompact: { transform: [{ scale: 0.56 }], marginHorizontal: -12, marginVertical: -18 },
   content: { flexGrow: 1, flexShrink: 0, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
+  contentNoScroll: { flex: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden' },
   contentLandscape: { paddingBottom: 4, gap: 6 },
   contentFullscreen: { paddingHorizontal: 4, paddingBottom: 4, gap: 4 },
   spectatorBanner: {

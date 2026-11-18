@@ -100,12 +100,12 @@ export const GAME_META: Record<GameType, { emoji: string; tagline: string; playe
   ve_doan: { emoji: '🎨', tagline: 'Vẽ hình siêu lầy cho cả xóm đua nhau đoán từ khóa!', players: '2–12 người' },
   bom_tu: { emoji: '💣', tagline: 'Gõ nhanh từ có tiếng bom đang cháy để chuyền trước khi nổ!', players: '2–12 người' },
   do_vui: { emoji: '🧠', tagline: 'Phỏng vấn CNTT (Intern → Junior), OOP đa ngôn ngữ, DSA, JS/TS & Tiếng Anh!', players: '1–12 người' },
-  ca_sau: { emoji: '🐊', tagline: 'Nhấn răng Cá Sấu Chúa cực căng: săn Răng Vàng +40đ, né Răng Sâu đớp tay!', players: '2–12 người' },
-  tinh_mat: { emoji: '👀', tagline: 'Không chờ lượt! Đua tay-mắt đập mục tiêu & săn kho báu thời gian thực!', players: '2–12 người' },
-  den_do: { emoji: '🚦', tagline: 'Đua 100m Đèn Đỏ Đèn Xanh kèm Còi Giả & Vỏ Chuối bóp đồng đội cười xỉu!', players: '2–12 người' },
   loto: { emoji: '🎱', tagline: 'Rao vè 90 số rộn ràng, dò vé giấy 3×9 và hô KINH giật giải!', players: '2–12 người' },
   caro: { emoji: '⭕', tagline: 'Cờ Caro tự mở rộng bàn 15×15 → 22×22 → 28×28 theo số phe (2–4 người)!', players: '2–4 người' },
-  croaksquad: { emoji: '🐸', tagline: 'Ếch co-op 60fps nuốt đồng đội rồi nhổ bắn vượt vực thẳm & mở cổng!', players: '2–6 người thật' },
+  croaksquad: { emoji: '🐸', tagline: 'Ếch co-op xoay ngang 60fps: nuốt & bắn bạn vượt vực sâu (chơi được cả với Máy)!', players: '2–6 người' },
+  ca_sau: { emoji: '🐊', tagline: 'Đầu Cá Sấu Chúa 3D há hàm răng trắng hếu — chạm trúng Răng Đau là sập hàm PHẬP!', players: '2–12 người' },
+  boom_online: { emoji: '💣', tagline: 'Boom Online Sinh Tồn Vòng Bo: nhốt bóng nước, đá bom, ném bom & Đĩa Bay phục thù!', players: '2–12 người' },
+  uno_mercy: { emoji: '🃏', tagline: 'UNO Show ’Em No Mercy: chồng +2/+4/+6/+10 không đáy, Số 7 cướp bài & 25 lá CHÁY BÀI!', players: '2–12 người' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -158,19 +158,19 @@ export const RULES: Record<GameType, string[]> = {
     '2 câu cuối nhân đôi điểm số (x2) kèm giải thích thực tế dễ hiểu sau mỗi câu!',
   ],
   ca_sau: [
-    'Hàm Cá Sấu Chúa có 14–24 chiếc răng (tự mở rộng theo số người chơi). Đến lượt ai chỉ cần chạm 1 chiếc răng trắng.',
-    'Trúng Răng Lành ăn điểm can đảm tăng dần; trúng 💎 Răng Vàng nổ +40đ; trúng 🔄 Răng Xoáy đảo ngược chiều lượt đi!',
-    'Ai xui chạm đúng 💥 Răng Đau sẽ bị Cá Sấu đớp PHẬP (-25đ) rồi mở hàm hiệp mới — không ai bị loại ngồi xem!',
+    'Đầu Cá Sấu Chúa 3D mở toang 2 hàm răng nanh trắng hếu: đến lượt ai chỉ cần nhấn 1 chiếc răng lành.',
+    'Trúng Răng Lành ăn điểm can đảm tăng dần; trúng 💎 Răng Vàng nổ +40đ; trúng 🔄 Răng Xoáy đảo ngược chiều!',
+    'Ai xui nhấn trúng 💥 Răng Đau sẽ bị nguyên hàm trên sập xuống đớp PHẬP (-25đ) rồi mở sang hiệp mới!',
   ],
-  tinh_mat: [
-    'Tất cả người chơi nhìn và đập CÙNG LÚC trên lưới biểu tượng 3D — không ai phải chờ lượt!',
-    'Xoay vòng 3 thử thách: Đập hình trùng mục tiêu, Tìm hình chỉ xuất hiện 1 lần, và Săn Kho Báu né Bom 💣.',
-    'Ai đập đúng nhanh nhất ăn +150đ; đập nhầm ô bị choáng tê tay 1,3 giây nên đừng bấm bừa nhé!',
+  boom_online: [
+    'Chạy trong mê cung phá thùng nhặt 👟 Giày Tăng Tốc, 💧 Tăng Tầm Nước, 💣 Thêm Bom, 🥊 Găng Tay Ném Bom qua tường & 🥾 Giày Đá Bom lăn thẳng góc hẹp!',
+    'Trúng tia nước chưa chết ngay mà bị nhốt trong Bóng Nước 4,5 giây: đồng đội chạm vào cứu sống, đối thủ lao tới tông "BỤP!" là kết liễu!',
+    'Sau 45 giây, Vòng Bo Gạch Tử Thần sập xoắn ốc từ ngoài vào giữa; người bị loại sớm được lái 🛸 Đĩa Bay ngoài biên ném bom trả thù!',
   ],
-  den_do: [
-    'Đua nước rút từ 0m tới 100m: Đèn Xanh bấm CHẠY liên hoàn (+3,5m/bước), Đèn Vàng giảm tốc, Đèn Đỏ phải đứng im!',
-    'Nhúc nhích lúc Đèn Đỏ sẽ bị tia Laser bắn lùi -28m (trừ khi đang bật Áo Tàng Hình 🛡️).',
-    'Vượt mốc 25m / 55m / 80m nhận Đạo Cụ Bóp Đồng Đội: 📣 Còi Giả Đèn Xanh dụ đối thủ chạy lúc Đèn Đỏ, hoặc 🍌 Vỏ Chuối quật ngã người dẫn đầu!',
+  uno_mercy: [
+    'Cộng Dồn Không Đáy (+2, +4, +6, +10): Đỡ đòn bằng lá rút có mức phạt bằng hoặc cao hơn lá trước để dồn +16, +20 lá lên đầu kẻ kế tiếp!',
+    'Luật Nổ Bài (Mercy Rule): Bất cứ ai bị dồn cầm từ 25 lá trở lên trên tay sẽ bị 💥 CHÁY BÀI — loại trực tiếp khỏi ván ngay lập tức!',
+    'Đánh Số 7 được chọn 1 đối thủ để CƯỚP TRẮNG toàn bộ bài trên tay; đánh Số 0 xoay vòng bài cả bàn; kèm Xả Cùng Màu & Bỏ Lượt Tất Cả!',
   ],
   loto: [
     'Mỗi người nhận 1 tờ vé Lô Tô 3×9 chuẩn hội chợ (mỗi hàng 5 số từ 1–90).',
@@ -183,9 +183,9 @@ export const RULES: Record<GameType, string[]> = {
     'Khi bật luật "Chặn hai đầu": chuỗi đúng 5 quân bị đối phương chặn sát cả 2 đầu sẽ chưa được tính thắng.',
   ],
   croaksquad: [
-    'Game đi cảnh giải đố phối hợp 2–6 người chơi thật (không dùng máy): cả đội cùng nhau vượt 3 màn đầm lầy.',
-    'Phóng lưỡi nuốt đồng đội vào bụng rồi ngắm đường cong quỹ đạo để nhổ/bắn bạn qua vực sâu hoặc lên vách cao!',
-    'Phối hợp dẫm công tắc giữ cầu, nhặt chìa khóa mở cổng đá và đưa cả đội chạm Cổng Đích để qua màn!',
+    'Game đi cảnh giải đố xoay ngang 60FPS (2–6 người chơi, hỗ trợ thêm cả AI Đồng Đội Máy thông minh!).',
+    'Phóng lưỡi nuốt đồng đội vào bụng rồi ngắm đường cong quỹ đạo để bắn bạn qua vực sâu hoặc lên vách cao!',
+    'Phối hợp dẫm công tắc mở cầu, nhặt chìa khóa mở cổng đá và đưa cả đội chạm Đài Sen Vàng để phá đảo 3 màn!',
   ],
 };
 

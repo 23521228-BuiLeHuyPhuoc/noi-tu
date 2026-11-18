@@ -18,9 +18,6 @@ import {
   type CroakTickPayload,
 } from '../../shared/src/croaksquad';
 import {
-  DEN_DO_GOAL_METERS, DEN_DO_ITEMS, DEN_DO_ROUND_OPTIONS,
-} from '../../shared/src/dendo';
-import {
   DO_VUI_DIFFICULTIES, DO_VUI_QUESTIONS, DO_VUI_TOPICS, pickDoVuiQuestions, questionsForTopic, secondsForDoVuiLevel,
   type DoVuiDifficulty, type DoVuiTopic,
 } from '../../shared/src/dovui';
@@ -35,9 +32,6 @@ import {
 } from '../../shared/src/pos';
 import { GIFT_IDS, SHOP_ITEMS, SKILL_IDS, vipOf } from '../../shared/src/shop';
 import { ROOM_THEMES } from '../../shared/src/themes';
-import {
-  TINH_MAT_BOMB_EMOJI, TINH_MAT_EMOJIS, TINH_MAT_ROUND_OPTIONS, generateTinhMatPuzzle,
-} from '../../shared/src/tinhmat';
 import { TYPHU_BOARD, isTyPhuProperty, upgradeCostOf } from '../../shared/src/typhu';
 import {
   BAUCUA_SYMBOLS, GAME_INFO,
@@ -50,13 +44,11 @@ import { BomTuGame } from '../src/games/bomtu';
 import { CaroGame } from '../src/games/caro';
 import { CaSauGame } from '../src/games/casau';
 import { CroakSquadGame } from '../src/games/croaksquad';
-import { DenDoGame } from '../src/games/dendo';
 import { DoVuiGame } from '../src/games/dovui';
 import type { EngineContext, EnginePlayer } from '../src/games/engine';
 import { GianDiepGame } from '../src/games/giandiep';
 import { LotoGame } from '../src/games/loto';
 import { MaSoiGame } from '../src/games/masoi';
-import { TinhMatGame } from '../src/games/tinhmat';
 import { TyPhuGame } from '../src/games/typhu';
 import { VeDoanGame } from '../src/games/vedoan';
 import { WordChainGame } from '../src/games/wordchain';
@@ -772,148 +764,6 @@ describe('Game 10 — Khám Răng Cá Sấu (2–12 Người, Răng Vàng / Đ�
 });
 
 // ============================================================================
-// 11. TINH MẮT ĐẬP NHANH — SIMULTANEOUS REFLEX ARENA (155 TEST CASES)
-// ============================================================================
-describe('Game 11 — Tinh Mắt Đập Nhanh (2–12 Người Đồng Thời Không Chờ Lượt, 155 cases)', () => {
-  it('kho 48 biểu tượng Fluent 3D độc nhất không chứa Bom & sinh đề chuẩn xác cho cả 3 chế độ', () => {
-    expect(TINH_MAT_EMOJIS).toHaveLength(48);
-    expect(new Set(TINH_MAT_EMOJIS).size).toBe(48);
-    expect(TINH_MAT_EMOJIS).not.toContain(TINH_MAT_BOMB_EMOJI);
-
-    for (let r = 1; r <= 9; r++) {
-      for (const pCount of [2, 6, 12]) {
-        const puz = generateTinhMatPuzzle(r, pCount, seededRng(11000 + r * 17 + pCount));
-        expect([12, 16]).toContain(puz.emojis.length);
-        expect(puz.validCellIds.size).toBeGreaterThanOrEqual(1);
-        if (puz.challengeKind === 'odd_one_out') {
-          const counts = new Map<string, number>();
-          for (const em of puz.emojis) counts.set(em, (counts.get(em) ?? 0) + 1);
-          const singles = [...counts.entries()].filter(([, cnt]) => cnt === 1);
-          expect(singles.length).toBe(pCount >= 5 ? 2 : 1);
-        }
-      }
-    }
-  });
-
-  it.each(Array.from({ length: 154 }, (_, i) => ({
-    players: 2 + (i % 11), // 2..12 người chơi đồng thời!
-    rounds: TINH_MAT_ROUND_OPTIONS[i % TINH_MAT_ROUND_OPTIONS.length],
-    testStun: i % 3 === 0,
-    seed: 11200 + i,
-  })))(
-    'Tinh Mắt Đập Nhanh ($players người, $rounds vòng, stun=$testStun, seed=$seed): đua đồng thời, choáng khi bấm sai & tổng kết chuẩn',
-    ({ players, rounds, testStun, seed }) => {
-      vi.useFakeTimers();
-      const ps = makePlayers(players);
-      const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, { tinhMatRounds: rounds }, 260, bots);
-      const g = new TinhMatGame(ctx);
-      g.start(ps);
-
-      if (testStun) {
-        // Tìm 1 ô sai để bấm thử choáng tay 1.3s
-        const v = g.view();
-        const wrongIdx = v.grid.findIndex((c) => {
-          if (v.challengeKind === 'match_target') return c.emoji !== v.targetEmoji;
-          if (v.challengeKind === 'avoid_bomb') return !v.bonusEmojis.includes(c.emoji);
-          return v.grid.filter((x) => x.emoji === c.emoji).length > 1;
-        });
-        if (wrongIdx >= 0) {
-          expect(g.action('p0', { type: 'tm_tap', cellId: wrongIdx }).ok).toBe(true);
-          expect(g.view().stunnedUntil.p0).toBeGreaterThan(Date.now());
-          // Đang bị choáng mà cố bấm tiếp -> bị từ chối ngay!
-          const anotherIdx = (wrongIdx + 1) % v.grid.length;
-          expect(g.action('p0', { type: 'tm_tap', cellId: anotherIdx }).ok).toBe(false);
-        }
-      }
-
-      let guard = 0;
-      while (!getResult() && guard++ < 220) {
-        if (g.view().phase === 'playing') {
-          for (const p of ps) {
-            const ba = g.botAction(p.id);
-            if (ba) g.action(p.id, ba);
-          }
-        }
-        vi.advanceTimersByTime(320);
-      }
-      expect(getResult()).not.toBeNull();
-      expect(getResult()!.ranking).toHaveLength(players);
-      g.dispose();
-    },
-  );
-});
-
-// ============================================================================
-// 12. ĐÈN ĐỎ ĐÈN XANH — TROLL SPRINT ARENA (155 TEST CASES)
-// ============================================================================
-describe('Game 12 — Đèn Đỏ Đèn Xanh (2–12 Người, Laser Đèn Đỏ & Đạo Cụ Bóp Đồng Đội, 155 cases)', () => {
-  it('phạt lùi -28m khi chạy lúc Đèn Đỏ, Khiên chắn Laser an toàn, Còi Giả & Vỏ Chuối hoạt động chính xác', () => {
-    vi.useFakeTimers();
-    const { ctx } = makeHarness(11801, { denDoRounds: 10 }, 0);
-    ctx.turnMs = undefined;
-    const g = new DenDoGame(ctx);
-    g.start(makePlayers(3));
-
-    // Pha đầu là Đèn Xanh: chạy liên tiếp vượt mốc 25m để nhận đạo cụ!
-    for (let step = 0; step < 9; step++) {
-      expect(g.action('p0', { type: 'dd_step' }).ok).toBe(true);
-      vi.advanceTimersByTime(120);
-    }
-    expect(g.view().progress.p0).toBeGreaterThanOrEqual(25);
-    expect(DEN_DO_ITEMS).toContain(g.view().items.p0);
-
-    // Chờ sang Đèn Đỏ và qua 180ms ân huệ -> p1 chạy không khiên sẽ bị bắn lùi & đưa vào caughtIds!
-    let guard = 0;
-    while (g.view().light !== 'red' && guard++ < 40) {
-      vi.advanceTimersByTime(250);
-    }
-    expect(g.view().light).toBe('red');
-    vi.advanceTimersByTime(220);
-
-    // Cho p1 nhích trước ở Đèn Xanh không kịp thì đang ở 0m -> vẫn bị ghi vào caughtIds!
-    expect(g.action('p1', { type: 'dd_step' }).ok).toBe(true);
-    expect(g.view().caughtIds).toContain('p1');
-    g.dispose();
-  });
-
-  it.each(Array.from({ length: 154 }, (_, i) => ({
-    players: 2 + (i % 11), // 2..12 người chơi!
-    rounds: DEN_DO_ROUND_OPTIONS[i % DEN_DO_ROUND_OPTIONS.length],
-    seed: 11900 + i,
-  })))(
-    'Đèn Đỏ Đèn Xanh ($players người, $rounds nhịp đèn, seed=$seed): đua 0->100m, nhặt đạo cụ & hoàn tất ván không rò timer',
-    ({ players, rounds, seed }) => {
-      vi.useFakeTimers();
-      const ps = makePlayers(players);
-      const bots = new Set(ps.map((p) => p.id));
-      const { ctx, getResult } = makeHarness(seed, { denDoRounds: rounds }, 260, bots);
-      const g = new DenDoGame(ctx);
-      g.start(ps);
-
-      let guard = 0;
-      while (!getResult() && guard++ < 260) {
-        const v = g.view();
-        if (v.light === 'green') {
-          g.action('p0', { type: 'dd_step' });
-        }
-        if (v.items.p0) {
-          g.action('p0', { type: 'dd_trick' });
-        }
-        for (const p of ps) {
-          const ba = g.botAction(p.id);
-          if (ba) g.action(p.id, ba);
-        }
-        vi.advanceTimersByTime(220);
-      }
-      expect(getResult()).not.toBeNull();
-      expect(DEN_DO_GOAL_METERS).toBe(100);
-      g.dispose();
-    },
-  );
-});
-
-// ============================================================================
 // 13. LÔ TÔ HỘI CHỢ 90 SỐ (160 TEST CASES)
 // ============================================================================
 describe('Game 13 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)', () => {
@@ -1100,23 +950,17 @@ describe('Game 14 — Cờ Caro Đại Chiến Co Giãn 15×15 / 22×22 / 28×28
 // 14. ĐẦM LẦY QUÁI CHIÊU — CROAK SQUAD CO-OP PHYSICS & MULTIPLAYER (180 CASES)
 // ============================================================================
 describe('Game 14 — Đầm Lầy Quái Chiêu (Croak Squad Co-op 2D Physics & Netcode, 180 cases)', () => {
-  it('Room chặn tuyệt đối thêm Bot vào croaksquad & tự dọn Bot khi chuyển sang croaksquad', () => {
+  it('Room cho phép thêm AI Đồng Đội Máy vào croaksquad & tự động di chuyển phối hợp trong màn chơi', () => {
     const room = new Room('FROG99', SHARED_DICT, { turnMs: 500 });
     const h = room.addPlayer('Ếch Trưởng');
     if (!h.ok) throw new Error(h.error);
-    expect(room.addBot(h.playerId).ok).toBe(true);
-    expect(room.players.some((p) => p.bot)).toBe(true);
-
-    // Đổi sang croaksquad -> tự xóa sạch bot!
     expect(room.configure(h.playerId, 'croaksquad').ok).toBe(true);
-    expect(room.players.some((p) => p.bot)).toBe(false);
-    // Cố tình bấm thêm bot trong croaksquad -> bị từ chối ngay!
-    expect(room.addBot(h.playerId)).toEqual({ ok: false, error: 'bad_request' });
-    // Chỉ có 1 người thật -> chưa cho start (min = 2 người thật)!
+    // Chỉ có 1 người -> chưa đủ min = 2
     expect(room.start(h.playerId)).toEqual({ ok: false, error: 'too_few_players' });
-
-    const p2 = room.addPlayer('Ếch Phó');
-    if (!p2.ok) throw new Error(p2.error);
+    // Thêm 2 AI Đồng Đội Máy -> vào ván mượt mà!
+    expect(room.addBot(h.playerId).ok).toBe(true);
+    expect(room.addBot(h.playerId).ok).toBe(true);
+    expect(room.players.filter((p) => p.bot)).toHaveLength(2);
     expect(room.start(h.playerId).ok).toBe(true);
     expect(room.toPublic().game?.type).toBe('croaksquad');
     room.dispose();
