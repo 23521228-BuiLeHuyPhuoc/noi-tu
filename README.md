@@ -66,7 +66,7 @@ Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SE
 
 ## Đang chạy
 - Web: <https://noi-tu-web.onrender.com>
-- Server: <https://noi-tu-server-sg.onrender.com> (kiểm tra: `/health`), gói Free ở Singapore, cùng vùng với MongoDB Atlas. cron-job.org gọi `/health` mỗi 10 phút để server không ngủ.
+- Server: <https://noi-tu-server-sg.onrender.com> (kiểm tra: `/health`), gói Free ở Singapore, cùng vùng với MongoDB Atlas. Server tự gọi `/health` mỗi 10 phút để không ngủ.
 - Cả hai được tạo từ `render.yaml`. Mỗi lần push lên nhánh `main`, GitHub Actions kiểm tra code; nếu toàn bộ CI thành công, Render tự động deploy lại cả server lẫn web.
 
 ## 2. Đưa server lên mạng (miễn phí, Render)
@@ -77,7 +77,7 @@ Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SE
 
 Pipeline nằm ở `.github/workflows/ci-cd.yml`. `render.yaml` dùng `autoDeployTrigger: checksPass`, nên Render chỉ deploy commit mới sau khi type-check, test, lint và build đều thành công; không cần Deploy Hook hay Render API key trong GitHub.
 
-Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng, khi đó người đầu tiên mở app phải chờ khoảng 1 phút. Để tránh việc này, một job trên cron-job.org gọi `https://noi-tu-server-sg.onrender.com/health` mỗi 10 phút. Giữ server thức cả ngày tốn khoảng 720–744 trong 750 giờ Free mỗi tháng của workspace, nên các web service Free khác trong cùng workspace gần như không còn giờ để chạy.
+Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng, khi đó người đầu tiên mở app phải chờ khoảng 1 phút. Để tránh việc này, khi chạy trên Render server tự gọi `/health` qua địa chỉ công khai (`RENDER_EXTERNAL_URL`) mỗi 10 phút (`server/src/keepAlive.ts`; tắt bằng biến `KEEP_ALIVE=0`). Giữ server thức cả ngày tốn khoảng 720–744 trong 750 giờ Free mỗi tháng của workspace, nên các web service Free khác trong cùng workspace gần như không còn giờ để chạy.
 
 ## Tài khoản & cơ sở dữ liệu (MongoDB)
 
