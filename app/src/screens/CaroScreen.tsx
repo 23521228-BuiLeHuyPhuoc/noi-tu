@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Line, Circle as SvgCircle } from 'react-native-svg';
 import type { CaroSymbol, CaroView } from '../../../shared/src/caro';
 import { themeById } from '../../../shared/src/themes';
 import type { ActionError, PublicPlayer, RoomState } from '../../../shared/src/types';
@@ -265,15 +266,16 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     [needsScroll, cellPx, viewportW, viewportH],
   );
 
-  // Tự căn giữa vào tâm bàn cờ khi khai cuộc hoặc đổi mức zoom, và tự bám theo nước vừa đánh trên bàn lớn
+  // Tự căn giữa vào tâm bàn cờ khi khai cuộc hoặc đổi mức zoom; khi có winLine thì khóa tiêu điểm vào đúng giữa 5 quân thắng!
   useEffect(() => {
     if (!needsScroll) return;
     const mid = Math.floor(view.size / 2);
-    const r = view.lastMove ? view.lastMove.row : mid;
-    const c = view.lastMove ? view.lastMove.col : mid;
+    const winMid = view.winLine && view.winLine.length > 0 ? view.winLine[Math.floor(view.winLine.length / 2)] : null;
+    const r = winMid ? winMid[0] : view.lastMove ? view.lastMove.row : mid;
+    const c = winMid ? winMid[1] : view.lastMove ? view.lastMove.col : mid;
     const id = setTimeout(() => focusBoardCell(r, c, view.moveCount > 0), 40);
     return () => clearTimeout(id);
-  }, [needsScroll, view.size, view.moveCount, view.lastMove, zoomMode, focusBoardCell]);
+  }, [needsScroll, view.size, view.moveCount, view.lastMove, view.winLine, zoomMode, focusBoardCell]);
 
   const actRef = useRef({ busy, gameEnded, isMyTurn, view, act: game.act });
   useEffect(() => {
@@ -479,6 +481,29 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
           })}
         </View>
       ))}
+
+      {view.winLine && view.winLine.length >= 2 && (() => {
+        const first = view.winLine[0];
+        const last = view.winLine[view.winLine.length - 1];
+        const pad = 3;
+        const x1 = pad + first[1] * cellPx + cellPx / 2;
+        const y1 = pad + first[0] * cellPx + cellPx / 2;
+        const x2 = pad + last[1] * cellPx + cellPx / 2;
+        const y2 = pad + last[0] * cellPx + cellPx / 2;
+        const winSym = view.winnerId ? view.symbols[view.winnerId] : undefined;
+        const glowColor = winSym ? SYMBOL_META[winSym].color : '#FACC15';
+        return (
+          <View pointerEvents="none" testID="caro-win-laser-line" style={StyleSheet.absoluteFill}>
+            <Svg width={boardPixelSide} height={boardPixelSide} viewBox={`0 0 ${boardPixelSide} ${boardPixelSide}`}>
+              <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke={glowColor} strokeWidth={Math.max(8, cellPx * 0.42)} strokeOpacity={0.38} strokeLinecap="round" />
+              <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#FACC15" strokeWidth={Math.max(4.5, cellPx * 0.22)} strokeOpacity={0.95} strokeLinecap="round" />
+              <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#FFFFFF" strokeWidth={Math.max(2, cellPx * 0.09)} strokeLinecap="round" />
+              <SvgCircle cx={x1} cy={y1} r={Math.max(4, cellPx * 0.16)} fill="#FEF08A" />
+              <SvgCircle cx={x2} cy={y2} r={Math.max(4, cellPx * 0.16)} fill="#FEF08A" />
+            </Svg>
+          </View>
+        );
+      })()}
     </View>
   );
 
@@ -596,6 +621,46 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
           </View>
         </LinearGradient>
       </MotionSurface>
+
+      {view.winLine && view.winnerId && (
+        <LinearGradient
+          testID="caro-win-reveal-banner"
+          colors={['#78350F', '#B45309', '#92400E']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.winRevealBanner, sticker(3)]}
+        >
+          <View style={styles.winRevealTop}>
+            <EmojiIcon emoji="🎯" size={20} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <T style={styles.winRevealTitle}>
+                {view.winnerId === me
+                  ? `CHIẾN THẮNG! Bạn nối thành công ${view.winLine.length} quân!`
+                  : `🏆 ${view.names[view.winnerId] ?? view.winnerId} đã nối ${view.winLine.length} quân thẳng hàng!`}
+              </T>
+              <T style={styles.winRevealSub}>
+                Hàng thắng: {view.winLine.map(([r, c]) => `(${r + 1},${c + 1})`).join(' → ')}
+              </T>
+            </View>
+            <Button
+              testID="caro-finish-reveal"
+              small
+              variant="gold"
+              disabled={busy}
+              title="Tổng kết"
+              onPress={() => void act({ type: 'caro_finish_reveal' })}
+            />
+          </View>
+          {view.revealEndsAt && (
+            <CountdownBar
+              endsAt={view.revealEndsAt}
+              total={5}
+              clockOffset={game.clockOffset}
+              lightText
+            />
+          )}
+        </LinearGradient>
+      )}
 
       {err && (
         <View style={[styles.errBanner, sticker(2)]}>
@@ -809,6 +874,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 11,
     paddingVertical: 7,
+  },
+  winRevealBanner: {
+    borderRadius: 16,
+    padding: 10,
+    gap: 7,
+    borderWidth: 2,
+    borderColor: '#FEF08A',
+  },
+  winRevealTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  winRevealTitle: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#FEF08A',
+    fontFamily: FONT,
+  },
+  winRevealSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FDE68A',
   },
   errBannerTxt: {
     flex: 1,

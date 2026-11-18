@@ -21,6 +21,7 @@ const DEFAULT_SEC: Record<GianDiepPhase, number> = {
   defense: 15,
   final_vote: 12,
   mrwhite_guess: 15,
+  spy_guess: 15,
   reveal_end: 7,
 };
 
@@ -127,11 +128,13 @@ export class GianDiepGame implements GameEngine {
     this.spyWord = flip ? this.pair.wordA : this.pair.wordB;
 
     const n = players.length;
-    const maxHidden = Math.max(1, Math.floor((n - 1) / 2));
+    // Đảm bảo tối thiểu 2 Dân Thường (hoặc nhiều hơn) để ván đấu kéo dài nhiều vòng kịch tính
+    const maxHidden = n <= 3 ? 1 : Math.max(1, Math.min(Math.floor(n / 2), n - 2));
     const wantWhite = (this.ctx.settings.giandiepMrWhite ?? (n >= 5)) && n >= 4;
     const whiteCount = wantWhite && maxHidden >= 2 ? 1 : 0;
     const requestedSpies = this.ctx.settings.giandiepSpies ?? (n >= 9 ? 3 : n >= 6 ? 2 : 1);
     const spyCount = Math.max(1, Math.min(requestedSpies, maxHidden - whiteCount));
+    const danCount = Math.max(2, n - spyCount - whiteCount);
 
     const deck: GianDiepRole[] = [];
     for (let i = 0; i < spyCount; i++) deck.push('giandiep');
@@ -149,7 +152,9 @@ export class GianDiepGame implements GameEngine {
       this.words.set(id, r === 'dan' ? this.danWord : r === 'giandiep' ? this.spyWord : null);
     });
 
-    this.pushSystem(`🕵️ Ván bắt đầu! Chủ đề: «${this.pair.category}» (${spyCount} Gián Điệp${whiteCount ? ' + 1 Mr. White' : ''})`);
+    this.pushSystem(
+      `🕵️ Ván bắt đầu! Chủ đề: «${this.pair.category}» (${danCount} Dân · ${spyCount} Gián Điệp${whiteCount ? ' · 1 Mr. White' : ''}) — Loại hết Gián Điệp để thắng!`,
+    );
     this.enterPhase('word_reveal', () => this.startRound());
     this.ctx.changed();
   }
@@ -375,6 +380,23 @@ export class GianDiepGame implements GameEngine {
       return;
     }
 
+    // Nếu Gián Điệp cuối cùng bị bắt khi phe Dân vẫn chưa lộ hết, cho Gián Điệp 15s phản đòn đoán từ khóa phe Dân!
+    const remainingHidden = [...this.alive].filter((id) => this.roles.get(id) !== 'dan');
+    if (role === 'giandiep' && remainingHidden.length === 0) {
+      this.mrWhiteId = chosen;
+      this.mrWhiteGuessed = false;
+      this.pushSystem(`🕵️ Gián Điệp cuối cùng ${this.seatTag(chosen)} bị lộ! Có 15 giây phản đòn đoán đúng từ Dân Thường để lật kèo!`);
+      this.enterPhase('spy_guess', () => {
+        this.mrWhiteId = null;
+        if (!this.checkWin()) {
+          this.round++;
+          this.startRound();
+        }
+      });
+      this.ctx.changed();
+      return;
+    }
+
     if (this.checkWin()) return;
     this.round++;
     this.startRound();
@@ -392,12 +414,13 @@ export class GianDiepGame implements GameEngine {
       return true;
     }
 
-    if (danAlive.length <= hiddenAlive.length) {
+    // Luật Undercover nhiều vòng: Phe Gián Điệp chỉ thắng theo số lượng khi phe Dân chỉ còn tối đa 1 người sống sót!
+    if (danAlive.length <= 1) {
       const winners = this.order.filter((id) => {
         const r = this.roles.get(id);
         return r === 'giandiep' || (r === 'mrwhite' && this.alive.has(id));
       });
-      this.beginRevealEnd(winners, `🕵️ Gián Điệp ẩn mình thành công! Phe Gián Điệp thắng (${this.spyWord} vs ${this.danWord})`);
+      this.beginRevealEnd(winners, `🕵️ Gián Điệp trụ tới vòng cuối thành công! Phe Gián Điệp thắng (${this.spyWord} vs ${this.danWord})`);
       return true;
     }
     return false;
@@ -487,7 +510,7 @@ export class GianDiepGame implements GameEngine {
     }
 
     if (action.type === 'gd_guess') {
-      if (this.phase !== 'mrwhite_guess' || this.mrWhiteId !== playerId || this.mrWhiteGuessed) {
+      if ((this.phase !== 'mrwhite_guess' && this.phase !== 'spy_guess') || this.mrWhiteId !== playerId || this.mrWhiteGuessed) {
         return { ok: false, reason: 'not_your_turn' };
       }
       const guess = action.word.normalize('NFC').replace(/\s+/g, ' ').trim();
@@ -497,13 +520,14 @@ export class GianDiepGame implements GameEngine {
       const matched =
         normPhrase(guess) === normPhrase(this.danWord) ||
         stripAccents(normPhrase(guess)) === stripAccents(normPhrase(this.danWord));
+      const guiserLabel = role === 'mrwhite' ? '🤍 Mr. White' : '🕵️ Gián Điệp';
       if (matched) {
         this.beginRevealEnd(
           [playerId],
-          `🤍 Mr. White ${this.names.get(playerId)} đoán trúng "${this.danWord}" và LẬT KÈO THẮNG ĐỘC LẬP!`,
+          `${guiserLabel} ${this.names.get(playerId)} đoán trúng "${this.danWord}" và LẬT KÈO THẮNG ĐỘC LẬP!`,
         );
       } else {
-        this.pushSystem(`❌ Mr. White đoán «${guess}» — trật lất!`);
+        this.pushSystem(`❌ ${guiserLabel} đoán «${guess}» — trật lất!`);
         this.mrWhiteId = null;
         if (!this.checkWin()) {
           this.round++;
@@ -669,7 +693,7 @@ export class GianDiepGame implements GameEngine {
       if (!anyHumanAlive) this.finalizeGame();
       return;
     }
-    if (this.phase === 'mrwhite_guess' && this.mrWhiteId === playerId) {
+    if ((this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') && this.mrWhiteId === playerId) {
       this.timer.clear();
       this.mrWhiteId = null;
       if (!this.checkWin()) {
@@ -712,7 +736,7 @@ export class GianDiepGame implements GameEngine {
   botAction(playerId: string): GameAction | null {
     if (this.finished || this.phase === 'reveal_end') return null;
 
-    if (this.phase === 'mrwhite_guess' && this.mrWhiteId === playerId && !this.mrWhiteGuessed) {
+    if ((this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') && this.mrWhiteId === playerId && !this.mrWhiteGuessed) {
       const guess = this.ctx.rng() < 0.25 ? this.danWord : this.spyWord;
       return { type: 'gd_guess', word: guess };
     }
@@ -793,6 +817,15 @@ export class GianDiepGame implements GameEngine {
   view(viewerId?: string): GianDiepView {
     const myRole = viewerId ? (this.roles.get(viewerId) ?? null) : null;
     const myWord = viewerId && myRole ? (this.words.get(viewerId) ?? null) : null;
+    const roleSummary = { dan: 0, giandiep: 0, mrwhite: 0 };
+    for (const r of this.roles.values()) {
+      roleSummary[r]++;
+    }
+    const aliveCounts = { dan: 0, hidden: 0 };
+    for (const id of this.alive) {
+      if (this.roles.get(id) === 'dan') aliveCounts.dan++;
+      else aliveCounts.hidden++;
+    }
     return {
       type: 'giandiep',
       round: this.round,
@@ -812,7 +845,9 @@ export class GianDiepGame implements GameEngine {
       votes: Object.fromEntries(this.votes),
       defendants: [...this.defendants],
       finalVotes: Object.fromEntries(this.finalVotes),
-      mrWhiteId: this.phase === 'mrwhite_guess' ? this.mrWhiteId : null,
+      mrWhiteId: (this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') ? this.mrWhiteId : null,
+      roleSummary,
+      aliveCounts,
       revealedAll: this.phase === 'reveal_end' ? this.revealedAll : null,
       wordPairReveal: this.phase === 'reveal_end' ? this.wordPairReveal : null,
       myRole,

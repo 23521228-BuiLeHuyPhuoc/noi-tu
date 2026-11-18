@@ -1008,12 +1008,15 @@ export class BoomOnlineGame implements GameEngine {
 
   private rollPowerUpKind(): BoomItemKind {
     const r = this.ctx.rng() * 100;
-    if (r < 24) return 'bomb';
-    if (r < 48) return 'range';
-    if (r < 70) return 'speed';
-    if (r < 83) return 'kick';
-    if (r < 95) return 'glove';
-    return 'needle';
+    if (r < 20) return 'bomb';
+    if (r < 40) return 'range';
+    if (r < 58) return 'speed';
+    if (r < 68) return 'kick';
+    if (r < 77) return 'glove';
+    if (r < 84) return 'max_range';
+    if (r < 90) return 'shield';
+    if (r < 95) return 'needle';
+    return 'treasure';
   }
 
   private applyItemPickup(p: BoomPlayerEntity, kind: BoomItemKind): void {
@@ -1023,6 +1026,9 @@ export class BoomOnlineGame implements GameEngine {
         break;
       case 'range':
         p.range = Math.min(BOOM_MAX_RANGE_LVL, p.range + 1);
+        break;
+      case 'max_range':
+        p.range = BOOM_MAX_RANGE_LVL;
         break;
       case 'speed':
         p.speedLvl = Math.min(BOOM_MAX_SPEED_LVL, p.speedLvl + 1);
@@ -1035,6 +1041,12 @@ export class BoomOnlineGame implements GameEngine {
         break;
       case 'needle':
         p.needles = Math.min(3, p.needles + 1);
+        break;
+      case 'shield':
+        p.shieldTicks = Math.max(p.shieldTicks, 140);
+        break;
+      case 'treasure':
+        this.scores[p.id] = (this.scores[p.id] ?? 0) + 25;
         break;
     }
   }

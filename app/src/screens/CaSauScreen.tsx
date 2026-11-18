@@ -27,7 +27,7 @@ import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { FONT } from '../theme';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { isMuted, play } from '../sound';
 import { useOnChange } from '../hooks';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -39,6 +39,63 @@ import { EmojiIcon, UiIcon } from '../components/Icons';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const STAGE_VW = 440;
 const STAGE_VH = 408;
+
+let crocAudioCtx: AudioContext | null = null;
+function playCrocJumpscareSfx(): void {
+  if (Platform.OS !== 'web' || isMuted()) return;
+  try {
+    if (!crocAudioCtx) {
+      const AudioCtor =
+        (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext ??
+        (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+      crocAudioCtx = new AudioCtor();
+    }
+    const ctx = crocAudioCtx;
+    if (ctx.state === 'suspended') void ctx.resume();
+    const now = ctx.currentTime;
+
+    // 1. Tiếng gầm trầm rợn người + hàm đóng rầm
+    const roarOsc = ctx.createOscillator();
+    const roarGain = ctx.createGain();
+    roarOsc.type = 'sawtooth';
+    roarOsc.frequency.setValueAtTime(160, now);
+    roarOsc.frequency.exponentialRampToValueAtTime(42, now + 0.55);
+    roarGain.gain.setValueAtTime(0.32, now);
+    roarGain.gain.exponentialRampToValueAtTime(0.001, now + 0.62);
+    roarOsc.connect(roarGain).connect(ctx.destination);
+    roarOsc.start(now);
+    roarOsc.stop(now + 0.64);
+
+    // 2. Tiếng rít hù dọa chói tai bất ngờ
+    const shriek = ctx.createOscillator();
+    const shriekGain = ctx.createGain();
+    shriek.type = 'square';
+    shriek.frequency.setValueAtTime(740, now);
+    shriek.frequency.exponentialRampToValueAtTime(190, now + 0.32);
+    shriekGain.gain.setValueAtTime(0.22, now);
+    shriekGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+    shriek.connect(shriekGain).connect(ctx.destination);
+    shriek.start(now);
+    shriek.stop(now + 0.36);
+
+    // 3. Tiếng nghiến răng rắc rắc
+    const crunchLen = Math.floor(ctx.sampleRate * 0.24);
+    const buf = ctx.createBuffer(1, crunchLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < crunchLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (crunchLen * 0.3));
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.35, now);
+    noise.connect(ng).connect(ctx.destination);
+    noise.start(now);
+  } catch {
+    // bỏ qua lỗi WebAudio
+  }
+}
 
 const EXTRA_ERRORS: Partial<Record<ActionError, string>> = {
   not_your_turn: 'Chưa tới lượt khám răng của bạn!',
@@ -181,13 +238,18 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   });
   const [pupilShift, setPupilShift] = useState(0);
 
-  // Animations for Hinged Upper Jaw, Jaw Slam Shake, Tooth Pulse, and Comic Starburst
+  // Animations for Hinged Upper Jaw, Victim Jumpscare Lunge + Violent 2D Shake, Tooth Pulse, and Comic Starburst
   const [jawAnim] = useState(() => new Animated.Value(0)); // 0 = open, 1 = slammed shut
   const [breatheAnim] = useState(() => new Animated.Value(0));
   const [shakeAnim] = useState(() => new Animated.Value(0));
+  const [shakeYAnim] = useState(() => new Animated.Value(0));
+  const [lungeScale] = useState(() => new Animated.Value(1));
+  const [strobeOpacity] = useState(() => new Animated.Value(0));
   const [burstScale] = useState(() => new Animated.Value(0));
 
   const isBite = view.phase === 'bite_reveal';
+  const isMeBitten = isBite && view.bittenPlayerId === me;
+  const isOtherBitten = isBite && view.bittenPlayerId !== me;
   const effectivePupilShift = isBite ? 0 : pupilShift;
   const isMyTurn = view.phase === 'pressing' && view.currentPlayerId === me;
 
@@ -238,34 +300,25 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
     return () => clearInterval(timer);
   }, [isBite, tension]);
 
-  // Jaw Slam + Screen Shake + Comic PHẬP!! Starburst when sore tooth is pressed
+  // Jaw Slam + Victim-Only Jumpscare Lunge + Violent 2D Screen Shake when sore tooth is pressed
   useEffect(() => {
     if (isBite) {
       burstScale.setValue(0.15);
-      Animated.parallel([
+      const commonAnims: Animated.CompositeAnimation[] = [
         Animated.sequence([
           Animated.timing(jawAnim, {
             toValue: -0.14,
-            duration: 55,
+            duration: 50,
             easing: Easing.out(Easing.quad),
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.spring(jawAnim, {
             toValue: 1,
-            stiffness: 420,
-            damping: 18,
-            mass: 0.9,
+            stiffness: 460,
+            damping: 16,
+            mass: 0.85,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]),
-        Animated.sequence([
-          Animated.delay(70),
-          Animated.timing(shakeAnim, { toValue: -11, duration: 38, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(shakeAnim, { toValue: 11, duration: 48, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(shakeAnim, { toValue: -8, duration: 48, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(shakeAnim, { toValue: 7, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(shakeAnim, { toValue: -4, duration: 42, useNativeDriver: USE_NATIVE_DRIVER }),
-          Animated.timing(shakeAnim, { toValue: 0, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
         ]),
         Animated.sequence([
           Animated.delay(85),
@@ -276,10 +329,68 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]),
-      ]).start();
+      ];
+
+      if (isMeBitten) {
+        commonAnims.push(
+          // Màn hình người thua rung lắc dữ dội 2 chiều liên hồi
+          Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: -26, duration: 36, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: 26, duration: 40, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: -22, duration: 40, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: 20, duration: 42, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: -16, duration: 44, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: 14, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: -10, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: 8, duration: 48, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: -4, duration: 48, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          Animated.sequence([
+            Animated.timing(shakeYAnim, { toValue: 18, duration: 38, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: -18, duration: 42, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: 14, duration: 42, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: -12, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: 8, duration: 45, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: -6, duration: 48, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(shakeYAnim, { toValue: 0, duration: 50, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+          // Đầu cá sấu nhào vọt tới sát camera!
+          Animated.sequence([
+            Animated.timing(lungeScale, {
+              toValue: 1.36,
+              duration: 110,
+              easing: Easing.out(Easing.back(1.8)),
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+            Animated.spring(lungeScale, {
+              toValue: 1.08,
+              friction: 5,
+              tension: 110,
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+          ]),
+          // Chớp đỏ kinh dị nhiều nhịp trên máy người bị cạp
+          Animated.sequence([
+            Animated.timing(strobeOpacity, { toValue: 0.92, duration: 60, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(strobeOpacity, { toValue: 0.28, duration: 90, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(strobeOpacity, { toValue: 0.85, duration: 70, useNativeDriver: USE_NATIVE_DRIVER }),
+            Animated.timing(strobeOpacity, { toValue: 0.42, duration: 280, useNativeDriver: USE_NATIVE_DRIVER }),
+          ]),
+        );
+      } else {
+        shakeAnim.setValue(0);
+        shakeYAnim.setValue(0);
+        lungeScale.setValue(1);
+        strobeOpacity.setValue(0);
+      }
+      Animated.parallel(commonAnims).start();
     } else {
       burstScale.setValue(0);
       shakeAnim.setValue(0);
+      shakeYAnim.setValue(0);
+      lungeScale.setValue(1);
+      strobeOpacity.setValue(0);
       Animated.spring(jawAnim, {
         toValue: 0,
         friction: 7,
@@ -287,7 +398,7 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
         useNativeDriver: USE_NATIVE_DRIVER,
       }).start();
     }
-  }, [isBite, jawAnim, shakeAnim, burstScale]);
+  }, [isBite, isMeBitten, jawAnim, shakeAnim, shakeYAnim, lungeScale, strobeOpacity, burstScale]);
 
   // Twitch jaw slightly when any safe tooth is pressed
   const prevPressedRef = useRef(pressedCount);
@@ -306,7 +417,11 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   useOnChange(view.phase, (ph) => {
     setErr(null);
     if (ph === 'bite_reveal') {
-      play(view.bittenPlayerId === me ? 'lose' : 'error');
+      if (view.bittenPlayerId === me) {
+        playCrocJumpscareSfx();
+      } else {
+        play('error');
+      }
     } else {
       play('pop');
     }
@@ -540,7 +655,14 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
     <Shell game={game} room={room} scroll={false} hideStrip wide={wide}>
       {view.round >= view.maxRounds && isBite && view.bittenPlayerId !== me && <Confetti />}
 
-      <View style={styles.rootFill}>
+      <Animated.View
+        style={[
+          styles.rootFill,
+          isMeBitten && {
+            transform: [{ translateX: shakeAnim }, { translateY: shakeYAnim }],
+          },
+        ]}
+      >
         {/* 1. COMPACT TOP TURN & SCORE STRIP */}
         <LinearGradient
           colors={
@@ -663,7 +785,9 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
               {
                 width: renderW,
                 height: renderH,
-                transform: [{ translateX: shakeAnim }],
+                transform: isMeBitten
+                  ? [{ translateX: shakeAnim }, { translateY: shakeYAnim }, { scale: lungeScale }]
+                  : [],
               },
             ]}
           >
@@ -1080,13 +1204,61 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
           </Animated.View>
         </View>
 
-        {/* Subtle theme-aware micro caption at bottom */}
-        <T numberOfLines={1} style={[styles.microFooter, { color: theme.onBg }]}>
-          {isMyTurn
-            ? 'Chạm trực tiếp vào chiếc răng trắng trên hàm cá sấu để khám!'
-            : 'Răng nhấn an toàn cộng điểm tăng dần · Đụng trúng răng sâu cá sấu sập hàm!'}
-        </T>
-      </View>
+        {/* Subtle theme-aware micro caption OR Victim-Free Tease Banner */}
+        {isOtherBitten ? (
+          <View testID="casau-safe-tease-banner" style={styles.safeTeaseBanner}>
+            <T numberOfLines={1} style={styles.safeTeaseTxt}>
+              🤣 Hú hồn! {view.names[view.bittenPlayerId ?? ''] ?? 'Đối thủ'} vừa bị Cá Sấu đớp Răng #{(view.trapTooth ?? 0) + 1} (-25đ)!
+            </T>
+          </View>
+        ) : (
+          <T numberOfLines={1} style={[styles.microFooter, { color: theme.onBg }]}>
+            {isMyTurn
+              ? 'Chạm trực tiếp vào chiếc răng trắng trên hàm cá sấu để khám!'
+              : 'Răng nhấn an toàn cộng điểm tăng dần · Đụng trúng răng sâu cá sấu sập hàm!'}
+          </T>
+        )}
+      </Animated.View>
+
+      {/* LỚP PHỦ JUMPSCARE HÙ DỌA KINH HOÀNG — CHỈ HIỆN TRÊN MÁY NGƯỜI BỊ CÁ SẤU ĐỚP! */}
+      {isMeBitten && (
+        <View pointerEvents="none" testID="casau-jumpscare-overlay" style={styles.jumpscareWrap}>
+          <Animated.View style={[styles.jumpscareRedVeil, { opacity: strobeOpacity }]} />
+          <Svg width="100%" height="100%" viewBox="0 0 400 700" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+            {/* Hàm răng nanh khổng lồ lao từ viền trên xuống */}
+            <Path
+              d="M0 0 L400 0 L400 120 L355 215 L312 105 L268 245 L220 92 L172 252 L126 108 L78 228 L34 112 L0 185 Z"
+              fill="#090D16"
+            />
+            <Path
+              d="M0 0 L400 0 L400 95 L355 205 L312 85 L268 235 L220 75 L172 242 L126 88 L78 218 L34 92 L0 170 Z"
+              fill="#DC2626"
+              fillOpacity={0.35}
+            />
+            <Polygon points="28,72 58,218 88,72" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="118,68 152,248 186,68" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="214,68 248,248 282,68" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="312,72 344,218 374,72" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+
+            {/* Hàm răng nanh khổng lồ vồ từ đáy màn hình lên */}
+            <Path
+              d="M0 700 L400 700 L400 580 L355 485 L312 595 L268 455 L220 608 L172 448 L126 592 L78 472 L34 588 L0 515 Z"
+              fill="#090D16"
+            />
+            <Polygon points="28,628 58,482 88,628" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="118,632 152,452 186,632" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="214,632 248,452 282,632" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+            <Polygon points="312,628 344,482 374,628" fill="#FFFDF7" stroke="#7F1D1D" strokeWidth="3" />
+          </Svg>
+
+          <View style={styles.jumpscareCard}>
+            <T style={styles.jumpscareBoom}>💀 CÁP ĐỨT TAY RỒI!!</T>
+            <T style={styles.jumpscareSub}>
+              BẠN BẤM TRÚNG RĂNG BOM #{(view.trapTooth ?? 0) + 1} (-25Đ)
+            </T>
+          </View>
+        </View>
+      )}
     </Shell>
   );
 }
@@ -1390,5 +1562,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.82,
     paddingBottom: 1,
+  },
+  safeTeaseBanner: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(6, 78, 59, 0.92)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1.5,
+    borderColor: '#4ADE80',
+  },
+  safeTeaseTxt: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#DCFCE7',
+    textAlign: 'center',
+  },
+  jumpscareWrap: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jumpscareRedVeil: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(185, 28, 28, 0.56)',
+    borderWidth: 8,
+    borderColor: '#EF4444',
+  },
+  jumpscareCard: {
+    backgroundColor: '#140408',
+    borderWidth: 3.5,
+    borderColor: '#FEF08A',
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 5,
+    marginHorizontal: 16,
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 0 36px rgba(239, 68, 68, 0.95)' } as object)
+      : null),
+  },
+  jumpscareBoom: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#F87171',
+    letterSpacing: 1,
+    textAlign: 'center',
+    fontFamily: FONT,
+  },
+  jumpscareSub: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#FEF08A',
+    textAlign: 'center',
   },
 });

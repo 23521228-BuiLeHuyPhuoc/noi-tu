@@ -255,11 +255,11 @@ export const CROAK_STAGES: readonly CroakStageDef[] = [
       // Vách cao bên trên hố bùn chứa công tắc mở cầu (chỉ tới được khi được đồng đội bắn lên!)
       { id: 'p_high_sw', x: 510, y: 315, w: 220, h: 32, kind: 'stone' },
       // Cầu gỗ bắc ngang hố bùn (chỉ hiện khi công tắc sw_bridge bật!)
-      { id: 'p_bridge1', x: 385, y: 540, w: 375, h: 26, kind: 'wood', activeWhenSwitch: 'sw_bridge' },
+      { id: 'p_bridge1', x: 380, y: 540, w: 380, h: 26, kind: 'wood', activeWhenSwitch: 'sw_bridge' },
       // Bờ giữa có Checkpoint #1
       { id: 'p_mid', x: 755, y: 540, w: 330, h: 180, kind: 'moss' },
       // Nấm nhún lò xo + tường cao chắn trước đích
-      { id: 'p_shroom1', x: 1010, y: 518, w: 68, h: 22, kind: 'bounce', bounceVy: -730 },
+      { id: 'p_shroom1', x: 1010, y: 518, w: 68, h: 22, kind: 'bounce', bounceVy: -870 },
       { id: 'p_wall_mid', x: 1150, y: 390, w: 46, h: 330, kind: 'stone' },
       // Mỏm đá mở cổng đích trên đỉnh tường
       { id: 'p_upper_gate', x: 1135, y: 245, w: 175, h: 28, kind: 'stone' },
@@ -297,6 +297,7 @@ export const CROAK_STAGES: readonly CroakStageDef[] = [
     goal: { x: 1755, y: 468, w: 88, h: 92 },
     platforms: [
       { id: 'p2_start', x: 0, y: 620, w: 470, h: 160, kind: 'moss' },
+      { id: 'p2_step1', x: 75, y: 555, w: 125, h: 65, kind: 'stone' },
       // Đài cao chứa Chìa Khóa Vàng
       { id: 'p2_key_ledge', x: 140, y: 345, w: 190, h: 30, kind: 'stone' },
       // Bệ sau cổng khóa + Checkpoint
@@ -342,9 +343,9 @@ export const CROAK_STAGES: readonly CroakStageDef[] = [
     goal: { x: 1945, y: 468, w: 92, h: 92 },
     platforms: [
       { id: 'p3_start', x: 0, y: 650, w: 430, h: 170, kind: 'moss' },
-      { id: 'p3_shroom_entry', x: 335, y: 628, w: 68, h: 22, kind: 'bounce', bounceVy: -700 },
-      // Tường thành Đền Cổ cao chắn ngang + cổng dưới chân tường
-      { id: 'p3_great_wall', x: 560, y: 300, w: 48, h: 210, kind: 'stone' },
+      { id: 'p3_shroom_entry', x: 335, y: 628, w: 68, h: 22, kind: 'bounce', bounceVy: -900 },
+      // Tường thành Đền Cổ chắn ngang + cổng dưới chân tường
+      { id: 'p3_great_wall', x: 560, y: 350, w: 48, h: 160, kind: 'stone' },
       { id: 'p3_courtyard', x: 560, y: 650, w: 590, h: 170, kind: 'stone' },
       // Thang máy dọc đưa lên tầng tháp chìa khóa
       { id: 'p3_elevator', x: 1210, y: 610, w: 120, h: 26, kind: 'wood', move: { dx: 0, dy: -210, periodSec: 4.5 } },
@@ -687,8 +688,9 @@ function performSpit(
   passenger.state = 'launched';
   passenger.x = sx;
   passenger.y = sy;
-  passenger.vx = Math.cos(angle) * speed;
-  passenger.vy = Math.sin(angle) * speed;
+  passenger.vx = Math.cos(angle) * speed + carrier.vx * 0.18;
+  // Khi người ngậm vừa nhảy vừa ném (carrier.vy < 0), cộng thêm xung lực nhảy để bay cao & mượt
+  passenger.vy = Math.sin(angle) * speed + (carrier.vy < 0 ? carrier.vy * 0.25 : 0);
   passenger.facing = Math.cos(angle) >= 0 ? 1 : -1;
   passenger.onGround = false;
 
@@ -702,56 +704,82 @@ function performSpit(
   });
 }
 
-function moveAndCollideFrog(
-  f: FrogEntity,
+export function moveAndCollideFrog(
+  f: { x: number; y: number; vx: number; vy: number; onGround: boolean; state?: FrogState; id?: string },
   solids: (CroakRect & { bounceVy?: number; vxPlatform?: number; vyPlatform?: number })[],
   dt: number,
-  world: CroakWorld,
+  world?: CroakWorld,
 ): void {
   const speedMag = Math.hypot(f.vx, f.vy);
   const steps = speedMag * dt > 12 ? Math.min(5, Math.ceil((speedMag * dt) / 10)) : 1;
   const sdt = dt / steps;
   f.onGround = false;
+  let carriedThisStep = false;
+
+  // 0. Bám dính bệ gỗ lơ lửng / thang máy di động (chỉ khi không đang nhảy bứt lên f.vy >= -40)
+  const startBottom = f.y + CROAK_FROG_H;
+  if (f.vy >= -40) {
+    for (const r of solids) {
+      if (!r.vxPlatform && !r.vyPlatform) continue;
+      if (r.bounceVy !== undefined) continue;
+      const horizOverlap = f.x + CROAK_FROG_W > r.x + 2 && f.x < r.x + r.w - 2;
+      const nearTop = startBottom >= r.y - 12 && startBottom <= r.y + 16;
+      if (horizOverlap && nearTop) {
+        if (r.vxPlatform) f.x += r.vxPlatform * dt;
+        f.y = r.y - CROAK_FROG_H;
+        f.vy = Math.max(0, r.vyPlatform ?? 0);
+        f.onGround = true;
+        carriedThisStep = true;
+        break;
+      }
+    }
+  }
 
   for (let s = 0; s < steps; s++) {
-    // Trục X
+    // Trục X: thu gọn 8px đáy chân (Step-Up Margin) để thanh gỗ lơ lửng dưới chân KHÔNG đẩy văng ếch ngang
+    const prevX = f.x;
     f.x += f.vx * sdt;
-    const boxX: CroakRect = { x: f.x, y: f.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
+    const boxX: CroakRect = { x: f.x, y: f.y + 2, w: CROAK_FROG_W, h: CROAK_FROG_H - 8 };
     for (const r of solids) {
       if (!rectsOverlap(boxX, r)) continue;
-      if (f.vx > 0) {
+      if (f.vx > 0 && prevX + CROAK_FROG_W <= r.x + 12) {
         f.x = r.x - CROAK_FROG_W;
         f.vx = f.state === 'launched' ? -f.vx * 0.28 : 0;
-      } else if (f.vx < 0) {
+        boxX.x = f.x;
+      } else if (f.vx < 0 && prevX >= r.x + r.w - 12) {
         f.x = r.x + r.w;
         f.vx = f.state === 'launched' ? -f.vx * 0.28 : 0;
+        boxX.x = f.x;
       }
-      boxX.x = f.x;
     }
 
     // Trục Y
+    const prevBottom = f.y + CROAK_FROG_H;
+    const prevTop = f.y;
     f.y += f.vy * sdt;
     const boxY: CroakRect = { x: f.x, y: f.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
     for (const r of solids) {
       if (!rectsOverlap(boxY, r)) continue;
-      if (f.vy >= 0) {
+      const platVy = r.vyPlatform ?? 0;
+      if (f.vy >= platVy - 25 && prevBottom <= r.y + Math.max(14, r.h * 0.7)) {
         f.y = r.y - CROAK_FROG_H;
         if (r.bounceVy !== undefined) {
           f.vy = r.bounceVy;
           f.onGround = false;
-          f.state = 'launched';
-          pushEvent(world, 'bounce', f.x + CROAK_FROG_W * 0.5, r.y, { actorId: f.id });
+          if (f.state !== undefined) f.state = 'launched';
+          if (world && f.id) pushEvent(world, 'bounce', f.x + CROAK_FROG_W * 0.5, r.y, { actorId: f.id });
         } else {
-          f.vy = 0;
+          f.vy = platVy > 0 ? platVy : 0;
           f.onGround = true;
-          if (r.vxPlatform) f.x += r.vxPlatform * sdt;
+          if (!carriedThisStep && r.vxPlatform) f.x += r.vxPlatform * sdt;
           if (f.state === 'launched') f.state = 'normal';
         }
-      } else {
+        boxY.y = f.y;
+      } else if (f.vy < 0 && prevTop >= r.y + r.h - 14) {
         f.y = r.y + r.h;
         f.vy = 0;
+        boxY.y = f.y;
       }
-      boxY.y = f.y;
     }
   }
 }
@@ -829,28 +857,32 @@ export function stepCroakWorld(
     const moveX = inp ? clamp(Math.round(inp.moveX), -1, 1) : 0;
     if (moveX !== 0) {
       f.facing = moveX > 0 ? 1 : -1;
-      // Nếu không truyền aimAngle tường minh thì tự lật góc ngắm theo hướng quay mặt
+      // Nếu không truyền aimAngle tường minh thì tự lật đối xứng góc ngắm theo hướng quay mặt
       if (inp?.aimAngle === undefined) {
-        f.aimAngle = f.facing === 1 ? -Math.PI * 0.3 : -Math.PI * 0.7;
+        if ((f.facing === 1 && Math.cos(f.aimAngle) < 0) || (f.facing === -1 && Math.cos(f.aimAngle) > 0)) {
+          f.aimAngle = -Math.PI - f.aimAngle;
+        }
       }
     }
     if (inp?.aimAngle !== undefined && Number.isFinite(inp.aimAngle)) {
       f.aimAngle = clamp(inp.aimAngle, -Math.PI, Math.PI);
-      f.facing = Math.cos(f.aimAngle) >= 0 ? 1 : -1;
+      if (inp.spit || moveX === 0) {
+        f.facing = Math.cos(f.aimAngle) >= 0 ? 1 : -1;
+      }
     }
     if (inp?.aimPower !== undefined && Number.isFinite(inp.aimPower)) {
       f.aimPower = clamp(inp.aimPower, 0.25, 1);
     }
 
     // Coyote time & Jump buffer
-    if (f.onGround) f.coyoteTicks = 4;
+    if (f.onGround) f.coyoteTicks = 6;
     else if (f.coyoteTicks > 0) f.coyoteTicks--;
 
-    if (inp?.jump) f.jumpBufferTicks = 3;
+    if (inp?.jump) f.jumpBufferTicks = 4;
     else if (f.jumpBufferTicks > 0) f.jumpBufferTicks--;
 
     if (f.jumpBufferTicks > 0 && f.coyoteTicks > 0) {
-      f.vy = f.bellyId ? CROAK_JUMP_VY * 0.9 : CROAK_JUMP_VY;
+      f.vy = f.bellyId ? CROAK_JUMP_VY * 0.92 : CROAK_JUMP_VY;
       f.onGround = false;
       f.coyoteTicks = 0;
       f.jumpBufferTicks = 0;
@@ -858,14 +890,14 @@ export function stepCroakWorld(
       pushEvent(world, 'jump', f.x + CROAK_FROG_W * 0.5, f.y + CROAK_FROG_H, { actorId: f.id });
     }
 
-    // Tự nhả nếu ngậm quá lâu
+    // Tự nhả nếu ngậm quá lâu hoặc bấm Bắn (cho phép cả vừa nhảy vừa ném trên không!)
     if (f.bellyId) {
       f.carryTicks++;
       if (f.carryTicks >= CROAK_MAX_CARRY_TICKS || inp?.spit) {
         performSpit(world, f, solids, inp?.aimAngle, inp?.aimPower);
       }
     } else if (inp?.tongue && f.tongueTicks <= 0) {
-      // Phóng lưỡi bắt đồng đội!
+      // Phóng lưỡi bắt đồng đội (mặc định bắn ngang theo hướng quay mặt kể cả khi đang nhảy)
       const ang = inp.aimAngle !== undefined ? f.aimAngle : f.facing === 1 ? 0 : Math.PI;
       const cx = f.x + CROAK_FROG_W * 0.5;
       const cy = f.y + CROAK_FROG_H * 0.5;
@@ -875,7 +907,7 @@ export function stepCroakWorld(
       if (f.state !== 'carrying') f.state = 'tongue';
       pushEvent(world, 'tongue', cx, cy, { actorId: f.id });
 
-      // Tìm đồng đội gần nhất nằm dọc theo đoạn thẳng lưỡi phóng ra
+      // Tìm đồng đội gần nhất nằm dọc theo đoạn thẳng lưỡi hoặc vùng phía trước mặt (kể cả đang nhảy lệch độ cao)
       let bestTarget: FrogEntity | null = null;
       let bestDist = Infinity;
       for (const other of world.frogs) {
@@ -884,7 +916,6 @@ export function stepCroakWorld(
         if (other.bellyId !== null || other.carrierId !== null) continue;
         const ox = other.x + CROAK_FROG_W * 0.5;
         const oy = other.y + CROAK_FROG_H * 0.5;
-        // Khoảng cách từ tâm đồng đội tới đoạn thẳng (cx,cy)->(tongueEndX,tongueEndY)
         const dx = f.tongueEndX - cx;
         const dy = f.tongueEndY - cy;
         const lenSq = dx * dx + dy * dy || 1;
@@ -893,7 +924,8 @@ export function stepCroakWorld(
         const py = cy + proj * dy;
         const dist = Math.hypot(ox - px, oy - py);
         const directDist = Math.hypot(ox - cx, oy - cy);
-        if (dist <= CROAK_TONGUE_RADIUS && directDist < bestDist) {
+        const inFrontCone = (ox - cx) * f.facing >= -18 && Math.abs(oy - cy) <= 58 && directDist <= CROAK_TONGUE_RANGE + 18;
+        if ((dist <= CROAK_TONGUE_RADIUS + 8 || inFrontCone) && directDist < bestDist) {
           bestDist = directDist;
           bestTarget = other;
         }

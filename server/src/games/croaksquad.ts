@@ -159,14 +159,15 @@ export class CroakSquadGame implements GameEngine {
           wantCoopLaunch = this.world.elapsedSec > 2.5;
         }
       } else if (!this.world.switchesOn['sw2_bridge']) {
+        const moverPlat = stage.platforms.find((p) => p.id === 'p2_mover1') ?? stage.platforms[3];
         if (cy < 320 && cx > 1230) {
           targetX = 1340;
         } else if (cx < 905) {
           // Đợi bệ gỗ di động p2_mover1 áp sát bờ trái trước khi nhảy sang
-          const mover = platformRectAt(stage.platforms[3], this.world.elapsedSec);
+          const mover = platformRectAt(moverPlat, this.world.elapsedSec);
           targetX = mover.x < 1015 ? mover.x + mover.w * 0.5 : 885;
         } else if (cx >= 905 && cx < 1290) {
-          const mover = platformRectAt(stage.platforms[3], this.world.elapsedSec);
+          const mover = platformRectAt(moverPlat, this.world.elapsedSec);
           targetX = mover.x + mover.w > 1215 ? 1345 : mover.x + mover.w * 0.5;
         } else {
           launchStandX = 1335;
@@ -184,17 +185,19 @@ export class CroakSquadGame implements GameEngine {
           wantCoopLaunch = this.world.elapsedSec > 2.5;
         }
       } else if (!this.world.keysCollected['key_sanctum']) {
+        const elevPlat = stage.platforms.find((p) => p.id === 'p3_elevator') ?? stage.platforms[4];
         if (cy < 420 && cx > 1350) {
           targetX = 1475;
         } else if (cx < 1145) {
-          const elev = platformRectAt(stage.platforms[4], this.world.elapsedSec);
+          const elev = platformRectAt(elevPlat, this.world.elapsedSec);
           targetX = elev.y > 560 ? elev.x + elev.w * 0.5 : 1120;
         } else if (cx >= 1145 && cx < 1375) {
-          const elev = platformRectAt(stage.platforms[4], this.world.elapsedSec);
+          const elev = platformRectAt(elevPlat, this.world.elapsedSec);
           targetX = elev.y < 435 ? 1450 : elev.x + elev.w * 0.5;
         }
       } else if (cx > 1370 && cx < 1755) {
-        const moverEnd = platformRectAt(stage.platforms[6], this.world.elapsedSec);
+        const endPlat = stage.platforms.find((p) => p.id === 'p3_mover_end') ?? stage.platforms[6];
+        const moverEnd = platformRectAt(endPlat, this.world.elapsedSec);
         if (cx < 1410 && moverEnd.x > 1470) {
           targetX = 1395;
         } else if (moverEnd.x + moverEnd.w < 1690 && cx < 1740) {

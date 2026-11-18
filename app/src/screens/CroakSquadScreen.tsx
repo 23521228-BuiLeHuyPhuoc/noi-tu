@@ -12,8 +12,8 @@ import {
   CROAK_STAGES,
   computeSpitArc,
   getSolidRects,
+  moveAndCollideFrog,
   platformRectAt,
-  rectsOverlap,
   type CroakInput,
   type CroakRect,
   type CroakSoundFx,
@@ -430,37 +430,7 @@ function stepPredictedFrog(
   pred.vx = moveDir * speed;
   if (moveDir !== 0) pred.facing = moveDir;
   pred.vy = Math.min(CROAK_MAX_FALL, pred.vy + CROAK_GRAVITY * dt);
-
-  pred.x += pred.vx * dt;
-  const boxX: CroakRect = { x: pred.x, y: pred.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
-  for (const r of solids) {
-    if (!rectsOverlap(boxX, r)) continue;
-    if (pred.vx > 0) pred.x = r.x - CROAK_FROG_W;
-    else if (pred.vx < 0) pred.x = r.x + r.w;
-    pred.vx = 0;
-    boxX.x = pred.x;
-  }
-
-  pred.onGround = false;
-  pred.y += pred.vy * dt;
-  const boxY: CroakRect = { x: pred.x, y: pred.y, w: CROAK_FROG_W, h: CROAK_FROG_H };
-  for (const r of solids) {
-    if (!rectsOverlap(boxY, r)) continue;
-    if (pred.vy >= 0) {
-      pred.y = r.y - CROAK_FROG_H;
-      if (r.bounceVy !== undefined) {
-        pred.vy = r.bounceVy;
-      } else {
-        pred.vy = 0;
-        pred.onGround = true;
-        if (r.vxPlatform) pred.x += r.vxPlatform * dt;
-      }
-    } else {
-      pred.y = r.y + r.h;
-      pred.vy = 0;
-    }
-    boxY.y = pred.y;
-  }
+  moveAndCollideFrog(pred, solids, dt);
 }
 
 function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
@@ -545,7 +515,11 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
     key: '',
     canvas: null,
   });
-  const lastPointerActionAtRef = useRef<number>(0);
+  const lastPointerActionAtRef = useRef<{ jump: number; tongue: number; spit: number }>({
+    jump: 0,
+    tongue: 0,
+    spit: 0,
+  });
 
   // Đồng bộ khi `room.game` thay đổi lớn (vd reset màn, đổi màn, người ra vào)
   useEffect(() => {
@@ -734,11 +708,11 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         }
       }
       const curAim = aimRef.current;
+      const includeAim = patch.spit || patch.aimAngle !== undefined;
       const payload: CroakInput = {
         seq: seqRef.current++,
         moveX: patch.moveX ?? moveDirRef.current,
-        aimAngle: patch.aimAngle ?? curAim.angle,
-        aimPower: patch.aimPower ?? curAim.power,
+        ...(includeAim ? { aimAngle: patch.aimAngle ?? curAim.angle, aimPower: patch.aimPower ?? curAim.power } : {}),
         ...(patch.jump ? { jump: true } : {}),
         ...(patch.tongue ? { tongue: true } : {}),
         ...(patch.spit ? { spit: true } : {}),
@@ -767,12 +741,11 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         input: {
           seq: seqRef.current++,
           moveX: dir,
-          aimAngle: nextAngle,
-          aimPower: curAim.power,
+          ...(hud.myState === 'carrying' ? { aimAngle: nextAngle, aimPower: curAim.power } : {}),
         },
       });
     },
-    [game],
+    [game, hud.myState],
   );
 
   // Điều khiển bàn phím trên Web (WASD / Mũi tên / Space / J / Q / E)
@@ -793,9 +766,10 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         }
       } else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
         e.preventDefault();
-        sendInput({ jump: true });
+        if (!e.repeat) sendInput({ jump: true });
       } else if (e.key === 'j' || e.key === 'J' || e.key === 'Enter') {
         e.preventDefault();
+        if (e.repeat) return;
         if (hud.myState === 'carrying') sendInput({ spit: true });
         else sendInput({ tongue: true });
       } else if (e.key === 'q' || e.key === 'Q') {
@@ -1421,13 +1395,13 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
     });
   };
 
-  const triggerActionImmediate = (fn: () => void) => {
-    lastPointerActionAtRef.current = performance.now();
+  const triggerActionImmediate = (kind: 'jump' | 'tongue' | 'spit', fn: () => void) => {
+    lastPointerActionAtRef.current[kind] = performance.now();
     fn();
   };
 
-  const triggerActionFallbackPress = (fn: () => void) => {
-    if (performance.now() - lastPointerActionAtRef.current < 340) return;
+  const triggerActionFallbackPress = (kind: 'jump' | 'tongue' | 'spit', fn: () => void) => {
+    if (performance.now() - lastPointerActionAtRef.current[kind] < 340) return;
     fn();
   };
 
@@ -1642,9 +1616,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                   // @ts-expect-error phản hồi 0ms ngay khi chạm
                   onPointerDown={(e: PointerEvent) => {
                     e.preventDefault();
-                    triggerActionImmediate(() => sendInput({ spit: true }));
+                    triggerActionImmediate('spit', () => sendInput({ spit: true }));
                   }}
-                  onPress={() => triggerActionFallbackPress(() => sendInput({ spit: true }))}
+                  onPress={() => triggerActionFallbackPress('spit', () => sendInput({ spit: true }))}
                   style={({ pressed }) => [styles.spitBtn, pressed && styles.btnPressed]}
                 >
                   <EmojiIcon emoji="🚀" size={20} />
@@ -1658,9 +1632,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                   // @ts-expect-error phản hồi 0ms ngay khi chạm
                   onPointerDown={(e: PointerEvent) => {
                     e.preventDefault();
-                    triggerActionImmediate(() => sendInput({ tongue: true }));
+                    triggerActionImmediate('tongue', () => sendInput({ tongue: true }));
                   }}
-                  onPress={() => triggerActionFallbackPress(() => sendInput({ tongue: true }))}
+                  onPress={() => triggerActionFallbackPress('tongue', () => sendInput({ tongue: true }))}
                   style={({ pressed }) => [styles.tongueBtn, pressed && styles.btnPressed]}
                 >
                   <EmojiIcon emoji="👅" size={20} />
@@ -1675,9 +1649,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                 // @ts-expect-error phản hồi 0ms ngay khi ngón tay chạm xuống màn hình
                 onPointerDown={(e: PointerEvent) => {
                   e.preventDefault();
-                  triggerActionImmediate(() => sendInput({ jump: true }));
+                  triggerActionImmediate('jump', () => sendInput({ jump: true }));
                 }}
-                onPress={() => triggerActionFallbackPress(() => sendInput({ jump: true }))}
+                onPress={() => triggerActionFallbackPress('jump', () => sendInput({ jump: true }))}
                 style={({ pressed }) => [styles.jumpBtn, pressed && styles.btnPressed]}
               >
                 <EmojiIcon emoji="🐸" size={22} />

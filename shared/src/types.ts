@@ -97,6 +97,8 @@ export interface RoomSettings {
   caroBlockTwoEnds?: boolean;
   /** Cờ caro: chế độ kích thước bàn cờ (`auto` tự mở rộng theo số phe, `mega` siêu đại chiến) */
   caroSizeMode?: CaroSizeMode;
+  /** Cờ caro: thời gian hiển thị đường 5 quân thắng trước tổng kết (ms, dùng nội bộ/test) */
+  caroRevealMs?: number;
   /** Đầm lầy quái chiêu: màn xuất phát (0..2) */
   croakStage?: 0 | 1 | 2;
   /** @deprecated tương thích ngược */
@@ -583,6 +585,7 @@ export type GameAction =
   | { type: 'loto_mark'; num: number }
   | { type: 'loto_kinh'; row: 0 | 1 | 2 }
   | { type: 'caro_move'; row: number; col: number }
+  | { type: 'caro_finish_reveal' }
   | { type: 'cs_input'; input: CroakInput }
   | { type: 'cs_reset_stage' }
   | { type: 'end' };

@@ -54,10 +54,13 @@ export const BOOM_DIR_DELTA: Readonly<Record<BoomDir, { dx: number; dy: number }
 export type BoomItemKind =
   | 'bomb'
   | 'range'
+  | 'max_range'
   | 'speed'
   | 'kick'
   | 'glove'
-  | 'needle';
+  | 'needle'
+  | 'shield'
+  | 'treasure';
 
 export interface BoomItemMeta {
   kind: BoomItemKind;
@@ -81,6 +84,13 @@ export const BOOM_ITEM_META: Record<BoomItemKind, BoomItemMeta> = {
     short: '+Tầm',
     color: '#06B6D4',
     desc: 'Tăng độ dài tia nước nổ (+1 ô)',
+  },
+  max_range: {
+    kind: 'max_range',
+    name: 'Siêu Thuốc Nước MAX',
+    short: 'MAX Tầm',
+    color: '#FACC15',
+    desc: 'Nâng cấp tức thì tầm tia nước lên tối đa 7 ô cực đại!',
   },
   speed: {
     kind: 'speed',
@@ -109,6 +119,20 @@ export const BOOM_ITEM_META: Record<BoomItemKind, BoomItemMeta> = {
     short: 'Kim chích',
     color: '#EC4899',
     desc: 'Khi bị nhốt trong bóng nước, bấm Kỹ Năng để tự chích nổ bóng thoát chết!',
+  },
+  shield: {
+    kind: 'shield',
+    name: 'Khiên Hộ Mệnh',
+    short: 'Khiên 7s',
+    color: '#8B5CF6',
+    desc: 'Bật giáp năng lượng bảo vệ miễn nhiễm tia nước nổ trong 7 giây!',
+  },
+  treasure: {
+    kind: 'treasure',
+    name: 'Kim Cương Kho Báu',
+    short: '+25đ',
+    color: '#14B8A6',
+    desc: 'Cộng ngay +25 điểm thưởng chiến công trong trận!',
   },
 };
 

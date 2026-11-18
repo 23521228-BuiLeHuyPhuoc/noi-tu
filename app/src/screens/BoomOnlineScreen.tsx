@@ -113,6 +113,7 @@ interface HudState {
   canKick: boolean;
   canGlove: boolean;
   needles: number;
+  shieldSec: number;
   standingOnBomb: boolean;
   ufoCooldownSec: number;
   roundWinnerText: string | null;
@@ -426,16 +427,16 @@ function drawPowerUpItem(
   const meta = BOOM_ITEM_META[it.kind];
   const cx = (it.tx + 0.5) * tilePx;
   const bob = Math.sin(now * 0.006 + it.id * 1.3) * (tilePx * 0.07);
-  const cy = (it.ty + 0.5) * tilePx + bob;
-  const r = tilePx * 0.34;
+  const cy = (it.ty + 0.48) * tilePx + bob;
+  const r = tilePx * 0.36;
 
   // Bóng dưới cỏ
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
   ctx.beginPath();
-  ctx.ellipse(cx, (it.ty + 0.82) * tilePx, r * 0.72, r * 0.28, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, (it.ty + 0.84) * tilePx, r * 0.72, r * 0.25, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Hào quang màu vật phẩm
+  // Hào quang xoay nhẹ quanh vật phẩm
   ctx.save();
   ctx.globalAlpha = 0.28 + 0.14 * Math.sin(now * 0.008 + it.id);
   ctx.fillStyle = meta.color;
@@ -444,37 +445,198 @@ function drawPowerUpItem(
   ctx.fill();
   ctx.restore();
 
-  // Viên ngọc vật phẩm bóng bẩy
-  roundRect(ctx, cx - r, cy - r, r * 2, r * 2, r * 0.52);
-  ctx.fillStyle = meta.color;
+  // Đế viên ngọc bo tròn 3D kiểu Crazy Arcade
+  const bgGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  bgGrad.addColorStop(0, '#FFFFFF');
+  bgGrad.addColorStop(0.28, meta.color);
+  bgGrad.addColorStop(1, '#0F172A');
+  roundRect(ctx, cx - r, cy - r, r * 2, r * 2, r * 0.46);
+  ctx.fillStyle = bgGrad;
   ctx.fill();
-  ctx.lineWidth = Math.max(1.5, tilePx * 0.055);
+  ctx.lineWidth = Math.max(1.6, tilePx * 0.06);
   ctx.strokeStyle = '#FFFFFF';
   ctx.stroke();
 
-  // Phản sáng đỉnh
-  roundRect(ctx, cx - r * 0.72, cy - r * 0.78, r * 1.44, r * 0.45, r * 0.25);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+  // Nền tối bên trong để icon vector nổi bật rực rỡ
+  roundRect(ctx, cx - r * 0.76, cy - r * 0.76, r * 1.52, r * 1.52, r * 0.32);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
   ctx.fill();
 
-  // Nhãn ký hiệu siêu rõ ngay cả ở màn nhỏ
-  const glyph =
-    it.kind === 'bomb'
-      ? '+B'
-      : it.kind === 'range'
-        ? '+T'
-        : it.kind === 'speed'
-          ? '⚡'
-          : it.kind === 'kick'
-            ? 'ĐÁ'
-            : it.kind === 'glove'
-              ? 'NÉM'
-              : 'KIM';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = `900 ${Math.max(8, Math.round(tilePx * (glyph.length > 2 ? 0.25 : 0.31)))}px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(glyph, cx, cy + 1);
+  // Vẽ icon vector đa lớp riêng biệt cho từng loại vật phẩm (chuẩn Bomberman / Crazy Arcade!)
+  ctx.save();
+  ctx.translate(cx, cy);
+  const s = r * 0.72;
+  switch (it.kind) {
+    case 'bomb': {
+      // Quả bóng nước tròn xanh có núm buộc & phản sáng trắng
+      ctx.fillStyle = '#38BDF8';
+      ctx.strokeStyle = '#E0F2FE';
+      ctx.lineWidth = Math.max(1.2, s * 0.14);
+      ctx.beginPath();
+      ctx.arc(0, s * 0.12, s * 0.68, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#0284C7';
+      roundRect(ctx, -s * 0.24, -s * 0.78, s * 0.48, s * 0.28, 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(-s * 0.24, -s * 0.06, s * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'range':
+    case 'max_range': {
+      // Bình thủy tinh đựng thuốc nước (+1 Tầm xanh / MAX Vàng Đỏ)
+      const isMax = it.kind === 'max_range';
+      ctx.fillStyle = isMax ? '#FEF08A' : '#BAE6FD';
+      roundRect(ctx, -s * 0.22, -s * 0.84, s * 0.44, s * 0.36, 2);
+      ctx.fill();
+      ctx.fillStyle = isMax ? '#EF4444' : '#0EA5E9';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = Math.max(1.2, s * 0.12);
+      ctx.beginPath();
+      ctx.arc(0, s * 0.22, s * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (isMax) {
+        ctx.fillStyle = '#FEF08A';
+        ctx.beginPath();
+        ctx.moveTo(s * 0.06, -s * 0.24);
+        ctx.lineTo(-s * 0.24, s * 0.22);
+        ctx.lineTo(s * 0.02, s * 0.22);
+        ctx.lineTo(-s * 0.08, s * 0.68);
+        ctx.lineTo(s * 0.28, s * 0.14);
+        ctx.lineTo(0, s * 0.14);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(-s * 0.2, s * 0.06, s * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'speed': {
+      // Đôi giày trượt có cánh thiên thần
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.2, -s * 0.1);
+      ctx.lineTo(-s * 0.82, -s * 0.56);
+      ctx.lineTo(-s * 0.52, s * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#FACC15';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.42, -s * 0.52);
+      ctx.lineTo(s * 0.1, -s * 0.52);
+      ctx.lineTo(s * 0.22, s * 0.15);
+      ctx.lineTo(s * 0.78, s * 0.25);
+      ctx.lineTo(s * 0.78, s * 0.64);
+      ctx.lineTo(-s * 0.52, s * 0.64);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'kick': {
+      // Giày đinh đá bom + đường sút cong
+      ctx.fillStyle = '#34D399';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.5, -s * 0.45);
+      ctx.lineTo(0, -s * 0.45);
+      ctx.lineTo(s * 0.12, s * 0.12);
+      ctx.lineTo(s * 0.65, s * 0.2);
+      ctx.lineTo(s * 0.65, s * 0.58);
+      ctx.lineTo(-s * 0.5, s * 0.58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#FEF08A';
+      ctx.beginPath();
+      ctx.arc(s * 0.52, -s * 0.2, s * 0.36, -Math.PI * 0.4, Math.PI * 0.35);
+      ctx.stroke();
+      break;
+    }
+    case 'glove': {
+      // Găng tay đấm bốc đỏ gắn cổ tay trắng
+      ctx.fillStyle = '#FB7185';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(s * 0.06, -s * 0.12, s * 0.56, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      roundRect(ctx, -s * 0.45, s * 0.32, s * 0.9, s * 0.34, 3);
+      ctx.fill();
+      break;
+    }
+    case 'needle': {
+      // Kim chích vàng nghiêng 45°
+      ctx.strokeStyle = '#FEF08A';
+      ctx.lineWidth = Math.max(2, s * 0.22);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.62, s * 0.62);
+      ctx.lineTo(s * 0.54, -s * 0.54);
+      ctx.stroke();
+      ctx.fillStyle = '#F472B6';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(s * 0.48, -s * 0.48, s * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'shield': {
+      // Khiên hiệp sĩ viền vàng tâm tím ngọc
+      ctx.fillStyle = '#A78BFA';
+      ctx.strokeStyle = '#FEF08A';
+      ctx.lineWidth = Math.max(1.5, s * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.72);
+      ctx.lineTo(s * 0.64, -s * 0.42);
+      ctx.lineTo(s * 0.52, s * 0.28);
+      ctx.lineTo(0, s * 0.78);
+      ctx.lineTo(-s * 0.52, s * 0.28);
+      ctx.lineTo(-s * 0.64, -s * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'treasure': {
+      // Viên kim cương 8 cạnh lấp lánh
+      ctx.fillStyle = '#2DD4BF';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.45, -s * 0.52);
+      ctx.lineTo(s * 0.45, -s * 0.52);
+      ctx.lineTo(s * 0.76, -s * 0.08);
+      ctx.lineTo(0, s * 0.76);
+      ctx.lineTo(-s * 0.76, -s * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.2, -s * 0.52);
+      ctx.lineTo(s * 0.2, -s * 0.52);
+      ctx.lineTo(0, s * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 function drawWaterBlast(
@@ -716,7 +878,8 @@ function drawBomberPlayer(
 
   // Nhân vật đang sống (`alive`) hoặc bị giam trong Bóng Nước (`trapped`)
   const moving = Math.hypot(p.vx, p.vy) > 0.2;
-  const walkBob = moving ? Math.abs(Math.sin(now * 0.018)) * (tilePx * 0.075) : 0;
+  const walkPhase = moving ? Math.sin(now * 0.024 + p.colorIndex) : 0;
+  const walkBob = moving ? Math.abs(walkPhase) * (tilePx * 0.075) : Math.sin(now * 0.005 + p.colorIndex) * (tilePx * 0.015);
   const trappedStruggle =
     p.state === 'trapped' ? Math.sin(now * 0.025 + p.colorIndex) * (tilePx * 0.05) : 0;
 
@@ -724,7 +887,7 @@ function drawBomberPlayer(
   if (mode === 'teams' || isMe) {
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(cx, cy + tilePx * 0.28, tilePx * 0.36, tilePx * 0.16, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + tilePx * 0.29, tilePx * 0.38, tilePx * 0.16, 0, 0, Math.PI * 2);
     ctx.strokeStyle = mode === 'teams' ? (p.team === 0 ? '#EF4444' : '#3B82F6') : '#FACC15';
     ctx.lineWidth = isMe ? 2.6 : 2;
     ctx.stroke();
@@ -732,77 +895,130 @@ function drawBomberPlayer(
   }
 
   // Đổ bóng chân
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.3)';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
   ctx.beginPath();
-  ctx.ellipse(cx, cy + tilePx * 0.3, tilePx * 0.28, tilePx * 0.12, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy + tilePx * 0.3, tilePx * 0.29, tilePx * 0.12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Khiên bất tử ngắn sau khi thoát bóng nước / đầu hiệp
-  if (p.shieldTicks > 0 && Math.floor(now / 65) % 2 === 0) {
+  // Khiên Hộ Mệnh Hoàng Kim (vẽ vòng hào quang năng lượng xoay nhẹ khi p.shieldTicks > 0)
+  if (p.shieldTicks > 0) {
+    const pulseAlpha = p.shieldTicks < 35 && Math.floor(now / 70) % 2 === 0 ? 0.35 : 0.85;
     ctx.save();
-    ctx.strokeStyle = '#FDE047';
-    ctx.lineWidth = 2.2;
+    ctx.globalAlpha = pulseAlpha;
+    ctx.strokeStyle = '#FACC15';
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.16)';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(cx, cy - tilePx * 0.04, tilePx * 0.43, 0, Math.PI * 2);
+    ctx.arc(cx, cy - tilePx * 0.04, tilePx * 0.47, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
     ctx.restore();
   }
 
   const bodyY = cy - walkBob + trappedStruggle;
-  const headR = tilePx * 0.29;
+  const headR = tilePx * 0.295;
+  const suitColor = mode === 'teams' ? (p.team === 0 ? '#E11D48' : '#2563EB') : hex;
 
-  // Hai bàn chân tròn chạy lon ton
-  const footSwing = moving ? Math.sin(now * 0.024) * (tilePx * 0.09) : 0;
-  ctx.fillStyle = '#1E293B';
+  // Hai bàn chân ủng Chibi đánh nhịp chạy lon ton
+  const footSwing = moving ? walkPhase * (tilePx * 0.1) : 0;
+  ctx.fillStyle = '#0F172A';
   ctx.beginPath();
-  ctx.arc(cx - tilePx * 0.12, cy + tilePx * 0.24 - Math.max(0, footSwing), tilePx * 0.085, 0, Math.PI * 2);
-  ctx.arc(cx + tilePx * 0.12, cy + tilePx * 0.24 - Math.max(0, -footSwing), tilePx * 0.085, 0, Math.PI * 2);
+  ctx.ellipse(cx - tilePx * 0.12, cy + tilePx * 0.24 - Math.max(0, footSwing), tilePx * 0.095, tilePx * 0.072, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + tilePx * 0.12, cy + tilePx * 0.24 - Math.max(0, -footSwing), tilePx * 0.095, tilePx * 0.072, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Thân áo chibi
-  roundRect(ctx, cx - tilePx * 0.19, bodyY + tilePx * 0.02, tilePx * 0.38, tilePx * 0.23, tilePx * 0.1);
-  ctx.fillStyle = mode === 'teams' ? (p.team === 0 ? '#DC2626' : '#2563EB') : hex;
+  // Hai cánh tay đeo găng trắng đánh vung vẩy ngược pha bước chân
+  const armSwing = moving ? -walkPhase * (tilePx * 0.1) : Math.sin(now * 0.006 + p.colorIndex) * (tilePx * 0.02);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx - tilePx * 0.24, bodyY + tilePx * 0.11 + armSwing, tilePx * 0.075, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx + tilePx * 0.24, bodyY + tilePx * 0.11 - armSwing, tilePx * 0.075, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Thân áo chibi + dây đai thắt lưng
+  roundRect(ctx, cx - tilePx * 0.19, bodyY + tilePx * 0.01, tilePx * 0.38, tilePx * 0.24, tilePx * 0.1);
+  ctx.fillStyle = suitColor;
   ctx.fill();
   ctx.lineWidth = 1.4;
   ctx.strokeStyle = '#0F172A';
   ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillRect(cx - tilePx * 0.16, bodyY + tilePx * 0.14, tilePx * 0.32, tilePx * 0.045);
 
-  // Mũ bảo hiểm Chibi Bomber tròn to bóng loáng
+  // Bình nước phản lực đôi sau lưng khi quay mặt đi lên (`dir === 3`)
+  if (p.dir === 3) {
+    ctx.fillStyle = '#38BDF8';
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 1.3;
+    roundRect(ctx, cx - tilePx * 0.15, bodyY - tilePx * 0.02, tilePx * 0.13, tilePx * 0.24, 4);
+    ctx.fill();
+    ctx.stroke();
+    roundRect(ctx, cx + tilePx * 0.02, bodyY - tilePx * 0.02, tilePx * 0.13, tilePx * 0.24, 4);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Mũ bảo hiểm Chibi Bomber tròn to bóng loáng + sọc trán thể thao
+  const helmetGrad = ctx.createRadialGradient(
+    cx - headR * 0.3,
+    bodyY - tilePx * 0.12 - headR * 0.3,
+    headR * 0.1,
+    cx,
+    bodyY - tilePx * 0.08,
+    headR,
+  );
+  helmetGrad.addColorStop(0, '#FFFFFF');
+  helmetGrad.addColorStop(0.28, suitColor);
+  helmetGrad.addColorStop(1, suitColor);
   ctx.beginPath();
   ctx.arc(cx, bodyY - tilePx * 0.08, headR, 0, Math.PI * 2);
-  ctx.fillStyle = hex;
+  ctx.fillStyle = helmetGrad;
   ctx.fill();
   ctx.lineWidth = Math.max(1.5, tilePx * 0.055);
   ctx.strokeStyle = '#0F172A';
   ctx.stroke();
 
-  // Ăng-ten cục bông trắng đặc trưng Bomberman trên đỉnh mũ
+  // Ăng-ten cục bông lắc lư theo nhịp chạy
+  const antLag = -walkPhase * (tilePx * 0.05);
   ctx.strokeStyle = '#0F172A';
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(cx, bodyY - tilePx * 0.08 - headR);
-  ctx.lineTo(cx, bodyY - tilePx * 0.08 - headR - tilePx * 0.1);
+  ctx.lineTo(cx + antLag, bodyY - tilePx * 0.08 - headR - tilePx * 0.1);
   ctx.stroke();
   ctx.fillStyle = isMe ? '#FACC15' : '#FFFFFF';
   ctx.beginPath();
-  ctx.arc(cx, bodyY - tilePx * 0.08 - headR - tilePx * 0.12, Math.max(2.2, tilePx * 0.085), 0, Math.PI * 2);
+  ctx.arc(cx + antLag, bodyY - tilePx * 0.08 - headR - tilePx * 0.12, Math.max(2.3, tilePx * 0.09), 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Kính chắn mặt & đôi mắt biểu cảm theo hướng nhìn (ẩn khi quay lưng lên trên dir === 3)
+  // Khuôn mặt & đôi mắt long lanh theo hướng nhìn (ẩn khi quay lưng lên trên dir === 3)
   if (p.dir !== 3) {
-    const lookX = p.dir === 1 ? -tilePx * 0.06 : p.dir === 2 ? tilePx * 0.06 : 0;
-    const visorW = headR * 1.38;
-    const visorH = headR * 0.86;
+    const lookX = p.dir === 1 ? -tilePx * 0.065 : p.dir === 2 ? tilePx * 0.065 : 0;
+    const visorW = headR * 1.42;
+    const visorH = headR * 0.88;
     const vx = cx - visorW * 0.5 + lookX;
-    const vy = bodyY - tilePx * 0.08 - visorH * 0.42;
+    const vy = bodyY - tilePx * 0.08 - visorH * 0.4;
 
-    roundRect(ctx, vx, vy, visorW, visorH, visorH * 0.42);
+    roundRect(ctx, vx, vy, visorW, visorH, visorH * 0.44);
     ctx.fillStyle = '#FFF7ED';
     ctx.fill();
     ctx.lineWidth = 1.2;
     ctx.strokeStyle = '#1E293B';
     ctx.stroke();
+
+    // Hai má hồng Chibi
+    ctx.fillStyle = 'rgba(251, 113, 133, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx + lookX - visorW * 0.3, vy + visorH * 0.72, tilePx * 0.048, tilePx * 0.028, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + lookX + visorW * 0.3, vy + visorH * 0.72, tilePx * 0.048, tilePx * 0.028, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = '#0F172A';
     if (p.state === 'trapped') {
@@ -813,9 +1029,17 @@ function drawBomberPlayer(
       ctx.fillText('><', cx + lookX, vy + visorH * 0.54);
     } else {
       const eyeOff = visorW * 0.22;
+      const eyeRx = Math.max(1.5, tilePx * 0.048);
+      const eyeRy = Math.max(2.2, tilePx * 0.082);
       ctx.beginPath();
-      ctx.ellipse(cx + lookX - eyeOff, vy + visorH * 0.5, Math.max(1.3, tilePx * 0.042), Math.max(2, tilePx * 0.075), 0, 0, Math.PI * 2);
-      ctx.ellipse(cx + lookX + eyeOff, vy + visorH * 0.5, Math.max(1.3, tilePx * 0.042), Math.max(2, tilePx * 0.075), 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + lookX - eyeOff, vy + visorH * 0.48, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + lookX + eyeOff, vy + visorH * 0.48, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Đốm sáng long lanh trong mắt
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(cx + lookX - eyeOff - eyeRx * 0.25, vy + visorH * 0.41, Math.max(0.8, eyeRx * 0.42), 0, Math.PI * 2);
+      ctx.arc(cx + lookX + eyeOff - eyeRx * 0.25, vy + visorH * 0.41, Math.max(0.8, eyeRx * 0.42), 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -981,6 +1205,7 @@ function BoomOnlineInner({
         canKick: !!mine?.canKick,
         canGlove: !!mine?.canGlove,
         needles: mine?.needles ?? 0,
+        shieldSec: mine && mine.shieldTicks > 0 ? Math.ceil(mine.shieldTicks / 20) : 0,
         standingOnBomb,
         ufoCooldownSec: mine ? Math.ceil(mine.ufoCooldownTicks / 20) : 0,
         roundWinnerText: winnerTxt,
@@ -2048,6 +2273,11 @@ function TopArcadeHud({
               {hud.needles > 0 && (
                 <View style={[styles.statChip, { borderColor: '#EC4899', backgroundColor: 'rgba(236,72,153,0.25)' }]}>
                   <T style={[styles.statChipTxt, { color: '#F9A8D4' }]}>📌×{hud.needles}</T>
+                </View>
+              )}
+              {hud.shieldSec > 0 && (
+                <View style={[styles.statChip, { borderColor: '#FACC15', backgroundColor: 'rgba(250,204,21,0.25)' }]}>
+                  <T style={[styles.statChipTxt, { color: '#FEF08A' }]}>🛡️{hud.shieldSec}s</T>
                 </View>
               )}
             </>

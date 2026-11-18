@@ -16,12 +16,14 @@ import { DISRUPT_MAX_BONUS_MS, type ActionResult, type GameAction } from '../../
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const DEFAULT_TURN_SECONDS = 25;
+const DEFAULT_WIN_REVEAL_MS = 4500;
 
 export class CaroGame implements GameEngine {
   private size = CARO_SIZE;
   private readonly sizeMode: CaroSizeMode;
   private readonly blockTwoEnds: boolean;
   private readonly turnMs: number;
+  private readonly revealMs: number;
 
   private order: string[] = [];
   private activeOrder: string[] = [];
@@ -40,6 +42,8 @@ export class CaroGame implements GameEngine {
   private winLine: [number, number][] | null = null;
   private winnerId: string | null = null;
   private isDraw = false;
+  private revealEndsAt: number | null = null;
+  private pendingFinish: { winnerId: string | null; isDraw: boolean; headline: string } | null = null;
 
   private finished = false;
   private readonly timer = new Timer();
@@ -50,10 +54,17 @@ export class CaroGame implements GameEngine {
     this.sizeMode = rawMode === 'mega' ? 'mega' : 'auto';
     const defMs = DEFAULT_TURN_SECONDS * 1000;
     this.turnMs = ctx.turnMs ? Math.min(defMs, Math.max(250, ctx.turnMs)) : defMs;
+    const explicitReveal = ctx.settings.caroRevealMs;
+    if (typeof explicitReveal === 'number' && Number.isFinite(explicitReveal)) {
+      this.revealMs = Math.max(0, explicitReveal);
+    } else {
+      // Trong các test nhanh (`turnMs < 1500`) vẫn giữ kết thúc tức thì; phòng chơi thực tế dừng 4.5s khoe đường 5 quân thắng
+      this.revealMs = !ctx.turnMs || ctx.turnMs >= 1500 ? DEFAULT_WIN_REVEAL_MS : 0;
+    }
   }
 
   private get currentPlayerId(): string | null {
-    if (this.finished || this.activeOrder.length === 0) return null;
+    if (this.finished || this.pendingFinish || this.activeOrder.length === 0) return null;
     return this.activeOrder[this.turnIdx] ?? null;
   }
 
@@ -135,11 +146,15 @@ export class CaroGame implements GameEngine {
       this.winnerId = playerId;
       this.turnEndsAt = null;
       const wName = this.names.get(playerId) ?? playerId;
-      this.finishGame(
-        playerId,
-        false,
-        `❌⭕ ${wName} (${sym}) nối 5 tuyệt đẹp hạ gục bàn cờ sau ${this.moveCount} nước!`,
-      );
+      const headline = `❌⭕ ${wName} (${sym}) nối ${won.length} tuyệt đẹp hạ gục bàn cờ sau ${this.moveCount} nước!`;
+      if (this.revealMs > 0) {
+        this.pendingFinish = { winnerId: playerId, isDraw: false, headline };
+        this.revealEndsAt = Date.now() + this.revealMs;
+        this.timer.set(this.revealMs, () => this.commitPendingFinish());
+        this.ctx.changed();
+        return;
+      }
+      this.finishGame(playerId, false, headline);
       return;
     }
 
@@ -158,9 +173,19 @@ export class CaroGame implements GameEngine {
     this.beginTurn();
   }
 
+  private commitPendingFinish(): void {
+    const pf = this.pendingFinish;
+    if (!pf || this.finished) return;
+    this.pendingFinish = null;
+    this.revealEndsAt = null;
+    this.finishGame(pf.winnerId, pf.isDraw, pf.headline);
+  }
+
   private finishGame(winnerId: string | null, isDraw: boolean, headline: string): void {
     if (this.finished) return;
     this.finished = true;
+    this.pendingFinish = null;
+    this.revealEndsAt = null;
     this.winnerId = winnerId;
     this.isDraw = isDraw;
     this.turnEndsAt = null;
@@ -204,6 +229,20 @@ export class CaroGame implements GameEngine {
   action(playerId: string, action: GameAction): ActionResult {
     if (this.finished) return { ok: false, reason: 'not_playing' };
     if (!this.order.includes(playerId)) return { ok: false, reason: 'not_playing' };
+
+    if (action.type === 'caro_finish_reveal') {
+      if (!this.pendingFinish) return { ok: false, reason: 'bad_action' };
+      this.commitPendingFinish();
+      return { ok: true };
+    }
+
+    if (this.pendingFinish) {
+      if (action.type === 'end' && playerId === this.ctx.hostId()) {
+        this.commitPendingFinish();
+        return { ok: true };
+      }
+      return { ok: false, reason: 'not_playing' };
+    }
 
     if (action.type === 'end') {
       if (playerId !== this.ctx.hostId()) return { ok: false, reason: 'not_host' };
@@ -251,7 +290,7 @@ export class CaroGame implements GameEngine {
   }
 
   removePlayer(playerId: string): void {
-    if (this.finished) return;
+    if (this.finished || this.pendingFinish) return;
     const idx = this.activeOrder.indexOf(playerId);
     if (idx === -1) return;
 
@@ -314,6 +353,7 @@ export class CaroGame implements GameEngine {
       winLine: this.winLine ? this.winLine.map(([r, c]) => [r, c]) : null,
       winnerId: this.winnerId,
       isDraw: this.isDraw,
+      revealEndsAt: this.revealEndsAt,
     };
   }
 

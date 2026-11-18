@@ -4,11 +4,17 @@
 
 export type VeDoanPhase = 'pick_word' | 'drawing' | 'round_end';
 
+export type VeDoanTool = 'pen' | 'eraser' | 'fill' | 'line' | 'rect' | 'circle';
+export const VE_DOAN_TOOLS: readonly VeDoanTool[] = ['pen', 'fill', 'eraser', 'line', 'rect', 'circle'];
+
 export interface VeDoanStroke {
+  tool?: VeDoanTool;
   color: string;
   width: number;
   /** Tọa độ chuẩn hóa [0..1000, 0..1000] */
   points: [number, number][];
+  /** Đường SVG path được dựng từ thuật toán Flood-Fill 2D (chỉ có khi tool === 'fill') */
+  fillPath?: string;
 }
 
 export interface VeDoanGuessEntry {
@@ -46,9 +52,237 @@ export interface VeDoanView {
 export const VE_DOAN_COLORS = [
   '#111827', '#E03131', '#F76707', '#F59F00', '#2F9E44',
   '#0CA678', '#1971C2', '#7048E8', '#E64980', '#8B5E34',
+  '#38BDF8', '#F472B6', '#FFFFFF',
 ] as const;
 
 export const VE_DOAN_WIDTHS = [4, 9, 16] as const;
+
+/**
+ * Dựng danh sách điểm cho các công cụ hình học (`line`, `rect`, `circle`) trong không gian 0..1000.
+ */
+export function buildVeDoanShapePoints(
+  tool: VeDoanTool,
+  start: [number, number],
+  end: [number, number],
+): [number, number][] {
+  const sx = Math.max(0, Math.min(1000, Math.round(start[0])));
+  const sy = Math.max(0, Math.min(1000, Math.round(start[1])));
+  const ex = Math.max(0, Math.min(1000, Math.round(end[0])));
+  const ey = Math.max(0, Math.min(1000, Math.round(end[1])));
+  if (tool === 'line') {
+    return [[sx, sy], [ex, ey]];
+  }
+  if (tool === 'rect') {
+    const x1 = Math.min(sx, ex);
+    const y1 = Math.min(sy, ey);
+    const x2 = Math.max(sx, ex);
+    const y2 = Math.max(sy, ey);
+    return [[x1, y1], [x2, y1], [x2, y2], [x1, y2], [x1, y1]];
+  }
+  if (tool === 'circle') {
+    const cx = (sx + ex) / 2;
+    const cy = (sy + ey) / 2;
+    const rx = Math.max(8, Math.abs(ex - sx) / 2);
+    const ry = Math.max(8, Math.abs(ey - sy) / 2);
+    const pts: [number, number][] = [];
+    const steps = 28;
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      pts.push([
+        Math.max(0, Math.min(1000, Math.round(cx + Math.cos(a) * rx))),
+        Math.max(0, Math.min(1000, Math.round(cy + Math.sin(a) * ry))),
+      ]);
+    }
+    return pts;
+  }
+  return [[sx, sy], [ex, ey]];
+}
+
+const FILL_GRID = 160;
+
+/**
+ * Thuật toán Flood-Fill 2D trên lưới ảo 160×160 chuẩn hóa về SVG Path trong không gian 0..1000.
+ * Tự động phát hiện biên khép kín từ bút vẽ, hình vuông, hình tròn, đường thẳng, cục tẩy & các lần đổ màu trước!
+ */
+export function computeFloodFillPath(
+  strokes: readonly VeDoanStroke[],
+  fx: number,
+  fy: number,
+): string {
+  const G = FILL_GRID;
+  const scale = 1000 / G;
+  const grid = new Uint16Array(G * G); // 0 = nền trắng (#FFFFFF)
+  const colorToId = new Map<string, number>([['#FFFFFF', 0]]);
+  const getColorId = (hex: string): number => {
+    const norm = hex.toUpperCase();
+    const hit = colorToId.get(norm);
+    if (hit !== undefined) return hit;
+    const next = colorToId.size + 1;
+    colorToId.set(norm, next);
+    return next;
+  };
+
+  const paintCell = (gx: number, gy: number, rad: number, cid: number) => {
+    for (let dy = -rad; dy <= rad; dy++) {
+      const yy = gy + dy;
+      if (yy < 0 || yy >= G) continue;
+      for (let dx = -rad; dx <= rad; dx++) {
+        const xx = gx + dx;
+        if (xx < 0 || xx >= G) continue;
+        if (dx * dx + dy * dy <= rad * rad + 0.5) {
+          grid[yy * G + xx] = cid;
+        }
+      }
+    }
+  };
+
+  const floodGrid = (sx: number, sy: number, cid: number): Uint8Array | null => {
+    if (sx < 0 || sx >= G || sy < 0 || sy >= G) return null;
+    const target = grid[sy * G + sx];
+    if (target === cid) return null;
+    const mask = new Uint8Array(G * G);
+    const stack: number[] = [sy * G + sx];
+    grid[sy * G + sx] = cid;
+    mask[sy * G + sx] = 1;
+    while (stack.length > 0) {
+      const idx = stack.pop()!;
+      const x = idx % G;
+      const y = (idx - x) / G;
+      if (x > 0) {
+        const n = idx - 1;
+        if (!mask[n] && grid[n] === target) {
+          grid[n] = cid;
+          mask[n] = 1;
+          stack.push(n);
+        }
+      }
+      if (x + 1 < G) {
+        const n = idx + 1;
+        if (!mask[n] && grid[n] === target) {
+          grid[n] = cid;
+          mask[n] = 1;
+          stack.push(n);
+        }
+      }
+      if (y > 0) {
+        const n = idx - G;
+        if (!mask[n] && grid[n] === target) {
+          grid[n] = cid;
+          mask[n] = 1;
+          stack.push(n);
+        }
+      }
+      if (y + 1 < G) {
+        const n = idx + G;
+        if (!mask[n] && grid[n] === target) {
+          grid[n] = cid;
+          mask[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+    return mask;
+  };
+
+  for (const s of strokes) {
+    if (!s.points.length) continue;
+    const tool = s.tool ?? 'pen';
+    if (tool === 'fill') {
+      const [px, py] = s.points[0];
+      const gx = Math.max(0, Math.min(G - 1, Math.floor((px / 1000) * G)));
+      const gy = Math.max(0, Math.min(G - 1, Math.floor((py / 1000) * G)));
+      floodGrid(gx, gy, getColorId(s.color));
+      continue;
+    }
+
+    const cid = tool === 'eraser' ? 0 : getColorId(s.color);
+    const rad = Math.max(1, Math.round(((s.width || 9) * 0.5) / scale));
+    if (s.points.length === 1) {
+      const gx = Math.max(0, Math.min(G - 1, Math.floor((s.points[0][0] / 1000) * G)));
+      const gy = Math.max(0, Math.min(G - 1, Math.floor((s.points[0][1] / 1000) * G)));
+      paintCell(gx, gy, rad, cid);
+      continue;
+    }
+
+    const pts = [...s.points];
+    // Nếu người chơi vẽ tự do gần khép kín vòng (< 42 đơn vị), tự khép kín luôn để đổ màu không bị tràn!
+    if (tool === 'pen' && pts.length >= 4) {
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      if (Math.hypot(first[0] - last[0], first[1] - last[1]) <= 42) {
+        pts.push(first);
+      }
+    }
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, ay] = pts[i];
+      const [bx, by] = pts[i + 1];
+      const dist = Math.hypot(bx - ax, by - ay);
+      const steps = Math.max(1, Math.ceil((dist / scale) * 2.2));
+      for (let st = 0; st <= steps; st++) {
+        const t = st / steps;
+        const x = ax + (bx - ax) * t;
+        const y = ay + (by - ay) * t;
+        const gx = Math.max(0, Math.min(G - 1, Math.floor((x / 1000) * G)));
+        const gy = Math.max(0, Math.min(G - 1, Math.floor((y / 1000) * G)));
+        paintCell(gx, gy, rad, cid);
+      }
+    }
+  }
+
+  const sx = Math.max(0, Math.min(G - 1, Math.floor((fx / 1000) * G)));
+  const sy = Math.max(0, Math.min(G - 1, Math.floor((fy / 1000) * G)));
+  const mask = floodGrid(sx, sy, 65535);
+  if (!mask) return '';
+
+  // Gom các ô đã fill thành các hình chữ nhật tối đa theo chiều ngang + chiều dọc để SVG nhẹ & siêu nét
+  interface GridRect { x1: number; x2: number; y1: number; y2: number }
+  const finishedRects: GridRect[] = [];
+  let active = new Map<string, GridRect>();
+
+  for (let y = 0; y < G; y++) {
+    const nextActive = new Map<string, GridRect>();
+    let x = 0;
+    while (x < G) {
+      while (x < G && !mask[y * G + x]) x++;
+      if (x >= G) break;
+      const x1 = x;
+      while (x < G && mask[y * G + x]) x++;
+      const x2 = x;
+      const key = `${x1}:${x2}`;
+      const prev = active.get(key);
+      if (prev) {
+        prev.y2 = y + 1;
+        nextActive.set(key, prev);
+        active.delete(key);
+      } else {
+        nextActive.set(key, { x1, x2, y1: y, y2: y + 1 });
+      }
+    }
+    for (const r of active.values()) finishedRects.push(r);
+    active = nextActive;
+  }
+  for (const r of active.values()) finishedRects.push(r);
+
+  if (finishedRects.length === 1 && finishedRects[0].x1 === 0 && finishedRects[0].x2 === G && finishedRects[0].y1 === 0 && finishedRects[0].y2 === G) {
+    return 'M0 0H1000V1000H0Z';
+  }
+
+  // Giới hạn an toàn và hợp nhất đường SVG
+  const parts: string[] = [];
+  for (const r of finishedRects) {
+    const rx = Math.max(0, Math.round(r.x1 * scale - 1));
+    const ry = Math.max(0, Math.round(r.y1 * scale - 1));
+    const rx2 = Math.min(1000, Math.round(r.x2 * scale + 1));
+    const ry2 = Math.min(1000, Math.round(r.y2 * scale + 1));
+    const rw = rx2 - rx;
+    const rh = ry2 - ry;
+    if (rw > 0 && rh > 0) {
+      parts.push(`M${rx} ${ry}h${rw}v${rh}h-${rw}z`);
+    }
+  }
+  return parts.join('');
+}
 
 const C = {
   black: '#111827',

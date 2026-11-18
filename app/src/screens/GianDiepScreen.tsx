@@ -23,7 +23,7 @@ const PHASE_META: Record<GianDiepView['phase'], { title: string; emoji: string; 
     title: 'Nhận Từ Khóa',
     emoji: '🔐',
     accent: '#0284C7',
-    hint: 'Ghi nhớ từ khóa ở góc phải trên (chạm để che khi ngồi cạnh bạn bè)!',
+    hint: 'Ghi nhớ từ khóa to bên dưới (chạm vào khung từ để ẩn khi ngồi gần bạn bè)!',
   },
   clue_turn: {
     title: 'Khai Gợi Ý',
@@ -60,6 +60,12 @@ const PHASE_META: Record<GianDiepView['phase'], { title: string; emoji: string; 
     emoji: '🤍',
     accent: '#475569',
     hint: 'Mr. White đoán đúng từ của Dân Thường sẽ thắng ngược ngay lập tức!',
+  },
+  spy_guess: {
+    title: 'Gián Điệp Phản Đòn',
+    emoji: '🕵️',
+    accent: '#EA580C',
+    hint: 'Gián Điệp cuối cùng bị bắt! Đoán trúng từ Dân Thường để lật kèo ngoạn mục!',
   },
   reveal_end: {
     title: 'Lật Mở Từ Khóa',
@@ -221,8 +227,8 @@ function GianDiepBody({ game, room }: { game: Game; room: RoomState }) {
 
   return (
     <View style={styles.root}>
-      {/* 1. Thanh Đỉnh Gọn Nhẹ + Thẻ Từ Khóa Bí Mật 1 chạm */}
-      <View style={[styles.topCard, compact && { paddingVertical: 7, paddingHorizontal: 10 }]}>
+      {/* 1. Thanh Trạng Thái Vòng Chơi & Cơ Cấu Vai Diễn */}
+      <View style={[styles.topCard, compact && { paddingVertical: 6, paddingHorizontal: 10 }]}>
         <View style={styles.topRow}>
           <View style={[styles.phasePill, { backgroundColor: meta.accent }]}>
             <EmojiIcon emoji={meta.emoji} size={14} />
@@ -231,25 +237,62 @@ function GianDiepBody({ game, room }: { game: Game; room: RoomState }) {
           <View style={styles.catBadge}>
             <T numberOfLines={1} style={styles.catTxt}>🏷️ {view.category}</T>
           </View>
-
-          <Pressable
-            testID="gd-secret-card"
-            onPress={() => setWordVisible((v) => !v)}
-            style={[styles.secretPill, !wordVisible && styles.secretPillHidden]}
-          >
-            <UiIcon name={wordVisible ? 'Eye' : 'Lock'} size={13} color="#FDE047" />
-            {wordVisible ? (
-              <T testID="gd-secret-word" numberOfLines={1} style={styles.secretPillWord}>
-                {view.myRole === 'mrwhite' ? 'MR. WHITE' : (view.myWord ?? '---')}
+          {view.roleSummary && (
+            <View testID="gd-role-summary" style={styles.roleSummaryPill}>
+              <T numberOfLines={1} style={styles.roleSummaryTxt}>
+                🧑{view.roleSummary.dan} · 🕵️{view.roleSummary.giandiep}
+                {view.roleSummary.mrwhite > 0 ? ` · 🤍${view.roleSummary.mrwhite}` : ''}
               </T>
-            ) : (
-              <T style={styles.secretPillMask}>Đã che từ</T>
-            )}
-          </Pressable>
+            </View>
+          )}
         </View>
-        <T numberOfLines={1} style={styles.hintTxt}>{meta.hint}</T>
+        <T numberOfLines={1} style={styles.hintTxt}>
+          {meta.hint}
+        </T>
         <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="gd-timer" />
       </View>
+
+      {/* 1B. THẺ TỪ KHÓA BÍ MẬT CỠ LỚN NỔI BẬT Ở TRUNG TÂM */}
+      <Pressable
+        testID="gd-secret-card"
+        onPress={() => setWordVisible((v) => !v)}
+        style={[
+          styles.heroSecretCard,
+          compact && { paddingVertical: 7, paddingHorizontal: 12 },
+          !wordVisible && styles.heroSecretCardHidden,
+        ]}
+      >
+        <View style={styles.heroSecretHeader}>
+          <View style={styles.heroSecretBadge}>
+            <UiIcon name={wordVisible ? 'Eye' : 'EyeOff'} size={13} color="#FDE047" />
+            <T style={styles.heroSecretLabel}>
+              {view.myRole === 'mrwhite'
+                ? 'THÂN PHẬN CỦA BẠN'
+                : '🔑 TỪ KHÓA BÍ MẬT CỦA BẠN'}
+            </T>
+          </View>
+          <T style={styles.heroSecretToggleHint}>
+            {wordVisible ? 'Chạm để che 🙈' : 'Chạm để xem 👁️'}
+          </T>
+        </View>
+        {wordVisible ? (
+          <T
+            testID="gd-secret-word"
+            numberOfLines={1}
+            style={[
+              styles.heroSecretWord,
+              compact && { fontSize: 19 },
+              view.myRole === 'mrwhite' && { color: '#E2E8F0', fontSize: compact ? 16 : 18 },
+            ]}
+          >
+            {view.myRole === 'mrwhite'
+              ? '🤍 MR. WHITE (Không có từ)'
+              : (view.myWord ?? '---').toUpperCase()}
+          </T>
+        ) : (
+          <T style={styles.heroSecretMask}>•••••••••• (Đã che từ khóa)</T>
+        )}
+      </Pressable>
 
       {/* 2. DUY NHẤT 1 Hàng Avatar Nghi Phạm Đánh Số #1..#N (Bỏ hoàn toàn lặp 2 hàng avatar!) */}
       <View style={styles.suspectWrap}>
@@ -333,8 +376,10 @@ function GianDiepBody({ game, room }: { game: Game; room: RoomState }) {
       <View style={styles.feedContainer}>
         <View style={styles.feedHeader}>
           <EmojiIcon emoji="🕵️" size={14} />
-          <T style={styles.feedHeaderTitle}>Hồ Sơ Lời Khai & Thảo Luận Trực Tiếp</T>
-          <T style={styles.feedCountTxt}>{view.alive.length}/{view.order.length} còn lại</T>
+          <T style={styles.feedHeaderTitle}>Hồ Sơ Lời Khai · Loại hết phe Điệp để thắng</T>
+          <T style={styles.feedCountTxt}>
+            {view.aliveCounts ? `🧑${view.aliveCounts.dan} vs 🕵️${view.aliveCounts.hidden}` : `${view.alive.length}/${view.order.length} còn lại`}
+          </T>
         </View>
 
         <ScrollView
@@ -422,7 +467,8 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
   const renderBottom = () => {
     if (view.phase === 'reveal_end') return undefined;
 
-    if (view.phase === 'mrwhite_guess') {
+    if (view.phase === 'mrwhite_guess' || view.phase === 'spy_guess') {
+      const isSpyCounter = view.phase === 'spy_guess';
       if (view.mrWhiteId === me) {
         const submitGuess = async () => {
           const clean = guessVal.trim();
@@ -433,7 +479,9 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
           <KeyboardLift>
             <View style={styles.dock}>
               <T style={[styles.dockStatus, { color: '#FDE047' }]}>
-                🤍 Cơ hội cuối! Đoán đúng từ của Dân Thường để LẬT KÈO THẮNG!
+                {isSpyCounter
+                  ? '🕵️ Phản đòn cuối! Đoán trúng từ của Dân Thường để LẬT KÈO THẮNG!'
+                  : '🤍 Cơ hội cuối! Đoán đúng từ của Dân Thường để LẬT KÈO THẮNG!'}
               </T>
               {err && <T style={styles.errTxt}>{err}</T>}
               <View style={styles.inputRow}>
@@ -455,7 +503,9 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
       }
       return (
         <T style={styles.waitTxt}>
-          🤍 Đang hồi hộp chờ Mr. White {view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ khóa…
+          {isSpyCounter
+            ? `🕵️ Đang hồi hộp chờ Gián Điệp ${view.names[view.mrWhiteId ?? ''] ?? ''} phản đòn đoán từ khóa…`
+            : `🤍 Đang hồi hộp chờ Mr. White ${view.names[view.mrWhiteId ?? ''] ?? ''} đoán từ khóa…`}
         </T>
       );
     }
@@ -722,26 +772,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
     borderWidth: 1,
     borderColor: 'rgba(217,119,6,0.3)',
-    maxWidth: 110,
+    maxWidth: 115,
   },
   catTxt: { fontSize: 11, fontWeight: '800', color: '#92400E' },
-
-  secretPill: {
+  roleSummaryPill: {
     marginLeft: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  roleSummaryTxt: { fontSize: 10.5, fontWeight: '900', color: '#3730A3' },
+
+  heroSecretCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    gap: 3,
+    borderWidth: 2,
+    borderColor: '#FACC15',
+    alignItems: 'center',
+  },
+  heroSecretCardHidden: { borderColor: '#64748B', backgroundColor: '#1E293B' },
+  heroSecretHeader: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#FACC15',
-    maxWidth: 155,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  secretPillHidden: { borderColor: '#64748B', backgroundColor: '#1E293B' },
-  secretPillWord: { color: '#FDE047', fontSize: 12, fontWeight: '900', fontFamily: FONT },
-  secretPillMask: { color: '#CBD5E1', fontSize: 11, fontWeight: '800' },
+  heroSecretBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroSecretLabel: { color: '#94A3B8', fontSize: 10.5, fontWeight: '900', letterSpacing: 0.6 },
+  heroSecretToggleHint: { color: '#64748B', fontSize: 10.5, fontWeight: '800' },
+  heroSecretWord: {
+    color: '#FDE047',
+    fontSize: 23,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    textAlign: 'center',
+    fontFamily: FONT,
+  },
+  heroSecretMask: { color: '#CBD5E1', fontSize: 15, fontWeight: '800', paddingVertical: 3 },
   hintTxt: { fontSize: 11.5, fontWeight: '700', color: '#475569' },
 
   suspectWrap: {

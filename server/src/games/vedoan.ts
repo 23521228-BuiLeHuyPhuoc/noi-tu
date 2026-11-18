@@ -1,12 +1,15 @@
 import {
   BOT_SKETCHES,
+  computeFloodFillPath,
   getBotSketch,
   VE_DOAN_COLORS,
+  VE_DOAN_TOOLS,
   VE_DOAN_WIDTHS,
   VE_DOAN_WORDS,
   type VeDoanGuessEntry,
   type VeDoanPhase,
   type VeDoanStroke,
+  type VeDoanTool,
   type VeDoanView,
 } from '../../../shared/src/vedoan';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
@@ -259,15 +262,29 @@ export class VeDoanGame implements GameEngine {
     return Math.max(0, Math.min(1000, Math.round(Number.isFinite(v) ? v : 0)));
   }
 
-  private sanitizeStroke(raw: VeDoanStroke): VeDoanStroke {
-    const color = (VE_DOAN_COLORS as readonly string[]).includes(raw.color) ? raw.color : '#111827';
-    const width = (VE_DOAN_WIDTHS as readonly number[]).includes(raw.width) ? raw.width : 9;
+  private sanitizeStroke(raw: VeDoanStroke, existingStrokes: readonly VeDoanStroke[] = []): VeDoanStroke {
+    const tool: VeDoanTool =
+      raw.tool && (VE_DOAN_TOOLS as readonly string[]).includes(raw.tool) ? raw.tool : 'pen';
+    const color = tool === 'eraser'
+      ? '#FFFFFF'
+      : (VE_DOAN_COLORS as readonly string[]).includes(raw.color)
+        ? raw.color
+        : '#111827';
+    const allowedWidths = tool === 'eraser' ? [12, 22, 34] : VE_DOAN_WIDTHS;
+    const fallbackWidth = tool === 'eraser' ? 22 : 9;
+    const width = (allowedWidths as readonly number[]).includes(raw.width) || (VE_DOAN_WIDTHS as readonly number[]).includes(raw.width)
+      ? raw.width
+      : fallbackWidth;
     const points = raw.points.slice(0, 160).map(([x, y]): [number, number] => [this.clampPt(x), this.clampPt(y)]);
-    return { color, width, points };
+    if (tool === 'fill' && points.length > 0) {
+      const fillPath = computeFloodFillPath(existingStrokes, points[0][0], points[0][1]);
+      return { tool, color, width, points: [points[0]], ...(fillPath ? { fillPath } : {}) };
+    }
+    return { ...(tool !== 'pen' ? { tool } : {}), color, width, points };
   }
 
   private isSameStroke(a: VeDoanStroke, b: VeDoanStroke): boolean {
-    if (a.color !== b.color || a.width !== b.width || a.points.length !== b.points.length) return false;
+    if ((a.tool ?? 'pen') !== (b.tool ?? 'pen') || a.color !== b.color || a.width !== b.width || a.points.length !== b.points.length) return false;
     for (let i = 0; i < a.points.length; i++) {
       if (a.points[i][0] !== b.points[i][0] || a.points[i][1] !== b.points[i][1]) return false;
     }
@@ -288,8 +305,11 @@ export class VeDoanGame implements GameEngine {
 
     if (action.type === 'vd_stroke') {
       if (this.phase !== 'drawing' || playerId !== this.drawerId) return { ok: false, reason: 'not_your_turn' };
-      if (this.strokes.length >= 80 || !action.stroke?.points?.length) return { ok: false, reason: 'bad_action' };
-      const cleanStroke = this.sanitizeStroke(action.stroke);
+      if (this.strokes.length >= 160 || !action.stroke?.points?.length) return { ok: false, reason: 'bad_action' };
+      const cleanStroke = this.sanitizeStroke(action.stroke, this.strokes);
+      if (cleanStroke.tool === 'fill' && !cleanStroke.fillPath) {
+        return { ok: true };
+      }
       if (this.ctx.isBot?.(playerId) && this.strokes.some((s) => this.isSameStroke(s, cleanStroke))) {
         this.scheduleNextBotStroke();
         return { ok: true };
@@ -330,21 +350,33 @@ export class VeDoanGame implements GameEngine {
       if (exact) {
         this.guessed.add(playerId);
         const remRatio = this.phaseEndsAt ? Math.max(0, Math.min(1, (this.phaseEndsAt - Date.now()) / this.phaseMs)) : 0;
-        const firstBonus = this.guessed.size === 1 ? 30 : 0;
-        const pts = 100 + Math.round(100 * remRatio) + firstBonus;
+        const hitRank = this.guessed.size;
+        const hintPenalty = Math.min(35, this.revealedIdx.size * 12);
+
+        // Tính điểm người đoán: thưởng tốc độ & thứ tự đoán trúng
+        const baseGuesser = hitRank === 1 ? 115 : hitRank === 2 ? 100 : 85;
+        const speedGuesser = Math.round((hitRank === 1 ? 85 : hitRank === 2 ? 70 : 55) * remRatio);
+        const pts = Math.max(70, baseGuesser + speedGuesser - hintPenalty);
         this.scores.set(playerId, (this.scores.get(playerId) ?? 0) + pts);
-        this.scores.set(this.drawerId, (this.scores.get(this.drawerId) ?? 0) + 45);
+
+        // Luật điểm công bằng cho Họa sĩ: vẽ đẹp & dễ hiểu -> người khác đoán ra sớm = thưởng cao xứng đáng!
+        const guessersNeeded = this.order.filter((id) => id !== this.drawerId && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)));
+        const allGuessed = guessersNeeded.length > 0 && guessersNeeded.every((id) => this.guessed.has(id));
+        const baseDrawer = hitRank === 1 ? 85 + Math.round(65 * remRatio) : 35;
+        const sweepBonus = allGuessed ? 35 : 0;
+        const drawerDelta = baseDrawer + sweepBonus;
+        this.scores.set(this.drawerId, (this.scores.get(this.drawerId) ?? 0) + drawerDelta);
+
         this.feed.push({
           id: ++this.feedSeq,
           playerId,
           name: this.names.get(playerId) ?? playerId,
-          text: `🎉 Đã đoán trúng! (+${pts} điểm)`,
+          text: `🎉 Đã đoán trúng! (+${pts}đ · 🎨 Họa sĩ +${drawerDelta}đ${allGuessed ? ' · Cả phòng hiểu!' : ''})`,
           hit: true,
         });
         if (this.feed.length > 24) this.feed.shift();
 
-        const guessersNeeded = this.order.filter((id) => id !== this.drawerId && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)));
-        if (guessersNeeded.length > 0 && guessersNeeded.every((id) => this.guessed.has(id))) {
+        if (allGuessed) {
           this.timer.clear();
           this.endTurn();
         } else {

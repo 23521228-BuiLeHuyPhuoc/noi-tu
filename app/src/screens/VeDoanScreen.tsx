@@ -1,8 +1,13 @@
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import {
-  VE_DOAN_COLORS, VE_DOAN_WIDTHS,
-  type VeDoanStroke, type VeDoanView,
+  buildVeDoanShapePoints,
+  computeFloodFillPath,
+  VE_DOAN_COLORS,
+  VE_DOAN_WIDTHS,
+  type VeDoanStroke,
+  type VeDoanTool,
+  type VeDoanView,
 } from '../../../shared/src/vedoan';
 import { themeById } from '../../../shared/src/themes';
 import type { PublicPlayer, RoomState } from '../../../shared/src/types';
@@ -16,20 +21,33 @@ import { Image } from '../components/Image';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { EmojiIcon, UiIcon } from '../components/Icons';
 
-function strokesToSvgUri(strokes: VeDoanStroke[]): string {
-  const parts: string[] = [];
-  for (const s of strokes) {
-    if (!s.points.length) continue;
-    if (s.points.length === 1) {
-      const [x, y] = s.points[0];
-      parts.push(`<circle cx="${x}" cy="${y}" r="${Math.max(4, s.width * 0.7)}" fill="${s.color}"/>`);
-    } else {
-      const pts = s.points.map(([x, y]) => `${x},${y}`).join(' ');
-      parts.push(
-        `<polyline fill="none" stroke="${s.color}" stroke-width="${s.width}" stroke-linecap="round" stroke-linejoin="round" points="${pts}"/>`,
-      );
-    }
+const TOOL_META: { id: VeDoanTool; label: string; emoji: string }[] = [
+  { id: 'pen', label: 'Bút', emoji: '✏️' },
+  { id: 'fill', label: 'Đổ màu', emoji: '🪣' },
+  { id: 'eraser', label: 'Tẩy', emoji: '🧹' },
+  { id: 'line', label: 'Thẳng', emoji: '📏' },
+  { id: 'rect', label: 'Vuông', emoji: '▭' },
+  { id: 'circle', label: 'Tròn', emoji: '◯' },
+];
+
+function strokeMarkup(s: VeDoanStroke, all: VeDoanStroke[], idx: number): string {
+  const tool = s.tool ?? 'pen';
+  if (tool === 'fill') {
+    const d = s.fillPath ?? (s.points[0] ? computeFloodFillPath(all.slice(0, idx), s.points[0][0], s.points[0][1]) : '');
+    return d ? `<path d="${d}" fill="${s.color}"/>` : '';
   }
+  const strokeColor = tool === 'eraser' ? '#FFFFFF' : s.color;
+  if (!s.points.length) return '';
+  if (s.points.length === 1) {
+    const [x, y] = s.points[0];
+    return `<circle cx="${x}" cy="${y}" r="${Math.max(4, s.width * 0.7)}" fill="${strokeColor}"/>`;
+  }
+  const pts = s.points.map(([x, y]) => `${x},${y}`).join(' ');
+  return `<polyline fill="none" stroke="${strokeColor}" stroke-width="${s.width}" stroke-linecap="round" stroke-linejoin="round" points="${pts}"/>`;
+}
+
+function strokesToSvgUri(strokes: VeDoanStroke[]): string {
+  const parts = strokes.map((s, idx) => strokeMarkup(s, strokes, idx)).filter(Boolean);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" preserveAspectRatio="none">${parts.join('')}</svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
@@ -50,6 +68,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const isDrawer = view.drawerId === me;
   const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
 
+  const [tool, setTool] = useState<VeDoanTool>('pen');
   const [color, setColor] = useState<string>(VE_DOAN_COLORS[0]);
   const [brush, setBrush] = useState<number>(VE_DOAN_WIDTHS[1]);
   const [draft, setDraft] = useState<VeDoanStroke | null>(null);
@@ -61,20 +80,24 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const sizeRef = useRef<{ w: number; h: number }>({ w: 320, h: 320 });
   const originRef = useRef<{ px: number; py: number } | null>(null);
   const draftPtsRef = useRef<[number, number][]>([]);
+  const shapeStartRef = useRef<[number, number] | null>(null);
   const drawingRef = useRef(false);
   const draftRafRef = useRef<number | null>(null);
 
-  const flushDraftFrame = (c: string, w: number) => {
+  const effectiveWidth = tool === 'eraser' ? (brush === 4 ? 12 : brush === 9 ? 22 : 34) : brush;
+  const effectiveColor = tool === 'eraser' ? '#FFFFFF' : color;
+
+  const flushDraftFrame = (curTool: VeDoanTool, c: string, w: number) => {
     if (draftRafRef.current !== null || typeof requestAnimationFrame === 'undefined') {
       if (typeof requestAnimationFrame === 'undefined') {
-        setDraft({ color: c, width: w, points: [...draftPtsRef.current] });
+        setDraft({ tool: curTool, color: c, width: w, points: [...draftPtsRef.current] });
       }
       return;
     }
     draftRafRef.current = requestAnimationFrame(() => {
       draftRafRef.current = null;
       if (drawingRef.current) {
-        setDraft({ color: c, width: w, points: [...draftPtsRef.current] });
+        setDraft({ tool: curTool, color: c, width: w, points: [...draftPtsRef.current] });
       }
     });
   };
@@ -90,26 +113,43 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const onWebDown = (e: WebPointerEvt) => {
     if (!canDraw) return;
+    const pt = webNorm(e);
+    if (tool === 'fill') {
+      void game.act({ type: 'vd_stroke', stroke: { tool: 'fill', color, width: brush, points: [pt] } });
+      return;
+    }
     drawingRef.current = true;
     try {
       if (e.pointerId !== undefined) e.currentTarget.setPointerCapture?.(e.pointerId);
     } catch {
       // bỏ qua
     }
-    const pt = webNorm(e);
-    draftPtsRef.current = [pt];
-    setDraft({ color, width: brush, points: [pt] });
+    if (tool === 'line' || tool === 'rect' || tool === 'circle') {
+      shapeStartRef.current = pt;
+      const pts = buildVeDoanShapePoints(tool, pt, pt);
+      draftPtsRef.current = pts;
+      setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: pts });
+    } else {
+      shapeStartRef.current = null;
+      draftPtsRef.current = [pt];
+      setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: [pt] });
+    }
   };
 
   const onWebMove = (e: WebPointerEvt) => {
-    if (!canDraw || !drawingRef.current) return;
+    if (!canDraw || !drawingRef.current || tool === 'fill') return;
     const pt = webNorm(e);
+    if ((tool === 'line' || tool === 'rect' || tool === 'circle') && shapeStartRef.current) {
+      draftPtsRef.current = buildVeDoanShapePoints(tool, shapeStartRef.current, pt);
+      flushDraftFrame(tool, effectiveColor, effectiveWidth);
+      return;
+    }
     const pts = draftPtsRef.current;
     const last = pts[pts.length - 1];
     if (!last || Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 8) {
       if (pts.length < 150) {
         draftPtsRef.current = [...pts, pt];
-        flushDraftFrame(color, brush);
+        flushDraftFrame(tool, effectiveColor, effectiveWidth);
       }
     }
   };
@@ -117,6 +157,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const onWebUp = () => {
     if (!drawingRef.current) return;
     drawingRef.current = false;
+    shapeStartRef.current = null;
     if (draftRafRef.current !== null && typeof cancelAnimationFrame !== 'undefined') {
       cancelAnimationFrame(draftRafRef.current);
       draftRafRef.current = null;
@@ -124,8 +165,11 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     const pts = draftPtsRef.current;
     draftPtsRef.current = [];
     setDraft(null);
-    if (canDraw && pts.length > 0) {
-      void game.act({ type: 'vd_stroke', stroke: { color, width: brush, points: pts } });
+    if (canDraw && tool !== 'fill' && pts.length > 0) {
+      void game.act({
+        type: 'vd_stroke',
+        stroke: { ...(tool !== 'pen' ? { tool } : {}), color: effectiveColor, width: effectiveWidth, points: pts },
+      });
     }
   };
 
@@ -153,20 +197,38 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
       if (Number.isFinite(px) && Number.isFinite(py)) originRef.current = { px, py };
     });
     const pt = toNorm(evt);
-    draftPtsRef.current = [pt];
-    setDraft({ color, width: brush, points: [pt] });
+    if (tool === 'fill') {
+      void game.act({ type: 'vd_stroke', stroke: { tool: 'fill', color, width: brush, points: [pt] } });
+      return;
+    }
+    if (tool === 'line' || tool === 'rect' || tool === 'circle') {
+      shapeStartRef.current = pt;
+      const pts = buildVeDoanShapePoints(tool, pt, pt);
+      draftPtsRef.current = pts;
+      setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: pts });
+    } else {
+      shapeStartRef.current = null;
+      draftPtsRef.current = [pt];
+      setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: [pt] });
+    }
   };
 
   const onDrawMove = (evt: GestureResponderEvent) => {
-    if (!canDraw || Platform.OS === 'web') return;
+    if (!canDraw || Platform.OS === 'web' || tool === 'fill') return;
     const pt = toNorm(evt);
+    if ((tool === 'line' || tool === 'rect' || tool === 'circle') && shapeStartRef.current) {
+      const next = buildVeDoanShapePoints(tool, shapeStartRef.current, pt);
+      draftPtsRef.current = next;
+      setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: next });
+      return;
+    }
     const pts = draftPtsRef.current;
     const last = pts[pts.length - 1];
     if (!last || Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 8) {
       if (pts.length < 150) {
         const next = [...pts, pt];
         draftPtsRef.current = next;
-        setDraft({ color, width: brush, points: next });
+        setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: next });
       }
     }
   };
@@ -174,11 +236,15 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const onDrawEnd = () => {
     if (Platform.OS === 'web') return;
     originRef.current = null;
+    shapeStartRef.current = null;
     const pts = draftPtsRef.current;
     draftPtsRef.current = [];
     setDraft(null);
-    if (canDraw && pts.length > 0) {
-      void game.act({ type: 'vd_stroke', stroke: { color, width: brush, points: pts } });
+    if (canDraw && tool !== 'fill' && pts.length > 0) {
+      void game.act({
+        type: 'vd_stroke',
+        stroke: { ...(tool !== 'pen' ? { tool } : {}), color: effectiveColor, width: effectiveWidth, points: pts },
+      });
     }
   };
 
@@ -302,6 +368,9 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
           )}
         </View>
         <CountdownBar endsAt={view.phaseEndsAt} total={view.phaseSeconds} clockOffset={game.clockOffset} testID="vd-timer" />
+        <T style={styles.scoringNote}>
+          ⚖️ Vẽ dễ hiểu = Họa sĩ +85..185đ &amp; Người đoán +70..200đ · Không ai đoán trúng = 0đ
+        </T>
       </View>
 
       {view.phase === 'pick_word' && isDrawer && view.wordOptions && (
@@ -345,21 +414,27 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
               preserveAspectRatio="none"
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
             >
-              {allStrokes.map((s, idx) =>
-                s.points.length === 1 ? (
-                  <circle key={idx} cx={s.points[0][0]} cy={s.points[0][1]} r={Math.max(4, s.width * 0.7)} fill={s.color} />
+              {allStrokes.map((s, idx) => {
+                const stTool = s.tool ?? 'pen';
+                if (stTool === 'fill') {
+                  const d = s.fillPath ?? (s.points[0] ? computeFloodFillPath(allStrokes.slice(0, idx), s.points[0][0], s.points[0][1]) : '');
+                  return d ? <path key={idx} d={d} fill={s.color} /> : null;
+                }
+                const stColor = stTool === 'eraser' ? '#FFFFFF' : s.color;
+                return s.points.length === 1 ? (
+                  <circle key={idx} cx={s.points[0][0]} cy={s.points[0][1]} r={Math.max(4, s.width * 0.7)} fill={stColor} />
                 ) : (
                   <polyline
                     key={idx}
                     fill="none"
-                    stroke={s.color}
+                    stroke={stColor}
                     strokeWidth={s.width}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={s.points.map(([x, y]) => `${x},${y}`).join(' ')}
                   />
-                ),
-              )}
+                );
+              })}
             </svg>
           ) : (
             <Image source={{ uri: svgUri }} style={{ width: '100%', height: '100%' }} resizeMode="stretch" />
@@ -368,7 +443,11 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
             <View style={styles.emptyCanvas} pointerEvents="none">
               <UiIcon name={canDraw ? 'Brush' : 'Eye'} size={24} color="#94A3B8" />
               <T style={styles.emptyHint}>
-                {canDraw ? 'Chạm và kéo để vẽ tại đây!' : 'Bảng vẽ đang trống...'}
+                {canDraw
+                  ? tool === 'fill'
+                    ? 'Chạm vào vùng bất kỳ để đổ màu!'
+                    : 'Chạm và kéo để vẽ tại đây!'
+                  : 'Bảng vẽ đang trống...'}
               </T>
             </View>
           )}
@@ -376,33 +455,60 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
         {canDraw && (
           <View style={styles.tools}>
+            {/* Thanh chọn công cụ: Bút / Đổ màu / Tẩy / Đường thẳng / Hình vuông / Hình tròn */}
+            <View style={styles.toolPickerRow}>
+              {TOOL_META.map((tm) => {
+                const active = tool === tm.id;
+                return (
+                  <Pressable
+                    key={tm.id}
+                    testID={`vd-tool-${tm.id}`}
+                    onPress={() => setTool(tm.id)}
+                    style={[styles.toolChip, active && styles.toolChipActive]}
+                  >
+                    <T style={styles.toolEmoji}>{tm.emoji}</T>
+                    <T style={[styles.toolLabel, active && styles.toolLabelActive]}>{tm.label}</T>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <View style={styles.palette}>
               {VE_DOAN_COLORS.map((col) => {
-                const isLight = col.toUpperCase() === '#FFFFFF' || col.toUpperCase() === '#FCC419';
+                const upper = col.toUpperCase();
+                const isLight = upper === '#FFFFFF' || upper === '#FCC419' || upper === '#38BDF8';
                 return (
                   <Pressable
                     key={col}
                     testID={`vd-color-${col}`}
-                    onPress={() => setColor(col)}
-                    style={[styles.swatch, { backgroundColor: col }, color === col && styles.swatchActive]}
+                    onPress={() => {
+                      setColor(col);
+                      if (tool === 'eraser') setTool('pen');
+                    }}
+                    style={[styles.swatch, { backgroundColor: col }, color === col && tool !== 'eraser' && styles.swatchActive]}
                   >
-                    {color === col && <UiIcon name="Check" size={14} color={isLight ? '#1C2024' : '#FFFFFF'} strokeWidth={3} />}
+                    {color === col && tool !== 'eraser' && (
+                      <UiIcon name="Check" size={14} color={isLight ? '#1C2024' : '#FFFFFF'} strokeWidth={3} />
+                    )}
                   </Pressable>
                 );
               })}
             </View>
             <View style={styles.toolActions}>
               <View style={styles.brushes}>
-                {VE_DOAN_WIDTHS.map((w) => (
-                  <Pressable
-                    key={w}
-                    testID={`vd-brush-${w}`}
-                    onPress={() => setBrush(w)}
-                    style={[styles.brushBtn, brush === w && styles.brushActive]}
-                  >
-                    <View style={{ width: w + 4, height: w + 4, borderRadius: 99, backgroundColor: color }} />
-                  </Pressable>
-                ))}
+                {VE_DOAN_WIDTHS.map((w) => {
+                  const dotCol = tool === 'eraser' ? '#94A3B8' : color === '#FFFFFF' ? '#64748B' : color;
+                  return (
+                    <Pressable
+                      key={w}
+                      testID={`vd-brush-${w}`}
+                      onPress={() => setBrush(w)}
+                      style={[styles.brushBtn, brush === w && styles.brushActive]}
+                    >
+                      <View style={{ width: w + 4, height: w + 4, borderRadius: 99, backgroundColor: dotCol }} />
+                    </Pressable>
+                  );
+                })}
               </View>
               <Button testID="vd-undo" small variant="paper" iconNode={<UiIcon name="Undo2" size={15} color={C.ink} />} title="Hoàn tác" onPress={() => act({ type: 'vd_undo' })} />
               <Button testID="vd-clear" small variant="paper" iconNode={<UiIcon name="Trash2" size={15} color={C.danger} />} title="Xóa" onPress={() => act({ type: 'vd_clear' })} />
@@ -448,6 +554,7 @@ const styles = StyleSheet.create({
   wordBox: { backgroundColor: '#1E293B', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center' },
   wordSecret: { color: '#FDE047', fontSize: 18, fontWeight: '900', letterSpacing: 1.2 },
   wordMasked: { color: '#F8FAFC', fontSize: 17, fontWeight: '900', letterSpacing: 2 },
+  scoringNote: { fontSize: 11, fontWeight: '800', color: '#475569', textAlign: 'center' },
 
   secTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
   pickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -461,6 +568,16 @@ const styles = StyleSheet.create({
   emptyHint: { fontSize: 14, fontWeight: '800', color: '#94A3B8' },
 
   tools: { gap: 8, paddingTop: 2 },
+  toolPickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
+  toolChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12,
+    backgroundColor: '#F1F5F9', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.14)',
+  },
+  toolChipActive: { backgroundColor: '#FEF3C7', borderColor: C.ink },
+  toolEmoji: { fontSize: 13 },
+  toolLabel: { fontSize: 11.5, fontWeight: '800', color: '#334155' },
+  toolLabelActive: { color: C.ink, fontWeight: '900' },
   palette: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center' },
   swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.18)', alignItems: 'center', justifyContent: 'center' },
   swatchActive: { borderColor: C.ink, borderWidth: 2.5, transform: [{ scale: 1.12 }] },

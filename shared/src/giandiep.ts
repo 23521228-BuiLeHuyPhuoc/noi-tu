@@ -12,6 +12,7 @@ export type GianDiepPhase =
   | 'defense'
   | 'final_vote'
   | 'mrwhite_guess'
+  | 'spy_guess'
   | 'reveal_end';
 
 export interface GianDiepWordPair {
@@ -72,6 +73,9 @@ export interface GianDiepView {
   /** Phiếu Phán Quyết cuối cùng: 'banish' | 'forgive' (nếu 1 bị cáo) hoặc id bị cáo / 'skip' (nếu nhiều bị cáo đồng phiếu) */
   finalVotes: Record<string, string>;
   mrWhiteId: string | null;
+  /** Cơ cấu vai diễn toàn ván & số người phe Dân / phe Ẩn danh còn sống */
+  roleSummary?: { dan: number; giandiep: number; mrwhite: number };
+  aliveCounts?: { dan: number; hidden: number };
   /** Mở toàn bộ vai trò & từ khóa của từng người ở cuối ván (`reveal_end`) để cả phòng đối chiếu */
   revealedAll: GianDiepRevealPlayer[] | null;
   wordPairReveal: { wordA: string; wordB: string; winnerHeadline: string } | null;

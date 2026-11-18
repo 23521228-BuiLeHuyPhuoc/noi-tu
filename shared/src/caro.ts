@@ -58,6 +58,8 @@ export interface CaroView {
   winLine: [number, number][] | null;
   winnerId: string | null;
   isDraw: boolean;
+  /** Thời điểm kết thúc pha chiêm ngưỡng đường 5 quân thắng trước khi sang bảng tổng kết */
+  revealEndsAt?: number | null;
 }
 
 const AXES: readonly [number, number][] = [

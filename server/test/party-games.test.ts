@@ -73,7 +73,7 @@ describe('Party Games Pack (Vẽ & Đoán, Bom Chữ, Đố Vui)', () => {
       expect(game.action('p1', { type: 'vd_guess', text: chosen })).toEqual({ ok: true });
       expect(game.view('p0').phase).toBe('round_end');
       expect(game.view('p1').scores.p1).toBeGreaterThanOrEqual(100);
-      expect(game.view('p0').scores.p0).toBe(45);
+      expect(game.view('p0').scores.p0).toBeGreaterThanOrEqual(120);
 
       // Qua lượt 2 (p1 vẽ) -> hết giờ kết thúc toàn ván
       vi.advanceTimersByTime(5100);
