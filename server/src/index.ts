@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { Dictionary } from './dictionary';
 import { createGameServer } from './app';
 import { MemoryStore, MongoStore, type Store } from './store';
+import { keepAliveUrl, startKeepAlive } from './keepAlive';
 
 // data/ nằm cạnh src/ khi chạy dev, hoặc cạnh dist/ khi chạy bản build
 const here = dirname(fileURLToPath(import.meta.url));
@@ -38,4 +39,9 @@ const store = await openStore();
 const server = createGameServer(dict, { store, room: { turnMs: turnSeconds ? turnSeconds * 1000 : undefined } });
 server.http.listen(port, () => {
   console.log(`Game server: cổng ${port}, ${dict.size} từ Việt, ${dict.en?.size ?? 0} từ Anh, lưu trữ: ${store.kind}${turnSeconds ? `, ${turnSeconds}s/lượt` : ''}`);
+  const pingUrl = keepAliveUrl(process.env);
+  if (pingUrl) {
+    startKeepAlive(pingUrl);
+    console.log(`Tự ping ${pingUrl} mỗi 10 phút để gói Free không ngủ`);
+  }
 });
