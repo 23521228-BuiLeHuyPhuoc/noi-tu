@@ -2,7 +2,7 @@
 
 The Expo app in `app/` builds as an Android application with package ID
 `com.huyphuoc.noitu`. Both build profiles connect to the existing HTTPS server
-at `https://noi-tu-server.onrender.com`.
+at `https://noi-tu-server-sg.onrender.com`.
 
 ## APK for device testing
 

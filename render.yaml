@@ -35,7 +35,7 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: EXPO_PUBLIC_SERVER_URL
-        value: https://noi-tu-server.onrender.com
+        value: https://noi-tu-server-sg.onrender.com
       - key: EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH
         value: "1"
       - key: EXPO_UNSTABLE_TREE_SHAKING

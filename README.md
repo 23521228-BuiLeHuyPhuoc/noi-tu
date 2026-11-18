@@ -66,24 +66,24 @@ Muốn thử trên điện thoại cùng Wi-Fi: chạy app với `EXPO_PUBLIC_SE
 
 ## Đang chạy
 - Web: <https://noi-tu-web.onrender.com>
-- Server: <https://noi-tu-server.onrender.com> (kiểm tra: `/health`)
+- Server: <https://noi-tu-server-sg.onrender.com> (kiểm tra: `/health`), gói Free ở Singapore, cùng vùng với MongoDB Atlas. cron-job.org gọi `/health` mỗi 10 phút để server không ngủ.
 - Cả hai được tạo từ `render.yaml`. Mỗi lần push lên nhánh `main`, GitHub Actions kiểm tra code; nếu toàn bộ CI thành công, Render tự động deploy lại cả server lẫn web.
 
 ## 2. Đưa server lên mạng (miễn phí, Render)
 
 1. Đẩy thư mục `noi-tu` lên một repo GitHub.
-2. Vào <https://render.com> → **New → Blueprint**, kết nối GitHub và chọn repo đó. Render tự đọc file `render.yaml`, rồi tạo `noi-tu-server` và `noi-tu-web`.
-3. Deploy xong sẽ có `https://noi-tu-server.onrender.com` và `https://noi-tu-web.onrender.com`. Mở `/health` trên địa chỉ server để kiểm tra, kết quả có dạng `{"ok":true,"words":79569,...}`.
+2. Vào <https://render.com> → **New → Blueprint**, kết nối GitHub và chọn repo đó. Render tự đọc file `render.yaml`, rồi tạo `noi-tu-server-sg` và `noi-tu-web`. Trước đó cần tạo Environment Group `noi-tu-server-env` chứa các biến bí mật (xem các mục bên dưới), vì `render.yaml` lấy biến từ group này.
+3. Deploy xong sẽ có `https://noi-tu-server-sg.onrender.com` và `https://noi-tu-web.onrender.com`. Mở `/health` trên địa chỉ server để kiểm tra, kết quả có dạng `{"ok":true,"words":79569,...}`.
 
 Pipeline nằm ở `.github/workflows/ci-cd.yml`. `render.yaml` dùng `autoDeployTrigger: checksPass`, nên Render chỉ deploy commit mới sau khi type-check, test, lint và build đều thành công; không cần Deploy Hook hay Render API key trong GitHub.
 
-Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng. Người đầu tiên mở app sẽ phải chờ khoảng 1 phút, app có hiện thông báo trong lúc chờ. Trong lúc đang có người chơi, server không ngủ.
+Gói miễn phí sẽ "ngủ" sau 15 phút không có ai dùng, khi đó người đầu tiên mở app phải chờ khoảng 1 phút. Để tránh việc này, một job trên cron-job.org gọi `https://noi-tu-server-sg.onrender.com/health` mỗi 10 phút. Giữ server thức cả ngày tốn khoảng 720–744 trong 750 giờ Free mỗi tháng của workspace, nên các web service Free khác trong cùng workspace gần như không còn giờ để chạy.
 
 ## Tài khoản & cơ sở dữ liệu (MongoDB)
 
 Server đọc chuỗi kết nối MongoDB từ biến môi trường `DATABASE` (tên CSDL: biến `DATABASE_NAME`, mặc định `xomlay`). Trong đó có 3 bảng: `users` (mật khẩu băm scrypt), `sessions` (tự hết hạn sau 180 ngày), `words` (từ được người chơi duyệt).
 
-- **Không** ghi chuỗi kết nối vào code hay file trong repo (repo đang public). Trên Render: **noi-tu-server → Environment → Add Environment Variable**, key `DATABASE`, value là chuỗi `mongodb://...` → Save, Render tự khởi động lại.
+- **Không** ghi chuỗi kết nối vào code hay file trong repo (repo đang public). Trên Render: **Environment Groups → noi-tu-server-env → Edit → Add Environment Variable**, key `DATABASE`, value là chuỗi `mongodb://...` → Save, Render tự khởi động lại.
 - MongoDB Atlas: mục **Network Access** phải cho phép IP của Render (đơn giản nhất là `0.0.0.0/0`), và nên dùng mật khẩu mạnh.
 - Kiểm tra: `/health` trả về `"db":"mongo"`. Nếu thấy `"db":"memory"` nghĩa là chưa đặt biến hoặc không kết nối được (xem log), tài khoản chỉ lưu tạm và mất khi server khởi động lại.
 - Chạy thử trên máy: `DATABASE='mongodb://...' npm run dev` trong thư mục `server`.
@@ -105,11 +105,11 @@ Lần được cộng **đầu tiên** của mỗi tài khoản nhân đôi. S�
 - *Theo mã*: nhập mã `XL……` + số tiền để cộng Ruby cho tài khoản có mã đó.
 - *Doanh thu*: hôm nay / tháng này / tổng (giờ Việt Nam). *Cộng/trừ*: theo tên đăng nhập, bắt buộc ghi lý do, không làm âm số dư.
 
-Trên Render (**noi-tu-server → Environment**): `ADMIN_USERNAMES=<tên đăng nhập tài khoản quản trị>` (nhiều người thì phân cách bằng dấu phẩy; tạo tài khoản đó trước). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại; nếu server lỡ chạy bộ nhớ tạm (`/health` → `"db":"memory"`) thì mọi lệnh quản trị bị chặn để người lạ không đăng ký trước tên quản trị (chỉ khi chạy thử trên máy mới đặt `ALLOW_MEMORY_ADMIN=1`). Đổi email cần nhập mật khẩu hiện tại; đổi/đặt lại mật khẩu thì các máy khác bị đăng xuất ngay.
+Trên Render (**Environment Groups → noi-tu-server-env**): `ADMIN_USERNAMES=<tên đăng nhập tài khoản quản trị>` (nhiều người thì phân cách bằng dấu phẩy; tạo tài khoản đó trước). Cần `DATABASE` (MongoDB) để Ruby không mất khi server khởi động lại; nếu server lỡ chạy bộ nhớ tạm (`/health` → `"db":"memory"`) thì mọi lệnh quản trị bị chặn để người lạ không đăng ký trước tên quản trị (chỉ khi chạy thử trên máy mới đặt `ALLOW_MEMORY_ADMIN=1`). Đổi email cần nhập mật khẩu hiện tại; đổi/đặt lại mật khẩu thì các máy khác bị đăng xuất ngay.
 
 ## Gửi mã quên mật khẩu (Gmail)
 
-Trong **noi-tu-server → Environment** trên Render đặt:
+Trong Environment Group **noi-tu-server-env** trên Render đặt:
 
 | Biến | Ý nghĩa |
 |---|---|
@@ -123,7 +123,7 @@ Mã hết hạn sau 10 phút, sai tối đa 5 lần, mỗi tài khoản tối đ
 
 ## Ảnh đại diện (Cloudinary)
 
-Trong **noi-tu-server → Environment** trên Render, nhập đủ `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` từ tài khoản Cloudinary. `render.yaml` để cả ba biến ở `sync: false` để nhập riêng khi deploy. Chạy trên máy thì đặt các biến này trong môi trường của terminal chạy server.
+Trong Environment Group **noi-tu-server-env** trên Render, nhập đủ `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` từ tài khoản Cloudinary. `render.yaml` chỉ tham chiếu group này (`fromGroup`), không chứa giá trị. Chạy trên máy thì đặt các biến này trong môi trường của terminal chạy server.
 
 **Không** ghi API secret vào code, repo, biến `EXPO_PUBLIC_*` hay cấu hình app; thông tin Cloudinary chỉ đặt ở server.
 
@@ -132,7 +132,7 @@ Trong **noi-tu-server → Environment** trên Render, nhập đủ `CLOUDINARY_C
 - `server/data/extra-words.txt`, `server/data/extra-words-en.txt`: thêm từ tiếng Việt (2 chữ) hoặc tiếng Anh (1 từ đơn)
 - `server/data/banned-words.txt`, `server/data/banned-words-en.txt`: loại từ sai hoặc từ không muốn cho dùng
 
-Sửa xong thì push lên nhánh `main`; khi CI thành công, Render tự deploy lại `noi-tu-server`. **Không cần build lại app.**
+Sửa xong thì push lên nhánh `main`; khi CI thành công, Render tự deploy lại `noi-tu-server-sg`. **Không cần build lại app.**
 
 Muốn tạo lại toàn bộ `words.txt` từ nguồn:
 ```bash

@@ -1,10 +1,10 @@
 // Kiểm tra nhanh server thật: 2 người chơi qua WebSocket, thử cả 4 game, ném/đánh nhau, trò chuyện và tài khoản.
 // Mỗi lần chạy tạo 1 tài khoản thử tên smoke_xxxx trong CSDL.
 // Chạy (dùng socket.io-client có sẵn trong app/node_modules):
-//   PowerShell:  $env:NODE_PATH="$PWD\app\node_modules"; node e2e\smoke-prod.cjs https://noi-tu-server.onrender.com
-//   bash:        NODE_PATH=app/node_modules node e2e/smoke-prod.cjs https://noi-tu-server.onrender.com
+//   PowerShell:  $env:NODE_PATH="$PWD\app\node_modules"; node e2e\smoke-prod.cjs https://noi-tu-server-sg.onrender.com
+//   bash:        NODE_PATH=app/node_modules node e2e/smoke-prod.cjs https://noi-tu-server-sg.onrender.com
 const { io } = require('socket.io-client');
-const URL = process.argv[2] || 'https://noi-tu-server.onrender.com';
+const URL = process.argv[2] || 'https://noi-tu-server-sg.onrender.com';
 const opts = { transports: ['websocket'], forceNew: true, reconnection: false };
 
 function connect() {
