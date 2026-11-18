@@ -461,8 +461,17 @@ export class MongoStore implements Store {
     return t;
   }
   async userBySession(token: string) {
-    const s = await this.sessions.findOne({ token: hashToken(token) });
-    return s ? this.userById(s.userId.toHexString()) : null;
+    // gộp tra phiên + lấy hồ sơ trong 1 vòng mạng MongoDB duy nhất thay vì 2 truy vấn tuần tự
+    const docs = await this.sessions
+      .aggregate<UserDoc>([
+        { $match: { token: hashToken(token) } },
+        { $limit: 1 },
+        { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'u' } },
+        { $unwind: '$u' },
+        { $replaceRoot: { newRoot: '$u' } },
+      ])
+      .toArray();
+    return docs[0] ? fromDoc(docs[0]) : null;
   }
   async deleteSession(token: string) {
     await this.sessions.deleteOne({ token: hashToken(token) });

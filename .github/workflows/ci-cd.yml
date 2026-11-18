@@ -75,4 +75,7 @@ jobs:
         run: npm run lint
 
       - name: Build web app
+        env:
+          EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH: "1"
+          EXPO_UNSTABLE_TREE_SHAKING: "1"
         run: npm exec -- expo export --platform web --output-dir dist

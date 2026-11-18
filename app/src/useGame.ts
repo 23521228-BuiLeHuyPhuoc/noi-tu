@@ -181,7 +181,12 @@ export function useGame(): Game {
   }, [updateGuest]);
 
   useEffect(() => {
-    const socket: GameSocket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+    const socket: GameSocket = io(SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      reconnectionDelay: 600,
+      reconnectionDelayMax: 3000,
+      timeout: 12000,
+    });
     socketRef.current = socket;
 
     socket.on('connect', async () => {
@@ -511,6 +516,13 @@ export function useGame(): Game {
     start: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')),
     restart: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')),
     act: async (a) => {
+      // input vật lý liên tục (Croak Squad): bắn một chiều không chờ ACK để triệt tiêu độ trễ khứ hồi
+      if (a.type === 'cs_input') {
+        const s = socketRef.current;
+        if (!s || !s.connected) return { ok: false, reason: 'not_playing' };
+        s.emit('game:input', a);
+        return { ok: true };
+      }
       const res = await call<ActionResult>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:action', a));
       return res ?? { ok: false, reason: 'not_playing' };
     },

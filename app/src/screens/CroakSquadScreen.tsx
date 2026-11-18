@@ -16,13 +16,26 @@ import { Shell, type StripOptions } from '../components/Shell';
 import { EmojiIcon, UiIcon } from '../components/Icons';
 import { Confetti } from '../components/Fun';
 
+let sharedCroakAudioCtx: AudioContext | null = null;
+
+function getCroakAudioCtx(): AudioContext | null {
+  const AudioCtx = (globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+    ?? (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!sharedCroakAudioCtx || sharedCroakAudioCtx.state === 'closed') {
+    sharedCroakAudioCtx = new AudioCtx();
+  }
+  if (sharedCroakAudioCtx.state === 'suspended') {
+    void sharedCroakAudioCtx.resume().catch(() => {});
+  }
+  return sharedCroakAudioCtx;
+}
+
 function playCroakSfx(sfx: CroakSoundFx): void {
   if (Platform.OS !== 'web' || isMuted()) return;
   try {
-    const AudioCtx = (globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-      ?? (globalThis as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = getCroakAudioCtx();
+    if (!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -71,7 +84,6 @@ function playCroakSfx(sfx: CroakSoundFx): void {
       osc.start(now);
       osc.stop(now + 0.21);
     }
-    setTimeout(() => void ctx.close().catch(() => {}), 400);
   } catch {
     // WebAudio bị trình duyệt chặn trước tương tác đầu tiên: bỏ qua an toàn
   }

@@ -44,9 +44,13 @@ export const storage = {
   /** khách: địa chỉ ảnh đại diện đã tải lên */
   getPhoto: () => get(KEYS.photo),
   setPhoto: (v: string | null) => set(KEYS.photo, v),
-  /** chế độ siêu mượt cho máy yếu / phòng đông */
+  /** chế độ siêu mượt cho máy yếu / phòng đông ('1' = bật, '0' = tắt thủ công, null = tự nhận diện theo cấu hình máy) */
   getSmoothMode: async () => (await get(KEYS.smooth)) === '1',
-  setSmoothMode: (on: boolean) => set(KEYS.smooth, on ? '1' : null),
+  getSmoothModePref: async (): Promise<boolean | null> => {
+    const v = await get(KEYS.smooth);
+    return v === '1' ? true : v === '0' ? false : null;
+  },
+  setSmoothMode: (on: boolean) => set(KEYS.smooth, on ? '1' : '0'),
   /** map / màu nền cá nhân đã chọn */
   getTheme: () => get(KEYS.theme),
   setTheme: (v: string | null) => set(KEYS.theme, v),

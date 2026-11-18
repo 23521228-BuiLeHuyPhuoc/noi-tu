@@ -1,5 +1,6 @@
+import { Suspense, lazy } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   useFonts,
@@ -12,20 +13,7 @@ import {
 import { useGame } from './src/useGame';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
-import { WordChainScreen } from './src/screens/WordChainScreen';
-import { BauCuaScreen } from './src/screens/BauCuaScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
-import { TyPhuScreen } from './src/screens/TyPhuScreen';
-import { MaSoiScreen } from './src/screens/MaSoiScreen';
-import { GianDiepScreen } from './src/screens/GianDiepScreen';
-import { VeDoanScreen } from './src/screens/VeDoanScreen';
-import { BomTuScreen } from './src/screens/BomTuScreen';
-import { DoVuiScreen } from './src/screens/DoVuiScreen';
-import { CahScreen } from './src/screens/CahScreen';
-import { CashGunsScreen } from './src/screens/CashGunsScreen';
-import { LotoScreen } from './src/screens/LotoScreen';
-import { CaroScreen } from './src/screens/CaroScreen';
-import { CroakSquadScreen } from './src/screens/CroakSquadScreen';
 import { ShakeProvider } from './src/components/Fun';
 import { FxStyles } from './src/components/FxStyles';
 import { WalletNoticeLayer } from './src/components/Wallet';
@@ -34,7 +22,31 @@ import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
 import { UiIcon } from './src/components/Icons';
 
+// Tách chunk theo từng trò chơi để màn hình chính tải nhanh và nhẹ bộ nhớ hơn trên di động
+const WordChainScreen = lazy(() => import('./src/screens/WordChainScreen').then((m) => ({ default: m.WordChainScreen })));
+const BauCuaScreen = lazy(() => import('./src/screens/BauCuaScreen').then((m) => ({ default: m.BauCuaScreen })));
+const TyPhuScreen = lazy(() => import('./src/screens/TyPhuScreen').then((m) => ({ default: m.TyPhuScreen })));
+const MaSoiScreen = lazy(() => import('./src/screens/MaSoiScreen').then((m) => ({ default: m.MaSoiScreen })));
+const GianDiepScreen = lazy(() => import('./src/screens/GianDiepScreen').then((m) => ({ default: m.GianDiepScreen })));
+const VeDoanScreen = lazy(() => import('./src/screens/VeDoanScreen').then((m) => ({ default: m.VeDoanScreen })));
+const BomTuScreen = lazy(() => import('./src/screens/BomTuScreen').then((m) => ({ default: m.BomTuScreen })));
+const DoVuiScreen = lazy(() => import('./src/screens/DoVuiScreen').then((m) => ({ default: m.DoVuiScreen })));
+const CahScreen = lazy(() => import('./src/screens/CahScreen').then((m) => ({ default: m.CahScreen })));
+const CashGunsScreen = lazy(() => import('./src/screens/CashGunsScreen').then((m) => ({ default: m.CashGunsScreen })));
+const LotoScreen = lazy(() => import('./src/screens/LotoScreen').then((m) => ({ default: m.LotoScreen })));
+const CaroScreen = lazy(() => import('./src/screens/CaroScreen').then((m) => ({ default: m.CaroScreen })));
+const CroakSquadScreen = lazy(() => import('./src/screens/CroakSquadScreen').then((m) => ({ default: m.CroakSquadScreen })));
+
 const Screen = Platform.OS === 'web' ? View : SafeAreaView;
+
+function GameLoadingFallback() {
+  return (
+    <View style={styles.loading}>
+      <ActivityIndicator size="large" color={C.gold} />
+      <T style={styles.loadingText}>Đang mở bàn chơi…</T>
+    </View>
+  );
+}
 
 export default function App() {
   useFonts({
@@ -81,7 +93,7 @@ export default function App() {
                   <T style={styles.offlineText}>Mất kết nối, đang nối lại…</T>
                 </View>
               )}
-              {body}
+              <Suspense fallback={<GameLoadingFallback />}>{body}</Suspense>
               <WalletNoticeLayer game={game} />
             </ShakeProvider>
           </FeedProvider>
@@ -97,4 +109,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.ink, padding: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   offlineText: { color: C.gold, textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  loading: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24,
+  },
+  loadingText: { color: C.gold, fontWeight: '700', fontSize: 14 },
 });

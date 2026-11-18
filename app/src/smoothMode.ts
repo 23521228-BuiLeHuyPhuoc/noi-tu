@@ -5,7 +5,22 @@
 import { useSyncExternalStore } from 'react';
 import { storage } from './storage';
 
-let smooth = false;
+function detectLowSpecDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true;
+    const cores = navigator.hardwareConcurrency;
+    const mem = (navigator as { deviceMemory?: number }).deviceMemory;
+    if ((typeof cores === 'number' && cores > 0 && cores <= 4) || (typeof mem === 'number' && mem > 0 && mem <= 4)) {
+      return true;
+    }
+  } catch {
+    // bỏ qua nếu trình duyệt chặn thông tin phần cứng
+  }
+  return false;
+}
+
+let smooth = detectLowSpecDevice();
 let localTheme: string | null = null;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -17,8 +32,8 @@ function notify() {
 export function initPrefs() {
   if (loaded) return;
   loaded = true;
-  void storage.getSmoothMode().then((v) => {
-    if (v !== smooth) {
+  void storage.getSmoothModePref().then((v) => {
+    if (v !== null && v !== smooth) {
       smooth = v;
       notify();
     }

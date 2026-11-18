@@ -20,7 +20,9 @@ function stripIpa(text: string): string {
 }
 
 export class Dictionary {
-  private readonly definitions = new Map<string, WordDefinition>();
+  /** chuỗi thuần dùng nguồn mặc định (tiết kiệm ~120.000 object wrapper trên heap V8); object giữ nguồn riêng */
+  private readonly definitions = new Map<string, WordDefinition | string>();
+  private defsLoader?: () => Record<string, WordDefinition | string>;
   private readonly words = new Set<string>();
   private readonly byFirst = new Map<string, string[]>();
   /** các từ có thể dùng làm từ mở đầu (chữ cuối có ít nhất vài từ nối tiếp) */
@@ -37,13 +39,25 @@ export class Dictionary {
     private readonly banned: ReadonlySet<string> = new Set(),
     definitions: Record<string, WordDefinition | string> = {},
     readonly lang: DictLang = 'vi',
+    definitionsLoader?: () => Record<string, WordDefinition | string>,
   ) {
+    for (const raw of words) this.insert(raw);
+    this.starters = [...this.words].filter((w) => (this.byFirst.get(this.lastUnit(w))?.length ?? 0) >= 3);
+    if (definitionsLoader) {
+      this.defsLoader = definitionsLoader;
+    } else {
+      this.ingestDefinitions(definitions);
+      this.recomputeDefinedStarters();
+    }
+  }
+
+  private ingestDefinitions(definitions: Record<string, WordDefinition | string>): void {
     for (const [raw, value] of Object.entries(definitions)) {
       const word = this.norm(raw);
       if (!word || !value) continue;
       if (typeof value === 'string') {
         if (usableDefinition(value)) {
-          this.definitions.set(word, { text: value.trim().slice(0, 400), source: DEFAULT_EN_SOURCE });
+          this.definitions.set(word, value.trim().slice(0, 400));
         }
       } else if (
         typeof value.text === 'string' &&
@@ -51,18 +65,39 @@ export class Dictionary {
         value.source.trim() &&
         usableDefinition(value.text)
       ) {
-        this.definitions.set(word, { text: value.text.trim().slice(0, 400), source: value.source.trim() });
+        const src = value.source.trim();
+        const txt = value.text.trim().slice(0, 400);
+        this.definitions.set(word, src === DEFAULT_EN_SOURCE ? txt : { text: txt, source: src });
       }
     }
-    for (const raw of words) this.insert(raw);
-    this.starters = [...this.words].filter((w) => (this.byFirst.get(this.lastUnit(w))?.length ?? 0) >= 3);
+  }
+
+  private recomputeDefinedStarters(): void {
     const allDefined = this.starters.filter((w) => this.definitions.has(w));
     if (this.lang === 'en') {
       const concise = allDefined.filter((w) => w.length >= 3 && w.length <= 7 && !w.endsWith('s'));
-      this.definedStarters = concise.length >= 50 ? concise : allDefined;
+      const base = concise.length >= 50 ? concise : allDefined;
+      if (this.common.size >= 50) {
+        const pick = base.filter((w) => this.common.has(w));
+        this.definedStarters = pick.length >= 50 ? pick : base;
+      } else {
+        this.definedStarters = base;
+      }
     } else {
       this.definedStarters = allDefined;
     }
+  }
+
+  private ensureDefinitions(): void {
+    if (!this.defsLoader) return;
+    const loader = this.defsLoader;
+    this.defsLoader = undefined;
+    this.ingestDefinitions(loader());
+    this.recomputeDefinedStarters();
+  }
+
+  private unpackDef(entry: WordDefinition | string): WordDefinition {
+    return typeof entry === 'string' ? { text: entry, source: DEFAULT_EN_SOURCE } : entry;
   }
 
   private norm(raw: string): string | null {
@@ -100,7 +135,7 @@ export class Dictionary {
     return w;
   }
 
-  /** Nạp từ thư mục data: words.txt + extra-words.txt − banned-words.txt (và kèm từ điển tiếng Anh nếu có) */
+  /** Nạp từ thư mục data: words.txt + extra-words.txt − banned-words.txt (giải nghĩa nạp lười khi chơi Nối từ để khởi động nhanh & nhẹ RAM) */
   static load(dataDir: string): Dictionary {
     const read = (name: string) => {
       const p = join(dataDir, name);
@@ -112,8 +147,8 @@ export class Dictionary {
     };
     const banned = new Set(read('banned-words.txt').map((w) => normalizeWord(w)).filter((w): w is string => !!w));
     const path = join(dataDir, 'definitions.json');
-    const definitions = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
-    const dict = new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned, definitions, 'vi');
+    const loader = existsSync(path) ? () => JSON.parse(readFileSync(path, 'utf8')) : undefined;
+    const dict = new Dictionary([...read('words.txt'), ...read('extra-words.txt')], banned, {}, 'vi', loader);
     if (existsSync(join(dataDir, 'words-en.txt'))) {
       dict.en = Dictionary.loadEn(dataDir);
     }
@@ -127,13 +162,12 @@ export class Dictionary {
       const w = this.norm(raw);
       if (w && this.words.has(w)) this.common.add(w);
     }
-    if (this.lang === 'en' && this.common.size >= 50) {
-      const pick = this.definedStarters.filter((w) => this.common.has(w));
-      if (pick.length >= 50) this.definedStarters = pick;
+    if (!this.defsLoader) {
+      this.recomputeDefinedStarters();
     }
   }
 
-  /** Nạp từ điển tiếng Anh từ thư mục data: words-en.txt + extra-words-en.txt − banned-words-en.txt */
+  /** Nạp từ điển tiếng Anh từ thư mục data: words-en.txt + extra-words-en.txt − banned-words-en.txt (definitions-en.json nạp lười) */
   static loadEn(dataDir: string): Dictionary {
     const read = (name: string) => {
       const p = join(dataDir, name);
@@ -145,8 +179,8 @@ export class Dictionary {
     };
     const banned = new Set(read('banned-words-en.txt').map((w) => normalizeEnWord(w)).filter((w): w is string => !!w));
     const path = join(dataDir, 'definitions-en.json');
-    const definitions = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
-    const dict = new Dictionary([...read('words-en.txt'), ...read('extra-words-en.txt')], banned, definitions, 'en');
+    const loader = existsSync(path) ? () => JSON.parse(readFileSync(path, 'utf8')) : undefined;
+    const dict = new Dictionary([...read('words-en.txt'), ...read('extra-words-en.txt')], banned, {}, 'en', loader);
     dict.setCommon(read('common-en.txt'));
     return dict;
   }
@@ -155,8 +189,12 @@ export class Dictionary {
   definition(raw: string): WordDefinition | undefined {
     const word = this.norm(raw);
     if (!word) return undefined;
-    const direct = this.definitions.get(word);
-    if (direct) return direct.text.startsWith('@') ? this.resolveRef(direct) : direct;
+    this.ensureDefinitions();
+    const rawDef = this.definitions.get(word);
+    if (rawDef) {
+      const direct = this.unpackDef(rawDef);
+      return direct.text.startsWith('@') ? this.resolveRef(direct) : direct;
+    }
     if (this.lang === 'en') return this.inflectedDefinition(word);
     return undefined;
   }
@@ -164,8 +202,10 @@ export class Dictionary {
   /** biến thể lưu dạng "@gốc|nhãn" (vd "@take|quá khứ của"): ghép nhãn với nghĩa của gốc */
   private resolveRef(def: WordDefinition): WordDefinition | undefined {
     const [lemma, label] = def.text.slice(1).split('|');
-    const base = lemma ? this.definitions.get(lemma) : undefined;
-    if (!base || base.text.startsWith('@') || !label) return undefined;
+    const rawBase = lemma ? this.definitions.get(lemma) : undefined;
+    if (!rawBase || !label) return undefined;
+    const base = this.unpackDef(rawBase);
+    if (base.text.startsWith('@')) return undefined;
     return { text: `(${label} ${lemma}) ${stripIpa(base.text)}`.slice(0, 400), source: base.source };
   }
 
@@ -216,8 +256,9 @@ export class Dictionary {
     }
     for (const [label, base] of candidates) {
       // chỉ đoán gốc từ khi gốc đó thật sự là một từ trong kho (tránh "need" -> "ne", "bring" -> "br")
-      const def = this.words.has(base) && base.length >= 2 ? this.definitions.get(base) : undefined;
-      if (def) {
+      const rawDef = this.words.has(base) && base.length >= 2 ? this.definitions.get(base) : undefined;
+      if (rawDef) {
+        const def = this.unpackDef(rawDef);
         return { text: `(${label} ${base}) ${stripIpa(def.text)}`.slice(0, 400), source: def.source };
       }
     }
@@ -245,6 +286,7 @@ export class Dictionary {
   hintOptions(syllable: string, used: ReadonlySet<string> = new Set()): string[] {
     const all = this.nextOptions(syllable, used);
     if (all.length <= 1) return all;
+    this.ensureDefinitions();
     const open = (w: string) => (this.byFirst.get(this.lastUnit(w)) ?? []).some((x) => x !== w && !used.has(x));
     const sane = (w: string) => this.lang !== 'en' || (w.length >= 3 && w.length <= 9);
     const tiers = [
@@ -267,6 +309,7 @@ export class Dictionary {
 
   /** Chọn ngẫu nhiên một từ chưa dùng mà sau đó vẫn còn từ để nối */
   randomStart(used: ReadonlySet<string>, rng: Rng = Math.random): string | null {
+    this.ensureDefinitions();
     const ok = (w: string) => {
       if (used.has(w)) return false;
       const list = this.byFirst.get(this.lastUnit(w)) ?? [];

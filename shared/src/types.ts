@@ -861,6 +861,8 @@ export interface ClientToServerEvents {
   'room:removeBot': (p: { id: string }, ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
+  /** gửi input vật lý thời gian thực một chiều (không chờ ACK để giảm nửa độ trễ mạng) */
+  'game:input': (a: GameAction) => void;
   'game:restart': (ack: (r: Ack) => void) => void;
   'room:leave': (ack: (r: Ack) => void) => void;
   /** chủ phòng đổi phòng thành công khai / riêng tư */

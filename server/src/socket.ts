@@ -24,9 +24,10 @@ export function broadcastRoom(io: IO, room: Room): void {
   }
   const sids = io.sockets.adapter.rooms.get(room.code);
   if (!sids) return;
+  const viewFor = room.toPublicFactory();
   for (const sid of sids) {
     const s = io.sockets.sockets.get(sid);
-    if (s) s.emit('room:state', room.toPublic((s.data as { playerId?: string }).playerId));
+    if (s) s.emit('room:state', viewFor((s.data as { playerId?: string }).playerId));
   }
 }
 
@@ -228,6 +229,12 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       const room = currentRoom();
       if (!room || !session) return ack({ ok: false, reason: 'not_playing' });
       ack(room.action(session.playerId, a));
+    });
+
+    socket.on('game:input', (a) => {
+      const room = currentRoom();
+      if (!room || !session) return;
+      room.action(session.playerId, a);
     });
 
     socket.on('game:restart', (ack) => {

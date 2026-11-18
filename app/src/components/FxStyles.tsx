@@ -60,13 +60,14 @@ const CSS = `
 ::-webkit-scrollbar-thumb:hover { background: rgba(232, 121, 249, 0.72); }
 
 [role="button"] {
-  transition: transform 140ms var(--xl-ease-spring), filter 140ms ease, box-shadow 140ms ease;
+  touch-action: manipulation;
+  transition: transform 140ms var(--xl-ease-spring), opacity 140ms ease;
 }
 [role="button"]:hover:not([aria-disabled="true"]) {
-  filter: brightness(1.05) saturate(1.08);
+  opacity: 0.94;
 }
 [role="button"]:active:not([aria-disabled="true"]) {
-  transform: translateY(2px) scale(0.975);
+  transform: translate3d(0, 2px, 0) scale(0.975);
 }
 
 ${CSSHAKES_CDN_FALLBACK}
@@ -77,14 +78,13 @@ ${CSSHAKES_CDN_FALLBACK}
 @keyframes xl-float { 0%, 100% { transform: translateY(0px) rotate(-4deg); } 50% { transform: translateY(-7px) rotate(5deg); } }
 @keyframes xl-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
 @keyframes xl-holo-sweep {
-  0% { background-position: 0% 0%; filter: hue-rotate(0deg) brightness(1.04); }
-  50% { background-position: 100% 100%; filter: hue-rotate(45deg) brightness(1.18); }
-  100% { background-position: 0% 0%; filter: hue-rotate(0deg) brightness(1.04); }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 @keyframes xl-disco-hue {
-  0% { filter: hue-rotate(0deg) saturate(1.35) brightness(1.1); }
-  50% { filter: hue-rotate(180deg) saturate(1.5) brightness(1.22); }
-  100% { filter: hue-rotate(360deg) saturate(1.35) brightness(1.1); }
+  0%, 100% { transform: scale(1); opacity: 0.94; }
+  50% { transform: scale(1.03); opacity: 1; }
 }
 @keyframes xl-omega-ring {
   0%, 100% { transform: scale(0.96) rotate(0deg); opacity: 0.85; }

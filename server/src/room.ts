@@ -644,30 +644,48 @@ export class Room {
   }
 
   toPublic(viewerId?: string): RoomState {
-    return {
-      code: this.code,
-      phase: this.phase,
-      hostId: this.hostId,
-      players: this.players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        connected: p.connected,
-        avatar: p.avatar,
-        ...(p.avatarUrl ? { avatarUrl: p.avatarUrl } : {}),
-        character: p.character,
-        ...(this.isSpectator(p.id) ? { spectator: true } : {}),
-        ...(p.account ? { account: true } : {}),
-        ...(p.cosmetics ? { cosmetics: p.cosmetics } : {}),
-        ...(p.vipTier ? { vipTier: p.vipTier } : {}),
-        ...(p.bot ? { bot: true } : {}),
-      })),
-      maxPlayers: MAX_PLAYERS,
-      gameType: this.gameType,
-      settings: this.settings,
-      serverNow: Date.now(),
-      game: this.gameView(viewerId),
-      result: this.result,
-      isPublic: this.isPublic,
+    return this.toPublicFactory()(viewerId);
+  }
+
+  /**
+   * Tạo hàm dựng `RoomState` dùng chung phần khung phòng (`players`, `settings`, `serverNow`...)
+   * cho toàn bộ người nhận trong cùng một nhịp phát sóng (tránh nhân bản mảng 12 lần trên CPU nhỏ).
+   */
+  toPublicFactory(): (viewerId?: string) => RoomState {
+    const players = this.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      connected: p.connected,
+      avatar: p.avatar,
+      ...(p.avatarUrl ? { avatarUrl: p.avatarUrl } : {}),
+      character: p.character,
+      ...(this.isSpectator(p.id) ? { spectator: true } : {}),
+      ...(p.account ? { account: true } : {}),
+      ...(p.cosmetics ? { cosmetics: p.cosmetics } : {}),
+      ...(p.vipTier ? { vipTier: p.vipTier } : {}),
+      ...(p.bot ? { bot: true } : {}),
+    }));
+    const serverNow = Date.now();
+    const cache = new Map<string, RoomState>();
+    return (viewerId?: string): RoomState => {
+      const key = this.hasPerPlayerView ? (viewerId ?? '') : '';
+      const hit = cache.get(key);
+      if (hit) return hit;
+      const state: RoomState = {
+        code: this.code,
+        phase: this.phase,
+        hostId: this.hostId,
+        players,
+        maxPlayers: MAX_PLAYERS,
+        gameType: this.gameType,
+        settings: this.settings,
+        serverNow,
+        game: this.gameView(viewerId),
+        result: this.result,
+        isPublic: this.isPublic,
+      };
+      cache.set(key, state);
+      return state;
     };
   }
 

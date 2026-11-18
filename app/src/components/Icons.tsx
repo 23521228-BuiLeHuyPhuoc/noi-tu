@@ -189,6 +189,8 @@ export const UiIcon = memo(function UiIcon({
 
 const SVG_URI_CACHE = new globalThis.Map<VectorDef, string>();
 function svgDataUriOf(def: VectorDef): string {
+  const staticUrl = (def as { readonly u?: string }).u;
+  if (staticUrl) return staticUrl;
   let u = SVG_URI_CACHE.get(def);
   if (!u) {
     const raw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${def.v}">${def.b}</svg>`;
@@ -198,7 +200,11 @@ function svgDataUriOf(def: VectorDef): string {
   return u;
 }
 
-/** Render một định nghĩa SVG 3D-shaded từ iconPack: trên Web dùng <img> data-URI cô lập hoàn toàn gradient ID & nhẹ DOM gấp 10 lần; có màu động thì dùng <svg> */
+/**
+ * Render định nghĩa SVG 3D-shaded từ iconPack:
+ * - Trên Web dùng `<img>` tải lười (`loading="lazy"`) trỏ tới SVG tĩnh trên CDN / data-URI.
+ * - Tắt `filter: drop-shadow` mặc định (Fluent 3D đã có đổ bóng bên trong SVG), giảm hàng trăm pass GPU khi cuộn trên Mobile.
+ */
 export const PackSvg = memo(function PackSvg({
   def,
   size = 20,
@@ -214,7 +220,7 @@ export const PackSvg = memo(function PackSvg({
 }) {
   const glowColor = typeof glow === 'string' ? glow : glow ? 'rgba(250,204,21,0.85)' : undefined;
   if (Platform.OS === 'web') {
-    const filter = glowColor ? `drop-shadow(0 0 ${Math.max(4, Math.round(size * 0.28))}px ${glowColor})` : 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.22))';
+    const filter = glowColor ? `drop-shadow(0 0 ${Math.max(4, Math.round(size * 0.26))}px ${glowColor})` : undefined;
     if (!color) {
       return (
         <View pointerEvents="none" style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, style]}>
@@ -222,11 +228,12 @@ export const PackSvg = memo(function PackSvg({
             src: svgDataUriOf(def),
             alt: '',
             draggable: false,
+            loading: 'lazy',
             decoding: 'async',
             width: size,
             height: size,
             'aria-hidden': true,
-            style: { display: 'block', width: size, height: size, objectFit: 'contain', filter, userSelect: 'none' },
+            style: { display: 'block', width: size, height: size, objectFit: 'contain', ...(filter ? { filter } : {}), userSelect: 'none' },
           })}
         </View>
       );
@@ -239,7 +246,7 @@ export const PackSvg = memo(function PackSvg({
           width: size,
           height: size,
           'aria-hidden': true,
-          style: { display: 'block', width: size, height: size, overflow: 'visible', filter },
+          style: { display: 'block', width: size, height: size, overflow: 'visible', ...(filter ? { filter } : {}) },
           dangerouslySetInnerHTML: { __html: body },
         })}
       </View>

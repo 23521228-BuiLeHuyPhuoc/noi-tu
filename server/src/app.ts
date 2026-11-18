@@ -74,6 +74,8 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   }));
   // sảnh: các phòng công khai đang mở, để vào chơi cùng người khác
   app.get('/api/rooms', (_req, res) => res.json({ ok: true, rooms: manager.listPublic() }));
+  // đệm ngắn 5s cho bảng xếp hạng khi chạy MongoDB để tránh quét toàn bảng liên tục; tự xóa ngay khi có ván kết thúc
+  const leaderCache = new Map<string, { exp: number; rows: unknown[] }>();
   // bảng xếp hạng số lần thắng (?game=<loại game> hoặc all)
   app.get('/api/leaderboard', (req, res) => {
     const g = String(req.query.game ?? 'all');
@@ -82,8 +84,19 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
       res.status(400).json({ ok: false });
       return;
     }
+    if (store.kind === 'mongo') {
+      const hit = leaderCache.get(g);
+      if (hit && hit.exp > Date.now()) {
+        res.json({ ok: true, rows: hit.rows });
+        return;
+      }
+    }
     store.leaderboard(game, 20).then(
-      (rows) => res.json({ ok: true, rows: rows.map((r, i) => ({ ...r, rank: i + 1 })) }),
+      (rows) => {
+        const ranked = rows.map((r, i) => ({ ...r, rank: i + 1 }));
+        if (store.kind === 'mongo') leaderCache.set(g, { exp: Date.now() + 5000, rows: ranked });
+        res.json({ ok: true, rows: ranked });
+      },
       (e) => {
         logErr('leaderboard')(e);
         res.status(500).json({ ok: false });
@@ -93,6 +106,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   app.get('/', (_req, res) => res.type('text').send('Nối Từ server đang chạy'));
   const http = createServer(app);
 
+  // giữ tắt perMessageDeflate mặc định để giảm trễ từng gói tin & tiết kiệm ~1MB zlib buffer mỗi socket trên Render 512MB
   const io: GameServer['io'] = new Server(http, { cors: { origin: '*' } });
   const manager: RoomManager = new RoomManager(dict, {
     ...opts,
@@ -103,7 +117,10 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         const ids = participants.filter((id) => id.startsWith(ACCOUNT_PREFIX)).map((id) => id.slice(ACCOUNT_PREFIX.length));
         const rawWinners = winnerIds && winnerIds.length > 0 ? winnerIds : winnerId ? [winnerId] : [];
         const winners = rawWinners.filter((id) => id.startsWith(ACCOUNT_PREFIX)).map((id) => id.slice(ACCOUNT_PREFIX.length));
-        if (ids.length) store.recordGame(ids, gameType, winners.length <= 1 ? (winners[0] ?? null) : winners).catch(logErr('recordGame'));
+        if (ids.length) {
+          leaderCache.clear();
+          store.recordGame(ids, gameType, winners.length <= 1 ? (winners[0] ?? null) : winners).catch(logErr('recordGame'));
+        }
       },
       // từ được cả phòng duyệt: dùng được ngay và lưu vào CSDL
       learnWord: (word, byName) => {
@@ -111,7 +128,9 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         if (w) store.addWord(w, byName).catch(logErr('addWord'));
       },
       onCroakTick: (room, payload) => {
-        io.to(room.code).emit('croak:tick', payload);
+        // có sự kiện âm thanh/cột mốc thì gửi tin cậy; tick vật lý thuần thì dùng volatile chống dồn hàng đợi khi mạng yếu
+        if (payload.events.length > 0) io.to(room.code).emit('croak:tick', payload);
+        else io.volatile.to(room.code).emit('croak:tick', payload);
       },
     },
     onRoomChange: (room) => broadcastRoom(io, room),

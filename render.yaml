@@ -2,6 +2,7 @@ services:
   - type: web
     name: noi-tu-server
     runtime: node
+    region: singapore
     plan: free
     branch: main
     autoDeployTrigger: checksPass
@@ -11,6 +12,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # giới hạn heap V8 vừa khung 512MB của gói Free để tránh tràn RAM / giật GC
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=448"
       # chuỗi kết nối MongoDB: nhập trong Render (Environment), KHÔNG ghi vào file này
       - key: DATABASE
         sync: false
@@ -37,8 +41,21 @@ services:
         value: "22"
       - key: EXPO_PUBLIC_SERVER_URL
         value: https://noi-tu-server.onrender.com
-    # luôn hỏi lại server để điện thoại không bị kẹt bản cũ sau mỗi lần cập nhật
+      - key: EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH
+        value: "1"
+      - key: EXPO_UNSTABLE_TREE_SHAKING
+        value: "1"
+    # index.html luôn hỏi lại để điện thoại nhận bản mới ngay; các bundle/icon có hash hoặc tĩnh thì cache dài hạn trên CDN
     headers:
       - path: /*
         name: Cache-Control
         value: no-cache
+      - path: /_expo/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /fluent/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
