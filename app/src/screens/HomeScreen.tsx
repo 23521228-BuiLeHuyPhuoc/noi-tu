@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GAME_INFO, type GameType } from '../../../shared/src/types';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
@@ -518,10 +518,7 @@ export function HomeScreen({ game }: { game: Game }) {
       {/* Thanh Điều Hướng 4 Mảnh (Bottom Navigation Bar) Chuẩn Điện Thoại */}
       <View
         testID="home-bottom-nav"
-        style={[
-          styles.bottomNavWrap,
-          Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)' } as object) : null,
-        ]}
+        style={styles.bottomNavWrap}
       >
         <View style={styles.bottomNavInner}>
           {FRAGMENTS.map((f) => {

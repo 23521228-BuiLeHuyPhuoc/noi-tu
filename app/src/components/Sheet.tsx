@@ -44,10 +44,7 @@ export function Sheet({
       <View style={styles.root}>
         <Pressable
           accessibilityLabel="Đóng"
-          style={[
-            styles.backdrop,
-            Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as object) : null,
-          ]}
+          style={styles.backdrop}
           onPress={onClose}
         />
         <View

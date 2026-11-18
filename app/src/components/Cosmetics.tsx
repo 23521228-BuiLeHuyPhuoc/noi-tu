@@ -8,6 +8,7 @@
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { shopItem, vipByTier } from '../../../shared/src/shop';
+import { useSmoothMode } from '../smoothMode';
 import { EmojiIcon } from './Icons';
 
 type FrameDef = {
@@ -66,10 +67,10 @@ export const frameOf = (id: string | undefined) => (id ? FRAMES[id] : undefined)
 
 const web = (o: Record<string, unknown>) => (Platform.OS === 'web' ? (o as object) : {});
 
-function Pulse({ children, style, from = 0.45 }: { children?: ReactNode; style: StyleProp<object>; from?: number }) {
+function Pulse({ children, style, from = 0.45, animated = true }: { children?: ReactNode; style: StyleProp<object>; from?: number; animated?: boolean }) {
   const t = useState(() => new Animated.Value(1))[0];
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !animated) return;
     const a = Animated.loop(
       Animated.sequence([
         Animated.timing(t, { toValue: from, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
@@ -78,29 +79,41 @@ function Pulse({ children, style, from = 0.45 }: { children?: ReactNode; style: 
     );
     a.start();
     return () => a.stop();
-  }, [t, from]);
+  }, [t, from, animated]);
   if (Platform.OS === 'web') {
-    return <View pointerEvents="none" style={[style, web({ animation: 'xl-pulse 1.4s ease-in-out infinite', willChange: 'transform, opacity' })]}>{children}</View>;
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          style,
+          animated ? web({ animation: 'xl-pulse 1.8s ease-in-out infinite' }) : null,
+        ]}
+      >
+        {children}
+      </View>
+    );
   }
-  return <Animated.View pointerEvents="none" style={[style, { opacity: t }]}>{children}</Animated.View>;
+  return <Animated.View pointerEvents="none" style={[style, animated ? { opacity: t } : null]}>{children}</Animated.View>;
 }
 
-function FrameBg({ f, outer }: { f: FrameDef; outer: number }) {
-  const anim = f.disco
-    ? 'xl-spin 2.4s linear infinite, xl-disco-hue 1.6s linear infinite'
-    : f.spin
-      ? `xl-spin ${f.tripleOmega ? 2.6 : f.dualRing ? 3.6 : 5.2}s linear infinite`
-      : undefined;
+/** Đĩa màu gradient xoay riêng biệt, KHÔNG gắn boxShadow lên phần tử đang xoay để GPU chỉ xoay 1 bitmap nhỏ gọn! */
+function FrameBg({ f, outer, animate }: { f: FrameDef; outer: number; animate: boolean }) {
+  const anim = !animate
+    ? undefined
+    : f.disco
+      ? 'xl-spin 3.2s linear infinite'
+      : f.spin
+        ? `xl-spin ${f.tripleOmega ? 3.2 : f.dualRing ? 4.2 : 6}s linear infinite`
+        : undefined;
   const style = [
     StyleSheet.absoluteFill,
     { borderRadius: outer / 2, backgroundColor: f.base },
     web({
       ...(f.image ? { backgroundImage: f.image } : {}),
-      ...(f.glow ? { boxShadow: f.glow } : {}),
-      ...(anim ? { animation: anim, willChange: 'transform' } : {}),
+      ...(anim ? { animation: anim } : {}),
     }),
   ];
-  if (f.pulse) return <Pulse style={style} from={0.5} />;
+  if (f.pulse && animate) return <Pulse style={style} from={0.62} animated />;
   return <View pointerEvents="none" style={style} />;
 }
 
@@ -117,27 +130,27 @@ const ALWAYS_ON_AURAS = new Set([
 ]);
 
 /** Hào quang quanh avatar: các bậc Đại Gia tỏa sáng liên tục kể cả lúc chờ, bùng nổ gấp đôi khi tới lượt! */
-function AuraGlow({ kind, outer, active }: { kind: string; outer: number; active?: boolean }) {
+function AuraGlow({ kind, outer, active, animate }: { kind: string; outer: number; active?: boolean; animate: boolean }) {
   const alwaysOn = ALWAYS_ON_AURAS.has(kind);
   if (!active && !alwaysOn) return null;
 
   const glowMap: Record<string, string> = {
-    aura_glow: '0 0 18px 8px rgba(120,200,255,0.92), 0 0 36px 14px rgba(255,255,255,0.55)',
-    aura_fire: '0 0 18px 8px rgba(255,98,0,0.92), 0 0 36px 14px rgba(255,200,0,0.6)',
-    aura_sakura: '0 0 18px 8px rgba(255,133,179,0.9), 0 0 32px 12px rgba(255,214,235,0.58)',
-    aura_clown_honk: '0 0 20px 8px rgba(250,204,21,0.92), 0 0 36px 14px rgba(239,68,68,0.68)',
-    aura_lightning: '0 0 20px 8px rgba(56,189,248,0.95), 0 0 38px 14px rgba(139,92,246,0.7)',
-    aura_butterfly: '0 0 18px 7px rgba(232,121,249,0.9), 0 0 32px 12px rgba(167,243,208,0.58)',
-    aura_disco_ball: '0 0 22px 9px rgba(236,72,153,0.95), 0 0 42px 16px rgba(34,211,238,0.75)',
-    aura_gold_coins: '0 0 20px 9px rgba(250,204,21,0.95), 0 0 38px 14px rgba(245,158,11,0.65)',
-    aura_dark_wolf: '0 0 20px 9px rgba(168,85,247,0.92), 0 0 38px 14px rgba(15,23,42,0.82)',
-    aura_matrix_ring: '0 0 20px 8px rgba(16,185,129,0.95), 0 0 38px 14px rgba(52,211,153,0.68)',
-    aura_rainbow_halo: '0 0 24px 10px rgba(255,0,128,0.9), 0 0 44px 18px rgba(0,229,255,0.75), 0 0 60px 22px rgba(255,238,0,0.55)',
-    aura_holy_wings: '0 0 22px 9px rgba(255,243,191,0.96), 0 0 42px 16px rgba(56,189,248,0.72)',
-    aura_lava_eruption: '0 0 24px 10px rgba(239,68,68,0.96), 0 0 46px 18px rgba(250,204,21,0.72)',
-    aura_diamond_storm: '0 0 24px 10px rgba(186,230,253,0.98), 0 0 46px 18px rgba(129,140,248,0.75)',
-    aura_cosmic_orbit: '0 0 24px 10px rgba(217,70,239,0.96), 0 0 46px 18px rgba(56,189,248,0.72)',
-    aura_omega_divine: '0 0 30px 12px rgba(255,215,0,0.98), 0 0 56px 22px rgba(236,72,153,0.88), 0 0 78px 28px rgba(0,240,255,0.68)',
+    aura_glow: '0 0 16px 6px rgba(120,200,255,0.9), 0 0 28px 10px rgba(255,255,255,0.45)',
+    aura_fire: '0 0 16px 6px rgba(255,98,0,0.9), 0 0 28px 10px rgba(255,200,0,0.52)',
+    aura_sakura: '0 0 16px 6px rgba(255,133,179,0.88), 0 0 28px 10px rgba(255,214,235,0.5)',
+    aura_clown_honk: '0 0 18px 6px rgba(250,204,21,0.9), 0 0 30px 10px rgba(239,68,68,0.6)',
+    aura_lightning: '0 0 18px 6px rgba(56,189,248,0.92), 0 0 30px 10px rgba(139,92,246,0.62)',
+    aura_butterfly: '0 0 16px 6px rgba(232,121,249,0.88), 0 0 28px 10px rgba(167,243,208,0.5)',
+    aura_disco_ball: '0 0 18px 7px rgba(236,72,153,0.92), 0 0 32px 12px rgba(34,211,238,0.65)',
+    aura_gold_coins: '0 0 18px 7px rgba(250,204,21,0.92), 0 0 30px 11px rgba(245,158,11,0.58)',
+    aura_dark_wolf: '0 0 18px 7px rgba(168,85,247,0.9), 0 0 30px 11px rgba(15,23,42,0.75)',
+    aura_matrix_ring: '0 0 18px 7px rgba(16,185,129,0.92), 0 0 30px 11px rgba(52,211,153,0.6)',
+    aura_rainbow_halo: '0 0 20px 8px rgba(255,0,128,0.88), 0 0 36px 14px rgba(0,229,255,0.68)',
+    aura_holy_wings: '0 0 18px 7px rgba(255,243,191,0.92), 0 0 32px 12px rgba(56,189,248,0.65)',
+    aura_lava_eruption: '0 0 20px 8px rgba(239,68,68,0.92), 0 0 36px 14px rgba(250,204,21,0.65)',
+    aura_diamond_storm: '0 0 20px 8px rgba(186,230,253,0.95), 0 0 36px 14px rgba(129,140,248,0.68)',
+    aura_cosmic_orbit: '0 0 20px 8px rgba(217,70,239,0.92), 0 0 36px 14px rgba(56,189,248,0.65)',
+    aura_omega_divine: '0 0 24px 9px rgba(255,215,0,0.96), 0 0 44px 16px rgba(236,72,153,0.8)',
   };
 
   const badgePairs: Record<string, [string, string]> = {
@@ -163,23 +176,19 @@ function AuraGlow({ kind, outer, active }: { kind: string; outer: number; active
   return (
     <>
       <Pulse
-        from={active ? 0.45 : 0.62}
+        from={active ? 0.5 : 0.68}
+        animated={animate}
         style={[
           { position: 'absolute', left: 0, top: 0, width: outer, height: outer, borderRadius: outer / 2 },
-          web({
-            boxShadow: glowMap[kind] ?? glowMap.aura_glow,
-            ...(kind === 'aura_rainbow_halo' || kind === 'aura_disco_ball' || kind === 'aura_omega_divine'
-              ? { animation: 'xl-pulse 1.3s ease-in-out infinite, xl-disco-hue 2.4s linear infinite' }
-              : {}),
-          }),
+          web({ boxShadow: glowMap[kind] ?? glowMap.aura_glow }),
         ]}
       />
       {pair && (active || alwaysOn) && (
         <>
-          <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.2 : -11, left: kind === 'aura_holy_wings' ? -14 : outer * 0.04 }, web({ animation: 'xl-wing-flap 1.1s ease-in-out infinite' })]}>
+          <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.2 : -11, left: kind === 'aura_holy_wings' ? -14 : outer * 0.04 }, animate ? web({ animation: 'xl-wing-flap 1.4s ease-in-out infinite' }) : null]}>
             <EmojiIcon emoji={pair[0]} size={sz} />
           </View>
-          <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.2 : -11, right: kind === 'aura_holy_wings' ? -14 : outer * 0.04 }, web({ animation: 'xl-wing-flap 1.1s ease-in-out infinite' })]}>
+          <View pointerEvents="none" style={[{ position: 'absolute', top: kind === 'aura_holy_wings' ? outer * 0.2 : -11, right: kind === 'aura_holy_wings' ? -14 : outer * 0.04 }, animate ? web({ animation: 'xl-wing-flap 1.4s ease-in-out infinite' }) : null]}>
             <EmojiIcon emoji={pair[1]} size={sz} />
           </View>
         </>
@@ -188,8 +197,8 @@ function AuraGlow({ kind, outer, active }: { kind: string; outer: number; active
   );
 }
 
-/** Thú cưng nhỏ nhún nhảy cạnh avatar */
-export const PetBadge = memo(function PetBadge({ pet, size }: { pet?: string; size: number }) {
+/** Thú cưng nhỏ nhún nhảy cạnh avatar (Fluent 3D đã có sẵn đổ bóng nội bộ, bỏ filter drop-shadow chồng lặp) */
+export const PetBadge = memo(function PetBadge({ pet, size, animate = true }: { pet?: string; size: number; animate?: boolean }) {
   if (!pet) return null;
   const it = shopItem(pet);
   if (!it) return null;
@@ -200,10 +209,10 @@ export const PetBadge = memo(function PetBadge({ pet, size }: { pet?: string; si
       pointerEvents="none"
       style={[
         { position: 'absolute', bottom: -5, left: -9, zIndex: 12 },
-        web({ animation: 'xl-float 2s ease-in-out infinite', willChange: 'transform', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' }),
+        animate ? web({ animation: 'xl-float 2.4s ease-in-out infinite' }) : null,
       ]}
     >
-      <EmojiIcon emoji={it.emoji} size={sz} glow="rgba(250,204,21,0.55)" />
+      <EmojiIcon emoji={it.emoji} size={sz} />
     </View>
   );
 });
@@ -241,13 +250,11 @@ export const TitleBadge = memo(function TitleBadge({ title }: { title?: string }
         { backgroundColor: col.bg, borderColor: col.bd },
         isSupreme
           ? web({
-              backgroundImage: 'linear-gradient(90deg, #991B1B, #7E22CE, #0369A1, #B45309, #991B1B)',
-              backgroundSize: '200% auto',
-              animation: 'xl-shimmer 2.4s linear infinite',
-              boxShadow: '0 0 12px rgba(250,204,21,0.85)',
+              backgroundImage: 'linear-gradient(90deg, #991B1B, #7E22CE, #0369A1, #B45309)',
+              boxShadow: '0 0 10px rgba(250,204,21,0.8)',
             })
           : col.holo
-            ? web({ boxShadow: `0 0 8px ${col.bd}` })
+            ? web({ boxShadow: `0 0 7px ${col.bd}` })
             : null,
       ]}
     >
@@ -356,20 +363,28 @@ export function chatBubbleTextColorOf(id?: string): string | undefined {
   }
 }
 
-/** Vẽ khung đa tầng + vệ tinh xoay + hào quang + thú cưng quanh avatar */
-export function FrameWrap({ size, frame, aura, pet, active, children }: {
-  size: number; frame?: string; aura?: string; pet?: string; active?: boolean; children: ReactNode;
+/** Vẽ khung đa tầng + vệ tinh xoay + hào quang + thú cưng quanh avatar (tự động hạ tải GPU ở phòng đông / Siêu Mượt) */
+export function FrameWrap({ size, frame, aura, pet, active, crowded = false, children }: {
+  size: number; frame?: string; aura?: string; pet?: string; active?: boolean; crowded?: boolean; children: ReactNode;
 }) {
+  const [smooth] = useSmoothMode();
   const f = frameOf(frame);
   const hasAura = !!aura;
   if (!f && !hasAura && !pet) return <>{children}</>;
   const pad = f ? Math.max(4, Math.round(size * (f.tripleOmega ? 0.14 : 0.115))) : 0;
   const outer = size + pad * 2;
+  const animate = !smooth && (!crowded || !!active);
   const orbitIcons = f?.orbitIcons ?? (f?.swords ? ['⚔️', '🗡️', '🗡️', '⚔️'] : undefined);
 
   return (
-    <View testID={frame ? `frame-${frame}` : undefined} style={{ width: outer, height: outer, borderRadius: outer / 2, alignItems: 'center', justifyContent: 'center' }}>
-      {hasAura && <AuraGlow kind={aura!} outer={outer} active={active} />}
+    <View
+      testID={frame ? `frame-${frame}` : undefined}
+      style={[
+        { width: outer, height: outer, borderRadius: outer / 2, alignItems: 'center', justifyContent: 'center' },
+        f?.glow ? web({ boxShadow: f.glow }) : null,
+      ]}
+    >
+      {hasAura && <AuraGlow kind={aura!} outer={outer} active={active} animate={animate} />}
       {f?.tripleOmega && (
         <View
           pointerEvents="none"
@@ -383,7 +398,10 @@ export function FrameWrap({ size, frame, aura, pet, active, children }: {
               borderStyle: 'dotted',
               borderColor: '#00F0FF',
             },
-            web({ animation: 'xl-omega-ring 3.2s ease-in-out infinite', boxShadow: '0 0 18px rgba(0,240,255,0.75)' }),
+            web({
+              ...(animate ? { animation: 'xl-omega-ring 3.8s ease-in-out infinite' } : {}),
+              boxShadow: '0 0 14px rgba(0,240,255,0.68)',
+            }),
           ]}
         />
       )}
@@ -400,17 +418,17 @@ export function FrameWrap({ size, frame, aura, pet, active, children }: {
               borderStyle: 'dashed',
               borderColor: '#FFD700',
             },
-            web({ animation: 'xl-spin-rev 4.6s linear infinite', willChange: 'transform' }),
+            animate ? web({ animation: 'xl-spin-rev 5.2s linear infinite' }) : null,
           ]}
         />
       )}
-      {f && <FrameBg f={f} outer={outer} />}
+      {f && <FrameBg f={f} outer={outer} animate={animate} />}
       {orbitIcons && (
         <View
           pointerEvents="none"
           style={[
             { position: 'absolute', width: outer + 12, height: outer + 12, alignItems: 'center', justifyContent: 'center' },
-            web({ animation: 'xl-spin 3.8s linear infinite', willChange: 'transform' }),
+            animate ? web({ animation: 'xl-spin 4.4s linear infinite' }) : null,
           ]}
         >
           <View style={{ position: 'absolute', top: -8 }}><EmojiIcon emoji={orbitIcons[0]} size={13} /></View>
@@ -422,103 +440,93 @@ export function FrameWrap({ size, frame, aura, pet, active, children }: {
       {children}
       {f?.badge && (
         <View pointerEvents="none" style={{ position: 'absolute', top: -Math.round(size * 0.22), right: -Math.round(size * 0.12), zIndex: 10 }}>
-          <EmojiIcon emoji={f.badge} size={Math.max(14, Math.round(size * 0.35))} glow="rgba(255,215,0,0.75)" />
+          <EmojiIcon emoji={f.badge} size={Math.max(14, Math.round(size * 0.35))} />
         </View>
       )}
-      <PetBadge pet={pet} size={size} />
+      <PetBadge pet={pet} size={size} animate={animate} />
     </View>
   );
 }
 
-const GRAD_TEXT: Record<string, { fallback: string; bg: string; glow?: string; wiggle?: boolean; disco?: boolean }> = {
+const CRISP_NAME_SHADOW = 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92))';
+
+const GRAD_TEXT: Record<string, { fallback: string; bg: string; wiggle?: boolean }> = {
   name_rainbow: {
     fallback: '#FF5F6D',
-    bg: 'linear-gradient(90deg, #ff0055, #ff9900, #ffee00, #00e676, #00e5ff, #a855f7, #ff0055)',
-    glow: 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92))',
+    bg: 'linear-gradient(90deg, #ff0055, #ff9900, #ffee00, #00e676, #00e5ff, #a855f7)',
   },
   name_gold_liquid: {
     fallback: '#FACC15',
-    bg: 'linear-gradient(90deg, #B45309, #FEF08A, #F59E0B, #FFFFFF, #EAB308, #B45309)',
-    glow: 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92)) drop-shadow(0 0 8px rgba(250,204,21,0.55))',
+    bg: 'linear-gradient(90deg, #FDE047, #F59E0B, #FFFBEB, #EAB308)',
   },
   name_fire_blaze: {
     fallback: '#FF5722',
     bg: 'linear-gradient(90deg, #FF1744, #FF9100, #FFEA00, #FF3D00)',
-    glow: 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92)) drop-shadow(0 0 8px rgba(255,87,34,0.65))',
   },
   name_clown_circus: {
     fallback: '#FB923C',
-    bg: 'linear-gradient(90deg, #EF4444, #FACC15, #22C55E, #3B82F6, #EC4899, #EF4444)',
-    glow: 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92))',
+    bg: 'linear-gradient(90deg, #EF4444, #FACC15, #22C55E, #3B82F6, #EC4899)',
     wiggle: true,
   },
   name_ice_crystal: {
     fallback: '#38BDF8',
     bg: 'linear-gradient(90deg, #38BDF8, #FFFFFF, #7DD3FC, #0EA5E9)',
-    glow: 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92)) drop-shadow(0 0 8px rgba(56,189,248,0.65))',
   },
   name_toxic_neon: {
     fallback: '#A3E635',
-    bg: 'linear-gradient(90deg, #65A30D, #BEF264, #22C55E, #ECFCCB, #84CC16)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 10px rgba(163,230,53,0.8))',
+    bg: 'linear-gradient(90deg, #84CC16, #BEF264, #22C55E, #ECFCCB)',
   },
   name_blood_moon: {
     fallback: '#F87171',
-    bg: 'linear-gradient(90deg, #DC2626, #FECACA, #EF4444, #FCA5A5, #DC2626)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 8px rgba(239,68,68,0.7))',
+    bg: 'linear-gradient(90deg, #EF4444, #FECACA, #F87171, #FCA5A5)',
   },
   name_pink_diva: {
     fallback: '#F472B6',
-    bg: 'linear-gradient(90deg, #EC4899, #FDF2F8, #F472B6, #E879F9, #EC4899)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.92)) drop-shadow(0 0 10px rgba(244,114,182,0.85))',
+    bg: 'linear-gradient(90deg, #EC4899, #FDF2F8, #F472B6, #E879F9)',
     wiggle: true,
   },
   name_matrix_hacker: {
     fallback: '#34D399',
-    bg: 'linear-gradient(90deg, #059669, #6EE7B7, #10B981, #D1FAE5, #059669)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 10px rgba(16,185,129,0.8))',
+    bg: 'linear-gradient(90deg, #10B981, #6EE7B7, #34D399, #D1FAE5)',
   },
   name_galaxy_shimmer: {
     fallback: '#E879F9',
-    bg: 'linear-gradient(90deg, #38BDF8, #E879F9, #FDE047, #818CF8, #38BDF8)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.92)) drop-shadow(0 0 9px rgba(232,121,249,0.7))',
+    bg: 'linear-gradient(90deg, #38BDF8, #E879F9, #FDE047, #818CF8)',
   },
   name_disco_fever: {
     fallback: '#F472B6',
-    bg: 'linear-gradient(90deg, #FF0080, #00F0FF, #FFEA00, #00FF88, #FF0080)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.92)) drop-shadow(0 0 12px rgba(255,0,128,0.8))',
-    disco: true,
+    bg: 'linear-gradient(90deg, #FF0080, #00F0FF, #FFEA00, #00FF88)',
   },
   name_lava_core: {
     fallback: '#FB923C',
-    bg: 'linear-gradient(90deg, #DC2626, #FEF08A, #F97316, #FFFFFF, #EF4444)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 10px rgba(249,115,22,0.85))',
+    bg: 'linear-gradient(90deg, #EF4444, #FEF08A, #F97316, #FFFFFF)',
   },
   name_holo_prism: {
     fallback: '#E0F2FE',
-    bg: 'linear-gradient(110deg, #ff0080, #ff8c00, #ffee00, #00ff88, #00e5ff, #c084fc, #ff0080)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.94)) drop-shadow(0 0 12px rgba(56,189,248,0.85))',
+    bg: 'linear-gradient(110deg, #ff0080, #ff8c00, #ffee00, #00ff88, #00e5ff, #c084fc)',
   },
   name_diamond_glitter: {
     fallback: '#E0F2FE',
-    bg: 'linear-gradient(90deg, #7DD3FC, #FFFFFF, #C4B5FD, #FFFFFF, #38BDF8)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 12px rgba(186,230,253,0.9))',
+    bg: 'linear-gradient(90deg, #7DD3FC, #FFFFFF, #C4B5FD, #FFFFFF)',
   },
   name_thunder_king: {
     fallback: '#FDE047',
-    bg: 'linear-gradient(90deg, #38BDF8, #FEF08A, #A855F7, #FFFFFF, #FACC15)',
-    glow: 'drop-shadow(0 1px 2px rgba(15,23,42,0.95)) drop-shadow(0 0 14px rgba(56,189,248,0.9))',
+    bg: 'linear-gradient(90deg, #38BDF8, #FEF08A, #A855F7, #FACC15)',
   },
 };
 
-/** Tên người chơi với 20 mẫu hiệu ứng rực rỡ */
-export function NameText({ fx, style, children, ...rest }: { fx?: string; style?: StyleProp<TextStyle>; children: ReactNode; testID?: string; numberOfLines?: number }) {
+/**
+ * Tên người chơi với 20 mẫu hiệu ứng rực rỡ:
+ * Không dùng `background-position` infinite repaint để trình duyệt cache cứng bitmap chữ trên GPU (0ms/frame)!
+ */
+export const NameText = memo(function NameText({ fx, style, children, ...rest }: { fx?: string; style?: StyleProp<TextStyle>; children: ReactNode; testID?: string; numberOfLines?: number }) {
+  const [smooth] = useSmoothMode();
   const flat = StyleSheet.flatten(style) ?? {};
 
   if (fx === 'name_omega_emperor') {
     return (
       <View style={styles.sparkRow}>
-        <EmojiIcon emoji="👑" size={12} glow="rgba(255,215,0,0.85)" />
+        <EmojiIcon emoji="👑" size={12} />
         <Text
           {...rest}
           style={[
@@ -526,28 +534,21 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
             { color: '#FEF08A', fontWeight: '900' },
             web({
               backgroundImage: 'linear-gradient(90deg, #FFD700, #FF0080, #00F0FF, #FFFBEB, #FFD700)',
-              backgroundSize: '200% auto',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              animation: 'xl-shimmer 1.8s linear infinite',
-              filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.96)) drop-shadow(0 0 12px rgba(255,215,0,0.85))',
+              filter: CRISP_NAME_SHADOW,
             }),
           ]}
         >
           {children}
         </Text>
-        <EmojiIcon emoji="🔱" size={12} glow="rgba(232,121,249,0.85)" />
+        <EmojiIcon emoji="🔱" size={12} />
       </View>
     );
   }
 
   const grad = fx ? GRAD_TEXT[fx] : undefined;
   if (grad) {
-    const anim = grad.disco
-      ? 'xl-shimmer 1.6s linear infinite, xl-disco-hue 1.8s linear infinite'
-      : grad.wiggle
-        ? 'xl-shimmer 2.2s linear infinite, xl-wiggle-clown 1.4s ease-in-out infinite'
-        : 'xl-shimmer 2.4s linear infinite';
     return (
       <Text
         {...rest}
@@ -556,11 +557,10 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
           { color: grad.fallback, fontWeight: '900' },
           web({
             backgroundImage: grad.bg,
-            backgroundSize: '200% auto',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            animation: anim,
-            filter: grad.glow ?? 'drop-shadow(0 1px 1.5px rgba(15,23,42,0.92))',
+            filter: CRISP_NAME_SHADOW,
+            ...(grad.wiggle && !smooth ? { animation: 'xl-wiggle-clown 1.8s ease-in-out infinite' } : {}),
           }),
         ]}
       >
@@ -575,7 +575,7 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
         style={[
           style,
           { color: '#F0ABFC', fontWeight: '900', textShadowColor: 'rgba(15,23,42,0.92)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-          web({ animation: 'xl-glitch 2.4s infinite' }),
+          !smooth ? web({ animation: 'xl-glitch 3s infinite' }) : null,
         ]}
       >
         {children}
@@ -589,7 +589,7 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
         style={[
           style,
           { color: '#22D3EE', fontWeight: '900', textShadowColor: 'rgba(15,23,42,0.88)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-          web({ animation: 'xl-pulse 1.5s ease-in-out infinite', filter: 'drop-shadow(0 0 8px rgba(34,211,238,0.75))' }),
+          web({ textShadow: '0 1px 2px rgba(15,23,42,0.92), 0 0 8px rgba(34,211,238,0.72)' }),
         ]}
       >
         {children}
@@ -603,7 +603,7 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
         style={[
           style,
           { color: '#FACC15', fontWeight: '900', textShadowColor: '#1C0F00', textShadowOffset: { width: 1, height: 2 }, textShadowRadius: 1 },
-          web({ textShadow: '0 1px 0 #854D0E, 0 2px 0 #422006, 0 0 10px rgba(250,204,21,0.65), 0 4px 8px rgba(0,0,0,0.65)' }),
+          web({ textShadow: '0 1px 0 #854D0E, 0 2px 0 #422006, 0 0 8px rgba(250,204,21,0.55), 0 3px 6px rgba(0,0,0,0.6)' }),
         ]}
       >
         {children}
@@ -612,7 +612,7 @@ export function NameText({ fx, style, children, ...rest }: { fx?: string; style?
   }
   if (fx === 'name_sparkle') return <SparkleText {...rest} style={flat}>{children}</SparkleText>;
   return <Text {...rest} style={style}>{children}</Text>;
-}
+});
 
 function SparkleText({ style, children, ...rest }: { style?: StyleProp<TextStyle>; children: ReactNode; testID?: string; numberOfLines?: number }) {
   const t = useState(() => new Animated.Value(1))[0];

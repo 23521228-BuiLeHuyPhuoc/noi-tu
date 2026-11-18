@@ -430,9 +430,19 @@ function customVectorOverlays(c: CharacterConfig, accentHex: string): string {
 
 const MAX_SVG_CACHE = 600;
 const svgCache = new Map<string, string>();
+const lookKeyCache = new WeakMap<object, string>();
 
-function configCacheKey(c: CharacterConfig, mood: Mood): string {
-  const lk = c.look ? Object.entries(c.look).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(';') : '';
+export function configCacheKey(c: CharacterConfig, mood: Mood = 'normal'): string {
+  let lk = '';
+  if (c.look) {
+    const cached = lookKeyCache.get(c.look);
+    if (cached !== undefined) {
+      lk = cached;
+    } else {
+      lk = Object.entries(c.look).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(';');
+      lookKeyCache.set(c.look, lk);
+    }
+  }
   return `db|${c.gender}|${c.age}|${c.hair}|${c.color}|${c.skin ?? 1}|${c.face ?? ''}|${c.build ?? ''}|${c.eyes ?? ''}|${c.brows ?? ''}|${c.accessory ?? ''}|${c.detail ?? ''}|${c.outfit ?? ''}|${lk}|${mood}`;
 }
 

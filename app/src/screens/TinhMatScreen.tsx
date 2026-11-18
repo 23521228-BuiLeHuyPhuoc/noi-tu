@@ -31,11 +31,12 @@ export function TinhMatScreen({ game, room }: { game: Game; room: RoomState }) {
   const isStunned = view.phase === 'playing' && myStunUntil > nowMs;
 
   useEffect(() => {
-    if (myStunUntil <= Date.now() + game.clockOffset) return;
-    const iv = setInterval(() => {
+    const remain = myStunUntil - (Date.now() + game.clockOffset);
+    if (remain <= 0) return;
+    const tm = setTimeout(() => {
       setNowMs(Date.now() + game.clockOffset);
-    }, 90);
-    return () => clearInterval(iv);
+    }, remain + 25);
+    return () => clearTimeout(tm);
   }, [myStunUntil, game.clockOffset]);
 
   useOnChange(view.round, () => {

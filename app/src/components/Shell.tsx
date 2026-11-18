@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { GAME_INFO, type PublicPlayer, type RoomState } from '../../../shared/src/types';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { GAME_INFO, type ChatMsg, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
@@ -45,6 +45,53 @@ export interface ShellTools {
 const ToolsCtx = createContext<ShellTools | null>(null);
 export const useShellTools = () => useContext(ToolsCtx);
 
+function sameFxRoster(a: PublicPlayer[], b: PublicPlayer[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].id !== b[i].id ||
+      a[i].name !== b[i].name ||
+      a[i].cosmetics?.chatBubble !== b[i].cosmetics?.chatBubble
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Cô lập hoàn toàn 6 lớp hiệu ứng chọc ghẹo/quà tặng (4.200+ dòng code) khỏi luồng cập nhật `room:state`:
+ * khi các ván chơi cập nhật điểm/bước chạy/xúc xắc liên tục, cả 6 lớp này KHÔNG re-render (0ms)!
+ */
+const RoomFxOverlays = memo(
+  function RoomFxOverlays({
+    game,
+    players,
+    chat,
+  }: {
+    game: Game;
+    players: PublicPlayer[];
+    chat: ChatMsg[];
+  }) {
+    return (
+      <>
+        <FunLayer game={game} players={players} chat={chat} />
+        <TrollLayer game={game} players={players} />
+        <TrollFxLayer game={game} players={players} />
+        <SkillLayer game={game} players={players} />
+        <PokeLayer game={game} players={players} />
+        <PokeSideLayer game={game} players={players} />
+      </>
+    );
+  },
+  (prev, next) =>
+    prev.game.me === next.game.me &&
+    prev.game.onFun === next.game.onFun &&
+    prev.chat === next.chat &&
+    sameFxRoster(prev.players, next.players),
+);
+
 /** Khung chung cho mọi màn trong phòng: nền Map, HUD kính mờ, hàng avatar 1–12 người, nội dung, vùng nút dưới */
 export function Shell({
   game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false, bare = false,
@@ -88,6 +135,27 @@ export function Shell({
   const stripSize = room.players.length >= 10 ? Math.min(baseSize, 42) : room.players.length >= 7 ? Math.min(baseSize, 46) : baseSize;
 
   const openMyProfile = useCallback(() => setProfileOpen(true), []);
+  const roomPlayersRef = useRef(room.players);
+  useEffect(() => {
+    roomPlayersRef.current = room.players;
+  }, [room.players]);
+
+  const handleSelectPlayer = useCallback(
+    (id: string) => {
+      if (id === game.me) {
+        setProfileOpen(true);
+        return;
+      }
+      const pl = roomPlayersRef.current.find((x) => x.id === id);
+      if (pl) setTarget(pl);
+    },
+    [game.me],
+  );
+
+  const fxGame = useMemo(
+    () => ({ me: game.me, onFun: game.onFun }) as unknown as Game,
+    [game.me, game.onFun],
+  );
 
   const [chaosHits, setChaosHits] = useState(0);
   const chaos = game.user?.admin
@@ -108,6 +176,7 @@ export function Shell({
 
   const meIsSpectator = room.players.find((p) => p.id === game.me)?.spectator === true;
   const isHost = room.hostId === game.me;
+  const crowded = room.players.length >= 6;
   const ownedSet = new Set(game.user?.owned ?? []);
 
   const content = (
@@ -128,7 +197,9 @@ export function Shell({
         rank={p.spectator ? undefined : strip.rank?.(p)}
         size={stripSize}
         editable={p.id === game.me}
-        onPress={p.id === game.me ? openMyProfile : meIsSpectator ? undefined : () => setTarget(p)}
+        crowded={crowded}
+        onPress={p.id === game.me ? openMyProfile : undefined}
+        onSelectPlayer={p.id !== game.me && !meIsSpectator ? handleSelectPlayer : undefined}
       />
     </View>
   ));
@@ -140,17 +211,13 @@ export function Shell({
       muted,
       toggleMute: () => { setMuted(!muted); setMutedState(!muted); },
       leave: () => setLeaving(true),
-      openPlayer: (id) => {
-        if (id === game.me) return setProfileOpen(true);
-        const pl = room.players.find((x) => x.id === id);
-        if (pl) setTarget(pl);
-      },
+      openPlayer: handleSelectPlayer,
       openProfile: openMyProfile,
       chaos,
       chaosHits,
     }}>
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <MapBackdrop themeId={activeThemeId} smooth={smooth} />
+      <MapBackdrop themeId={activeThemeId} smooth={smooth || room.phase === 'playing'} />
       <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
         {!bare && (<>
         <View
@@ -158,7 +225,6 @@ export function Shell({
             styles.top,
             compactLandscape && styles.topLandscape,
             iconOnly && styles.topTight,
-            Platform.OS === 'web' ? ({ backdropFilter: 'blur(12px)' } as object) : null,
           ]}
         >
           <Button
@@ -260,12 +326,7 @@ export function Shell({
         )}
 
         {overlay}
-        <FunLayer game={game} players={room.players} chat={game.chat} />
-        <TrollLayer game={game} players={room.players} />
-        <TrollFxLayer game={game} players={room.players} />
-        <SkillLayer game={game} players={room.players} />
-        <PokeLayer game={game} players={room.players} />
-        <PokeSideLayer game={game} players={room.players} />
+        <RoomFxOverlays game={fxGame} players={room.players} chat={game.chat} />
         {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
         {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
         {profileOpen && <ProfileSheet game={game} room={room} onClose={() => setProfileOpen(false)} />}
@@ -395,8 +456,8 @@ const styles = StyleSheet.create({
   top: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginHorizontal: 10, marginTop: 8, paddingHorizontal: 8, paddingVertical: 6,
-    borderRadius: 18, backgroundColor: 'rgba(15, 23, 42, 0.36)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18, backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   topLandscape: { marginTop: 3, paddingVertical: 3, paddingHorizontal: 8, gap: 6 },
   chip: { flexShrink: 0 },

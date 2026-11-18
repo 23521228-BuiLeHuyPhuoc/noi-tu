@@ -41,20 +41,32 @@ const ShakeCtx = createContext<(mode?: ShakeMode) => void>(() => {});
 export const useShake = () => useContext(ShakeCtx);
 
 export function ShakeProvider({ children }: { children: ReactNode }) {
+  const [shaking, setShaking] = useState(false);
   const x = useState(() => new Animated.Value(0))[0];
   const y = useState(() => new Animated.Value(0))[0];
   const rot = useState(() => new Animated.Value(0))[0];
   const mirror = useState(() => new Animated.Value(0))[0];
   useEffect(() => () => { mirror.stopAnimation(); }, [mirror]);
 
+  const finishShake = useCallback(({ finished }: { finished: boolean }) => {
+    if (finished) {
+      x.setValue(0);
+      y.setValue(0);
+      rot.setValue(0);
+      mirror.setValue(0);
+      setShaking(false);
+    }
+  }, [x, y, rot, mirror]);
+
   const shake = useCallback((mode: ShakeMode = 'normal') => {
+    setShaking(true);
     if (mode === 'mirror') {
       mirror.stopAnimation();
       Animated.sequence([
         Animated.timing(mirror, { toValue: 180, duration: 450, useNativeDriver: false }),
         Animated.delay(2500),
         Animated.timing(mirror, { toValue: 0, duration: 450, useNativeDriver: false }),
-      ]).start();
+      ]).start(finishShake);
       return;
     }
     x.stopAnimation();
@@ -66,7 +78,7 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
       Animated.sequence(steps.map(([dx, dr]) => Animated.parallel([
         Animated.timing(x, { toValue: dx, duration: 500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
         Animated.timing(rot, { toValue: dr, duration: 500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      ]))).start();
+      ]))).start(finishShake);
       return;
     }
     if (mode === 'dodge') {
@@ -83,7 +95,7 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
           Animated.timing(x, { toValue: 0, duration: 320, easing: Easing.out(Easing.back(2)), useNativeDriver: false }),
           Animated.timing(y, { toValue: 0, duration: 320, easing: Easing.out(Easing.back(2)), useNativeDriver: false }),
         ]),
-      ]).start();
+      ]).start(finishShake);
       return;
     }
     if (mode === 'spin') {
@@ -100,7 +112,7 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
         Animated.timing(rot, { toValue: 350, duration: 180, useNativeDriver: false }),
         Animated.timing(rot, { toValue: 365, duration: 150, useNativeDriver: false }),
         Animated.timing(rot, { toValue: 360, duration: 120, useNativeDriver: false }),
-      ]).start(() => rot.setValue(0));
+      ]).start((r) => { rot.setValue(0); finishShake(r); });
       return;
     }
     if (mode === 'quake') {
@@ -119,7 +131,7 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
             Animated.timing(rot, { toValue: dr, duration: 55, useNativeDriver: false }),
           ]),
         ),
-      ).start();
+      ).start(finishShake);
       return;
     }
     Animated.sequence(
@@ -132,8 +144,17 @@ export function ShakeProvider({ children }: { children: ReactNode }) {
           Animated.timing(rot, { toValue: dr, duration: 45, useNativeDriver: false }),
         ]),
       ),
-    ).start();
-  }, [x, y, rot, mirror]);
+    ).start(finishShake);
+  }, [x, y, rot, mirror, finishShake]);
+
+  // Khi đứng yên (99.9% thời gian): dùng View thuần KHÔNG gắn transform để tránh ép GPU tạo offscreen buffer 12MB toàn màn hình!
+  if (!shaking) {
+    return (
+      <ShakeCtx.Provider value={shake}>
+        <View style={{ flex: 1 }}>{children}</View>
+      </ShakeCtx.Provider>
+    );
+  }
 
   const rotateDeg = Animated.add(rot, mirror).interpolate({
     inputRange: [-360, 360],

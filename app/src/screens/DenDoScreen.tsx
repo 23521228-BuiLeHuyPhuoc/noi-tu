@@ -36,9 +36,10 @@ export function DenDoScreen({ game, room }: { game: Game; room: RoomState }) {
     view.fakeSirenUntil !== null && view.fakeSirenUntil > nowMs && view.fakeSirenBy !== null;
 
   useEffect(() => {
-    if (!view.fakeSirenUntil || view.fakeSirenUntil <= Date.now() + game.clockOffset) return;
-    const iv = setInterval(() => setNowMs(Date.now() + game.clockOffset), 120);
-    return () => clearInterval(iv);
+    const remain = (view.fakeSirenUntil ?? 0) - (Date.now() + game.clockOffset);
+    if (!view.fakeSirenUntil || remain <= 0) return;
+    const tm = setTimeout(() => setNowMs(Date.now() + game.clockOffset), remain + 25);
+    return () => clearTimeout(tm);
   }, [view.fakeSirenUntil, game.clockOffset]);
 
   useOnChange(view.light, (lt) => {

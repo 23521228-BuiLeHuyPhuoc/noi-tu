@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, ChaosAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
@@ -226,7 +226,8 @@ export function useGame(): Game {
     socket.on('connect_error', () => setStatus((s) => (s === 'online' ? 'offline' : s)));
     socket.on('room:state', (state) => {
       if (roomCodeRef.current && state.code !== roomCodeRef.current) return;
-      setClockOffset(state.serverNow - Date.now());
+      const nextOffset = state.serverNow - Date.now();
+      setClockOffset((prev) => (prev === 0 || Math.abs(nextOffset - prev) > 250 ? nextOffset : prev));
       setRoom(state);
     });
     socket.on('fun:event', (e) => {
@@ -501,21 +502,26 @@ export function useGame(): Game {
   const checkinStatus = useCallback(() => shopCall<CheckinStatus>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('checkin:status')), [shopCall]);
   const funQuota = useCallback(() => call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:quota')), [call]);
 
-  return {
-    status,
-    room,
-    me,
-    notice,
-    clockOffset,
-    createRoom: (name, gameType) => enter('create', name, '', gameType),
-    joinRoom: (code, name) => enter('join', name, code),
-    configure: (p) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:config', p)),
-    customize: (p) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('player:customize', p)),
-    addBot: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:addBot')),
-    removeBot: (id) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:removeBot', { id })),
-    start: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')),
-    restart: () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')),
-    act: async (a) => {
+  const createRoom = useCallback((name: string, gameType: GameType) => enter('create', name, '', gameType), [enter]);
+  const joinRoom = useCallback((code: string, name: string) => enter('join', name, code), [enter]);
+  const configure = useCallback(
+    (p: { gameType?: GameType; settings?: Partial<RoomSettings> }) =>
+      simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:config', p)),
+    [simple],
+  );
+  const customize = useCallback(
+    (p: Partial<CharacterConfig>) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('player:customize', p)),
+    [simple],
+  );
+  const addBot = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:addBot')), [simple]);
+  const removeBot = useCallback(
+    (id: string) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:removeBot', { id })),
+    [simple],
+  );
+  const start = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')), [simple]);
+  const restart = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')), [simple]);
+  const act = useCallback(
+    async (a: GameAction): Promise<ActionResult> => {
       // input vật lý liên tục (Croak Squad): bắn một chiều không chờ ACK để triệt tiêu độ trễ khứ hồi
       if (a.type === 'cs_input') {
         const s = socketRef.current;
@@ -526,129 +532,248 @@ export function useGame(): Game {
       const res = await call<ActionResult>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:action', a));
       return res ?? { ok: false, reason: 'not_playing' };
     },
-    leave: () => {
-      socketRef.current?.emit('room:leave', () => {});
-      void forget();
-    },
-    kick: (playerId) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:kick', { playerId })),
-    setPublic: (value) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:visibility', { public: value })),
-    listRooms,
-    leaderboard,
-    sendFun: async (f) => {
+    [call],
+  );
+  const leave = useCallback(() => {
+    socketRef.current?.emit('room:leave', () => {});
+    void forget();
+  }, [forget]);
+  const kick = useCallback(
+    (playerId: string) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:kick', { playerId })),
+    [simple],
+  );
+  const setPublic = useCallback(
+    (value: boolean) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:visibility', { public: value })),
+    [simple],
+  );
+  const sendFun = useCallback(
+    async (f: FunSend): Promise<FunAck> => {
       const res = await call<FunAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:send', f));
       return res ?? { ok: false };
     },
-    sendChaos: async () => {
-      const res = await call<ChaosAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:chaos'));
-      return res ?? { ok: false, reason: 'busy' };
-    },
-    onFun: (cb) => {
-      funListeners.current.add(cb);
-      return () => {
-        funListeners.current.delete(cb);
-      };
-    },
-    onCroakTick: (cb) => {
-      croakListeners.current.add(cb);
-      return () => {
-        croakListeners.current.delete(cb);
-      };
-    },
-    user,
-    authReady,
-    register: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:register', p)),
-    login: (username, password) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:login', { username, password })),
-    forgotPassword: async (who) => {
-      const res = await call<{ ok: true } | { ok: false; error: 'mail_disabled' | 'invalid_username' | 'rate_limited' }>((s) =>
-        s.timeout(ACK_TIMEOUT).emitWithAck('auth:forgot', { who: who.trim() }));
-      if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
-      return res.ok ? null : authText[res.error];
-    },
-    resetPassword: (who, code, password) =>
-      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:reset', { who: who.trim(), code: code.trim(), password })),
-    setEmail: (email, password) =>
-      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:setEmail', password === undefined ? { email: email.trim() } : { email: email.trim(), password })),
-    changePassword: (oldPassword, password) =>
-      authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:changePassword', { oldPassword, password })),
-    updateProfile: (p) => authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
-    uploadAvatar,
-    removeAvatar,
-    guest,
-    saveProfile,
-    changePhoto,
-    removePhoto,
-    photoPersist,
-    logout: async () => {
-      await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:logout'));
-      setUser(null);
-      await storage.setToken(null);
-      await forget();
-    },
-    chat,
-    wallet,
-    loadWallet,
-    requestTopup: async (amount) => {
-      const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:request', { amount }));
-      if (!r.ok) return r.error;
-      await loadWallet();
-      return null;
-    },
-    rubyHistory: async () => {
-      const r = await walletCall<{ rows: RubyLedgerRow[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:history'));
-      return r.ok ? { ok: true, data: r.data.rows } : r;
-    },
-    onWallet: (cb) => {
-      walletListeners.current.add(cb);
-      return () => {
-        walletListeners.current.delete(cb);
-      };
-    },
-    adminRequests: async (status) => {
-      const r = await walletCall<{ requests: TopupRequest[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:requests', { status }));
-      return r.ok ? { ok: true, data: r.data.requests } : r;
-    },
-    adminApprove: (id, amount) =>
-      walletCall<{ ruby: number; balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:approve', amount === undefined ? { id } : { id, amount })),
-    adminReject: async (id) => {
-      const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:reject', { id }));
-      return r.ok ? { ok: true, data: r.data.request } : r;
-    },
-    adminCreditCode: (code, amount, nonce) =>
-      walletCall<{ ruby: number; balance: number; request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:creditCode', { code, amount, nonce })),
-    adminAdjust: (username, delta, reason) =>
-      walletCall<{ balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:adjust', { username, delta, reason })),
-    adminRevenue: () => walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),
-    loadShop,
-    buyItem: async (itemId) => {
-      const r = await shopCall<{ balance: number; owned: string[]; rubySpent?: number; vipTier?: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:buy', { itemId }));
-      if (!r.ok) return r.error;
-      setUser((u) => (u ? {
-        ...u, ruby: r.data.balance, owned: r.data.owned,
-        ...(r.data.rubySpent !== undefined ? { rubySpent: r.data.rubySpent } : {}),
-        ...(r.data.vipTier !== undefined ? { vipTier: r.data.vipTier } : {}),
-      } : u));
-      return null;
-    },
-    equipItem: async (slot, itemId) => {
-      const r = await shopCall<{ equipped: ShopInfo['equipped'] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('shop:equip', { slot, itemId }));
-      if (!r.ok) return r.error;
-      setUser((u) => (u ? { ...u, equipped: r.data.equipped } : u));
-      return null;
-    },
-    checkinStatus,
-    checkinClaim: async () => {
-      const r = await shopCall<{ reward: number; balance: number; streak: number; day: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('checkin:claim'));
-      if (r.ok) setUser((u) => (u ? { ...u, ruby: r.data.balance } : u));
-      return r;
-    },
-    funQuota,
-    sendChat: async (text) => {
+    [call],
+  );
+  const sendChaos = useCallback(async (): Promise<ChaosAck> => {
+    const res = await call<ChaosAck>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('fun:chaos'));
+    return res ?? { ok: false, reason: 'busy' };
+  }, [call]);
+  const onFun = useCallback((cb: (e: FunEvent) => void) => {
+    funListeners.current.add(cb);
+    return () => {
+      funListeners.current.delete(cb);
+    };
+  }, []);
+  const onCroakTick = useCallback((cb: (p: CroakTickPayload) => void) => {
+    croakListeners.current.add(cb);
+    return () => {
+      croakListeners.current.delete(cb);
+    };
+  }, []);
+  const onWallet = useCallback((cb: (n: WalletNotice) => void) => {
+    walletListeners.current.add(cb);
+    return () => {
+      walletListeners.current.delete(cb);
+    };
+  }, []);
+  const sendChat = useCallback(
+    async (text: string) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { text }));
       return !!res?.ok;
     },
-    sendSticker: async (stickerId) => {
+    [call],
+  );
+  const sendSticker = useCallback(
+    async (stickerId: StickerId) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { kind: 'sticker', stickerId }));
       return !!res?.ok;
     },
-  };
+    [call],
+  );
+
+  const authFns = useMemo(
+    () => ({
+      register: (p: { username: string; email: string; password: string; displayName: string; avatar?: number }) =>
+        authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:register', p)),
+      login: (username: string, password: string) =>
+        authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:login', { username, password })),
+      forgotPassword: async (who: string) => {
+        const res = await call<{ ok: true } | { ok: false; error: 'mail_disabled' | 'invalid_username' | 'rate_limited' }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('auth:forgot', { who: who.trim() }),
+        );
+        if (!res) return 'Chưa kết nối được tới server, thử lại nhé.';
+        return res.ok ? null : authText[res.error];
+      },
+      resetPassword: (who: string, code: string, password: string) =>
+        authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:reset', { who: who.trim(), code: code.trim(), password })),
+      setEmail: (email: string, password?: string) =>
+        authCall((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('auth:setEmail', password === undefined ? { email: email.trim() } : { email: email.trim(), password }),
+        ),
+      changePassword: (oldPassword: string, password: string) =>
+        authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:changePassword', { oldPassword, password })),
+      updateProfile: (p: { displayName?: string; avatar?: number }) =>
+        authCall((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:update', p)),
+      logout: async () => {
+        await call((s) => s.timeout(ACK_TIMEOUT).emitWithAck('auth:logout'));
+        setUser(null);
+        await storage.setToken(null);
+        await forget();
+      },
+      requestTopup: async (amount: number) => {
+        const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:request', { amount }));
+        if (!r.ok) return r.error;
+        await loadWallet();
+        return null;
+      },
+      rubyHistory: async (): Promise<WalletResult<RubyLedgerRow[]>> => {
+        const r = await walletCall<{ rows: RubyLedgerRow[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('wallet:history'));
+        return r.ok ? { ok: true, data: r.data.rows } : r;
+      },
+      adminRequests: async (statusArg: TopupRequest['status']): Promise<WalletResult<TopupRequest[]>> => {
+        const r = await walletCall<{ requests: TopupRequest[] }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:requests', { status: statusArg }));
+        return r.ok ? { ok: true, data: r.data.requests } : r;
+      },
+      adminApprove: (id: string, amount?: number) =>
+        walletCall<{ ruby: number; balance: number }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('admin:approve', amount === undefined ? { id } : { id, amount }),
+        ),
+      adminReject: async (id: string): Promise<WalletResult<TopupRequest>> => {
+        const r = await walletCall<{ request: TopupRequest }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:reject', { id }));
+        return r.ok ? { ok: true, data: r.data.request } : r;
+      },
+      adminCreditCode: (code: string, amount: number, nonce: string) =>
+        walletCall<{ ruby: number; balance: number; request: TopupRequest }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('admin:creditCode', { code, amount, nonce }),
+        ),
+      adminAdjust: (username: string, delta: number, reason: string) =>
+        walletCall<{ balance: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:adjust', { username, delta, reason })),
+      adminRevenue: () =>
+        walletCall<{ today: number; month: number; total: number }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('admin:revenue')),
+      buyItem: async (itemId: string) => {
+        const r = await shopCall<{ balance: number; owned: string[]; rubySpent?: number; vipTier?: number }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('shop:buy', { itemId }),
+        );
+        if (!r.ok) return r.error;
+        setUser((u) =>
+          u
+            ? {
+                ...u,
+                ruby: r.data.balance,
+                owned: r.data.owned,
+                ...(r.data.rubySpent !== undefined ? { rubySpent: r.data.rubySpent } : {}),
+                ...(r.data.vipTier !== undefined ? { vipTier: r.data.vipTier } : {}),
+              }
+            : u,
+        );
+        return null;
+      },
+      equipItem: async (slot: CosmeticSlot, itemId: string | null) => {
+        const r = await shopCall<{ equipped: ShopInfo['equipped'] }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('shop:equip', { slot, itemId }),
+        );
+        if (!r.ok) return r.error;
+        setUser((u) => (u ? { ...u, equipped: r.data.equipped } : u));
+        return null;
+      },
+      checkinClaim: async () => {
+        const r = await shopCall<{ reward: number; balance: number; streak: number; day: number }>((s) =>
+          s.timeout(ACK_TIMEOUT).emitWithAck('checkin:claim'),
+        );
+        if (r.ok) setUser((u) => (u ? { ...u, ruby: r.data.balance } : u));
+        return r;
+      },
+    }),
+    [authCall, call, forget, loadWallet, shopCall, walletCall],
+  );
+
+  return useMemo(
+    () => ({
+      status,
+      room,
+      me,
+      notice,
+      clockOffset,
+      createRoom,
+      joinRoom,
+      configure,
+      customize,
+      addBot,
+      removeBot,
+      start,
+      restart,
+      act,
+      leave,
+      kick,
+      setPublic,
+      listRooms,
+      leaderboard,
+      sendFun,
+      sendChaos,
+      onFun,
+      onCroakTick,
+      user,
+      authReady,
+      ...authFns,
+      uploadAvatar,
+      removeAvatar,
+      guest,
+      saveProfile,
+      changePhoto,
+      removePhoto,
+      photoPersist,
+      chat,
+      wallet,
+      loadWallet,
+      onWallet,
+      loadShop,
+      checkinStatus,
+      funQuota,
+      sendChat,
+      sendSticker,
+    }),
+    [
+      status,
+      room,
+      me,
+      notice,
+      clockOffset,
+      createRoom,
+      joinRoom,
+      configure,
+      customize,
+      addBot,
+      removeBot,
+      start,
+      restart,
+      act,
+      leave,
+      kick,
+      setPublic,
+      listRooms,
+      leaderboard,
+      sendFun,
+      sendChaos,
+      onFun,
+      onCroakTick,
+      user,
+      authReady,
+      authFns,
+      uploadAvatar,
+      removeAvatar,
+      guest,
+      saveProfile,
+      changePhoto,
+      removePhoto,
+      photoPersist,
+      chat,
+      wallet,
+      loadWallet,
+      onWallet,
+      loadShop,
+      checkinStatus,
+      funQuota,
+      sendChat,
+      sendSticker,
+    ],
+  );
 }

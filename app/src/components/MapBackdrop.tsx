@@ -89,7 +89,7 @@ function backgroundGradient(t: RoomTheme): string {
 export const MapBackdrop = memo(function MapBackdrop({ themeId, smooth = false }: { themeId?: string; smooth?: boolean }) {
   const theme = themeById(themeId);
   const fx = theme.particleFx ?? 'none';
-  const count = smooth ? 0 : fx === 'none' ? 0 : theme.price > 0 ? 7 : 4;
+  const count = smooth ? 0 : fx === 'none' ? 0 : theme.price > 0 ? 4 : 2;
   const particles = useMemo(() => makeParticles(fx, count), [fx, count]);
 
   return (

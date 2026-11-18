@@ -88,6 +88,10 @@ input, textarea, [contenteditable="true"], [data-selectable="true"], [data-selec
   contain-intrinsic-size: 0 86px;
 }
 
+.xl-contain {
+  contain: layout style;
+}
+
 ${CSSHAKES_CDN_FALLBACK}
 
 @keyframes xl-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

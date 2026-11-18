@@ -1,8 +1,8 @@
 import { Image } from './Image';
-import { memo, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Mood, PublicPlayer } from '../../../shared/src/types';
-import { avatarOf, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
+import { avatarOf, configCacheKey, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
@@ -46,19 +46,20 @@ const PortraitImage = memo(function PortraitImage({ p, mood = 'normal', size, re
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const primary = resolvedUri ?? portraitOf(p, mood).uri;
   const uri = failedUri === primary ? portraitOf({ ...p, avatarUrl: undefined }, mood).uri : primary;
+  const needFallbackUnderlay = !uri.startsWith('data:');
   return (
     <>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-        <EmojiIcon emoji={avatarOf(p.avatar).emoji} size={Math.max(16, Math.round(size * 0.56))} />
-      </View>
+      {needFallbackUnderlay && (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <EmojiIcon emoji={avatarOf(p.avatar).emoji} size={Math.max(16, Math.round(size * 0.56))} />
+        </View>
+      )}
       <Image source={{ uri }} onError={() => setFailedUri(primary)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
     </>
   );
 });
 
-export const Avatar = memo(function Avatar({
-  player, size = 52, active, dim, host, sub, me, onPress, ring, rank, editable,
-}: {
+interface AvatarProps {
   player: PublicPlayer;
   size?: number;
   active?: boolean;
@@ -68,13 +69,71 @@ export const Avatar = memo(function Avatar({
   sub?: string;
   me?: boolean;
   onPress?: () => void;
+  /** callback ổn định nhận playerId để không phá vỡ React.memo khi danh sách người chơi cập nhật */
+  onSelectPlayer?: (playerId: string) => void;
   /** màu viền riêng (vd: màu ngựa) */
   ring?: string;
   /** hạng (1..n): hiện thành huy hiệu nhỏ ở góc avatar */
   rank?: number;
   /** avatar của chính mình: hiện bút chì, chạm để sửa tên & ảnh */
   editable?: boolean;
-}) {
+  /** phòng đông (>= 6 người): tự động giảm hiệu ứng xoay liên tục của người đang chờ lượt */
+  crowded?: boolean;
+}
+
+function sameCosmetics(a: PublicPlayer['cosmetics'], b: PublicPlayer['cosmetics']): boolean {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  return (
+    a.frame === b.frame &&
+    a.aura === b.aura &&
+    a.pet === b.pet &&
+    a.title === b.title &&
+    a.nameFx === b.nameFx &&
+    a.chatBubble === b.chatBubble
+  );
+}
+
+function samePlayerVisual(a: PublicPlayer, b: PublicPlayer): boolean {
+  if (a === b) return true;
+  if (
+    a.id !== b.id ||
+    a.name !== b.name ||
+    a.connected !== b.connected ||
+    a.spectator !== b.spectator ||
+    a.avatar !== b.avatar ||
+    a.avatarUrl !== b.avatarUrl ||
+    a.vipTier !== b.vipTier ||
+    !sameCosmetics(a.cosmetics, b.cosmetics)
+  ) {
+    return false;
+  }
+  if (a.character === b.character) return true;
+  if (!a.character || !b.character) return false;
+  return configCacheKey(a.character) === configCacheKey(b.character);
+}
+
+function areAvatarPropsEqual(prev: AvatarProps, next: AvatarProps): boolean {
+  return (
+    prev.size === next.size &&
+    prev.active === next.active &&
+    prev.dim === next.dim &&
+    prev.host === next.host &&
+    prev.sub === next.sub &&
+    prev.me === next.me &&
+    prev.ring === next.ring &&
+    prev.rank === next.rank &&
+    prev.editable === next.editable &&
+    prev.crowded === next.crowded &&
+    prev.onPress === next.onPress &&
+    prev.onSelectPlayer === next.onSelectPlayer &&
+    samePlayerVisual(prev.player, next.player)
+  );
+}
+
+export const Avatar = memo(function Avatar({
+  player, size = 52, active, dim, host, sub, me, onPress, onSelectPlayer, ring, rank, editable, crowded,
+}: AvatarProps) {
   const face = useFace(player.id);
   const avatarRef = useMeasuredView(`avatar-${player.id}`);
   const pt = portraitOf(player, face.mood);
@@ -145,100 +204,132 @@ export const Avatar = memo(function Avatar({
     return () => anim.stop();
   }, [face.wobble, rot, shiftX, grow]);
 
-  const rotateInterpolate = rot.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-360deg', '360deg'],
-  });
+  const handlePress = useCallback(() => {
+    if (onPress) onPress();
+    else if (onSelectPlayer) onSelectPlayer(player.id);
+  }, [onPress, onSelectPlayer, player.id]);
 
+  const interactive = Boolean(onPress || onSelectPlayer);
   const cos = player.cosmetics;
+
+  const circleContent = (
+    <>
+      <PortraitImage p={player} mood={face.mood} size={size} resolvedUri={pt.uri} />
+      {face.doodle && (
+        <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
+      )}
+      {face.tint && (
+        <View pointerEvents="none" testID={`tint-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: TINTS[face.tint].bg }]}>
+          <EmojiIcon emoji={TINTS[face.tint].emoji} size={Math.max(16, Math.round(size * 0.44))} />
+        </View>
+      )}
+      {face.morph && face.morph in MORPHS && (
+        <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: MORPHS[face.morph as keyof typeof MORPHS].bg }]}>
+          <EmojiIcon emoji={MORPHS[face.morph as keyof typeof MORPHS].emoji} size={Math.max(20, Math.round(size * 0.64))} />
+        </View>
+      )}
+      {face.morph === 'cage' && (
+        <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.cage, { borderRadius: size / 2 }]}>
+          {[0, 1, 2, 3, 4].map((i) => <View key={i} style={styles.cageBar} />)}
+          <View style={styles.cageLockPill}>
+            <UiIcon name="Lock" size={11} color="#FEF08A" strokeWidth={2.5} />
+          </View>
+        </View>
+      )}
+      {face.wobble === 'blackout' && (
+        <View pointerEvents="none" style={[styles.blackoutMask, { borderRadius: size / 2 }]}>
+          <EmojiIcon emoji="🔌" size={Math.max(16, Math.round(size * 0.42))} />
+        </View>
+      )}
+      {player.avatarUrl && face.mood !== 'normal' && (
+        <View pointerEvents="none" style={styles.moodBadge}>
+          <EmojiIcon emoji={MOOD_EMOJI[face.mood]} size={16} />
+        </View>
+      )}
+      {face.charm && (
+        <View pointerEvents="none" testID={`charm-${player.id}`} style={styles.charm}>
+          <EmojiIcon emoji="✨" size={18} />
+        </View>
+      )}
+      {face.morph === 'bomb' && <BombBadge />}
+      {host && (
+        <View pointerEvents="none" style={styles.crown}>
+          <EmojiIcon emoji="👑" size={18} />
+        </View>
+      )}
+      {!player.connected && (
+        <View pointerEvents="none" style={styles.offPill}>
+          <EmojiIcon emoji="💤" size={14} />
+        </View>
+      )}
+      {editable && player.connected && (
+        <View pointerEvents="none" testID="avatar-edit-badge" style={styles.editPill}>
+          <UiIcon name="Pencil" size={10} color="#1C2024" strokeWidth={2.5} />
+        </View>
+      )}
+      {rank !== undefined && (
+        <View testID={`rank-badge-${player.id}`} style={[styles.rank, rank === 1 && { backgroundColor: '#FFF7C2', borderColor: '#F59E0B' }]}>
+          <RankMedal rank={rank} size={16} />
+        </View>
+      )}
+    </>
+  );
+
   return (
     <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : onPress ? `Chọc ${player.name}` : player.name}
+      onPress={interactive ? handlePress : undefined}
+      disabled={!interactive}
+      accessibilityRole={interactive ? 'button' : undefined}
+      accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : interactive ? `Chọc ${player.name}` : player.name}
       style={[styles.wrap, { minWidth: size + 22, maxWidth: size + 64 }, dim && { opacity: 0.4 }]}
     >
-      <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} pet={cos?.pet} active={active}>
-      <Animated.View
-        ref={avatarRef}
-        collapsable={false}
-        testID={`avatar-${player.id}`}
-        style={[
-          styles.circle,
-          {
-            width: size, height: size, borderRadius: size / 2,
-            backgroundColor: pt.light,
-            borderColor: borderCol, borderWidth: ring || player.character ? 3 : 2,
-            transform: [
-              ...(active ? [{ scale: 1.08 }] : []),
-              { scale: grow },
-              { translateX: shiftX },
-              { rotate: rotateInterpolate },
-            ],
-          },
-          active && styles.active,
-        ]}
-      >
-        <PortraitImage p={player} mood={face.mood} size={size} resolvedUri={pt.uri} />
-        {face.doodle && (
-          <Image testID={`doodle-${player.id}`} accessibilityLabel={`Bị vẽ bậy: ${face.doodle}`} source={{ uri: doodleUri(face.doodle) }} pointerEvents="none" style={styles.doodle} resizeMode="cover" />
-        )}
-        {face.tint && (
-          <View pointerEvents="none" testID={`tint-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: TINTS[face.tint].bg }]}>
-            <EmojiIcon emoji={TINTS[face.tint].emoji} size={Math.max(16, Math.round(size * 0.44))} />
+      <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} pet={cos?.pet} active={active} crowded={crowded}>
+        {face.wobble ? (
+          <Animated.View
+            ref={avatarRef}
+            collapsable={false}
+            testID={`avatar-${player.id}`}
+            style={[
+              styles.circle,
+              {
+                width: size, height: size, borderRadius: size / 2,
+                backgroundColor: pt.light,
+                borderColor: borderCol, borderWidth: ring || player.character ? 3 : 2,
+                transform: [
+                  ...(active ? [{ scale: 1.08 }] : []),
+                  { scale: grow },
+                  { translateX: shiftX },
+                  {
+                    rotate: rot.interpolate({
+                      inputRange: [-1, 1],
+                      outputRange: ['-360deg', '360deg'],
+                    }),
+                  },
+                ],
+              },
+              active && styles.active,
+            ]}
+          >
+            {circleContent}
+          </Animated.View>
+        ) : (
+          <View
+            ref={avatarRef}
+            collapsable={false}
+            testID={`avatar-${player.id}`}
+            style={[
+              styles.circle,
+              {
+                width: size, height: size, borderRadius: size / 2,
+                backgroundColor: pt.light,
+                borderColor: borderCol, borderWidth: ring || player.character ? 3 : 2,
+              },
+              active && styles.active,
+            ]}
+          >
+            {circleContent}
           </View>
         )}
-        {face.morph && face.morph in MORPHS && (
-          <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.blackoutMask, { borderRadius: size / 2, backgroundColor: MORPHS[face.morph as keyof typeof MORPHS].bg }]}>
-            <EmojiIcon emoji={MORPHS[face.morph as keyof typeof MORPHS].emoji} size={Math.max(20, Math.round(size * 0.64))} />
-          </View>
-        )}
-        {face.morph === 'cage' && (
-          <View pointerEvents="none" testID={`morph-${player.id}`} style={[styles.cage, { borderRadius: size / 2 }]}>
-            {[0, 1, 2, 3, 4].map((i) => <View key={i} style={styles.cageBar} />)}
-            <View style={styles.cageLockPill}>
-              <UiIcon name="Lock" size={11} color="#FEF08A" strokeWidth={2.5} />
-            </View>
-          </View>
-        )}
-        {face.wobble === 'blackout' && (
-          <View pointerEvents="none" style={[styles.blackoutMask, { borderRadius: size / 2 }]}>
-            <EmojiIcon emoji="🔌" size={Math.max(16, Math.round(size * 0.42))} />
-          </View>
-        )}
-        {player.avatarUrl && face.mood !== 'normal' && (
-          <View pointerEvents="none" style={styles.moodBadge}>
-            <EmojiIcon emoji={MOOD_EMOJI[face.mood]} size={16} />
-          </View>
-        )}
-        {face.charm && (
-          <View pointerEvents="none" testID={`charm-${player.id}`} style={styles.charm}>
-            <EmojiIcon emoji="✨" size={18} />
-          </View>
-        )}
-        {face.morph === 'bomb' && <BombBadge />}
-        {host && (
-          <View pointerEvents="none" style={styles.crown}>
-            <EmojiIcon emoji="👑" size={18} />
-          </View>
-        )}
-        {!player.connected && (
-          <View pointerEvents="none" style={styles.offPill}>
-            <EmojiIcon emoji="💤" size={14} />
-          </View>
-        )}
-        {editable && player.connected && (
-          <View pointerEvents="none" testID="avatar-edit-badge" style={styles.editPill}>
-            <UiIcon name="Pencil" size={10} color="#1C2024" strokeWidth={2.5} />
-          </View>
-        )}
-        {rank !== undefined && (
-          <View testID={`rank-badge-${player.id}`} style={[styles.rank, rank === 1 && { backgroundColor: '#FFF7C2', borderColor: '#F59E0B' }]}>
-            <RankMedal rank={rank} size={16} />
-          </View>
-        )}
-      </Animated.View>
       </FrameWrap>
       {(cos?.title || (player.vipTier && player.vipTier > 0)) && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, flexWrap: 'wrap', marginTop: active ? 4 : 1 }}>
@@ -255,7 +346,7 @@ export const Avatar = memo(function Avatar({
       {sub !== undefined && <Text style={styles.sub}>{sub}</Text>}
     </Pressable>
   );
-});
+}, areAvatarPropsEqual);
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', gap: 3 },

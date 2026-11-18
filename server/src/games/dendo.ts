@@ -70,6 +70,17 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
   private botCheckedSirenSeq = new Map<string, number>();
 
   private finished = false;
+  private suppressBroadcast = false;
+  private dirtyDuringBatch = false;
+
+  private notifyChanged(): void {
+    if (this.suppressBroadcast) {
+      this.dirtyDuringBatch = true;
+      return;
+    }
+    this.ctx.changed();
+  }
+
   private readonly phaseTimer = new Timer();
   private readonly matchTimer = new Timer();
   private readonly botPaceTimer = new Timer();
@@ -200,7 +211,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
     if (this.finished) return;
     if (!this.activeOrder.some((id) => this.isBotPlayer(id))) return;
 
-    const paceMs = Math.max(25, Math.round(220 * this.scale));
+    const paceMs = Math.max(25, Math.round(300 * this.scale));
     this.botPaceTimer.set(paceMs, () => {
       if (this.finished) return;
       this.tickBots();
@@ -213,46 +224,56 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
     const now = Date.now();
     const bots = this.activeOrder.filter((id) => this.isBotPlayer(id));
 
-    for (const botId of bots) {
-      if (this.finished) return;
+    this.suppressBroadcast = true;
+    this.dirtyDuringBatch = false;
+    try {
+      for (const botId of bots) {
+        if (this.finished) return;
 
-      const held = this.items.get(botId) ?? null;
+        const held = this.items.get(botId) ?? null;
 
-      if (this.light === 'green') {
-        if (held === 'shield' && !this.shieldedIds.has(botId) && this.ctx.rng() < 0.35) {
-          this.action(botId, { type: 'dd_trick' });
-          continue;
-        }
-        if (held === 'banana' && this.hasOpponentAhead(botId) && this.ctx.rng() < 0.3) {
-          this.action(botId, { type: 'dd_trick' });
-          continue;
-        }
-        if (this.ctx.rng() < 0.62) {
-          this.action(botId, { type: 'dd_step' });
-        }
-      } else if (this.light === 'yellow') {
-        if (this.ctx.rng() < 0.14) {
-          this.action(botId, { type: 'dd_step' });
-        }
-      } else if (this.light === 'red') {
-        if (this.caughtIds.has(botId)) continue;
-        if (now - this.lightStartedAt < this.redGraceMs + 30) continue;
+        if (this.light === 'green') {
+          if (held === 'shield' && !this.shieldedIds.has(botId) && this.ctx.rng() < 0.35) {
+            this.action(botId, { type: 'dd_trick' });
+            continue;
+          }
+          if (held === 'banana' && this.hasOpponentAhead(botId) && this.ctx.rng() < 0.3) {
+            this.action(botId, { type: 'dd_trick' });
+            continue;
+          }
+          if (this.ctx.rng() < 0.68) {
+            this.action(botId, { type: 'dd_step' });
+          }
+        } else if (this.light === 'yellow') {
+          if (this.ctx.rng() < 0.14) {
+            this.action(botId, { type: 'dd_step' });
+          }
+        } else if (this.light === 'red') {
+          if (this.caughtIds.has(botId)) continue;
+          if (now - this.lightStartedAt < this.redGraceMs + 30) continue;
 
-        // Bot chủ động bóp Còi Giả Đèn Xanh giữa lúc Đèn Đỏ để bẫy cả phòng!
-        if (held === 'fake_green' && (!this.fakeSirenUntil || now >= this.fakeSirenUntil) && this.ctx.rng() < 0.25) {
-          this.action(botId, { type: 'dd_trick' });
-          continue;
-        }
+          // Bot chủ động bóp Còi Giả Đèn Xanh giữa lúc Đèn Đỏ để bẫy cả phòng!
+          if (held === 'fake_green' && (!this.fakeSirenUntil || now >= this.fakeSirenUntil) && this.ctx.rng() < 0.25) {
+            this.action(botId, { type: 'dd_trick' });
+            continue;
+          }
 
-        // Nếu có người khác vừa bóp Còi Giả Đèn Xanh: 12% xác suất bot bị giật mình phạm quy!
-        if (this.fakeSirenUntil && now < this.fakeSirenUntil && this.fakeSirenBy !== botId) {
-          if (this.botCheckedSirenSeq.get(botId) !== this.fakeSirenSeq) {
-            this.botCheckedSirenSeq.set(botId, this.fakeSirenSeq);
-            if (this.ctx.rng() < 0.12) {
-              this.action(botId, { type: 'dd_step' });
+          // Nếu có người khác vừa bóp Còi Giả Đèn Xanh: 12% xác suất bot bị giật mình phạm quy!
+          if (this.fakeSirenUntil && now < this.fakeSirenUntil && this.fakeSirenBy !== botId) {
+            if (this.botCheckedSirenSeq.get(botId) !== this.fakeSirenSeq) {
+              this.botCheckedSirenSeq.set(botId, this.fakeSirenSeq);
+              if (this.ctx.rng() < 0.12) {
+                this.action(botId, { type: 'dd_step' });
+              }
             }
           }
         }
+      }
+    } finally {
+      this.suppressBroadcast = false;
+      if (this.dirtyDuringBatch && !this.finished) {
+        this.dirtyDuringBatch = false;
+        this.ctx.changed();
       }
     }
   }
@@ -308,7 +329,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
       return;
     }
 
-    this.ctx.changed();
+    this.notifyChanged();
   }
 
   private finishGame(championId: string | null, customHeadline: string | undefined): void {
@@ -416,7 +437,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
         this.shieldedIds.delete(playerId);
         this.shieldGraceUntil.set(playerId, now + 400);
         this.pushEvent(`🛡️ ${pName} lỡ chân lúc Đèn Đỏ nhưng Áo Tàng Hình đã chặn đứng tia Laser!`);
-        this.ctx.changed();
+        this.notifyChanged();
         return { ok: true };
       }
 
@@ -428,7 +449,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
       this.pushEvent(
         `🚨 PHẠM QUY! Radar quét trúng ${pName} nhúc nhích lúc Đèn Đỏ — giật lùi -${DEN_DO_RED_PENALTY}m!`,
       );
-      this.ctx.changed();
+      this.notifyChanged();
       return { ok: true };
     }
 
@@ -445,7 +466,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
       if (item === 'shield') {
         this.shieldedIds.add(playerId);
         this.pushEvent(`🛡️ ${pName} bật Áo Tàng Hình bảo hộ!`);
-        this.ctx.changed();
+        this.notifyChanged();
         return { ok: true };
       }
 
@@ -455,7 +476,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
         this.fakeSirenUntil = now + (this.scale < 1 ? Math.max(250, Math.round(DEN_DO_SIREN_MS * this.scale)) : DEN_DO_SIREN_MS);
         this.botCheckedSirenSeq.clear();
         this.pushEvent(`📣 AI ĐÓ HÔ GIẢ: «CHẠY ĐI KÌA BÀ CON ƠI!!» (${pName} bóp còi lừa tình!)`);
-        this.ctx.changed();
+        this.notifyChanged();
         return { ok: true };
       }
 
@@ -479,7 +500,7 @@ export class DenDoGame implements Omit<GameEngine, 'view' | 'botAction'> {
           this.pushEvent(`🍌 ${pName} quăng vỏ chuối ra đường đua!`);
         }
 
-        this.ctx.changed();
+        this.notifyChanged();
         return { ok: true };
       }
     }

@@ -31,7 +31,7 @@ function strokesToSvgUri(strokes: VeDoanStroke[]): string {
     }
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" preserveAspectRatio="none">${parts.join('')}</svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 interface WebPointerEvt {
@@ -62,6 +62,22 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const originRef = useRef<{ px: number; py: number } | null>(null);
   const draftPtsRef = useRef<[number, number][]>([]);
   const drawingRef = useRef(false);
+  const draftRafRef = useRef<number | null>(null);
+
+  const flushDraftFrame = (c: string, w: number) => {
+    if (draftRafRef.current !== null || typeof requestAnimationFrame === 'undefined') {
+      if (typeof requestAnimationFrame === 'undefined') {
+        setDraft({ color: c, width: w, points: [...draftPtsRef.current] });
+      }
+      return;
+    }
+    draftRafRef.current = requestAnimationFrame(() => {
+      draftRafRef.current = null;
+      if (drawingRef.current) {
+        setDraft({ color: c, width: w, points: [...draftPtsRef.current] });
+      }
+    });
+  };
 
   const canDraw = isDrawer && view.phase === 'drawing';
 
@@ -92,9 +108,8 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     const last = pts[pts.length - 1];
     if (!last || Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 8) {
       if (pts.length < 150) {
-        const next = [...pts, pt];
-        draftPtsRef.current = next;
-        setDraft({ color, width: brush, points: next });
+        draftPtsRef.current = [...pts, pt];
+        flushDraftFrame(color, brush);
       }
     }
   };
@@ -102,6 +117,10 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const onWebUp = () => {
     if (!drawingRef.current) return;
     drawingRef.current = false;
+    if (draftRafRef.current !== null && typeof cancelAnimationFrame !== 'undefined') {
+      cancelAnimationFrame(draftRafRef.current);
+      draftRafRef.current = null;
+    }
     const pts = draftPtsRef.current;
     draftPtsRef.current = [];
     setDraft(null);
