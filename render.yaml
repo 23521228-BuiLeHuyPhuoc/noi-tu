@@ -1,6 +1,8 @@
 services:
+  # Render không đổi được vùng của service có sẵn, nên server Singapore (gần MongoDB Atlas) là service mới;
+  # service "noi-tu-server" cũ ở Oregon đã bỏ.
   - type: web
-    name: noi-tu-server
+    name: noi-tu-server-sg
     runtime: node
     region: singapore
     plan: free
@@ -15,18 +17,11 @@ services:
       # giới hạn heap V8 vừa khung 512MB của gói Free để tránh tràn RAM / giật GC
       - key: NODE_OPTIONS
         value: "--max-old-space-size=448"
-      # chuỗi kết nối MongoDB: nhập trong Render (Environment), KHÔNG ghi vào file này
-      - key: DATABASE
-        sync: false
       - key: DATABASE_NAME
         value: xomlay
-      # Cloudinary: nhập riêng trong Render, KHÔNG ghi API secret vào repo
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
+      # Biến bí mật (DATABASE, CLOUDINARY_*, SMTP_USER/SMTP_PASS, ADMIN_USERNAMES) nằm trong Environment Group
+      # "noi-tu-server-env" trên Render. Sửa giá trị ở đó, KHÔNG ghi vào file này.
+      - fromGroup: noi-tu-server-env
 
   # Bản web của app: mở link là chơi được trên mọi điện thoại (kể cả iPhone)
   - type: web
