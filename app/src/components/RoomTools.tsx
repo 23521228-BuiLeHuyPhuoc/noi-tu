@@ -5,17 +5,33 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type LeaderRow, type PublicPlayer, type RoomState, type RoomSummary } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { GAME_META } from '../messages';
 import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Portrait } from './Avatar';
 import { Sheet } from './Sheet';
-import { EmojiIcon, RankMedal, UiIcon } from './Icons';
+import { RankMedal, UiIcon, type UiIconName } from './Icons';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
+const GAME_UI_ICON: Record<GameType, UiIconName> = {
+  wordchain: 'MessageCircle',
+  wordchain_en: 'Globe',
+  baucua: 'Dices',
+  typhu: 'Crown',
+  masoi: 'Moon',
+  giandiep: 'Search',
+  ve_doan: 'Brush',
+  bom_tu: 'Bomb',
+  do_vui: 'HelpCircle',
+  loto: 'Star',
+  caro: 'LayoutGrid',
+  croaksquad: 'Zap',
+  ca_sau: 'AlertTriangle',
+  boom_online: 'Flame',
+  uno_mercy: 'Layers',
+};
 const PHASE: Record<RoomSummary['phase'], { text: string; color: string }> = {
   lobby: { text: 'Đang chờ người', color: C.jadeDeep },
-  playing: { text: 'Đang chơi · vào xem', color: '#D97706' },
+  playing: { text: 'Đang chơi · vào xem', color: C.goldDeep },
   finished: { text: 'Vừa xong ván', color: C.muted },
 };
 
@@ -50,7 +66,7 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
       {rooms === null ? (
         <ActivityIndicator color={C.son} />
       ) : rooms.length === 0 ? (
-        <T testID="rooms-empty" style={styles.muted}>Chưa có phòng công khai nào. Tạo phòng mới để người khác vào chơi cùng nhé!</T>
+        <T testID="rooms-empty" style={styles.muted}>Chưa có phòng công khai nào. Tạo phòng mới để mời bạn bè chơi cùng.</T>
       ) : (
         rooms.map((r) => {
           const full = r.players >= r.maxPlayers;
@@ -60,7 +76,7 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
               <Portrait p={{ avatar: r.hostAvatar, avatarUrl: r.hostAvatarUrl }} size={44} />
               <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <EmojiIcon emoji={GAME_META[r.gameType].emoji} size={16} />
+                  <UiIcon name={GAME_UI_ICON[r.gameType]} size={15} color={C.secondary} />
                   <T numberOfLines={1} style={styles.roomTitle}>
                     {GAME_INFO[r.gameType].name} · {r.hostName}
                   </T>
@@ -107,7 +123,7 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
   const myId = game.user?.id;
 
   return (
-    <Sheet title="🏆 Bảng xếp hạng" onClose={onClose}>
+    <Sheet title="Bảng xếp hạng" onClose={onClose}>
       {tabs.length > 1 && (
         <View style={styles.tabs}>
           {tabs.map((t) => (
@@ -116,7 +132,6 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
               testID={`lb-tab-${t}`}
               small
               variant={t === tab ? 'ink' : 'paper'}
-              icon={t === 'all' ? undefined : GAME_META[t].emoji}
               title={t === 'all' ? 'Tất cả' : GAME_INFO[t].name}
               style={styles.tab}
               onPress={() => setTab(t)}
@@ -130,7 +145,7 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
       ) : rows === null ? (
         <ActivityIndicator color={C.son} />
       ) : rows.length === 0 ? (
-        <T testID="lb-empty" style={styles.muted}>Chưa có ai trên bảng. Tạo tài khoản rồi chơi để ghi tên mình đầu tiên!</T>
+        <T testID="lb-empty" style={styles.muted}>Chưa có ai trên bảng xếp hạng. Đăng nhập tài khoản rồi chơi để ghi tên mình đầu tiên.</T>
       ) : (
         <View testID="lb-list" style={{ gap: 6 }}>
           {rows.map((r) => (
@@ -251,21 +266,27 @@ export function KickInline({ game, player, onDone }: { game: Game; player: Publi
 }
 
 const styles = StyleSheet.create({
-  h2: { fontSize: 17, fontWeight: '800' },
-  sub: { fontSize: 14, fontWeight: '800', color: C.ink },
-  muted: { fontSize: 13, color: C.muted },
+  h2: { fontSize: 16, fontWeight: '600', color: C.ink },
+  sub: { fontSize: 13.5, fontWeight: '600', color: C.ink },
+  muted: { fontSize: 12.5, color: C.muted, fontWeight: '400', fontVariant: ['tabular-nums'] },
   refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  link: { fontSize: 13, color: C.son, fontWeight: '800' },
+  link: { fontSize: 13, color: C.son, fontWeight: '600' },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  roomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 16, padding: 10 },
-  roomTitle: { fontSize: 15, fontWeight: '900', color: C.ink, flexShrink: 1 },
-  badge: { fontSize: 12, fontWeight: '800' },
+  roomRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.parchment,
+    borderRadius: 13, padding: 10, borderWidth: 1, borderColor: C.borderSubtle,
+  },
+  roomTitle: { fontSize: 14.5, fontWeight: '600', color: C.ink, flexShrink: 1 },
+  badge: { fontSize: 12, fontWeight: '500', fontVariant: ['tabular-nums'] },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tab: { flexGrow: 1 },
-  lbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mist, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 10 },
-  lbMe: { backgroundColor: '#FEF9C3', ...sticker(2) },
+  lbRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.parchment,
+    borderRadius: 13, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: C.borderSubtle,
+  },
+  lbMe: { backgroundColor: C.goldSoft, borderColor: 'rgba(180,83,9,0.28)', ...sticker(1) },
   rankBox: { width: 30, alignItems: 'center', justifyContent: 'center' },
-  lbName: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '800', color: C.ink },
-  wins: { fontSize: 15, fontWeight: '900', color: C.jadeDeep },
+  lbName: { flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: '600', color: C.ink },
+  wins: { fontSize: 14.5, fontWeight: '600', color: C.jadeDeep, fontVariant: ['tabular-nums'] },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

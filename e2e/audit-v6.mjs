@@ -143,6 +143,10 @@ await M.t('create-ve_doan').waitFor({ timeout: 12000 });
 await C360.t('create-ve_doan').waitFor({ timeout: 12000 });
 await G4.t('create-ve_doan').waitFor({ timeout: 12000 });
 
+await D.shot('00-home-desktop');
+await M.shot('00b-home-390x844');
+await C360.shot('00c-home-360x640');
+
 // Nhập tên Guest trước khi tạo/vào phòng
 for (const p of [D, M, C360, G4]) {
   if ((await p.t('name-input').count()) > 0) {
@@ -156,6 +160,7 @@ await D.t('room-code').waitFor({ timeout: 8000 });
 const roomCode = (await D.t('room-code').innerText()).trim();
 await joinRoomByCode(M, roomCode, 'Mobi');
 await joinRoomByCode(C360, roomCode, 'Mini');
+await M.shot('00d-lobby-390x844');
 
 // ------------------------------------------------------------
 // 1. GLOBAL CHATSHEET PERF & ZERO OVERFLOW TRÊN MOBILE
@@ -384,11 +389,16 @@ await M.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {
 await M.t('gd-ready-btn').waitFor({ timeout: 4000 });
 await sleep(200);
 
-// Chuyển Vote -> thẻ Bỏ Phiếu nổi không che khung chat + vừa mở bảng vừa chat + thu gọn/mở lại
-for (const p of [D, M, C360, G4]) {
+// Chuyển Vote -> phải đủ cả phòng đồng ý (2/4 chưa chuyển); vote xong vẫn đợi hết giờ để đổi phiếu & xem ai vote ai
+for (const p of [D, M]) {
   if ((await p.t('gd-ready-btn').count()) > 0) await p.t('gd-ready-btn').click().catch(() => {});
 }
-check(await has(M.t('gd-vote-modal'), 6000), 'GianDiep: hiện thẻ Bỏ Phiếu không chặn chat');
+await sleep(300);
+check((await M.t('gd-vote-modal').count()) === 0, 'GianDiep: 2/4 vote sẵn sàng CHƯA chuyển sang bình chọn');
+for (const p of [C360, G4]) {
+  if ((await p.t('gd-ready-btn').count()) > 0) await p.t('gd-ready-btn').click().catch(() => {});
+}
+check(await has(M.t('gd-vote-modal'), 6000), 'GianDiep: cả phòng vote sẵn sàng mới mở thẻ Bỏ Phiếu không chặn chat');
 check((await M.page.locator('[data-testid^="gd-vote-pick-"]').count()) >= 1, 'GianDiep: hiện thẻ nghi phạm gd-vote-pick-*');
 check((await M.t('gd-chat-input').count()) === 1, 'GianDiep Vote: khung chat vẫn hiện & gõ được khi bảng Bỏ phiếu đang mở');
 await M.t('gd-chat-input').fill('Mọi người chốt phiếu kỹ nha!').catch(() => {});
@@ -396,16 +406,13 @@ await M.t('gd-chat-send').click().catch(() => {});
 await sleep(200);
 await noOuterScroll(M, 'GianDiep Vote');
 await noOuterScroll(C360, 'GianDiep Vote');
-await D.shot('05f3-giandiep-vote-desktop');
-await M.shot('05f-giandiep-vote-390x844');
-await C360.shot('05f2-giandiep-vote-360x640');
 
 await M.t('gd-vote-minimize').click();
 check(await has(M.t('gd-reopen-vote-btn'), 3000), 'GianDiep Vote: thanh Mở lại hiện rõ khi thu gọn');
 await M.t('gd-reopen-vote-btn').click();
 await M.t('gd-vote-modal').waitFor({ timeout: 3000 });
 
-// Bầu dồn vào 1 mục tiêu để qua Biện minh -> Phán quyết Cuối (gd-verdict-modal)
+// Bầu dồn vào 1 mục tiêu -> giữ nguyên Vote tới hết giờ + hiển thị ai vote ai + cho phép đổi phiếu
 const targetPickId = await D.page.locator('[data-testid^="gd-vote-pick-"]').first().getAttribute('data-testid');
 for (const p of [D, M, C360, G4]) {
   if (targetPickId && (await p.t(targetPickId).count()) > 0) {
@@ -415,13 +422,32 @@ for (const p of [D, M, C360, G4]) {
   }
   await sleep(120);
 }
+await sleep(1000);
+check((await M.t('gd-vote-modal').count()) === 1, 'GianDiep Vote: vote đủ cả phòng vẫn đợi hết giờ bình chọn');
+check((await M.page.locator('[data-testid^="gd-voters-"]').count()) >= 1, 'GianDiep Vote: hiển thị trực tiếp tên người đã vote ai');
+if ((await M.t('gd-skip-vote').count()) > 0) {
+  await M.t('gd-skip-vote').click().catch(() => {});
+  await sleep(250);
+  check((await M.t('gd-voters-skip').count()) === 1, 'GianDiep Vote: đổi phiếu sang Bỏ qua cập nhật trực tiếp');
+  if (targetPickId && (await M.t(targetPickId).count()) > 0) {
+    await M.t(targetPickId).click().catch(() => {});
+    await sleep(200);
+  }
+}
+await D.shot('05f3-giandiep-vote-desktop');
+await M.shot('05f-giandiep-vote-390x844');
+await C360.shot('05f2-giandiep-vote-360x640');
 
 let defendantPg = null;
-for (const p of [D, M, C360, G4]) {
-  if (await has(p.t('gd-defense-done'), 2500)) {
-    defendantPg = p;
-    break;
+const defDeadline = Date.now() + 12500;
+while (!defendantPg && Date.now() < defDeadline) {
+  for (const p of [D, M, C360, G4]) {
+    if ((await p.t('gd-defense-done').count()) > 0) {
+      defendantPg = p;
+      break;
+    }
   }
+  if (!defendantPg) await sleep(200);
 }
 const nonDefPg = [D, M, C360, G4].find((p) => p !== defendantPg) ?? M;
 if (defendantPg) {
@@ -434,7 +460,19 @@ if (defendantPg) {
   await defendantPg.t('gd-defense-done').click().catch(() => {});
 }
 
-check(await has(M.t('gd-verdict-modal'), 6000), 'GianDiep: hiện thẻ Phán Quyết Cuối không chặn chat');
+check(await has(M.t('gd-verdict-modal'), 12000), 'GianDiep: hiện thẻ Phán Quyết Cuối không chặn chat');
+for (const p of [D, M, C360, G4]) {
+  const verdictBtn = p.page.locator('[data-testid="gd-verdict-banish"], [data-testid="gd-verdict-forgive"], [data-testid^="gd-verdict-pick-"]').first();
+  if ((await verdictBtn.count()) > 0) {
+    await verdictBtn.click().catch(() => {});
+    await sleep(100);
+  }
+}
+await sleep(250);
+check(
+  (await M.t('gd-verdict-voters').count()) === 1 || (await M.page.locator('[data-testid^="gd-verdict-voters-"]').count()) >= 1,
+  'GianDiep Verdict: hiển thị trực tiếp tên người bỏ phiếu phán quyết',
+);
 if (defendantPg) {
   check((await defendantPg.t('gd-chat-input').count()) === 1, 'GianDiep Verdict: bị cáo vẫn nhắn tin biện minh được trong lúc phán quyết');
   await defendantPg.t('gd-chat-input').fill('Tin mình đi mình là Dân thường mà!').catch(() => {});

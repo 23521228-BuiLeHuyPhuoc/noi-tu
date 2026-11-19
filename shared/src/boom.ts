@@ -246,8 +246,14 @@ export interface BoomTickPayload {
   ringActive: boolean;
   width: number;
   height: number;
-  /** mảng phẳng length = width * height của các ô BoomTile */
-  grid: BoomTile[];
+  /** Số thứ tự input cuối đã xử lý cho từng người chơi (dùng cho Server Reconciliation) */
+  acks?: Record<string, number>;
+  /** Phiên bản lưới hiện tại tăng mỗi khi có ô thay đổi (vỡ thùng / gạch vòng bo) */
+  gridVersion?: number;
+  /** Bản đồ đầy đủ (gửi ở view() / đầu hiệp / keyframe định kỳ); tick thường dùng gridDiff */
+  grid?: BoomTile[];
+  /** Chỉ gửi các ô [idx, tile] vừa thay đổi so với tick trước để giảm băng thông tick */
+  gridDiff?: [number, BoomTile][];
   /** danh sách chỉ số ô (ty * width + tx) sắp bị gạch tử thần sập xuống trong ~1.5s tới */
   warningCells: number[];
   items: BoomItemEntity[];
@@ -274,7 +280,7 @@ export interface BoomView {
   colors: Record<string, number>;
   teams: Record<string, 0 | 1>;
   roundWinnerText: string | null;
-  snapshot: BoomTickPayload;
+  snapshot: BoomTickPayload & { grid: BoomTile[] };
 }
 
 export interface BoomInput {

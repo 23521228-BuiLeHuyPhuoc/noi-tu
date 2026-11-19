@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
-import { themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
-import { GAME_META } from '../messages';
 import { play } from '../sound';
-import { C } from '../theme';
+import { C, backdropPalette, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Shell } from '../components/Shell';
 import { Confetti } from '../components/Fun';
 import { Portrait } from '../components/Avatar';
 import { NameText, TitleBadge } from '../components/Cosmetics';
-import { EmojiIcon, RankMedal, UiIcon } from '../components/Icons';
-import { MotionSurface } from '../components/MotionPrimitives';
+import { UiIcon } from '../components/Icons';
 
 const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
@@ -28,11 +25,14 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const iWon = !!game.me && winIds.includes(game.me);
   const [error, setError] = useState<string | null>(null);
   const playerById = new Map(room.players.map((p) => [p.id, p]));
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
+  const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
+  const pal = backdropPalette(activeThemeId);
 
   useEffect(() => {
     play(iWon || !hasWinner ? 'win' : 'lose');
   }, [iWon, hasWinner]);
+
+  const cleanHeadline = r.headline.replace(/!+$/g, '').trim();
 
   return (
     <Shell
@@ -44,44 +44,41 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
             {error && <T style={styles.error}>{error}</T>}
             <Button
               testID="restart-btn"
-              iconNode={<UiIcon name="RotateCcw" size={16} color="#271400" />}
+              variant="ink"
+              iconNode={<UiIcon name="RotateCcw" size={16} color={C.onSon} strokeWidth={1.65} />}
               title={`Chơi lại ${GAME_INFO[room.gameType].name}`}
               onPress={async () => setError(await game.restart())}
             />
           </>
         ) : (
-          <T style={[styles.wait, { color: theme.onBg }]}>Chờ chủ phòng chọn ván tiếp theo…</T>
+          <T style={[styles.wait, { color: pal.muted }]}>Chờ chủ phòng chọn ván tiếp theo</T>
         )
       }
     >
       {(iWon || !hasWinner) && <Confetti />}
-      <MotionSurface>
-        <View style={styles.hero}>
-          <View style={[styles.trophyRing, { borderColor: theme.accent }]}>
-            <EmojiIcon emoji={iWon ? '🏆' : hasWinner ? '🎉' : '🏁'} size={54} />
-          </View>
-          <T testID="result-title" style={[styles.headline, { color: theme.accent }]}>
-            {iWon ? 'Bạn thắng rồi!' : r.headline}
-          </T>
-          {iWon && <T style={[styles.sub, { color: theme.onBg }]}>{r.headline}</T>}
+      <Card style={[styles.heroCard, sticker(2)]}>
+        <View style={[styles.trophyRing, iWon && styles.trophyRingWin]}>
+          <UiIcon name={iWon ? 'Trophy' : hasWinner ? 'Award' : 'Star'} size={28} color={iWon ? C.goldDeep : C.secondary} strokeWidth={1.65} />
         </View>
-      </MotionSurface>
+        <T testID="result-title" style={styles.headline}>
+          {iWon ? 'Bạn đã chiến thắng' : cleanHeadline}
+        </T>
+        {iWon && <T style={styles.sub}>{cleanHeadline}</T>}
+      </Card>
+
       <Card style={{ gap: 6 }}>
         {r.ranking.map((e, i) => {
           const pl = playerById.get(e.playerId);
           const isWinnerRow = winIds.includes(e.playerId) || i === 0;
           return (
             <View key={e.playerId} style={[styles.rank, isWinnerRow && styles.first]}>
-              <View style={styles.medalBox}>
-                {winIds.includes(e.playerId) ? (
-                  <EmojiIcon emoji="🏆" size={24} />
-                ) : (
-                  <RankMedal rank={i + 1} size={22} />
-                )}
+              <View style={styles.rankNumBox}>
+                <T style={[styles.rankNumTxt, isWinnerRow && styles.rankNumWin]}>#{i + 1}</T>
               </View>
               <Portrait
                 p={pl ?? { avatar: i }}
-                size={44}
+                size={40}
+                border={1.5}
                 frame={pl?.cosmetics?.frame}
                 pet={pl?.cosmetics?.pet}
               />
@@ -96,7 +93,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                     </View>
                   )}
                 </View>
-                <T style={styles.detail}>{e.detail}</T>
+                <T style={styles.detail}>{e.detail.replace(/!+$/g, '')}</T>
               </View>
             </View>
           );
@@ -104,10 +101,10 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
       </Card>
 
       {isHost && (
-        <Card style={{ gap: 8 }}>
+        <Card style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <EmojiIcon emoji="🎮" size={18} />
-            <T style={{ fontSize: 14.5, fontWeight: '900', color: C.ink }}>Đổi nhanh sang trò chơi khác (14 game)</T>
+            <UiIcon name="LayoutGrid" size={16} color={C.secondary} strokeWidth={1.65} />
+            <T style={{ fontSize: 14.5, fontWeight: '600', color: C.ink }}>Đổi sang trò chơi khác</T>
           </View>
           <View style={styles.row}>
             {GAMES.filter((g) => g !== room.gameType).map((g) => (
@@ -116,7 +113,6 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                 testID={`switch-${g}`}
                 small
                 variant="paper"
-                icon={GAME_META[g].emoji}
                 title={GAME_INFO[g].name}
                 style={{ flexGrow: 1, minWidth: 112 }}
                 onPress={async () => setError(await game.configure({ gameType: g }))}
@@ -130,20 +126,40 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', gap: 8, paddingVertical: 10 },
+  heroCard: { alignItems: 'center', gap: 8, paddingVertical: 18 },
   trophyRing: {
-    width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(15,23,42,0.42)',
-    borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headline: { fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center', lineHeight: 33 },
-  sub: { color: C.onSon, fontSize: 15, textAlign: 'center', fontWeight: '700' },
-  rank: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 14 },
-  first: { backgroundColor: '#FEF9C3', borderWidth: 1, borderColor: 'rgba(217,119,6,0.28)' },
-  medalBox: { width: 32, alignItems: 'center', justifyContent: 'center' },
-  name: { fontWeight: '800', fontSize: 16 },
-  detail: { color: C.muted, fontSize: 13 },
+  trophyRingWin: {
+    backgroundColor: C.goldSoft,
+    borderColor: 'rgba(180, 83, 9, 0.30)',
+  },
+  headline: { fontSize: 20, fontWeight: '600', color: C.ink, textAlign: 'center', lineHeight: 26 },
+  sub: { color: C.secondary, fontSize: 13.5, textAlign: 'center', fontWeight: '400' },
+  rank: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  first: { backgroundColor: C.goldSoft, borderColor: 'rgba(180, 83, 9, 0.25)' },
+  rankNumBox: { width: 28, alignItems: 'center', justifyContent: 'center' },
+  rankNumTxt: { fontSize: 13, fontWeight: '600', color: C.muted, fontVariant: ['tabular-nums'] },
+  rankNumWin: { color: C.goldDeep },
+  name: { fontWeight: '600', fontSize: 15, color: C.ink },
+  detail: { color: C.secondary, fontSize: 12.5, fontVariant: ['tabular-nums'] },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  rowWide: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  wait: { color: C.onSon, textAlign: 'center', fontWeight: '700', paddingVertical: 14 },
-  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '700', textAlign: 'center' },
+  wait: { textAlign: 'center', fontWeight: '500', fontSize: 14, paddingVertical: 12 },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 10, borderRadius: 10, fontWeight: '600', textAlign: 'center', fontSize: 13 },
 });

@@ -109,13 +109,15 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
       reason: 'word_leaked',
     });
 
-    for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
+    for (const id of game.view('p0').alive) game.action(id, { type: 'gd_ready' });
     expect(game.view('p0').phase).toBe('vote');
 
-    // Bầu chọn p2 lên vành móng ngựa -> vào Pha Biện Minh -> cả phòng Tha Bổng!
+    // Bầu chọn p2 lên vành móng ngựa -> còn người chơi thật nên giữ nguyên pha 'vote' tới hết giờ (cho phép đổi phiếu)
     for (const id of ['p0', 'p1', 'p3', 'p4']) game.action(id, { type: 'gd_vote', target: 'p2' });
     game.action('p2', { type: 'gd_vote', target: 'p0' });
     game.action('p5', { type: 'gd_vote', target: 'skip' });
+    expect(game.view('p2').phase).toBe('vote');
+    vi.advanceTimersByTime(2100);
 
     expect(game.view('p2').phase).toBe('defense');
     expect(game.view('p2').defendants).toEqual(['p2']);
@@ -126,6 +128,8 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     for (const id of ['p0', 'p1', 'p3', 'p4', 'p5']) {
       expect(game.action(id, { type: 'gd_verdict', verdict: 'forgive' })).toEqual({ ok: true });
     }
+    expect(game.view('p0').phase).toBe('final_vote');
+    vi.advanceTimersByTime(2100);
     // Được tha bổng -> sang Vòng 2 vẫn còn đủ 6 người!
     expect(game.view('p0').round).toBe(2);
     expect(game.view('p0').alive).toHaveLength(6);
@@ -138,10 +142,12 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     expect(game.view('p0').phase).toBe('clue_summary');
     for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
     expect(game.view('p0').phase).toBe('discussion');
-    for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
+    for (const id of game.view('p0').alive) game.action(id, { type: 'gd_ready' });
     expect(game.view('p0').phase).toBe('vote');
     for (const id of ['p0', 'p2', 'p3', 'p4', 'p5']) game.action(id, { type: 'gd_vote', target: 'p1' });
     game.action('p1', { type: 'gd_vote', target: 'p0' });
+    expect(game.view('p1').phase).toBe('vote');
+    vi.advanceTimersByTime(2100);
 
     expect(game.view('p1').phase).toBe('defense');
     game.action('p1', { type: 'gd_ready' });
@@ -149,6 +155,8 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     for (const id of ['p0', 'p2', 'p3', 'p4', 'p5']) {
       game.action(id, { type: 'gd_verdict', verdict: 'banish' });
     }
+    expect(game.view('p1').phase).toBe('final_vote');
+    vi.advanceTimersByTime(2100);
 
     expect(game.view('p1').phase).toBe('mrwhite_guess');
     expect(game.view('p1').mrWhiteId).toBe('p1');

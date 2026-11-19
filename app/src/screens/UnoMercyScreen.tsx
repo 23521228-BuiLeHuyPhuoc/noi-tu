@@ -1,7 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Animated,
-  Easing,
   Modal,
   Platform,
   Pressable,
@@ -31,11 +30,11 @@ import type { Game } from '../useGame';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { actionText } from '../messages';
 import { play } from '../sound';
-import { C, sticker } from '../theme';
+import { C, FONT, sticker } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
-import { EmojiIcon, UiIcon, type UiIconName } from '../components/Icons';
+import { UiIcon, type UiIconName } from '../components/Icons';
 import { Sheet } from '../components/Sheet';
 import { Shell, useShellTools } from '../components/Shell';
 
@@ -49,28 +48,35 @@ const CARD_GRADS: Record<UnoCardColor, readonly [string, string, string]> = {
   wild: ['#334155', '#0F172A', '#020617'],
 };
 
+const COLOR_PICK_BG: Record<UnoColor, string> = {
+  red: '#DC2626',
+  blue: '#2563EB',
+  green: '#15803D',
+  yellow: '#B45309',
+};
+
 const BANNER_THEME: Record<
   UnoMercyEffectBanner['kind'],
-  { bg: readonly [string, string]; border: string; accent: string; emoji: string }
+  { accent: string; tint: string; icon: UiIconName }
 > = {
-  mercy_ko: { bg: ['#450A0A', '#7F1D1D'], border: '#F87171', accent: '#FCA5A5', emoji: '💥' },
-  stack: { bg: ['#431407', '#7C2D12'], border: '#FB923C', accent: '#FDBA74', emoji: '🔥' },
-  swap_7: { bg: ['#3B0764', '#581C87'], border: '#C084FC', accent: '#E9D5FF', emoji: '🦊' },
-  rotate_0: { bg: ['#083344', '#155E75'], border: '#22D3EE', accent: '#A5F3FC', emoji: '🌪️' },
-  discard_all: { bg: ['#064E3B', '#065F46'], border: '#34D399', accent: '#A7F3D0', emoji: '🌪️' },
-  skip_all: { bg: ['#1E1B4B', '#312E81'], border: '#818CF8', accent: '#C7D2FE', emoji: '⏭️' },
-  roulette: { bg: ['#4A044E', '#701A75'], border: '#E879F9', accent: '#F5D0FE', emoji: '🎰' },
-  uno_catch: { bg: ['#4C0519', '#881337'], border: '#FDA4AF', accent: '#FFE4E6', emoji: '🚨' },
+  mercy_ko: { accent: '#F87171', tint: 'rgba(185, 28, 28, 0.20)', icon: 'Skull' },
+  stack: { accent: '#FB923C', tint: 'rgba(180, 83, 9, 0.22)', icon: 'Flame' },
+  swap_7: { accent: '#FACC15', tint: 'rgba(180, 83, 9, 0.20)', icon: 'RefreshCw' },
+  rotate_0: { accent: '#38BDF8', tint: 'rgba(14, 116, 144, 0.22)', icon: 'RotateCcw' },
+  discard_all: { accent: '#4ADE80', tint: 'rgba(21, 128, 61, 0.20)', icon: 'Layers' },
+  skip_all: { accent: '#93C5FD', tint: 'rgba(37, 99, 235, 0.20)', icon: 'Zap' },
+  roulette: { accent: '#FDE047', tint: 'rgba(180, 83, 9, 0.22)', icon: 'Dices' },
+  uno_catch: { accent: '#FCA5A5', tint: 'rgba(159, 43, 54, 0.24)', icon: 'AlertTriangle' },
 };
 
 const EXTRA_ERRORS: Partial<Record<ActionError, string>> = {
-  not_your_turn: 'Chưa tới lượt đánh của bạn!',
-  illegal_move: 'Lá bài này không hợp lệ với màu/số hoặc chồng bài phạt hiện tại!',
-  bad_action: 'Thao tác chưa hợp lệ lúc này!',
+  not_your_turn: 'Chưa tới lượt đánh của bạn',
+  illegal_move: 'Lá bài này không hợp lệ với màu/số hoặc chồng bài phạt hiện tại',
+  bad_action: 'Thao tác chưa hợp lệ lúc này',
 };
 
 function errOf(reason: ActionError): string {
-  return EXTRA_ERRORS[reason] ?? actionText[reason] ?? 'Thao tác chưa hợp lệ.';
+  return EXTRA_ERRORS[reason] ?? actionText[reason] ?? 'Thao tác chưa hợp lệ';
 }
 
 function cornerIndexOf(kind: UnoCardKind): string {
@@ -82,13 +88,13 @@ function cornerIndexOf(kind: UnoCardKind): string {
     case 'skip_all':
       return '⏭';
     case 'discard_all':
-      return '🌪';
+      return '≡';
     case 'draw2':
       return '+2';
     case 'draw4':
       return '+4';
     case 'wild_roulette':
-      return '🎰';
+      return '◎';
     case 'wild_reverse_draw4':
       return '⇄4';
     case 'wild_draw6':
@@ -103,29 +109,29 @@ function cornerIndexOf(kind: UnoCardKind): string {
 function shortCardTag(kind: UnoCardKind): string | null {
   switch (kind) {
     case '0':
-      return 'XOAY BÀN';
+      return 'Xoay bàn';
     case '7':
-      return 'CƯỚP BÀI';
+      return 'Đổi bài';
     case 'skip':
-      return 'CẤM';
+      return 'Cấm';
     case 'reverse':
-      return 'ĐẢO';
+      return 'Đảo';
     case 'skip_all':
-      return 'BỎ HẾT';
+      return 'Bỏ hết';
     case 'discard_all':
-      return 'XẢ MÀU';
+      return 'Xả màu';
     case 'draw2':
-      return 'RÚT +2';
+      return 'Rút +2';
     case 'draw4':
-      return 'RÚT +4';
+      return 'Rút +4';
     case 'wild_roulette':
-      return 'QUAY MÀU';
+      return 'Quay màu';
     case 'wild_reverse_draw4':
-      return 'ĐẢO +4';
+      return 'Đảo +4';
     case 'wild_draw6':
-      return 'SIÊU +6';
+      return 'Siêu +6';
     case 'wild_draw10':
-      return 'HỦY +10';
+      return 'Hủy +10';
     default:
       return null;
   }
@@ -203,9 +209,9 @@ const UnoCardFace = memo(function UnoCardFace({
           opacity: dimmed ? 0.46 : 1,
         },
         playable && Platform.OS === 'web'
-          ? ({ boxShadow: '0 0 16px rgba(250, 204, 21, 0.78), 0 8px 16px rgba(0,0,0,0.45)' } as object)
+          ? ({ boxShadow: '0 8px 16px rgba(0,0,0,0.45)' } as object)
           : Platform.OS === 'web'
-            ? ({ boxShadow: '0 5px 12px rgba(0,0,0,0.38)' } as object)
+            ? ({ boxShadow: '0 4px 10px rgba(0,0,0,0.34)' } as object)
             : null,
       ]}
     >
@@ -320,35 +326,35 @@ const OpponentCard = memo(function OpponentCard({
   const warnMercy = !elim && count >= 17 && count < 21;
   const isOne = !elim && count === 1;
 
-  let badgeBg = 'rgba(30, 41, 59, 0.9)';
-  let badgeBorder = 'rgba(148, 163, 184, 0.35)';
+  let badgeBg = C.darkSubtle;
+  let badgeBorder = C.darkBorder;
   let badgeText = `${count} lá`;
-  let badgeColor = '#F8FAFC';
+  let badgeColor = C.darkText;
 
   if (elim) {
-    badgeBg = 'rgba(127, 29, 29, 0.92)';
+    badgeBg = 'rgba(185, 28, 28, 0.35)';
     badgeBorder = '#F87171';
-    badgeText = elim.reason === 'mercy_25' ? `💥 CHÁY ${elim.peakCards}` : '🚪 RỜI';
+    badgeText = elim.reason === 'mercy_25' ? `Cháy ${elim.peakCards}` : 'Đã rời';
     badgeColor = '#FECACA';
   } else if (unoVulnerable) {
-    badgeBg = '#BE123C';
-    badgeBorder = '#FDE047';
-    badgeText = '🚨 QUÊN UNO';
-    badgeColor = '#FEF08A';
-  } else if (isOne || unoSafe) {
-    badgeBg = '#B45309';
+    badgeBg = '#9F2B36';
     badgeBorder = '#FACC15';
-    badgeText = '🔥 UNO! (1)';
+    badgeText = 'Quên UNO';
+    badgeColor = '#FEF3C7';
+  } else if (isOne || unoSafe) {
+    badgeBg = C.goldDeep;
+    badgeBorder = '#FACC15';
+    badgeText = 'UNO (1)';
     badgeColor = '#FEF9C3';
   } else if (nearMercy) {
     badgeBg = '#991B1B';
     badgeBorder = '#FCA5A5';
-    badgeText = `⚠️ ${count}/${UNO_MERCY_LIMIT}`;
+    badgeText = `${count}/${UNO_MERCY_LIMIT}`;
     badgeColor = '#FEE2E2';
   } else if (warnMercy) {
     badgeBg = '#9A3412';
     badgeBorder = '#FDBA74';
-    badgeText = `🔥 ${count}/${UNO_MERCY_LIMIT}`;
+    badgeText = `${count}/${UNO_MERCY_LIMIT}`;
     badgeColor = '#FFEDD5';
   }
 
@@ -455,19 +461,6 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       play('turn');
     }
   });
-
-  // Hiệu ứng nhịp thở cho Nọc Bài / Cảnh báo
-  const [pulseAnim] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 750, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
-        Animated.timing(pulseAnim, { toValue: 0, duration: 750, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulseAnim]);
 
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);
   const elimMap = useMemo(() => new Map(view.eliminated.map((e) => [e.id, e])), [view.eliminated]);
@@ -670,27 +663,27 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
   const mercyBarColor =
     myCount >= 21 ? '#EF4444' : myCount >= 16 ? '#F97316' : myCount >= 11 ? '#EAB308' : '#22C55E';
 
-  let statusHint = `⏳ Đang chờ lượt của ${activeName}...`;
+  let statusHint = `Đang chờ lượt của ${activeName}`;
   if (!amParticipant) {
-    statusHint = '👀 Bạn đang theo dõi bàn UNO Tàn Nhẫn!';
+    statusHint = 'Bạn đang theo dõi bàn UNO No Mercy';
   } else if (myElim) {
-    statusHint = `💥 Bạn đã cháy bài (${myElim.peakCards} lá) — cùng hóng xem ai sống sót cuối cùng!`;
+    statusHint = `Bạn đã nổ bài (${myElim.peakCards} lá) — chờ xem ai sống sót cuối cùng`;
   } else if (isMyTurn && view.phase === 'choose_swap') {
-    statusHint = '🦊 Chọn ngay 1 đối thủ để CƯỚP TRẮNG toàn bộ bài trên tay!';
+    statusHint = 'Chọn 1 đối thủ để đổi toàn bộ bài trên tay';
   } else if (isMyTurn && view.roulettePending) {
-    statusHint = `🎰 Vòng Quay Tử Thần! Chạm Nọc Bài để bốc tới khi trúng màu ${activeMeta.name}!`;
+    statusHint = `Vòng quay tử thần — chạm Nọc bài để bốc tới khi trúng màu ${activeMeta.name}`;
   } else if (isMyTurn && view.drawStack > 0) {
     statusHint =
       playableIds.size > 0
-        ? `🔥 Chọn bài >= +${view.drawMinValue} (viền vàng) để CHỒNG TIẾP, hoặc chạm Nọc nhận +${view.drawStack} lá!`
-        : `💀 Hết bài đỡ! Chạm Nọc Bài để nuốt trọn +${view.drawStack} lá phạt!`;
+        ? `Chọn lá ≥ +${view.drawMinValue} để chồng tiếp, hoặc chạm Nọc nhận +${view.drawStack} lá`
+        : `Hết bài đỡ — chạm Nọc bài để nhận +${view.drawStack} lá phạt`;
   } else if (isMyTurn && view.drewThisTurn) {
-    statusHint = '✨ Chạm lá sáng viền vàng để đánh ngay, hoặc bấm "Qua lượt"!';
+    statusHint = 'Chạm lá sáng viền để đánh ngay, hoặc chọn Qua lượt';
   } else if (isMyTurn) {
     statusHint =
       playableIds.size > 0
-        ? '⚡ Tới lượt bạn — chạm lá bài sáng viền vàng để ra đòn!'
-        : '🃏 Không có lá hợp lệ — chạm Nọc Bài để bốc tới khi đi được!';
+        ? 'Tới lượt bạn — chạm lá sáng viền để đánh'
+        : 'Không có lá hợp lệ — chạm Nọc bài để bốc';
   }
 
   const canTapDeck = isMyTurn && view.phase === 'playing' && !view.drewThisTurn && !busy;
@@ -699,13 +692,13 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
   let deckLabel = `Nọc: ${view.deckCount}`;
   let deckSub = canTapDeck ? '+ Rút 1 lá' : 'Chồng bốc';
   if (isMyTurn && view.roulettePending) {
-    deckLabel = '🎰 QUAY MÀU';
+    deckLabel = 'Quay màu';
     deckSub = `Ra ${activeMeta.name}`;
   } else if (isMyTurn && view.drawStack > 0 && !view.drewThisTurn) {
-    deckLabel = `💀 NHẬN +${view.drawStack}`;
-    deckSub = playableIds.size > 0 ? 'Hoặc chồng bài!' : 'Bắt buộc rút!';
+    deckLabel = `Nhận +${view.drawStack}`;
+    deckSub = playableIds.size > 0 ? 'Hoặc chồng bài' : 'Bắt buộc rút';
   } else if (isMyTurn && playableIds.size === 0 && !view.drewThisTurn) {
-    deckLabel = '✨ BỐC BÀI';
+    deckLabel = 'Bốc bài';
     deckSub = 'Tới khi đi được';
   }
 
@@ -721,10 +714,11 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
             <UiIcon
               name={view.direction === 1 ? 'RefreshCw' : 'RotateCcw'}
               size={12}
-              color={view.direction === 1 ? '#38BDF8' : '#E879F9'}
+              color={view.direction === 1 ? '#7DD3FC' : '#FDE047'}
+              strokeWidth={1.75}
             />
             <T style={styles.dirPillText}>
-              {view.direction === 1 ? '↻ Chiều thuận' : '↺ Chiều ngược'}
+              {view.direction === 1 ? 'Chiều thuận' : 'Chiều ngược'}
             </T>
           </View>
 
@@ -736,7 +730,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
           </View>
 
           <View style={[styles.timerPill, secLeft <= 5 && styles.timerPillUrgent]}>
-            <UiIcon name="Timer" size={12} color={secLeft <= 5 ? '#FCA5A5' : '#FDE047'} />
+            <UiIcon name="Timer" size={12} color={secLeft <= 5 ? '#FCA5A5' : '#FDE047'} strokeWidth={1.75} />
             <T style={[styles.timerPillText, secLeft <= 5 && { color: '#FECACA' }]}>{secLeft}s</T>
           </View>
 
@@ -752,20 +746,20 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
             }}
             style={styles.miniToolBtn}
           >
-            <UiIcon name="History" size={14} color="#E2E8F0" />
+            <UiIcon name="History" size={14} color={C.darkText} strokeWidth={1.65} />
           </Pressable>
 
           <Pressable
             testID="um-rules-open"
             accessibilityRole="button"
-            accessibilityLabel="Luật UNO Tàn Nhẫn"
+            accessibilityLabel="Luật UNO No Mercy"
             onPress={() => {
               play('pop');
               setRulesOpen(true);
             }}
             style={styles.miniToolBtn}
           >
-            <UiIcon name="HelpCircle" size={14} color="#FDE047" />
+            <UiIcon name="HelpCircle" size={14} color={C.gold} strokeWidth={1.65} />
           </Pressable>
 
           {isHost && (
@@ -777,9 +771,9 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                 play('pop');
                 setConfirmEnd(true);
               }}
-              style={[styles.miniToolBtn, { borderColor: 'rgba(248,113,113,0.45)' }]}
+              style={[styles.miniToolBtn, { borderColor: 'rgba(248, 113, 113, 0.35)' }]}
             >
-              <UiIcon name="X" size={14} color="#FCA5A5" />
+              <UiIcon name="X" size={14} color="#FCA5A5" strokeWidth={1.65} />
             </Pressable>
           )}
         </View>
@@ -808,126 +802,103 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
         )}
       </View>
 
-      {/* 2. Bảng Điện Tử Chấn Động (Shock Banner / Event Ticker) */}
+      {/* 2. Bảng Thông Báo Sự Kiện Trên Bàn */}
       {view.lastBanner && bannerTheme ? (
         <Animated.View style={{ transform: [{ scale: bannerAnim }] }}>
-          <LinearGradient
-            colors={[...bannerTheme.bg]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.shockBanner, { borderColor: bannerTheme.border }]}
+          <View
+            style={[
+              styles.shockBanner,
+              { backgroundColor: C.darkSurface, borderColor: C.darkBorder, borderLeftColor: bannerTheme.accent },
+            ]}
           >
-            <EmojiIcon emoji={bannerTheme.emoji} size={compact ? 18 : 22} />
+            <View style={[styles.shockIconBox, { backgroundColor: bannerTheme.tint }]}>
+              <UiIcon name={bannerTheme.icon} size={compact ? 15 : 17} color={bannerTheme.accent} strokeWidth={1.75} />
+            </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <T numberOfLines={1} style={[styles.shockHeadline, compact && { fontSize: 11.5 }]}>
-                {view.lastBanner.headline}
+              <T numberOfLines={1} style={[styles.shockHeadline, compact && { fontSize: 12 }]}>
+                {view.lastBanner.headline.replace(/!+$/g, '')}
               </T>
               {view.lastBanner.subtext ? (
                 <T numberOfLines={1} style={[styles.shockSubtext, { color: bannerTheme.accent }]}>
-                  {view.lastBanner.subtext}
+                  {view.lastBanner.subtext.replace(/!+$/g, '')}
                 </T>
               ) : null}
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
       ) : (
         <View style={styles.idleTicker}>
           <T numberOfLines={1} style={styles.idleTickerText}>
-            {view.log.at(-1)?.text ?? '🃏 UNO Show \'Em No Mercy — Chồng bài không đáy, 25 lá NỔ BÀI!'}
+            {view.log.at(-1)?.text ?? 'UNO No Mercy — Chồng bài không giới hạn, 25 lá bị loại'}
           </T>
         </View>
       )}
 
-      {/* 3. Sới Bài Trung Tâm (No-Mercy Felt Arena) */}
-      <LinearGradient
-        colors={['rgba(15, 23, 42, 0.86)', 'rgba(9, 13, 22, 0.94)']}
-        style={[styles.feltArena, { borderColor: activeMeta.hex + '66' }]}
-      >
-        {/* Vòng hào quang màu hiện tại dưới mặt bàn */}
+      {/* 3. Sới Bài Trung Tâm */}
+      <View style={[styles.feltArena, { borderColor: C.darkBorder }]}>
         <View
           pointerEvents="none"
           style={[
             styles.arenaColorHalo,
             {
               borderColor: activeMeta.hex + '44',
-              backgroundColor: activeMeta.hex + '14',
+              backgroundColor: activeMeta.hex + '12',
             },
           ]}
         />
 
         <View style={styles.tableColumns}>
-          {/* Cột Trái: Nọc Bài 3D */}
+          {/* Cột Trái: Nọc Bài */}
           <View style={styles.deckCol}>
-            <Animated.View
-              style={[
-                deckUrgent && {
-                  transform: [
-                    {
-                      scale: pulseAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.06],
-                      }),
-                    },
-                  ],
-                },
+            <Pressable
+              testID="um-draw-pile"
+              accessibilityRole="button"
+              accessibilityLabel={deckLabel}
+              disabled={!canTapDeck}
+              onPress={handleDrawPress}
+              style={({ pressed }) => [
+                styles.deckStackWrap,
+                compact ? { width: 78, height: 112 } : { width: 88, height: 126 },
+                pressed && canTapDeck && { transform: [{ translateY: 2 }] },
               ]}
             >
-              <Pressable
-                testID="um-draw-pile"
-                accessibilityRole="button"
-                accessibilityLabel={deckLabel}
-                disabled={!canTapDeck}
-                onPress={handleDrawPress}
-                style={({ pressed }) => [
-                  styles.deckStackWrap,
-                  compact ? { width: 78, height: 112 } : { width: 88, height: 126 },
-                  pressed && canTapDeck && { transform: [{ translateY: 2 }] },
+              <View style={[styles.deckShadowCard, { top: 4, left: 5 }]} />
+              <View style={[styles.deckShadowCard, { top: 2, left: 2.5 }]} />
+              <View
+                style={[
+                  styles.deckTopFace,
+                  isMyTurn && view.roulettePending && { backgroundColor: '#2A1635', borderColor: C.gold },
+                  isMyTurn && view.drawStack > 0 && { backgroundColor: '#3B1219', borderColor: '#F87171' },
+                  canTapDeck && styles.deckTopInteractive,
+                  deckUrgent && styles.deckTopUrgent,
                 ]}
               >
-                {/* 2 lớp bài lót tạo khối 3D */}
-                <View style={[styles.deckShadowCard, { top: 4, left: 5 }]} />
-                <View style={[styles.deckShadowCard, { top: 2, left: 2.5 }]} />
-                <LinearGradient
-                  colors={
-                    isMyTurn && view.roulettePending
-                      ? ['#86198F', '#4A044E', '#1E1B4B']
-                      : isMyTurn && view.drawStack > 0
-                        ? ['#991B1B', '#450A0A', '#0F172A']
-                        : ['#1E293B', '#0F172A', '#020617']
-                  }
-                  style={[
-                    styles.deckTopFace,
-                    canTapDeck && styles.deckTopInteractive,
-                    deckUrgent && styles.deckTopUrgent,
-                  ]}
-                >
-                  <View style={styles.deckCrest}>
-                    <T style={styles.deckCrestTitle}>NO MERCY</T>
-                  </View>
-                  <T numberOfLines={2} style={[styles.deckMainLabel, compact && { fontSize: 10.5 }]}>
-                    {deckLabel}
-                  </T>
-                  <T numberOfLines={1} style={styles.deckSubLabel}>
-                    {deckSub}
-                  </T>
-                </LinearGradient>
-              </Pressable>
-            </Animated.View>
+                <View style={styles.deckCrest}>
+                  <T style={styles.deckCrestTitle}>No Mercy</T>
+                </View>
+                <T numberOfLines={2} style={[styles.deckMainLabel, compact && { fontSize: 10.5 }]}>
+                  {deckLabel}
+                </T>
+                <T numberOfLines={1} style={styles.deckSubLabel}>
+                  {deckSub}
+                </T>
+              </View>
+            </Pressable>
           </View>
 
-          {/* Cột Giữa: Lá Trên Đỉnh + Vòng Neon Màu + Huy Hiệu Chồng Phạt */}
+          {/* Cột Giữa: Lá Trên Đỉnh + Vòng Màu Hiệu Lực + Huy Hiệu Chồng Phạt */}
           <View style={styles.centerPileCol}>
             {view.drawStack > 0 && (
               <View testID="um-stack-badge" style={styles.stackBadge}>
-                <T style={styles.stackBadgeMain}>🔥 CHỒNG PHẠT +{view.drawStack}</T>
-                <T style={styles.stackBadgeSub}>Đỡ bằng &gt;= +{view.drawMinValue}</T>
+                <T style={styles.stackBadgeMain}>Chồng phạt +{view.drawStack}</T>
+                <T style={styles.stackBadgeSub}>Đỡ bằng ≥ +{view.drawMinValue}</T>
               </View>
             )}
 
             {view.roulettePending && (
               <View testID="um-roulette-badge" style={styles.rouletteBadge}>
                 <T style={styles.rouletteBadgeText}>
-                  🎰 VÒNG QUAY: {activeMeta.name.toUpperCase()}
+                  Vòng quay: {activeMeta.name}
                 </T>
               </View>
             )}
@@ -937,10 +908,10 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                 styles.discardHaloWrap,
                 {
                   borderColor: activeMeta.hex,
-                  backgroundColor: activeMeta.hex + '22',
+                  backgroundColor: activeMeta.hex + '1C',
                 },
                 Platform.OS === 'web'
-                  ? ({ boxShadow: `0 0 26px ${activeMeta.hex}77` } as object)
+                  ? ({ boxShadow: '0 8px 20px rgba(0, 0, 0, 0.35)' } as object)
                   : null,
               ]}
             >
@@ -958,31 +929,18 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
           {/* Cột Phải: Các Nút Tác Chiến Nổi (Hô UNO / Bắt Lỗi UNO / Qua Lượt) */}
           <View style={styles.quickActionsCol}>
             {catchTargetId && (
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      scale: pulseAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.07],
-                      }),
-                    },
-                  ],
-                }}
+              <Pressable
+                testID="um-catch-uno"
+                accessibilityRole="button"
+                onPress={handleCatchUnoPress}
+                style={({ pressed }) => [styles.catchUnoBtn, pressed && { opacity: 0.88 }]}
               >
-                <Pressable
-                  testID="um-catch-uno"
-                  accessibilityRole="button"
-                  onPress={handleCatchUnoPress}
-                  style={styles.catchUnoBtn}
-                >
-                  <EmojiIcon emoji="🚨" size={18} />
-                  <T style={styles.catchUnoTitle}>BẮT UNO!</T>
-                  <T numberOfLines={1} style={styles.catchUnoSub}>
-                    {(view.names[catchTargetId] ?? 'Đối thủ').slice(0, 8)} (+2 lá)
-                  </T>
-                </Pressable>
-              </Animated.View>
+                <UiIcon name="AlertTriangle" size={16} color="#FEF2F2" strokeWidth={1.75} />
+                <T style={styles.catchUnoTitle}>Bắt UNO</T>
+                <T numberOfLines={1} style={styles.catchUnoSub}>
+                  {(view.names[catchTargetId] ?? 'Đối thủ').slice(0, 8)} (+2 lá)
+                </T>
+              </Pressable>
             )}
 
             {showShoutUno && (
@@ -990,18 +948,18 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                 testID="um-shout-uno"
                 accessibilityRole="button"
                 onPress={handleShoutUnoPress}
-                style={styles.shoutUnoBtn}
+                style={({ pressed }) => [styles.shoutUnoBtn, pressed && { opacity: 0.88 }]}
               >
-                <EmojiIcon emoji="🔥" size={18} />
-                <T style={styles.shoutUnoTitle}>HÔ UNO!</T>
+                <UiIcon name="Megaphone" size={16} color="#FFFBEB" strokeWidth={1.75} />
+                <T style={styles.shoutUnoTitle}>Hô UNO</T>
                 <T style={styles.shoutUnoSub}>Bấm kẻo phạt +2</T>
               </Pressable>
             )}
 
             {amAlive && amUnoSafe && myCount <= 2 && (
               <View style={styles.unoSafeBadge}>
-                <UiIcon name="Shield" size={14} color="#4ADE80" />
-                <T style={styles.unoSafeText}>ĐÃ HÔ UNO</T>
+                <UiIcon name="Shield" size={13} color="#4ADE80" strokeWidth={1.75} />
+                <T style={styles.unoSafeText}>Đã hô UNO</T>
               </View>
             )}
 
@@ -1010,32 +968,32 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                 testID="um-pass-btn"
                 accessibilityRole="button"
                 onPress={handlePassPress}
-                style={styles.passTurnBtn}
+                style={({ pressed }) => [styles.passTurnBtn, pressed && { opacity: 0.88 }]}
               >
-                <UiIcon name="ChevronRight" size={16} color="#F8FAFC" />
+                <UiIcon name="ChevronRight" size={15} color={C.darkText} strokeWidth={1.75} />
                 <T style={styles.passTurnText}>Qua lượt</T>
               </Pressable>
             )}
 
             {!catchTargetId && !showShoutUno && !(amAlive && amUnoSafe && myCount <= 2) && !(isMyTurn && view.drewThisTurn) && (
               <View style={styles.turnSpotlightBox}>
-                <T style={styles.turnSpotlightLabel}>LƯỢT HIỆN TẠI</T>
+                <T style={styles.turnSpotlightLabel}>Lượt hiện tại</T>
                 <T numberOfLines={2} style={[styles.turnSpotlightName, isMyTurn && { color: '#4ADE80' }]}>
-                  {isMyTurn ? '⚡ BẠN ĐÁNH!' : activeName}
+                  {isMyTurn ? 'Đến lượt bạn' : activeName}
                 </T>
               </View>
             )}
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
-      {/* 4. Khay Bài Của Bạn + Thanh Đo Nổ Bài (Mercy Meter) */}
+      {/* 4. Khay Bài Của Bạn + Thanh Đo Nổ Bài */}
       <View style={[styles.handDock, isMyTurn && styles.handDockMyTurn]}>
         <View style={styles.handHeader}>
           <View style={styles.handTitleRow}>
             <T style={styles.handTitleText}>
               {myElim
-                ? `💀 Đã nổ bài (${myElim.peakCards} lá)`
+                ? `Đã nổ bài (${myElim.peakCards} lá)`
                 : amParticipant
                   ? `Bài của bạn: ${myCount}/${UNO_MERCY_LIMIT} lá`
                   : 'Chế độ khán giả'}
@@ -1054,12 +1012,12 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                   />
                 </View>
                 <T style={[styles.mercyMeterTag, myCount >= 20 && { color: '#FCA5A5' }]}>
-                  {myCount >= 21 ? '⚠️ SẮP NỔ!' : myCount >= 16 ? '🔥 Nguy hiểm' : 'An toàn'}
+                  {myCount >= 21 ? 'Sắp nổ' : myCount >= 16 ? 'Nguy hiểm' : 'An toàn'}
                 </T>
               </View>
             )}
           </View>
-          <T numberOfLines={1} style={[styles.handHintText, isMyTurn && { color: '#FEF08A' }]}>
+          <T numberOfLines={1} style={[styles.handHintText, isMyTurn && { color: C.goldSoft }]}>
             {statusHint}
           </T>
         </View>
@@ -1106,8 +1064,8 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
           <View style={styles.emptyHandBox}>
             <T style={styles.emptyHandText}>
               {myElim
-                ? `💥 Quá mốc ${UNO_MERCY_LIMIT} lá — Bạn vẫn có thể bấm BẮT UNO nếu có người quên hô!`
-                : 'Đang chờ chia bài...'}
+                ? `Quá mốc ${UNO_MERCY_LIMIT} lá — Bạn vẫn có thể bấm Bắt UNO nếu có người quên hô`
+                : 'Đang chờ chia bài…'}
             </T>
           </View>
         )}
@@ -1117,15 +1075,15 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       {pendingWild && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setPendingWild(null)}>
           <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, sticker(4)]}>
+            <View style={[styles.modalCard, sticker(3)]}>
               <View style={styles.modalTopRow}>
                 <UnoCardFace card={pendingWild} variant="mini" playable />
-                <View style={{ flex: 1, gap: 3 }}>
+                <View style={{ flex: 1, gap: 4 }}>
                   <T style={styles.modalTitle}>{getUnoCardLabel(pendingWild.kind).title}</T>
                   <T style={styles.modalDesc}>
                     {pendingWild.kind === 'wild_roulette'
-                      ? 'Chọn màu Tử Thần — người kế tiếp phải bốc liên tục tới khi ra màu này!'
-                      : 'Chọn màu hiệu lực tiếp theo cho bàn đấu:'}
+                      ? 'Chọn màu tử thần — người kế tiếp phải bốc liên tục tới khi ra màu này'
+                      : 'Chọn màu hiệu lực tiếp theo cho bàn đấu'}
                   </T>
                 </View>
               </View>
@@ -1142,19 +1100,12 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                       onPress={() => handleConfirmWild(col)}
                       style={({ pressed }) => [
                         styles.colorChoiceBtn,
-                        { borderColor: meta.border },
-                        pressed && { transform: [{ scale: 0.97 }] },
+                        { backgroundColor: COLOR_PICK_BG[col] },
+                        pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
                       ]}
                     >
-                      <LinearGradient
-                        colors={[...CARD_GRADS[col]]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.colorChoiceInner}
-                      >
-                        <T style={styles.colorChoiceName}>{meta.name}</T>
-                        <T style={styles.colorChoiceCount}>Trên tay: {cnt} lá</T>
-                      </LinearGradient>
+                      <T style={styles.colorChoiceName}>{meta.name}</T>
+                      <T style={styles.colorChoiceCount}>Trên tay: {cnt} lá</T>
                     </Pressable>
                   );
                 })}
@@ -1177,13 +1128,15 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
           }}
         >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, sticker(4)]}>
+            <View style={[styles.modalCard, sticker(3)]}>
               <View style={styles.modalHeaderLine}>
-                <EmojiIcon emoji="🦊" size={24} />
-                <View style={{ flex: 1 }}>
-                  <T style={styles.modalTitle}>Số 7 · Cướp Trắng Bộ Bài!</T>
+                <View style={styles.modalIconRing}>
+                  <UiIcon name="RefreshCw" size={18} color={C.goldDeep} strokeWidth={1.65} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T style={styles.modalTitle}>Số 7 · Đổi toàn bộ bài</T>
                   <T style={styles.modalDesc}>
-                    Chọn 1 đối thủ để đổi toàn bộ {myCount} lá của bạn lấy bài của họ:
+                    Chọn 1 đối thủ để đổi toàn bộ {myCount} lá của bạn lấy bài của họ
                   </T>
                 </View>
               </View>
@@ -1201,26 +1154,26 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
                       style={({ pressed }) => [
                         styles.swapRow,
                         juicy && styles.swapRowJuicy,
-                        pressed && { transform: [{ scale: 0.98 }] },
+                        pressed && { opacity: 0.88 },
                       ]}
                     >
-                      {opp.player && <Portrait p={opp.player} size={36} border={2} />}
+                      {opp.player && <Portrait p={opp.player} size={36} border={1.5} />}
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <T numberOfLines={1} style={styles.swapRowName}>
                           {opp.name}
                         </T>
-                        <T style={[styles.swapRowHint, juicy && { color: '#FDE047' }, risky && { color: '#FCA5A5' }]}>
+                        <T style={[styles.swapRowHint, juicy && { color: C.goldDeep }, risky && { color: C.danger }]}>
                           {opp.count === 1
-                            ? '🔥 CƯỚP LÁ UNO CUỐI CÙNG!!'
+                            ? 'Chỉ còn 1 lá UNO — đổi ngay'
                             : juicy
-                              ? '✨ Rất ít bài — Cướp ngay!'
+                              ? 'Rất ít bài — nên đổi'
                               : risky
-                                ? '⚠️ Đang ôm nhiều bài, coi chừng nổ!'
+                                ? 'Đang ôm nhiều bài, coi chừng nổ'
                                 : 'Đổi toàn bộ bài trên tay'}
                         </T>
                       </View>
-                      <View style={[styles.swapCountBadge, juicy && { backgroundColor: '#B45309', borderColor: '#FACC15' }]}>
-                        <T style={styles.swapCountText}>{opp.count} lá</T>
+                      <View style={[styles.swapCountBadge, juicy && styles.swapCountBadgeJuicy]}>
+                        <T style={[styles.swapCountText, juicy && { color: C.goldDeep }]}>{opp.count} lá</T>
                       </View>
                     </Pressable>
                   );
@@ -1237,7 +1190,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
 
       {/* ================= SHEET: Lịch Sử Bàn Chơi ================= */}
       {logOpen && (
-        <Sheet title="📜 Diễn Biến Bàn Đấu" onClose={() => setLogOpen(false)}>
+        <Sheet title="Diễn biến bàn đấu" onClose={() => setLogOpen(false)}>
           <View style={{ gap: 6 }}>
             {[...view.log].reverse().map((entry) => (
               <View key={entry.id} style={styles.logRow}>
@@ -1248,35 +1201,35 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
         </Sheet>
       )}
 
-      {/* ================= SHEET: Sổ Tay Luật UNO Tàn Nhẫn ================= */}
+      {/* ================= SHEET: Sổ Tay Luật UNO No Mercy ================= */}
       {rulesOpen && (
-        <Sheet title="🃏 Luật UNO Tàn Nhẫn (No Mercy)" onClose={() => setRulesOpen(false)}>
+        <Sheet title="Luật UNO No Mercy" onClose={() => setRulesOpen(false)}>
           <View style={{ gap: 10 }}>
             <View style={styles.ruleCard}>
-              <T style={styles.ruleTitle}>💥 Luật Nổ Bài (&gt;= {UNO_MERCY_LIMIT} lá)</T>
+              <T style={styles.ruleTitle}>Luật Nổ bài (từ {UNO_MERCY_LIMIT} lá)</T>
               <T style={styles.ruleBody}>
-                Bất cứ ai cầm từ {UNO_MERCY_LIMIT} lá trở lên trên tay ở bất kỳ thời điểm nào sẽ CHÁY BÀI và bị loại trực tiếp khỏi ván!
+                Ai cầm từ {UNO_MERCY_LIMIT} lá trở lên trên tay ở bất kỳ thời điểm nào sẽ nổ bài và bị loại khỏi ván.
               </T>
             </View>
             <View style={styles.ruleCard}>
-              <T style={styles.ruleTitle}>🔥 Cộng Dồn Không Đáy (+2, +4, +6, +10)</T>
+              <T style={styles.ruleTitle}>Cộng dồn lá rút (+2, +4, +6, +10)</T>
               <T style={styles.ruleBody}>
-                Khi bị tấn công bằng lá rút phạt, bạn được phép chồng tiếp bất kỳ lá rút phạt nào có giá trị lớn hơn hoặc bằng lá vừa đánh (+2 → +2/+4/+6/+10; +6 → +6/+10)!
+                Khi bị tấn công bằng lá rút phạt, bạn được phép chồng tiếp bất kỳ lá rút phạt nào có giá trị lớn hơn hoặc bằng lá vừa đánh (+2 lên +2/+4/+6/+10; +6 lên +6/+10).
               </T>
             </View>
             <View style={styles.ruleCard}>
-              <T style={styles.ruleTitle}>🦊 Luật Số 7 &amp; 🌪️ Luật Số 0</T>
+              <T style={styles.ruleTitle}>Luật Số 7 và Số 0</T>
               <T style={styles.ruleBody}>
-                • Đánh lá Số 7: Chọn 1 người bất kỳ để TRÁO TOÀN BỘ BÀI trên tay!{'\n'}
-                • Đánh lá Số 0: Tất cả mọi người chuyển bài cho người kế tiếp theo chiều đánh!
+                Đánh lá Số 7: chọn 1 người bất kỳ để tráo toàn bộ bài trên tay.{'\n'}
+                Đánh lá Số 0: tất cả mọi người chuyển bài cho người kế tiếp theo chiều đánh.
               </T>
             </View>
             <View style={styles.ruleCard}>
-              <T style={styles.ruleTitle}>🎰 Bảo Bối Hủy Diệt Tình Bạn</T>
+              <T style={styles.ruleTitle}>Các lá hành động đặc biệt</T>
               <T style={styles.ruleBody}>
-                • 🌪️ Xả Cùng Màu: Đánh 1 lá, xả sạch mọi lá cùng màu đó trên tay!{'\n'}
-                • ⏭️ Bỏ Tất Cả: Cấm lượt cả bàn, bạn được đánh tiếp ngay 1 lượt!{'\n'}
-                • 🎰 Vòng Quay Tử Thần: Chỉ định 1 màu; người kế tiếp phải bốc liên tục cho tới khi ra lá màu đó!
+                Xả cùng màu: đánh 1 lá, xả sạch mọi lá cùng màu đó trên tay.{'\n'}
+                Bỏ tất cả: bỏ lượt cả bàn, bạn được đánh tiếp ngay 1 lượt.{'\n'}
+                Vòng quay tử thần: chỉ định 1 màu; người kế tiếp phải bốc liên tục tới khi ra lá màu đó.
               </T>
             </View>
           </View>
@@ -1285,8 +1238,8 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
 
       {/* ================= SHEET: Chủ Phòng Kết Thúc Sớm ================= */}
       {confirmEnd && (
-        <Sheet title="⏹ Kết thúc ván sớm?" onClose={() => setConfirmEnd(false)}>
-          <T style={{ color: C.muted }}>
+        <Sheet title="Kết thúc ván sớm" onClose={() => setConfirmEnd(false)}>
+          <T style={{ color: C.secondary, fontSize: 13.5, lineHeight: 19 }}>
             Ván đấu sẽ khép lại ngay và xếp hạng theo người đang cầm ít bài nhất trên tay.
           </T>
           <Button
@@ -1323,7 +1276,7 @@ const styles = StyleSheet.create({
   screenRoot: {
     flex: 1,
     minHeight: 0,
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 4,
     paddingBottom: 2,
   },
@@ -1336,7 +1289,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 4,
   },
   dirPill: {
@@ -1344,70 +1297,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 99,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderColor: C.darkBorder,
   },
   dirPillRev: {
-    borderColor: 'rgba(232, 121, 249, 0.55)',
-    backgroundColor: 'rgba(59, 7, 100, 0.72)',
+    borderColor: 'rgba(250, 204, 21, 0.35)',
+    backgroundColor: C.darkSubtle,
   },
   dirPillText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#F1F5F9',
+    fontWeight: '600',
+    color: C.darkText,
   },
   colorIndicatorPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 99,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
   },
   colorDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   colorIndicatorText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.darkText,
   },
   timerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 99,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.4)',
+    borderColor: C.darkBorder,
   },
   timerPillUrgent: {
-    backgroundColor: 'rgba(127, 29, 29, 0.9)',
+    backgroundColor: 'rgba(185, 28, 28, 0.36)',
     borderColor: '#F87171',
   },
   timerPillText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#FDE047',
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: C.gold,
+    fontVariant: ['tabular-nums'],
   },
   miniToolBtn: {
     width: 28,
     height: 28,
-    borderRadius: 9,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: C.darkBorder,
   },
 
   oppScroll: {
@@ -1426,13 +1380,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 6,
     paddingVertical: 4,
-    borderRadius: 14,
+    borderRadius: 12,
     minWidth: 74,
     maxWidth: 92,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    gap: 2,
+    backgroundColor: 'rgba(26, 30, 40, 0.88)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    gap: 3,
     overflow: 'hidden',
   },
   oppCardCompact: {
@@ -1442,32 +1396,33 @@ const styles = StyleSheet.create({
   },
   oppNameText: {
     fontSize: 10.5,
-    fontWeight: '800',
-    color: '#F1F5F9',
+    fontWeight: '600',
+    color: C.darkText,
     maxWidth: '100%',
     textAlign: 'center',
   },
   oppCardActive: {
-    backgroundColor: 'rgba(6, 78, 59, 0.78)',
+    backgroundColor: 'rgba(21, 128, 61, 0.28)',
     borderColor: '#4ADE80',
   },
   oppCardDanger: {
-    borderColor: '#EF4444',
-    backgroundColor: 'rgba(69, 10, 10, 0.78)',
+    borderColor: C.danger,
+    backgroundColor: 'rgba(127, 29, 29, 0.34)',
   },
   oppCardElim: {
-    opacity: 0.68,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    opacity: 0.65,
+    backgroundColor: 'rgba(17, 20, 28, 0.72)',
   },
   oppCountPill: {
     paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 99,
+    paddingVertical: 2,
+    borderRadius: 6,
     borderWidth: 1,
   },
   oppCountText: {
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
 
   // --- Shock Banner ---
@@ -1476,33 +1431,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderLeftWidth: 3,
     flexShrink: 0,
+  },
+  shockIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shockHeadline: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '600',
+    color: C.darkText,
   },
   shockSubtext: {
-    fontSize: 10.5,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '500',
   },
   idleTicker: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: 'rgba(15, 23, 42, 0.66)',
+    backgroundColor: 'rgba(26, 30, 40, 0.85)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: C.darkBorder,
     flexShrink: 0,
   },
   idleTickerText: {
     fontSize: 11.5,
-    fontWeight: '700',
-    color: '#CBD5E1',
+    fontWeight: '500',
+    color: C.darkMuted,
     textAlign: 'center',
   },
 
@@ -1510,8 +1473,9 @@ const styles = StyleSheet.create({
   feltArena: {
     flex: 1,
     minHeight: 156,
-    borderRadius: 20,
-    borderWidth: 1.5,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: '#131922',
     paddingHorizontal: 8,
     paddingVertical: 6,
     justifyContent: 'center',
@@ -1519,10 +1483,10 @@ const styles = StyleSheet.create({
   },
   arenaColorHalo: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 2,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    borderWidth: 1,
     alignSelf: 'center',
   },
   tableColumns: {
@@ -1543,16 +1507,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '94%',
     height: '94%',
-    borderRadius: 13,
-    backgroundColor: '#1E293B',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: 12,
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 249, 245, 0.22)',
   },
   deckTopFace: {
     flex: 1,
-    borderRadius: 13,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(251, 249, 245, 0.30)',
+    backgroundColor: C.darkSurface,
     padding: 6,
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1561,34 +1526,33 @@ const styles = StyleSheet.create({
     borderColor: '#93C5FD',
   },
   deckTopUrgent: {
-    borderColor: '#FACC15',
-    borderWidth: 2.5,
+    borderColor: C.gold,
+    borderWidth: 2,
   },
   deckCrest: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: '#DC2626',
+    backgroundColor: C.son,
     borderWidth: 1,
-    borderColor: '#FDE047',
-    transform: [{ rotate: '-8deg' }],
+    borderColor: 'rgba(254, 243, 199, 0.5)',
   },
   deckCrestTitle: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: '#FEF08A',
-    letterSpacing: 0.4,
+    fontSize: 9,
+    fontWeight: '600',
+    color: C.goldSoft,
   },
   deckMainLabel: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '600',
+    color: C.darkText,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   deckSubLabel: {
     fontSize: 9.5,
-    fontWeight: '700',
-    color: '#CBD5E1',
+    fontWeight: '500',
+    color: C.darkMuted,
     textAlign: 'center',
   },
 
@@ -1596,52 +1560,54 @@ const styles = StyleSheet.create({
     flex: 1.2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
   },
   stackBadge: {
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: '#991B1B',
-    borderWidth: 1.5,
-    borderColor: '#FACC15',
+    borderRadius: 8,
+    backgroundColor: C.danger,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 243, 199, 0.45)',
     alignItems: 'center',
   },
   stackBadgeMain: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: C.goldSoft,
+    fontVariant: ['tabular-nums'],
   },
   stackBadgeSub: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 9.5,
+    fontWeight: '500',
     color: '#FECACA',
+    fontVariant: ['tabular-nums'],
   },
   rouletteBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: '#701A75',
-    borderWidth: 1.5,
-    borderColor: '#F5D0FE',
+    borderRadius: 8,
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: C.gold,
   },
   rouletteBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FDF4FF',
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: C.goldSoft,
   },
   discardHaloWrap: {
-    padding: 5,
-    borderRadius: 20,
-    borderWidth: 2,
+    padding: 4,
+    borderRadius: 18,
+    borderWidth: 1.5,
   },
   activeColorTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 99,
+    paddingVertical: 3,
+    borderRadius: 8,
     borderWidth: 1,
   },
   colorDotSmall: {
@@ -1650,8 +1616,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   activeColorTagText: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 10.5,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -1659,47 +1625,51 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 8,
   },
   catchUnoBtn: {
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: '#BE123C',
-    borderWidth: 2,
-    borderColor: '#FDE047',
-    minWidth: 86,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: C.danger,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 243, 199, 0.5)',
+    minWidth: 88,
+    gap: 2,
   },
   catchUnoTitle: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   catchUnoSub: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#FFE4E6',
+    fontVariant: ['tabular-nums'],
   },
   shoutUnoBtn: {
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: '#D97706',
-    borderWidth: 2,
-    borderColor: '#FEF08A',
-    minWidth: 86,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: C.goldDeep,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 243, 199, 0.5)',
+    minWidth: 88,
+    gap: 2,
   },
   shoutUnoTitle: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#FFFBEB',
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   shoutUnoSub: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#FEF3C7',
+    fontSize: 9.5,
+    fontWeight: '500',
+    color: C.goldSoft,
+    fontVariant: ['tabular-nums'],
   },
   unoSafeBadge: {
     flexDirection: 'row',
@@ -1707,52 +1677,51 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: 'rgba(6, 78, 59, 0.88)',
+    borderRadius: 8,
+    backgroundColor: 'rgba(21, 128, 61, 0.25)',
     borderWidth: 1,
-    borderColor: '#34D399',
+    borderColor: '#4ADE80',
   },
   unoSafeText: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 10.5,
+    fontWeight: '600',
     color: '#A7F3D0',
   },
   passTurnBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 13,
-    backgroundColor: '#334155',
-    borderWidth: 1.5,
-    borderColor: '#94A3B8',
+    borderRadius: 10,
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
   },
   passTurnText: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.darkText,
   },
   turnSpotlightBox: {
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 13,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    maxWidth: 98,
+    borderColor: C.darkBorder,
+    maxWidth: 100,
   },
   turnSpotlightLabel: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 0.3,
+    fontSize: 9.5,
+    fontWeight: '500',
+    color: C.darkMuted,
   },
   turnSpotlightName: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: C.darkText,
     textAlign: 'center',
     marginTop: 2,
   },
@@ -1760,18 +1729,18 @@ const styles = StyleSheet.create({
   // --- Khay Bài Người Chơi (Bottom Pinned Hand Dock) ---
   handDock: {
     flexShrink: 0,
-    borderRadius: 18,
-    paddingHorizontal: 8,
+    borderRadius: 14,
+    paddingHorizontal: 10,
     paddingTop: 6,
     paddingBottom: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.86)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    gap: 2,
+    backgroundColor: 'rgba(26, 30, 40, 0.94)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    gap: 4,
   },
   handDockMyTurn: {
-    borderColor: 'rgba(250, 204, 21, 0.7)',
-    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    borderColor: 'rgba(245, 158, 11, 0.55)',
+    backgroundColor: C.darkBg,
   },
   handHeader: {
     gap: 2,
@@ -1785,8 +1754,9 @@ const styles = StyleSheet.create({
   },
   handTitleText: {
     fontSize: 12,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
   mercyMeterWrap: {
     flexDirection: 'row',
@@ -1797,24 +1767,24 @@ const styles = StyleSheet.create({
   },
   mercyMeterTrack: {
     flex: 1,
-    height: 7,
-    borderRadius: 99,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
     overflow: 'hidden',
   },
   mercyMeterFill: {
     height: '100%',
-    borderRadius: 99,
+    borderRadius: 3,
   },
   mercyMeterTag: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: C.darkMuted,
   },
   handHintText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#CBD5E1',
+    fontWeight: '500',
+    color: C.darkMuted,
   },
   handScroll: {
     flexGrow: 0,
@@ -1840,8 +1810,8 @@ const styles = StyleSheet.create({
   },
   emptyHandText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontWeight: '500',
+    color: C.darkMuted,
     textAlign: 'center',
   },
 
@@ -1860,22 +1830,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 3,
     left: 5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontVariant: ['tabular-nums'],
     zIndex: 3,
   },
   cardCornerBottom: {
     position: 'absolute',
     bottom: 3,
     right: 5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontVariant: ['tabular-nums'],
     transform: [{ rotate: '180deg' }],
     zIndex: 3,
   },
@@ -1906,8 +1872,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   cardCenterSymbol: {
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   cardMicroTag: {
     paddingHorizontal: 4,
@@ -1915,14 +1881,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   cardMicroTagText: {
-    fontWeight: '900',
-    letterSpacing: -0.2,
+    fontWeight: '600',
   },
 
-  // --- Modals ---
+  // --- Modals (Warm Paper & Ink) ---
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(2, 6, 23, 0.75)',
+    backgroundColor: 'rgba(28, 25, 23, 0.54)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
@@ -1930,10 +1895,8 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 380,
-    borderRadius: 22,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.5,
-    borderColor: 'rgba(250, 204, 21, 0.45)',
+    borderRadius: 16,
+    backgroundColor: C.paper,
     padding: 16,
     gap: 12,
   },
@@ -1947,15 +1910,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  modalIconRing: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.goldSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontSize: 15.5,
+    fontWeight: '600',
+    color: C.ink,
+    fontFamily: FONT,
   },
   modalDesc: {
-    fontSize: 12,
-    color: '#CBD5E1',
-    lineHeight: 16,
+    fontSize: 12.5,
+    color: C.secondary,
+    lineHeight: 17,
   },
   colorGrid: {
     flexDirection: 'row',
@@ -1965,94 +1939,98 @@ const styles = StyleSheet.create({
   colorChoiceBtn: {
     width: '48%',
     flexGrow: 1,
-    borderRadius: 14,
-    borderWidth: 2,
-    overflow: 'hidden',
-  },
-  colorChoiceInner: {
+    borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(31, 27, 22, 0.14)',
   },
   colorChoiceName: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 14.5,
+    fontWeight: '600',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   colorChoiceCount: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.92)',
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontVariant: ['tabular-nums'],
   },
 
   swapRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 9,
-    borderRadius: 14,
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(148, 163, 184, 0.25)',
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   swapRowJuicy: {
-    backgroundColor: 'rgba(120, 53, 15, 0.55)',
-    borderColor: '#FACC15',
+    backgroundColor: C.goldSoft,
+    borderColor: 'rgba(180, 83, 9, 0.30)',
   },
   swapRowName: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.ink,
   },
   swapRowHint: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: C.secondary,
   },
   swapCountBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: '#1E293B',
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: C.paper,
     borderWidth: 1,
-    borderColor: '#64748B',
+    borderColor: C.borderSubtle,
+  },
+  swapCountBadgeJuicy: {
+    borderColor: 'rgba(180, 83, 9, 0.35)',
   },
   swapCountText: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: C.ink,
+    fontVariant: ['tabular-nums'],
   },
 
   logRow: {
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   logText: {
     fontSize: 12.5,
     color: C.ink,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   ruleCard: {
-    padding: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 10,
     backgroundColor: C.mist,
-    gap: 3,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    gap: 4,
   },
   ruleTitle: {
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 13.5,
+    fontWeight: '600',
     color: C.ink,
   },
   ruleBody: {
-    fontSize: 12,
-    color: C.muted,
-    lineHeight: 17,
+    fontSize: 12.5,
+    color: C.secondary,
+    lineHeight: 18,
   },
 });

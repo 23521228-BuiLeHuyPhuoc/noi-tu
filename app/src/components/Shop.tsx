@@ -7,7 +7,6 @@ import { Image } from './Image';
  *   -> Người dùng cuộn xuống tận món đồ cuối cùng bấm Mua / Trang bị / Xem thử vẫn thấy ngay sự thay đổi trực tiếp trên đỉnh màn hình mà không phải cuộn ngược lên!
  */
 import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   CHECKIN_REWARDS,
@@ -25,7 +24,7 @@ import { themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { CHU_LAY_STICKERS } from '../stickers';
 import { play } from '../sound';
-import { C, GRADS } from '../theme';
+import { C } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Sheet } from './Sheet';
 import { WalletSheet, fmtRuby } from './Wallet';
@@ -38,7 +37,7 @@ import {
   chatBubbleTextColorOf,
 } from './Cosmetics';
 import { Portrait } from './Avatar';
-import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
+import { EmojiIcon, RubyIcon, UiIcon, type UiIconName } from './Icons';
 
 export type ShopTabId = 'skill' | 'deco' | 'sticker' | 'gift';
 
@@ -49,22 +48,22 @@ export interface ShopSpotlight {
   label: string;
 }
 
-const TABS: { id: ShopTabId; emoji: string; label: string }[] = [
-  { id: 'deco', emoji: '👑', label: 'Hóa Trang VIP' },
-  { id: 'skill', emoji: '⚡', label: 'Chiêu Lầy' },
-  { id: 'gift', emoji: '🎁', label: 'Siêu Quà' },
-  { id: 'sticker', emoji: '🔤', label: 'Sticker' },
+const TABS: { id: ShopTabId; icon: UiIconName; label: string }[] = [
+  { id: 'deco', icon: 'Crown', label: 'Hóa trang VIP' },
+  { id: 'skill', icon: 'Zap', label: 'Chiêu lầy' },
+  { id: 'gift', icon: 'Gift', label: 'Siêu quà' },
+  { id: 'sticker', icon: 'Sparkles', label: 'Sticker' },
 ];
 
-const DECO: { slot: CosmeticSlot; title: string; short: string }[] = [
-  { slot: 'frame', title: '👑 Khung avatar', short: 'Khung' },
-  { slot: 'nameFx', title: '✨ Hiệu ứng tên', short: 'Tên' },
-  { slot: 'aura', title: '🌟 Hào quang tới lượt', short: 'Hào quang' },
-  { slot: 'pet', title: '🐾 Thú cưng kề vai', short: 'Thú cưng' },
-  { slot: 'title', title: '🎖️ Danh hiệu Phú Hào', short: 'Danh hiệu' },
-  { slot: 'chatBubble', title: '💬 Bong bóng chat VIP', short: 'Chat' },
-  { slot: 'entrance', title: '🚪 Hiệu ứng vào phòng', short: 'Vào phòng' },
-  { slot: 'roomTheme', title: '🗺️ Map & Chủ đề phòng', short: 'Map' },
+const DECO: { slot: CosmeticSlot; icon: UiIconName; title: string; short: string }[] = [
+  { slot: 'frame', icon: 'Crown', title: 'Khung avatar', short: 'Khung' },
+  { slot: 'nameFx', icon: 'Sparkles', title: 'Hiệu ứng tên', short: 'Tên' },
+  { slot: 'aura', icon: 'Star', title: 'Hào quang tới lượt', short: 'Hào quang' },
+  { slot: 'pet', icon: 'Smile', title: 'Thú cưng kề vai', short: 'Thú cưng' },
+  { slot: 'title', icon: 'Award', title: 'Danh hiệu Phú Hào', short: 'Danh hiệu' },
+  { slot: 'chatBubble', icon: 'MessageCircle', title: 'Bong bóng chat VIP', short: 'Chat' },
+  { slot: 'entrance', icon: 'LogIn', title: 'Hiệu ứng vào phòng', short: 'Vào phòng' },
+  { slot: 'roomTheme', icon: 'Map', title: 'Map & Chủ đề phòng', short: 'Map' },
 ];
 
 function defaultGuestPreview(hasUser: boolean): ShopPreviewState {
@@ -132,20 +131,20 @@ export function ShopPreviewDock({
               position: 'sticky',
               top: 6,
               zIndex: 55,
-              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.36)',
+              boxShadow: '0 4px 12px rgba(31, 27, 22, 0.14)',
             } as object)
           : null,
       ]}
     >
       <View style={styles.dockTopMeta}>
         <View style={styles.dockPinPill}>
-          <UiIcon name="Sparkles" size={11} color="#FDE047" />
+          <UiIcon name="Sparkles" size={11} color="#FDE68A" />
           <T style={styles.dockPinTxt}>
             {spotlight
               ? spotlight.label
               : hasPreview
-                ? 'SÂN KHẤU XEM THỬ TRỰC TIẾP'
-                : 'DIỆN MẠO ĐANG TRANG BỊ'}
+                ? 'Sân khấu xem thử'
+                : 'Diện mạo đang trang bị'}
           </T>
         </View>
 
@@ -172,7 +171,7 @@ export function ShopPreviewDock({
               style={styles.dockResetBtn}
               accessibilityRole="button"
             >
-              <UiIcon name="RotateCcw" size={11} color="#1E293B" />
+              <UiIcon name="RotateCcw" size={11} color={C.ink} />
               <T style={styles.dockResetTxt}>Gốc</T>
             </Pressable>
           )}
@@ -183,7 +182,7 @@ export function ShopPreviewDock({
             accessibilityRole="button"
             accessibilityLabel={compact ? 'Mở rộng sân khấu' : 'Thu gọn sân khấu'}
           >
-            <UiIcon name={compact ? 'ChevronDown' : 'ChevronUp'} size={14} color="#F8FAFC" />
+            <UiIcon name={compact ? 'ChevronDown' : 'ChevronUp'} size={14} color={C.darkText} />
           </Pressable>
         </View>
       </View>
@@ -212,7 +211,7 @@ export function ShopPreviewDock({
                 { color: themeNow.accent },
               ]}
             >
-              {user?.displayName ?? 'Đại Gia Xóm Lầy'}
+              {user?.displayName ?? 'Đại gia Xóm Lầy'}
             </NameText>
           </View>
 
@@ -224,11 +223,11 @@ export function ShopPreviewDock({
 
           <View style={[styles.previewBubble, compact && { paddingVertical: 3 }, bStyle]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-              <EmojiIcon emoji={spotlight ? spotlight.emoji : themeNow.emoji} size={14} />
+              <UiIcon name={spotlight ? 'Sparkles' : 'Map'} size={13} color={bColor ?? C.secondary} />
               <T
                 numberOfLines={1}
                 style={[
-                  { fontSize: 11.5, fontWeight: '800', color: C.ink },
+                  { fontSize: 11.5, fontWeight: '500', color: C.ink },
                   bColor ? { color: bColor } : null,
                 ]}
               >
@@ -316,14 +315,14 @@ export function ShopBody({
     setBusy(null);
     if (err) return setError(err);
     play('coin');
-    // Hiển thị xem trước ngay trên Dock ghim đỉnh màn hình, bấm "Trang bị" là mặc luôn không cần cuộn lên!
+    // Hiển thị xem trước ngay trên Dock ghim đỉnh màn hình, bấm "Trang bị" là mặc luôn không cần cuộn lên
     if (isDecoSlot(item.kind)) {
       setPreview((prev) => ({ ...prev, [item.kind]: item.id }));
-      setSpotlight({ emoji: item.emoji, label: `Đã mua: ${item.name} · Bấm Trang bị để mặc!` });
+      setSpotlight({ emoji: item.emoji, label: `Đã mua: ${item.name} · Bấm Trang bị để mặc` });
     } else {
-      setSpotlight({ emoji: item.emoji, label: `Đã sở hữu: ${item.name}!` });
+      setSpotlight({ emoji: item.emoji, label: `Đã sở hữu: ${item.name}` });
     }
-    feed(`🎉 Đã tậu siêu phẩm ${item.name}!`, 'good');
+    feed(`Đã mua ${item.name}`, 'good');
   };
 
   const equip = async (slot: CosmeticSlot, id: string | null, item?: ShopItem) => {
@@ -351,7 +350,7 @@ export function ShopBody({
           testID={`guest-buy-${item.id}`}
           small
           variant="gold"
-          title={`Đăng ký mua 💎${fmtRuby(item.price)}`}
+          title={`Đăng ký mua ${fmtRuby(item.price)}`}
           onPress={() => onRequestAuth?.()}
         />
       );
@@ -361,7 +360,7 @@ export function ShopBody({
         testID={`buy-${item.id}`}
         small
         variant="gold"
-        title={`Mua 💎${fmtRuby(item.price)}`}
+        title={`Mua ${fmtRuby(item.price)}`}
         disabled={busy !== null}
         onPress={() => void buy(item)}
       />
@@ -392,29 +391,29 @@ export function ShopBody({
         ]}
       >
         <View style={[styles.itemIconWrap, isVip && styles.itemIconVip, isMythic && styles.itemIconMythic]}>
-          <EmojiIcon emoji={item.emoji} size={30} glow={isMythic} />
+          <EmojiIcon emoji={item.emoji} size={28} />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <T style={[styles.itemName, isMythic && { color: '#FEF08A' }]}>{item.name}</T>
+            <T style={[styles.itemName, isMythic && { color: '#FDE68A' }]}>{item.name}</T>
             {isMythic && (
               <View style={styles.mythicTag}>
-                <T style={styles.mythicTagTxt}>🔱 THẦN THOẠI</T>
+                <T style={styles.mythicTagTxt}>Thần thoại</T>
               </View>
             )}
             {isVip && (
               <View style={styles.vipTag}>
-                <T style={styles.vipTagTxt}>👑 ĐẠI GIA</T>
+                <T style={styles.vipTagTxt}>Đại gia</T>
               </View>
             )}
           </View>
-          {item.desc ? <T style={[styles.itemDesc, isMythic && { color: '#E9D5FF' }]}>{item.desc}</T> : null}
+          {item.desc ? <T style={[styles.itemDesc, isMythic && { color: C.darkMuted }]}>{item.desc}</T> : null}
           {extra}
         </View>
         <View style={styles.itemAct}>
           <View style={styles.pricePill}>
             <RubyIcon size={13} />
-            <T style={[styles.price, isMythic && { color: '#FDE047' }]}>{fmtRuby(item.price)}</T>
+            <T style={[styles.price, isMythic && { color: '#FDE68A' }]}>{fmtRuby(item.price)}</T>
           </View>
           {action}
         </View>
@@ -443,41 +442,41 @@ export function ShopBody({
       {user ? (
         <View style={styles.balanceRow}>
           <View style={styles.rubyInline}>
-            <RubyIcon size={22} />
+            <RubyIcon size={20} />
             <T testID="shop-balance" style={styles.balance}>{fmtRuby(ruby)}</T>
           </View>
           <Button
             testID="shop-topup"
             small
             variant="gold"
-            iconNode={<UiIcon name="Plus" size={14} color="#271400" />}
+            iconNode={<UiIcon name="Plus" size={14} color={C.ink} />}
             title="Nạp thêm Ruby"
             onPress={() => onOpenWallet?.()}
           />
         </View>
       ) : (
-        <LinearGradient colors={['#4C1D95', '#831843', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.guestWhaleBanner}>
+        <View style={styles.guestWhaleBanner}>
           <View style={{ flex: 1, gap: 2 }}>
-            <T style={{ color: '#FEF08A', fontWeight: '900', fontSize: 15 }}>💎 ĐẶC QUYỀN ĐẠI GIA XÓM LẦY</T>
-            <T style={{ color: '#F8FAFC', fontSize: 12, fontWeight: '700' }}>
-              Thử miễn phí mọi Khung 3 Vòng, Hào Quang Cầu Vồng, Màn Hình Xanh BSOD & Quà Ngai Vàng 10.000💎 ngay trên thanh Dock phía trên!
+            <T style={{ color: '#FDE68A', fontWeight: '600', fontSize: 14.5 }}>Đặc quyền đại gia Xóm Lầy</T>
+            <T style={{ color: C.darkMuted, fontSize: 12, fontWeight: '400' }}>
+              Thử miễn phí mọi khung, hào quang, hiệu ứng và quà VIP ngay trên thanh xem thử phía trên.
             </T>
           </View>
           <Button small variant="gold" title="Đăng ký ngay" onPress={() => onRequestAuth?.()} />
-        </LinearGradient>
+        </View>
       )}
 
       {/* Thanh Đẳng Cấp VIP Prestige */}
-      <LinearGradient colors={[...GRADS.vipDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} testID="vip-progress-card" style={styles.vipCard}>
+      <View testID="vip-progress-card" style={styles.vipCard}>
         <View style={styles.vipTop}>
           <VipBadge tier={user ? vip.tier : 6} />
           <T style={styles.vipTitle}>
-            {user ? (vip.tier > 0 ? vip.name : 'Chưa vào bảng VIP Phú Hào') : 'Xem trước cấp Chí Tôn Vũ Trụ (VIP 6)'}
+            {user ? (vip.tier > 0 ? vip.name : 'Chưa vào bảng VIP Phú Hào') : 'Xem trước cấp Thiên Đế (VIP 6)'}
           </T>
           <T style={styles.vipPts}>{fmtRuby(pts)} điểm</T>
         </View>
         <View style={styles.vipTrack}>
-          <View style={[styles.vipFill, { width: `${(user ? vipPct : 1) * 100}%`, backgroundColor: user ? vip.color : '#F472B6' }]} />
+          <View style={[styles.vipFill, { width: `${(user ? vipPct : 1) * 100}%`, backgroundColor: user ? vip.color : C.gold }]} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
           {nextVip ? (
@@ -485,17 +484,13 @@ export function ShopBody({
               <T style={styles.vipSub}>Còn</T>
               <RubyIcon size={12} />
               <T style={styles.vipSub}>{fmtRuby(Math.max(0, nextVip.minPoints - pts))} nữa thăng cấp</T>
-              <EmojiIcon emoji={nextVip.badge} size={13} />
-              <T style={styles.vipSub}>{nextVip.name}!</T>
+              <T style={styles.vipSub}>{nextVip.name}</T>
             </>
           ) : (
-            <>
-              <EmojiIcon emoji="🔱" size={14} />
-              <T style={styles.vipSub}>Đã chạm đỉnh Thiên Đế Chí Tôn (VIP Tối Thượng)!</T>
-            </>
+            <T style={styles.vipSub}>Đã chạm đỉnh Thiên Đế Chí Tôn (VIP tối thượng)</T>
           )}
         </View>
-      </LinearGradient>
+      </View>
 
       <View style={styles.tabs}>
         {TABS.map((x) => {
@@ -509,8 +504,8 @@ export function ShopBody({
               onPress={() => setTab(x.id)}
               style={[styles.tab, on && styles.tabOn]}
             >
-              <EmojiIcon emoji={x.emoji} size={15} />
-              <T style={[styles.tabText, on && { color: C.gold }]}>{x.label}</T>
+              <UiIcon name={x.icon} size={14} color={on ? C.onSon : C.secondary} />
+              <T style={[styles.tabText, on && { color: C.onSon }]}>{x.label}</T>
             </Pressable>
           );
         })}
@@ -520,7 +515,7 @@ export function ShopBody({
       {tab === 'skill' && (
         <>
           <T style={styles.note}>
-            Mỗi ngày có {FREE_POKES_PER_DAY} lượt chọc cơ bản miễn phí. 28 Tuyệt Kỹ Đại Gia dưới đây trả Ruby mỗi lần tung chiêu — phủ kín màn hình đối thủ bằng Màn Hình Xanh BSOD, Mưa Dép Vàng 24K, Còi Cảnh Sát, Búa Ban Vĩnh Viễn & Thiên Đế Phán Quyết!
+            Mỗi ngày có {FREE_POKES_PER_DAY} lượt chọc cơ bản miễn phí. 28 tuyệt kỹ trả Ruby mỗi lần tung chiêu — hiệu ứng toàn màn hình.
           </T>
           {section('skill').map((it) =>
             row(
@@ -547,7 +542,7 @@ export function ShopBody({
       {tab === 'deco' && (
         <>
           <T style={styles.note}>
-            Mua 1 lần sở hữu & tự trang bị ngay · Thanh Sân Khấu trên đỉnh màn hình luôn cập nhật tức thì dù bạn đang cuộn ở tận cuối trang!
+            Mua 1 lần sở hữu và trang bị ngay. Sân khấu xem thử trên đỉnh màn hình luôn cập nhật tức thì.
           </T>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.filterRow}>
@@ -556,7 +551,7 @@ export function ShopBody({
               onPress={() => setDecoFilter('all')}
               style={[styles.filterPill, decoFilter === 'all' && styles.filterOn]}
             >
-              <T style={[styles.filterTxt, decoFilter === 'all' && { color: C.gold }]}>Tất cả (8)</T>
+              <T style={[styles.filterTxt, decoFilter === 'all' && { color: C.onSon }]}>Tất cả (8)</T>
             </Pressable>
             {DECO.map((d) => (
               <Pressable
@@ -565,79 +560,74 @@ export function ShopBody({
                 onPress={() => setDecoFilter(d.slot)}
                 style={[styles.filterPill, decoFilter === d.slot && styles.filterOn]}
               >
-                <T style={[styles.filterTxt, decoFilter === d.slot && { color: C.gold }]}>{d.short}</T>
+                <T style={[styles.filterTxt, decoFilter === d.slot && { color: C.onSon }]}>{d.short}</T>
               </Pressable>
             ))}
           </ScrollView>
 
-          {visibleDeco.map(({ slot, title }) => {
-            const parts = title.split(' ');
-            const slotEmoji = parts[0];
-            const slotLabel = parts.slice(1).join(' ');
-            return (
-              <View key={slot} style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  <EmojiIcon emoji={slotEmoji} size={18} />
-                  <T style={styles.sectionLabel}>{slotLabel}</T>
-                </View>
-                {section(slot).map((it) => {
-                  const has = owned.has(it.id);
-                  const on = equipped[slot] === it.id;
-                  const action = has ? (
-                    on ? (
-                      <Button
-                        testID={`unequip-${it.id}`}
-                        small
-                        variant="paper"
-                        title="Gỡ"
-                        disabled={busy !== null}
-                        onPress={() => void equip(slot, null, it)}
-                      />
-                    ) : (
-                      <Button
-                        testID={`equip-${it.id}`}
-                        small
-                        variant="jade"
-                        title="Trang bị"
-                        disabled={busy !== null}
-                        onPress={() => void equip(slot, it.id, it)}
-                      />
-                    )
-                  ) : (
-                    <>
-                      <Button
-                        testID={`try-${it.id}`}
-                        small
-                        variant="paper"
-                        title={preview[slot] === it.id ? 'Đang thử' : 'Xem thử'}
-                        onPress={() => {
-                          play('pop');
-                          const turningOff = preview[slot] === it.id;
-                          setPreview((p) => ({ ...p, [slot]: turningOff ? undefined : it.id }));
-                          setSpotlight(
-                            turningOff ? null : { emoji: it.emoji, label: `Đang thử: ${it.name}` },
-                          );
-                        }}
-                      />
-                      {buyButton(it)}
-                    </>
-                  );
-                  return row(
-                    it,
-                    action,
-                    has ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <UiIcon name="CheckCircle2" size={13} color={C.jadeDeep} />
-                        <T style={[styles.itemDesc, { color: C.jadeDeep, fontWeight: '800' }]}>
-                          {on ? 'Đang dùng' : 'Đã có'}
-                        </T>
-                      </View>
-                    ) : undefined,
-                  );
-                })}
+          {visibleDeco.map(({ slot, icon, title }) => (
+            <View key={slot} style={{ gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <UiIcon name={icon} size={16} color={C.secondary} />
+                <T style={styles.sectionLabel}>{title}</T>
               </View>
-            );
-          })}
+              {section(slot).map((it) => {
+                const has = owned.has(it.id);
+                const on = equipped[slot] === it.id;
+                const action = has ? (
+                  on ? (
+                    <Button
+                      testID={`unequip-${it.id}`}
+                      small
+                      variant="paper"
+                      title="Gỡ"
+                      disabled={busy !== null}
+                      onPress={() => void equip(slot, null, it)}
+                    />
+                  ) : (
+                    <Button
+                      testID={`equip-${it.id}`}
+                      small
+                      variant="jade"
+                      title="Trang bị"
+                      disabled={busy !== null}
+                      onPress={() => void equip(slot, it.id, it)}
+                    />
+                  )
+                ) : (
+                  <>
+                    <Button
+                      testID={`try-${it.id}`}
+                      small
+                      variant="paper"
+                      title={preview[slot] === it.id ? 'Đang thử' : 'Xem thử'}
+                      onPress={() => {
+                        play('pop');
+                        const turningOff = preview[slot] === it.id;
+                        setPreview((p) => ({ ...p, [slot]: turningOff ? undefined : it.id }));
+                        setSpotlight(
+                          turningOff ? null : { emoji: it.emoji, label: `Đang thử: ${it.name}` },
+                        );
+                      }}
+                    />
+                    {buyButton(it)}
+                  </>
+                );
+                return row(
+                  it,
+                  action,
+                  has ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <UiIcon name="CheckCircle2" size={13} color={C.jadeDeep} />
+                      <T style={[styles.itemDesc, { color: C.jadeDeep, fontWeight: '600' }]}>
+                        {on ? 'Đang dùng' : 'Đã có'}
+                      </T>
+                    </View>
+                  ) : undefined,
+                );
+              })}
+            </View>
+          ))}
         </>
       )}
 
@@ -668,7 +658,7 @@ export function ShopBody({
       {tab === 'gift' && (
         <>
           <T style={styles.note}>
-            15 Siêu Quà Đại Gia (tới 10.000💎 Ngai Vàng Vũ Trụ Chí Tôn!): chạm avatar bạn bè trong phòng rồi bấm “Tặng quà” để nổ pháo hoa toàn màn hình & vinh danh Phú Hào!
+            15 siêu quà đại gia: chạm avatar bạn bè trong phòng rồi bấm Tặng quà để kích hoạt pháo hoa và điểm VIP.
           </T>
           {section('gift').map((it) =>
             row(
@@ -691,7 +681,7 @@ export function ShopBody({
           )}
           {user && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <EmojiIcon emoji="💝" size={15} />
+              <UiIcon name="Gift" size={14} color={C.son} />
               <T style={styles.note}>Điểm quà bạn đã nhận: {fmtRuby(user.giftPoints ?? 0)}</T>
             </View>
           )}
@@ -719,7 +709,7 @@ export function ShopSheet({
   if (walletOpen) return <WalletSheet game={game} onClose={() => setWalletOpen(false)} />;
   return (
     <Sheet
-      title="Cửa hàng Phú Hào 🛍️"
+      title="Cửa hàng Phú Hào"
       onClose={onClose}
       stickyTop={
         <ShopPreviewDock
@@ -783,12 +773,12 @@ export function CheckinSheet({
   const rewards = st?.rewards ?? CHECKIN_REWARDS;
   const done = st ? st.nextDay - 1 : 0;
   return (
-    <Sheet title="Điểm danh hằng ngày 🎁" onClose={onClose}>
+    <Sheet title="Điểm danh hằng ngày" onClose={onClose}>
       {won !== null && <Confetti />}
       {won !== null && (
         <View style={[styles.rubyInline, { justifyContent: 'center' }]}>
           <T testID="checkin-won" style={styles.won}>+{won}</T>
-          <RubyIcon size={28} />
+          <RubyIcon size={26} />
         </View>
       )}
       <T style={styles.note}>
@@ -813,9 +803,9 @@ export function CheckinSheet({
               <T style={styles.dayNum}>Ngày {day}</T>
               <View style={{ height: 28, justifyContent: 'center', alignItems: 'center' }}>
                 {isDone ? (
-                  <UiIcon name="CheckCircle2" size={24} color={C.jadeDeep} />
+                  <UiIcon name="CheckCircle2" size={22} color={C.jadeDeep} />
                 ) : day === 7 ? (
-                  <EmojiIcon emoji="🎁" size={24} />
+                  <UiIcon name="Gift" size={22} color={C.son} />
                 ) : (
                   <RubyIcon size={22} />
                 )}
@@ -830,13 +820,13 @@ export function CheckinSheet({
         (st.canClaim ? (
           <Button
             testID="checkin-claim"
-            title={busy ? 'Đang nhận…' : `Nhận +${st.nextReward} 💎`}
+            title={busy ? 'Đang nhận…' : `Nhận +${st.nextReward} Ruby`}
             disabled={busy}
             onPress={claim}
           />
         ) : (
           <T testID="checkin-done" style={styles.note}>
-            Hôm nay bạn đã điểm danh rồi. Ngày mai nhận +{st.nextReward} Ruby nhé!
+            Hôm nay bạn đã điểm danh rồi. Ngày mai nhận +{st.nextReward} Ruby.
           </T>
         ))}
     </Sheet>
@@ -844,18 +834,18 @@ export function CheckinSheet({
 }
 
 const styles = StyleSheet.create({
-  note: { fontSize: 13, color: C.muted, lineHeight: 18 },
+  note: { fontSize: 12.5, color: C.muted, lineHeight: 18, fontWeight: '400', fontVariant: ['tabular-nums'] },
   error: {
     color: '#FFFFFF',
     backgroundColor: C.danger,
     padding: 8,
     borderRadius: 10,
-    fontWeight: '700',
+    fontWeight: '500',
     overflow: 'hidden',
   },
   dockOuter: {
-    borderRadius: 18,
-    borderWidth: 2.5,
+    borderRadius: 14,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 7,
@@ -878,16 +868,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2.5,
     borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    backgroundColor: C.darkBg,
     borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.45)',
+    borderColor: C.darkBorder,
     flexShrink: 1,
   },
   dockPinTxt: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FEF08A',
-    letterSpacing: 0.3,
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#FDE68A',
   },
   dockTopActions: {
     flexDirection: 'row',
@@ -901,14 +890,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: C.paper,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: C.borderStrong,
   },
   dockRubyTxt: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: C.son,
+    fontVariant: ['tabular-nums'],
   },
   dockResetBtn: {
     flexDirection: 'row',
@@ -917,20 +907,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: '#FEF9C3',
+    backgroundColor: C.paper,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: C.borderStrong,
   },
   dockResetTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '600',
+    color: C.ink,
   },
   dockCollapseBtn: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: C.darkBg,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -945,45 +937,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     padding: 12,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#FACC15',
+    borderRadius: 14,
+    backgroundColor: C.darkSurface,
+    borderWidth: 1,
+    borderColor: C.goldDeep,
   },
   balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     justifyContent: 'space-between',
-    backgroundColor: C.mist,
+    backgroundColor: C.parchment,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   rubyInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  balance: { fontSize: 22, fontWeight: '900', color: C.son },
+  balance: { fontSize: 21, fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
   vipCard: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,197,61,0.55)',
+    borderRadius: 14,
+    backgroundColor: C.darkBg,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     padding: 12,
     gap: 7,
   },
   vipTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  vipTitle: { color: '#FEF08A', fontWeight: '900', fontSize: 13, flex: 1 },
-  vipPts: { color: '#CBD5E1', fontWeight: '800', fontSize: 11 },
+  vipTitle: { color: '#FDE68A', fontWeight: '600', fontSize: 13, flex: 1 },
+  vipPts: { color: C.darkMuted, fontWeight: '500', fontSize: 11, fontVariant: ['tabular-nums'] },
   vipTrack: {
-    height: 7,
+    height: 6,
     borderRadius: 99,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: C.darkSubtle,
     overflow: 'hidden',
   },
   vipFill: { height: '100%', borderRadius: 99 },
-  vipSub: { color: '#E2E8F0', fontSize: 11, fontWeight: '700' },
-  tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 14, padding: 4, gap: 4 },
+  vipSub: { color: C.darkText, fontSize: 11, fontWeight: '400', fontVariant: ['tabular-nums'] },
+  tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: C.borderSubtle },
   tab: {
     flex: 1,
-    minHeight: 40,
-    borderRadius: 11,
+    minHeight: 38,
+    borderRadius: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -991,87 +987,89 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   tabOn: { backgroundColor: C.ink },
-  tabText: { fontWeight: '800', fontSize: 11.5, textAlign: 'center', color: C.ink },
+  tabText: { fontWeight: '600', fontSize: 11.5, textAlign: 'center', color: C.secondary },
   filterRow: { gap: 6, paddingVertical: 2 },
   filterPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: C.mist,
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.1)',
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   filterOn: { backgroundColor: C.ink, borderColor: C.ink },
-  filterTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
-  sectionLabel: { fontSize: 14, fontWeight: '900', color: C.ink },
+  filterTxt: { fontSize: 12, fontWeight: '500', color: C.secondary, fontVariant: ['tabular-nums'] },
+  sectionLabel: { fontSize: 14, fontWeight: '600', color: C.ink },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: C.mist,
-    borderRadius: 16,
+    backgroundColor: C.parchment,
+    borderRadius: 13,
     padding: 10,
-  },
-  itemVip: { backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B' },
-  itemMythic: { backgroundColor: '#1E1136', borderWidth: 2, borderColor: '#FACC15' },
-  itemIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.08)',
+    borderColor: C.borderSubtle,
+  },
+  itemVip: { backgroundColor: C.goldSoft, borderColor: 'rgba(180,83,9,0.28)' },
+  itemMythic: { backgroundColor: C.darkSurface, borderColor: C.goldDeep },
+  itemIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 11,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  itemIconVip: { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' },
-  itemIconMythic: { backgroundColor: '#3B0764', borderColor: '#F472B6', borderWidth: 1.5 },
-  mythicTag: { backgroundColor: '#EC4899', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 },
-  mythicTagTxt: { fontSize: 9.5, fontWeight: '900', color: '#FEF08A' },
+  itemIconVip: { backgroundColor: C.paper, borderColor: 'rgba(180,83,9,0.28)' },
+  itemIconMythic: { backgroundColor: C.darkSubtle, borderColor: C.darkBorder },
+  mythicTag: { backgroundColor: C.son, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 6 },
+  mythicTagTxt: { fontSize: 9.5, fontWeight: '600', color: '#FFFFFF' },
   vipTag: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: C.paper,
     borderWidth: 1,
-    borderColor: '#D97706',
+    borderColor: 'rgba(180,83,9,0.32)',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 6,
   },
-  vipTagTxt: { fontSize: 9.5, fontWeight: '900', color: '#92400E' },
-  itemName: { fontSize: 15, fontWeight: '900', color: C.ink },
-  itemDesc: { fontSize: 12, color: C.muted, lineHeight: 16 },
+  vipTagTxt: { fontSize: 9.5, fontWeight: '600', color: C.goldDeep },
+  itemName: { fontSize: 14.5, fontWeight: '600', color: C.ink },
+  itemDesc: { fontSize: 12, color: C.muted, lineHeight: 16, fontWeight: '400' },
   itemAct: { alignItems: 'flex-end', gap: 4, maxWidth: 175 },
   pricePill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  price: { fontSize: 13, fontWeight: '900', color: C.son },
-  previewName: { fontSize: 18, fontWeight: '900', flexShrink: 1 },
+  price: { fontSize: 13, fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
+  previewName: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
   previewBubble: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#FFFDF8',
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.16)',
+    borderRadius: 10,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
     maxWidth: '100%',
   },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   stickerThumb: { width: 76, height: 58 },
-  owned: { fontSize: 13, fontWeight: '800', color: C.jadeDeep },
-  won: { fontSize: 34, fontWeight: '900', color: C.son, textAlign: 'center' },
+  owned: { fontSize: 13, fontWeight: '600', color: C.jadeDeep },
+  won: { fontSize: 30, fontWeight: '600', color: C.son, textAlign: 'center', fontVariant: ['tabular-nums'] },
   days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   day: {
     width: '22.5%',
     minWidth: 68,
     alignItems: 'center',
-    backgroundColor: C.mist,
-    borderRadius: 14,
+    backgroundColor: C.parchment,
+    borderRadius: 12,
     paddingVertical: 9,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
     gap: 2,
   },
   dayDone: { opacity: 0.65 },
-  dayToday: { borderColor: C.gold, backgroundColor: '#FEF9C3', transform: [{ scale: 1.05 }] },
+  dayToday: { borderColor: C.goldDeep, backgroundColor: C.goldSoft, borderWidth: 1.5 },
   dayBig: { width: '48%' },
-  dayNum: { fontSize: 11, fontWeight: '800', color: C.muted },
-  dayReward: { fontSize: 14, fontWeight: '900', color: C.son },
+  dayNum: { fontSize: 11, fontWeight: '500', color: C.muted, fontVariant: ['tabular-nums'] },
+  dayReward: { fontSize: 13.5, fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
 });

@@ -1,9 +1,9 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useKeyboardInset, useStableWindow } from '../hooks';
-import { C, sticker } from '../theme';
+import { C } from '../theme';
 import { T } from '../ui';
-import { EmojiIcon, UiIcon, splitEdgeEmoji } from './Icons';
+import { UiIcon, splitEdgeEmoji } from './Icons';
 
 let openCount = 0;
 const listeners = new Set<() => void>();
@@ -12,7 +12,7 @@ export function useSheetOpen(): boolean {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => openCount > 0, () => false);
 }
 
-/** Bảng trượt từ dưới lên bo tròn mềm mại, hỗ trợ `stickyTop`, `stickyBottom` & `scroll={false}` tránh lồng ScrollView */
+/** Bảng trượt từ dưới lên theo chuẩn Warm Paper & Ink */
 export function Sheet({
   title,
   onClose,
@@ -41,7 +41,7 @@ export function Sheet({
   }, [onClose]);
 
   const parsed = splitEdgeEmoji(title);
-  const titleEmoji = parsed.leading ?? parsed.trailing;
+  const cleanTitle = (parsed.text || title).replace(/!+$/g, '').trim();
 
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
@@ -54,7 +54,6 @@ export function Sheet({
         <View
           style={[
             styles.panel,
-            sticker(0),
             { maxHeight },
             short && styles.panelShort,
             kb > 0 && Platform.OS === 'web' && { marginBottom: kb },
@@ -62,29 +61,22 @@ export function Sheet({
               ? ({
                   animation: 'xl-sheet-in 180ms cubic-bezier(0.22, 1, 0.36, 1)',
                   transition: 'margin-bottom 180ms cubic-bezier(0.22, 1, 0.36, 1)',
-                  boxShadow: '0 -4px 16px rgba(15,23,42,0.18)',
+                  boxShadow: '0 -8px 28px rgba(31, 27, 22, 0.16)',
                 } as object)
               : null,
           ]}
         >
           <View style={styles.grip} />
           <View style={styles.head}>
-            <View style={styles.titleRow}>
-              {titleEmoji && (
-                <View style={styles.titleIconWrap}>
-                  <EmojiIcon emoji={titleEmoji} size={22} />
-                </View>
-              )}
-              <T style={styles.title}>{parsed.text || title}</T>
-            </View>
+            <T numberOfLines={1} style={styles.title}>{cleanTitle}</T>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Đóng bảng"
               onPress={onClose}
               hitSlop={10}
-              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.72 }]}
             >
-              <UiIcon name="X" size={18} color={C.ink} strokeWidth={2.5} />
+              <UiIcon name="X" size={16} color={C.secondary} strokeWidth={1.75} />
             </Pressable>
           </View>
           {stickyTop ? <View style={styles.stickyWrap}>{stickyTop}</View> : null}
@@ -106,24 +98,44 @@ export function Sheet({
 
 const styles = StyleSheet.create({
   root: { position: (Platform.OS === 'web' ? 'fixed' : 'absolute') as 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, justifyContent: 'flex-end' },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.56)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(28, 25, 23, 0.48)' },
   panel: {
-    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomWidth: 0,
-    padding: 16, paddingBottom: 20, gap: 12, width: '100%', maxWidth: 540, alignSelf: 'center', overflow: 'hidden',
+    backgroundColor: C.paper,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: C.borderSubtle,
+    padding: 16,
+    paddingBottom: 20,
+    gap: 12,
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+    overflow: 'hidden',
   },
   panelShort: { maxWidth: 680, padding: 12, paddingBottom: 14, gap: 8 },
   stickyWrap: { flexShrink: 0 },
   body: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
-  bodyContent: { gap: 14 },
+  bodyContent: { gap: 12 },
   bodyFixed: { flexShrink: 1, minHeight: 0, gap: 10 },
-  grip: { width: 42, height: 4.5, borderRadius: 3, backgroundColor: 'rgba(28,32,36,0.16)', alignSelf: 'center' },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
-  titleIconWrap: {
-    width: 34, height: 34, borderRadius: 11, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
+  grip: { width: 36, height: 4, borderRadius: 2, backgroundColor: C.borderStrong, alignSelf: 'center' },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderSubtle,
   },
-  title: { fontSize: 19, fontWeight: '900', color: C.ink, flexShrink: 1 },
+  title: { fontSize: 17, fontWeight: '600', color: C.ink, flex: 1, minWidth: 0 },
   closeBtn: {
-    width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: C.mist,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

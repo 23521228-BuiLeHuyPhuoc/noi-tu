@@ -100,6 +100,11 @@ export class BoomOnlineGame implements GameEngine {
 
   private latestInputs: Record<string, BoomInput> = {};
   private pendingEdges: Record<string, { placeBomb?: boolean; special?: boolean }> = {};
+  private pendingMoveTaps: Record<string, { dx: number; dy: number } | undefined> = {};
+  private lastReceivedSeq: Record<string, number> = {};
+  private lastProcessedSeq: Record<string, number> = {};
+  private gridVersion = 1;
+  private pendingGridDiffs: [number, BoomTile][] = [];
 
   private tickEvents: BoomEvent[] = [];
   private recentEvents: BoomEvent[] = [];
@@ -217,8 +222,11 @@ export class BoomOnlineGame implements GameEngine {
     this.killFeed = [];
     this.latestInputs = {};
     this.pendingEdges = {};
+    this.pendingMoveTaps = {};
     this.passThroughBombs = {};
     this.botBombCooldown = {};
+    this.gridVersion = 1;
+    this.pendingGridDiffs = [];
 
     // 1. Tường đá viền ngoài + Trụ đá bàn cờ cố định bên trong (tx % 2 === 0 && ty % 2 === 0)
     for (let ty = 0; ty < H; ty++) {
@@ -311,6 +319,13 @@ export class BoomOnlineGame implements GameEngine {
     this.phaseEndsAt = Date.now() + this.phaseTicksLeft * this.tickIntervalMs;
   }
 
+  private setGridTile(idx: number, tile: BoomTile): void {
+    if (this.grid[idx] === tile) return;
+    this.grid[idx] = tile;
+    this.gridVersion++;
+    this.pendingGridDiffs.push([idx, tile]);
+  }
+
   private emitEvent(kind: BoomSfxKind, extra?: Omit<BoomEvent, 'id' | 'kind'>): void {
     const ev: BoomEvent = {
       id: this.nextEventId++,
@@ -383,11 +398,11 @@ export class BoomOnlineGame implements GameEngine {
         this.phase = 'playing';
         this.timeLeftMs = BOOM_ROUND_SEC * 1000;
         this.phaseEndsAt = Date.now() + Math.round((this.timeLeftMs / 1000) * BOOM_FPS * this.tickIntervalMs);
-        this.ctx.emitBoomTick?.(this.buildSnapshot());
+        this.ctx.emitBoomTick?.(this.buildSnapshot(false));
         this.ctx.changed();
         return;
       }
-      this.ctx.emitBoomTick?.(this.buildSnapshot());
+      this.ctx.emitBoomTick?.(this.buildSnapshot(false));
       return;
     }
 
@@ -399,11 +414,11 @@ export class BoomOnlineGame implements GameEngine {
           return;
         }
         this.startRound(this.round + 1);
-        this.ctx.emitBoomTick?.(this.buildSnapshot());
+        this.ctx.emitBoomTick?.(this.buildSnapshot(false));
         this.ctx.changed();
         return;
       }
-      this.ctx.emitBoomTick?.(this.buildSnapshot());
+      this.ctx.emitBoomTick?.(this.buildSnapshot(false));
       return;
     }
 
@@ -422,9 +437,11 @@ export class BoomOnlineGame implements GameEngine {
       } else {
         const base = this.latestInputs[p.id];
         const edges = this.pendingEdges[p.id];
+        const tap = this.pendingMoveTaps[p.id];
+        const baseMoving = base && (Math.abs(base.dx) > 0.04 || Math.abs(base.dy) > 0.04);
         stepInputs[p.id] = {
-          dx: base?.dx ?? 0,
-          dy: base?.dy ?? 0,
+          dx: baseMoving ? base.dx : (tap?.dx ?? base?.dx ?? 0),
+          dy: baseMoving ? base.dy : (tap?.dy ?? base?.dy ?? 0),
           placeBomb: !!(edges?.placeBomb || base?.placeBomb),
           special: !!(edges?.special || base?.special),
         };
@@ -432,9 +449,13 @@ export class BoomOnlineGame implements GameEngine {
           base.placeBomb = false;
           base.special = false;
         }
+        if (this.lastReceivedSeq[p.id] !== undefined) {
+          this.lastProcessedSeq[p.id] = this.lastReceivedSeq[p.id];
+        }
       }
     }
     this.pendingEdges = {};
+    this.pendingMoveTaps = {};
 
     // 2. Xử lý Kim Tự Cứu (`needle`) ngay đầu nhịp cho người đang bị nhốt trong bóng nước
     for (const p of this.players) {
@@ -696,7 +717,7 @@ export class BoomOnlineGame implements GameEngine {
       return;
     }
 
-    this.ctx.emitBoomTick?.(this.buildSnapshot());
+    this.ctx.emitBoomTick?.(this.buildSnapshot(true));
   }
 
   private grantBombPassThroughOnTile(bombId: number, btx: number, bty: number): void {
@@ -992,7 +1013,7 @@ export class BoomOnlineGame implements GameEngine {
 
     // Phá thùng gỗ & quay thưởng rớt vật phẩm (~42% tỉ lệ rơi, mỗi thùng chỉ tính 1 lần dù trúng nhiều tia)
     for (const idx of cratesHit) {
-      this.grid[idx] = 0;
+      this.setGridTile(idx, 0);
       if (this.ctx.rng() < 0.42) {
         const tx = idx % this.width;
         const ty = Math.floor(idx / this.width);
@@ -1082,7 +1103,7 @@ export class BoomOnlineGame implements GameEngine {
 
   private slamDeathWallAt(tx: number, ty: number): void {
     const idx = ty * this.width + tx;
-    this.grid[idx] = 3;
+    this.setGridTile(idx, 3);
 
     // Xóa vật phẩm, tia nước và bom bị đè dưới gạch tử thần
     this.items = this.items.filter((it) => !(it.tx === tx && it.ty === ty));
@@ -1539,7 +1560,7 @@ export class BoomOnlineGame implements GameEngine {
     this.phaseTicksLeft = this.roundEndTicksCfg;
     this.phaseEndsAt = Date.now() + this.phaseTicksLeft * this.tickIntervalMs;
 
-    this.ctx.emitBoomTick?.(this.buildSnapshot());
+    this.ctx.emitBoomTick?.(this.buildSnapshot(false));
     this.ctx.changed();
   }
 
@@ -1577,6 +1598,13 @@ export class BoomOnlineGame implements GameEngine {
     }
 
     const raw = a.input;
+    if (typeof raw.seq === 'number' && Number.isFinite(raw.seq)) {
+      const prevSeq = this.lastReceivedSeq[playerId];
+      if (prevSeq !== undefined && raw.seq < prevSeq) {
+        return { ok: true };
+      }
+      this.lastReceivedSeq[playerId] = raw.seq;
+    }
     const dx =
       typeof raw.dx === 'number' && Number.isFinite(raw.dx)
         ? Math.max(-1, Math.min(1, raw.dx))
@@ -1587,6 +1615,9 @@ export class BoomOnlineGame implements GameEngine {
         : 0;
 
     this.latestInputs[playerId] = { dx, dy };
+    if (Math.abs(dx) > 0.04 || Math.abs(dy) > 0.04) {
+      this.pendingMoveTaps[playerId] = { dx, dy };
+    }
     if (raw.placeBomb || raw.special) {
       const cur = this.pendingEdges[playerId] ?? {};
       if (raw.placeBomb) cur.placeBomb = true;
@@ -1601,6 +1632,9 @@ export class BoomOnlineGame implements GameEngine {
     this.order = this.order.filter((id) => id !== playerId);
     delete this.latestInputs[playerId];
     delete this.pendingEdges[playerId];
+    delete this.pendingMoveTaps[playerId];
+    delete this.lastReceivedSeq[playerId];
+    delete this.lastProcessedSeq[playerId];
     delete this.passThroughBombs[playerId];
     this.players = this.players.filter((p) => p.id !== playerId);
 
@@ -1627,6 +1661,7 @@ export class BoomOnlineGame implements GameEngine {
     if (!connected) {
       delete this.latestInputs[playerId];
       delete this.pendingEdges[playerId];
+      delete this.pendingMoveTaps[playerId];
     }
     this.ctx.changed();
   }
@@ -1703,7 +1738,12 @@ export class BoomOnlineGame implements GameEngine {
     });
   }
 
-  private buildSnapshot(): BoomTickPayload {
+  private buildSnapshot(deltaMode = false): BoomTickPayload {
+    const includeFullGrid = !deltaMode || this.tick % 30 === 0;
+    const diffs = this.pendingGridDiffs;
+    if (deltaMode) {
+      this.pendingGridDiffs = [];
+    }
     return {
       tick: this.tick,
       round: this.round,
@@ -1712,7 +1752,10 @@ export class BoomOnlineGame implements GameEngine {
       ringActive: this.ringActive,
       width: this.width,
       height: this.height,
-      grid: [...this.grid],
+      acks: { ...this.lastProcessedSeq },
+      gridVersion: this.gridVersion,
+      ...(includeFullGrid ? { grid: [...this.grid] } : {}),
+      ...(!includeFullGrid && diffs.length > 0 ? { gridDiff: diffs } : {}),
       warningCells: [...this.warningCells],
       items: this.items.map((it) => ({ ...it })),
       bombs: this.bombs.map((b) => ({
@@ -1759,7 +1802,8 @@ export class BoomOnlineGame implements GameEngine {
       teams: { ...this.teams },
       roundWinnerText: this.roundWinnerText,
       snapshot: {
-        ...this.buildSnapshot(),
+        ...this.buildSnapshot(false),
+        grid: [...this.grid],
         events: [...this.recentEvents],
       },
     };

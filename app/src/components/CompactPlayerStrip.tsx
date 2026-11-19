@@ -20,8 +20,7 @@ export interface CompactPlayerStripProps {
 }
 
 /**
- * Dải người chơi siêu gọn (1 dòng ~36px): chân dung 22px, tên rút gọn và điểm/trạng thái.
- * Chạm vào mình mở Hồ sơ, chạm vào người khác mở Bảng chọc ghẹo — giữ đủ tương tác mà không chiếm màn chơi.
+ * Dải người chơi siêu gọn (1 dòng ~34px): chân dung 20px, tên rút gọn và điểm/hạng chuẩn dossier.
  */
 export function CompactPlayerStrip({
   room,
@@ -76,16 +75,14 @@ export function CompactPlayerStrip({
               dark ? styles.pillDark : styles.pillLight,
               isMe && (dark ? styles.pillMeDark : styles.pillMeLight),
               isActive && styles.pillActive,
-              ringColor ? { borderColor: ringColor, borderWidth: 2 } : null,
+              ringColor ? { borderColor: ringColor, borderWidth: 1.5 } : null,
               isDim && styles.pillDim,
             ]}
           >
             {rk !== undefined && rk > 0 && (
-              <View style={[styles.rkBadge, rk === 1 && styles.rkGold]}>
-                <T style={[styles.rkTxt, rk === 1 && styles.rkTxtGold]}>#{rk}</T>
-              </View>
+              <T style={[styles.rkTxt, rk === 1 && styles.rkTxtGold]}>#{rk}</T>
             )}
-            <Portrait p={p} size={22} border={1.5} />
+            <Portrait p={p} size={20} border={1} />
             <T
               numberOfLines={1}
               style={[
@@ -114,10 +111,11 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 0,
     flexShrink: 0,
-    minHeight: 34,
-    maxHeight: 38,
+    minHeight: 32,
+    maxHeight: 36,
   },
   row: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 2,
@@ -126,86 +124,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   pillLight: {
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderColor: 'rgba(15,23,42,0.14)',
+    backgroundColor: C.paper,
+    borderColor: C.borderSubtle,
   },
   pillDark: {
-    backgroundColor: 'rgba(15,23,42,0.82)',
-    borderColor: 'rgba(148,163,184,0.34)',
+    backgroundColor: C.darkSurface,
+    borderColor: C.darkBorder,
   },
   pillMeLight: {
-    backgroundColor: '#FEF9C3',
-    borderColor: 'rgba(217,119,6,0.45)',
+    backgroundColor: C.mist,
+    borderColor: C.borderStrong,
   },
   pillMeDark: {
-    backgroundColor: 'rgba(234,179,8,0.22)',
-    borderColor: 'rgba(250,204,21,0.65)',
+    backgroundColor: C.darkSubtle,
+    borderColor: 'rgba(251, 249, 245, 0.24)',
   },
   pillActive: {
-    borderColor: '#F59E0B',
-    borderWidth: 2,
+    backgroundColor: C.goldSoft,
+    borderColor: C.goldDeep,
   },
   pillDim: {
     opacity: 0.45,
   },
-  rkBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 6,
-    backgroundColor: '#E2E8F0',
-  },
-  rkGold: {
-    backgroundColor: '#FACC15',
-  },
   rkTxt: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#334155',
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: C.muted,
+    fontVariant: ['tabular-nums'],
   },
   rkTxtGold: {
-    color: '#422006',
+    color: C.goldDeep,
   },
   name: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    maxWidth: 66,
+    fontSize: 12,
+    fontWeight: '500',
+    maxWidth: 72,
     fontFamily: FONT,
   },
   nameLight: {
     color: C.ink,
   },
   nameDark: {
-    color: '#F8FAFC',
+    color: C.darkText,
   },
   nameActive: {
-    color: '#B45309',
-    fontWeight: '900',
+    color: C.ink,
+    fontWeight: '600',
   },
   subBadge: {
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 999,
+    borderRadius: 6,
   },
   subLight: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: C.mist,
   },
   subDark: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
   subTxt: {
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 10.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   subTxtLight: {
-    color: '#334155',
+    color: C.secondary,
   },
   subTxtDark: {
-    color: '#E2E8F0',
+    color: C.darkText,
   },
 });

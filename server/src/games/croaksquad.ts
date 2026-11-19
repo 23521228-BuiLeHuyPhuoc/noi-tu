@@ -32,6 +32,10 @@ export class CroakSquadGame implements GameEngine {
   private latestInputs: Record<string, CroakInput> = {};
   /** Các phím nhấp 1 lần (nhảy, phóng lưỡi, nhả) được giữ tới tick vật lý kế tiếp rồi xóa */
   private pendingEdges: Record<string, { jump?: boolean; tongue?: boolean; spit?: boolean }> = {};
+  private pendingMoveTaps: Record<string, number | undefined> = {};
+  private pendingSpitAim: Record<string, { aimAngle?: number; aimPower?: number } | undefined> = {};
+  private lastReceivedSeq: Record<string, number> = {};
+  private lastProcessedSeq: Record<string, number> = {};
   /** Bộ nhớ trạng thái AI cho từng chú ếch máy (đếm nhịp ngắm bắn, chống kẹt địa hình) */
   private botMem: Record<string, { holdAimTicks: number; lastX: number; stuckTicks: number; tongueCd: number }> = {};
   private loop?: ReturnType<typeof setInterval>;
@@ -276,11 +280,14 @@ export class CroakSquadGame implements GameEngine {
       }
       const base = this.latestInputs[id];
       const edges = this.pendingEdges[id];
-      if (base || edges) {
+      const tapMoveX = this.pendingMoveTaps[id];
+      const spitAim = edges?.spit ? this.pendingSpitAim[id] : undefined;
+      if (base || edges || tapMoveX !== undefined) {
+        const moveX = base && base.moveX !== 0 ? base.moveX : (tapMoveX ?? base?.moveX ?? 0);
         merged[id] = {
-          moveX: base?.moveX ?? 0,
-          aimAngle: base?.aimAngle,
-          aimPower: base?.aimPower,
+          moveX,
+          aimAngle: spitAim?.aimAngle ?? base?.aimAngle,
+          aimPower: spitAim?.aimPower ?? base?.aimPower,
           jump: edges?.jump || base?.jump,
           tongue: edges?.tongue || base?.tongue,
           spit: edges?.spit || base?.spit,
@@ -291,8 +298,13 @@ export class CroakSquadGame implements GameEngine {
         base.tongue = false;
         base.spit = false;
       }
+      if (this.lastReceivedSeq[id] !== undefined) {
+        this.lastProcessedSeq[id] = this.lastReceivedSeq[id];
+      }
     }
     this.pendingEdges = {};
+    this.pendingMoveTaps = {};
+    this.pendingSpitAim = {};
 
     const evs = stepCroakWorld(this.world, merged, CROAK_DT);
 
@@ -301,7 +313,7 @@ export class CroakSquadGame implements GameEngine {
       return;
     }
 
-    this.ctx.emitCroakTick?.(toCroakTickPayload(this.world, evs));
+    this.ctx.emitCroakTick?.(toCroakTickPayload(this.world, evs, { ...this.lastProcessedSeq }));
 
     // Khi qua màn mới hoặc có sự kiện quan trọng (chìa khóa, công tắc, checkpoint, hoàn thành màn), đồng bộ cả RoomState
     const stageChanged = this.world.stageIndex !== prevStage;
@@ -335,6 +347,13 @@ export class CroakSquadGame implements GameEngine {
     }
 
     const raw = a.input;
+    if (typeof raw.seq === 'number' && Number.isFinite(raw.seq)) {
+      const prevSeq = this.lastReceivedSeq[playerId];
+      if (prevSeq !== undefined && raw.seq < prevSeq) {
+        return { ok: true };
+      }
+      this.lastReceivedSeq[playerId] = raw.seq;
+    }
     const moveX = typeof raw.moveX === 'number' && Number.isFinite(raw.moveX)
       ? Math.max(-1, Math.min(1, Math.round(raw.moveX)))
       : 0;
@@ -346,11 +365,19 @@ export class CroakSquadGame implements GameEngine {
       ...(aimAngle !== undefined ? { aimAngle } : {}),
       ...(aimPower !== undefined ? { aimPower } : {}),
     };
+    if (moveX !== 0) {
+      this.pendingMoveTaps[playerId] = moveX;
+    }
     if (raw.jump || raw.tongue || raw.spit) {
       const cur = this.pendingEdges[playerId] ?? {};
       if (raw.jump) cur.jump = true;
       if (raw.tongue) cur.tongue = true;
-      if (raw.spit) cur.spit = true;
+      if (raw.spit) {
+        cur.spit = true;
+        if (aimAngle !== undefined || aimPower !== undefined) {
+          this.pendingSpitAim[playerId] = { aimAngle, aimPower };
+        }
+      }
       this.pendingEdges[playerId] = cur;
     }
     return { ok: true };
@@ -361,6 +388,10 @@ export class CroakSquadGame implements GameEngine {
     this.order = this.order.filter((id) => id !== playerId);
     delete this.latestInputs[playerId];
     delete this.pendingEdges[playerId];
+    delete this.pendingMoveTaps[playerId];
+    delete this.pendingSpitAim[playerId];
+    delete this.lastReceivedSeq[playerId];
+    delete this.lastProcessedSeq[playerId];
     delete this.botMem[playerId];
     removeCroakPlayer(this.world, playerId);
     const anyHumanLeft = this.order.some((id) => !this.ctx.isBot?.(id));
@@ -378,6 +409,8 @@ export class CroakSquadGame implements GameEngine {
     if (!connected) {
       delete this.latestInputs[playerId];
       delete this.pendingEdges[playerId];
+      delete this.pendingMoveTaps[playerId];
+      delete this.pendingSpitAim[playerId];
     }
     this.ctx.changed();
   }

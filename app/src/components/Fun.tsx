@@ -30,7 +30,7 @@ import { POKES, type PokeItem } from '../../../shared/src/pokes';
 import { getSmoothModeSync } from '../smoothMode';
 import { chatBubbleStyleOf, chatBubbleTextColorOf } from './Cosmetics';
 import confetti from 'canvas-confetti';
-import { EmojiIcon, UiIcon, splitEdgeEmoji } from './Icons';
+import { EmojiIcon, UiIcon, type UiIconName } from './Icons';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -462,7 +462,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
               vibrate(nice ? 60 : 200);
               if (!nice) shake();
             }
-            feed(`${from} ${nice ? 'tặng' : 'ném'} ${emoji} vào mặt bạn!`, nice ? 'fun' : 'bad');
+            feed(`${from} ${nice ? 'tặng' : 'ném'} ${emoji} vào mặt bạn`, nice ? 'fun' : 'bad');
           }
         };
         play('whoosh');
@@ -483,8 +483,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           vibrate(400);
           shake();
           play('turn');
-          feed(`⏰ ${from} đang hối bạn đó!`, 'bad');
-        } else feed(`⏰ ${from} đang hối ${nameOf(e.to)}`, 'fun');
+          feed(`${from} đang hối bạn`, 'bad');
+        } else feed(`${from} đang hối ${nameOf(e.to)}`, 'fun');
       } else if (e.kind === 'emoji') {
         play('pop');
         if (fromR) add({ kind: 'float', emoji: e.emoji, at: fromR });
@@ -502,7 +502,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
             vibrate(e.ko ? [200, 80, 300] : 150);
             shake(e.ko ? 'quake' : 'normal');
           }
-          if (e.ko) feed(`💥 ${from} hạ đo ván ${toMe ? 'bạn' : nameOf(e.to)}! (hồi đầy máu)`, toMe ? 'bad' : 'fun');
+          if (e.ko) feed(`${from} hạ đo ván ${toMe ? 'bạn' : nameOf(e.to)} (hồi đầy máu)`, toMe ? 'bad' : 'fun');
           else if (toMe) feed(`${from} ${move.name.toLowerCase()} bạn ${move.emoji} -${damage} máu`, 'bad');
         };
         play('whoosh');
@@ -563,7 +563,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setWobble(e.to, 'blackout', 4200);
       }
       // bị chọc đúng lúc đang tới lượt Nối từ: server bù lại thời gian
-      if (toMe && e.pausedMs) feed(`⏸ Bị chọc nên được bù +${(e.pausedMs / 1000).toLocaleString('vi-VN')} giây vào lượt`, 'good');
+      if (toMe && e.pausedMs) feed(`Bị chọc nên được bù +${(e.pausedMs / 1000).toLocaleString('vi-VN')} giây vào lượt`, 'good');
     });
   }, [game, add, feed, shake, say, layer]);
 
@@ -586,10 +586,10 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         <Bubble key={b.key} item={b} pos={placed[i]} onDone={() => unsay(b.key)} />
       ))}
       {combo >= 2 && (
-        <View testID="poke-combo" style={[styles.comboBadge, sticker(3)]}>
-          <EmojiIcon emoji={combo >= 7 ? '🌪️' : combo >= 4 ? '⚡' : '🔥'} size={15} />
+        <View testID="poke-combo" style={[styles.comboBadge, sticker(2)]}>
+          <UiIcon name={combo >= 7 ? 'Zap' : combo >= 4 ? 'Flame' : 'Sparkles'} size={14} color={C.gold} />
           <Text style={styles.comboText}>
-            {combo >= 7 ? `SIÊU BÃO XÓM LẦY x${combo}!` : combo >= 4 ? `LIÊN HOÀN x${combo}!` : `COMBO x${combo}!`}
+            {combo >= 7 ? `Siêu bão Xóm Lầy ×${combo}` : combo >= 4 ? `Liên hoàn ×${combo}` : `Combo ×${combo}`}
           </Text>
         </View>
       )}
@@ -711,7 +711,7 @@ function InkSplash({ corner, size, onDone: finish }: { corner: number; size: Siz
           />
         ))}
         <View style={{ position: 'absolute', left: S * 0.36, top: S * 0.3, width: S * 0.14, height: S * 0.08, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.22)', transform: [{ rotate: '-25deg' }] }} />
-        <Text style={styles.inkHint}>lau đi 🧽</Text>
+        <Text style={styles.inkHint}>Chạm để lau</Text>
       </Pressable>
     </Animated.View>
   );
@@ -742,21 +742,18 @@ function BlackoutSplash({ onDone: finish }: { onDone: () => void }) {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: 'rgba(4, 6, 14, 0.96)',
+          backgroundColor: 'rgba(17, 20, 28, 0.96)',
           opacity: alpha,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          gap: 14,
+          gap: 12,
         },
       ]}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <EmojiIcon emoji="🔌" size={48} />
-        <EmojiIcon emoji="⚡" size={48} />
-      </View>
-      <T style={{ color: C.gold, fontSize: 20, fontWeight: '900', textAlign: 'center' }}>SỤP NGUỒN SÁNG!</T>
-      <T style={{ color: '#CED4DA', fontSize: 14, fontWeight: '700', textAlign: 'center' }}>Ai đó vừa giật cầu dao làm tối sầm màn hình của bạn</T>
+      <UiIcon name="Zap" size={44} color={C.gold} />
+      <T style={{ color: C.darkText, fontSize: 19, fontWeight: '600', textAlign: 'center' }}>Sụp nguồn sáng</T>
+      <T style={{ color: C.darkMuted, fontSize: 14, fontWeight: '400', textAlign: 'center' }}>Ai đó vừa giật cầu dao làm tối màn hình của bạn</T>
       <Pressable
         testID="blackout-recover"
         accessibilityRole="button"
@@ -766,12 +763,12 @@ function BlackoutSplash({ onDone: finish }: { onDone: () => void }) {
           Animated.timing(alpha, { toValue: 0, duration: 160, useNativeDriver: false }).start(onDone);
         }}
         style={{
-          marginTop: 6, backgroundColor: C.gold, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10,
-          borderWidth: 2, borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 8,
+          marginTop: 6, backgroundColor: C.gold, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10,
+          borderWidth: 1, borderColor: C.goldDeep, flexDirection: 'row', alignItems: 'center', gap: 8,
         }}
       >
-        <UiIcon name="Zap" size={17} color={C.ink} />
-        <T style={{ color: C.ink, fontWeight: '900', fontSize: 15 }}>Bật lại cầu dao</T>
+        <UiIcon name="Zap" size={16} color={C.ink} />
+        <T style={{ color: C.ink, fontWeight: '600', fontSize: 14 }}>Bật lại cầu dao</T>
       </Pressable>
     </Animated.View>
   );
@@ -848,12 +845,12 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
 // ---------- Bảng chọn đồ để ném / hối ----------
 
 type ThrowFilter = 'all' | 'skill' | 'gift' | 'troll' | 'hit';
-const THROW_FILTERS: { id: ThrowFilter; label: string }[] = [
-  { id: 'all', label: 'Tất cả' },
-  { id: 'skill', label: '⚡ Kỹ năng VIP' },
-  { id: 'gift', label: '🎁 Quà Đại Gia' },
-  { id: 'troll', label: '😈 Chọc lầy' },
-  { id: 'hit', label: '🥊 Đánh & Ném' },
+const THROW_FILTERS: { id: ThrowFilter; icon: UiIconName; label: string }[] = [
+  { id: 'all', icon: 'Layers', label: 'Tất cả' },
+  { id: 'skill', icon: 'Zap', label: 'Kỹ năng VIP' },
+  { id: 'gift', icon: 'Gift', label: 'Quà đại gia' },
+  { id: 'troll', icon: 'Smile', label: 'Chọc vui' },
+  { id: 'hit', icon: 'Swords', label: 'Đánh & Ném' },
 ];
 
 export function ThrowSheet({ game, target, onClose }: { game: Game; target: PublicPlayer; onClose: () => void }) {
@@ -872,12 +869,12 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
     void game.sendFun(f).then((r) => {
       if (!r.ok && r.reason === 'quota') {
         feed(game.user ? `Hết ${FREE_POKES_PER_DAY} lượt chọc miễn phí hôm nay — nạp Ruby để chọc tiếp` : `Hết ${FREE_POKES_PER_DAY} lượt chọc miễn phí hôm nay — đăng ký tài khoản và nạp Ruby để chọc tiếp`, 'info');
-      } else if (!r.ok && r.reason === 'need_ruby') feed('Không đủ Ruby cho chiêu này, vào Cửa hàng để nạp thêm 💎', 'info');
+      } else if (!r.ok && r.reason === 'need_ruby') feed('Không đủ Ruby cho chiêu này, vào Cửa hàng để nạp thêm', 'info');
       else if (!r.ok && r.reason === 'need_account') feed('Cần đăng nhập tài khoản để dùng kỹ năng và tặng quà', 'info');
       // mỗi người chỉ bị rung/sụp nguồn/gián/mực tối đa 3 lần mỗi 15 giây
       if (!r.ok && r.reason === 'limited') {
-        feed(`⏳ ${target.name} bị chọc đủ rồi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa nhé (tối đa 3 lần/15 giây)`, 'info');
-      } else if (!r.ok && r.reason === 'busy') feed('Chọc chậm thôi, từ từ nào 😅', 'info');
+        feed(`${target.name} bị chọc đủ rồi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa nhé (tối đa 3 lần/15 giây)`, 'info');
+      } else if (!r.ok && r.reason === 'busy') feed('Chọc chậm thôi, từ từ nào', 'info');
     });
   };
   const hit = (move: HitMove) => send({ kind: 'hit', to: target.id, move });
@@ -887,16 +884,15 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
     <Sheet title={`Chọc ${target.name}`} onClose={onClose}>
       {quota && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 }}>
-          <EmojiIcon emoji="🎟️" size={16} />
+          <UiIcon name="Zap" size={14} color={C.goldDeep} />
           <T testID="poke-quota" style={[styles.quota, { marginTop: 0 }]}>
-            Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 💎 / lần)
+            Còn {quota.left}/{quota.free} lượt chọc miễn phí hôm nay (hết thì 1 Ruby / lần)
           </T>
         </View>
       )}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingBottom: 2 }}>
         {THROW_FILTERS.map((f) => {
           const on = filter === f.id;
-          const sp = splitEdgeEmoji(f.label);
           return (
             <Pressable
               key={f.id}
@@ -904,8 +900,8 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
               onPress={() => setFilter(f.id)}
               style={[styles.filterPill, on && styles.filterPillOn]}
             >
-              {sp.leading && <EmojiIcon emoji={sp.leading} size={13} />}
-              <T style={[styles.filterPillTxt, on && { color: C.gold }]}>{sp.text || f.label}</T>
+              <UiIcon name={f.icon} size={13} color={on ? C.onSon : C.secondary} />
+              <T style={[styles.filterPillTxt, on && { color: C.onSon }]}>{f.label}</T>
             </Pressable>
           );
         })}
@@ -913,7 +909,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       <Button
         testID="poke-kho-open"
         variant={kho ? 'ink' : 'gold'}
-        icon="🎁"
+        iconNode={<UiIcon name="Gift" size={15} color={kho ? C.onSon : C.ink} />}
         title={kho ? 'Đóng kho chọc ghẹo' : `Kho chọc ghẹo · ${POKES.length} món`}
         onPress={() => setKho((v) => !v)}
       />
@@ -921,7 +917,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       {show('hit') && (
         <>
           <View style={styles.secHeadingRow}>
-            <EmojiIcon emoji="🥊" size={16} />
+            <UiIcon name="Swords" size={15} color={C.secondary} />
             <T style={styles.sectionLabel}>Đánh nhau (máu ảo, không ảnh hưởng ván chơi)</T>
           </View>
           <View style={styles.hits}>
@@ -938,8 +934,8 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       {show('troll') && (
         <>
           <View style={styles.secHeadingRow}>
-            <EmojiIcon emoji="😈" size={16} />
-            <T style={styles.sectionLabel}>Chọc mất dạy (chỉ để cười thôi nha)</T>
+            <UiIcon name="Smile" size={15} color={C.secondary} />
+            <T style={styles.sectionLabel}>Chọc lầy giải trí</T>
           </View>
           <T style={styles.limitNote}>Rung, xoay, sụp nguồn, gián, mực, hối: mỗi người chỉ dính tối đa 3 lần mỗi 15 giây. Đang tới lượt nối từ thì được bù lại thời gian.</T>
           {pane ? (
@@ -968,22 +964,22 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
             </>
           ) : (
             <View style={styles.trolls}>
-              <Button testID="troll-doodle" icon="🖍️" title="Vẽ bậy" variant={pane === 'doodle' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'doodle' ? null : 'doodle')} />
-              <Button testID="troll-roach" icon="🪳" title="Thả gián" variant="gold" style={styles.troll} onPress={() => send({ kind: 'roach', to: target.id })} />
-              <Button testID="troll-ink" icon="🦑" title="Tạt mực" variant="gold" style={styles.troll} onPress={() => send({ kind: 'ink', to: target.id })} />
-              <Button testID="troll-nick" icon="🏷️" title="Biệt danh" variant={pane === 'nick' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'nick' ? null : 'nick')} />
-              <Button testID="troll-honk" icon="📢" title="Bật loa" variant="gold" style={styles.troll} onPress={() => send({ kind: 'honk', to: target.id })} />
-              <Button testID="troll-cry" icon="😭" title="Khóc thuê" variant="gold" style={styles.troll} onPress={() => send({ kind: 'cry', to: target.id })} />
-              <Button testID="troll-blackout" icon="🔌" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
-              <Button testID="troll-spin" icon="🌀" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
-              <Button testID="troll-quake" icon="🌋" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
-              <Button testID="troll-fart" icon="💨" title="Thả bom thối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'fart', to: target.id })} />
-              <Button testID="troll-slipper" icon="🩴" title="Dép bay liên hoàn" variant="gold" style={styles.troll} onPress={() => send({ kind: 'slipper', to: target.id })} />
-              <Button testID="troll-chicken" icon="🐔" title="Gà mổ" variant="gold" style={styles.troll} onPress={() => send({ kind: 'chicken', to: target.id })} />
-              <Button testID="troll-bigface" icon="🤪" title="Mặt to" variant="gold" style={styles.troll} onPress={() => send({ kind: 'bigface', to: target.id })} />
-              <Button testID="troll-banana" icon="🍌" title="Vỏ chuối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'banana', to: target.id })} />
-              <Button testID="troll-mirror" icon="🪞" title="Lật ngược màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'mirror', to: target.id })} />
-              <Button testID="troll-charm" icon="✨" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
+              <Button testID="troll-doodle" title="Vẽ bậy" variant={pane === 'doodle' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'doodle' ? null : 'doodle')} />
+              <Button testID="troll-roach" title="Thả gián" variant="gold" style={styles.troll} onPress={() => send({ kind: 'roach', to: target.id })} />
+              <Button testID="troll-ink" title="Tạt mực" variant="gold" style={styles.troll} onPress={() => send({ kind: 'ink', to: target.id })} />
+              <Button testID="troll-nick" title="Biệt danh" variant={pane === 'nick' ? 'ink' : 'gold'} style={styles.troll} onPress={() => setPane(pane === 'nick' ? null : 'nick')} />
+              <Button testID="troll-honk" title="Bật loa" variant="gold" style={styles.troll} onPress={() => send({ kind: 'honk', to: target.id })} />
+              <Button testID="troll-cry" title="Khóc thuê" variant="gold" style={styles.troll} onPress={() => send({ kind: 'cry', to: target.id })} />
+              <Button testID="troll-blackout" title="Sụp nguồn sáng" variant="gold" style={styles.troll} onPress={() => send({ kind: 'blackout', to: target.id })} />
+              <Button testID="troll-spin" title="Xoay màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'spin', to: target.id })} />
+              <Button testID="troll-quake" title="Rung động đất" variant="gold" style={styles.troll} onPress={() => send({ kind: 'quake', to: target.id })} />
+              <Button testID="troll-fart" title="Thả bom thối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'fart', to: target.id })} />
+              <Button testID="troll-slipper" title="Dép bay liên hoàn" variant="gold" style={styles.troll} onPress={() => send({ kind: 'slipper', to: target.id })} />
+              <Button testID="troll-chicken" title="Gà mổ" variant="gold" style={styles.troll} onPress={() => send({ kind: 'chicken', to: target.id })} />
+              <Button testID="troll-bigface" title="Mặt to" variant="gold" style={styles.troll} onPress={() => send({ kind: 'bigface', to: target.id })} />
+              <Button testID="troll-banana" title="Vỏ chuối" variant="gold" style={styles.troll} onPress={() => send({ kind: 'banana', to: target.id })} />
+              <Button testID="troll-mirror" title="Lật ngược màn hình" variant="gold" style={styles.troll} onPress={() => send({ kind: 'mirror', to: target.id })} />
+              <Button testID="troll-charm" title="Xin vía cho mình" variant="paper" style={styles.troll} onPress={() => send({ kind: 'charm' })} />
             </View>
           )}
         </>
@@ -992,8 +988,8 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       {show('skill') && (
         <>
           <View style={styles.secHeadingRow}>
-            <EmojiIcon emoji="⚡" size={16} />
-            <T style={styles.sectionLabel}>Kỹ năng VIP trả Ruby (hiệu ứng cực ngầu)</T>
+            <UiIcon name="Zap" size={15} color={C.secondary} />
+            <T style={styles.sectionLabel}>Kỹ năng VIP trả Ruby</T>
           </View>
           <View style={styles.trolls}>
             {SKILL_IDS.map((id) => {
@@ -1003,8 +999,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
                 <Button
                   key={id}
                   testID={`skill-${id}`}
-                  icon={it.emoji}
-                  title={`${it.name} 💎${it.price}`}
+                  title={`${it.name} · ${it.price} Ruby`}
                   small
                   variant={mythic ? 'gold' : 'ink'}
                   style={styles.troll}
@@ -1019,7 +1014,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       {show('gift') && (
         <>
           <View style={styles.secHeadingRow}>
-            <EmojiIcon emoji="🎁" size={16} />
+            <UiIcon name="Gift" size={15} color={C.secondary} />
             <T style={styles.sectionLabel}>Tặng quà Phú Hào (tặng điểm quà & lên VIP)</T>
           </View>
           <View style={styles.trolls}>
@@ -1030,8 +1025,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
                 <Button
                   key={id}
                   testID={`gift-${id}`}
-                  icon={it.emoji}
-                  title={`${it.name} 💎${it.price}`}
+                  title={`${it.name} · ${it.price} Ruby`}
                   small
                   variant={mega ? 'gold' : 'jade'}
                   style={styles.troll}
@@ -1043,7 +1037,15 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         </>
       )}
 
-      <Button testID="shop-open-throw" small variant="paper" icon="🛍️" title="Cửa hàng VIP" style={{ alignSelf: 'flex-start' }} onPress={() => setShopOpen(true)} />
+      <Button
+        testID="shop-open-throw"
+        small
+        variant="paper"
+        iconNode={<UiIcon name="ShoppingBag" size={14} color={C.ink} />}
+        title="Cửa hàng VIP"
+        style={{ alignSelf: 'flex-start' }}
+        onPress={() => setShopOpen(true)}
+      />
 
       {show('hit') && (
         <>
@@ -1066,7 +1068,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
       )}
       <Button
         testID="poke-btn"
-        icon="⏰"
+        iconNode={<UiIcon name="Timer" size={15} color={C.onSon} />}
         title={`Hối ${target.name}`}
         variant="ink"
         onPress={() => send({ kind: 'poke', to: target.id })}
@@ -1152,7 +1154,7 @@ const ChatMessageList = memo(function ChatMessageList({
       contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
       keyboardShouldPersistTaps="handled"
     >
-      {chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
+      {chat.length === 0 && <T style={styles.empty}>Chưa có tin nhắn nào. Mở hàng câu chuyện đi.</T>}
       {chat.map((m) => {
         const mine = m.from === me;
         const pl = playerMap.get(m.from);
@@ -1162,19 +1164,19 @@ const ChatMessageList = memo(function ChatMessageList({
         return (
           <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
             {/* Không gắn frame xoay/glow trong danh sách chat popup để tránh overdraw GPU trên mobile */}
-            <Portrait p={pl ?? FALLBACK_CHAT_AVATAR} size={28} border={1.5} />
+            <Portrait p={pl ?? FALLBACK_CHAT_AVATAR} size={24} border={1} />
             <View style={[styles.msg, mine ? styles.msgMine : null, bStyle]}>
               {!mine && <T style={[styles.msgName, bColor ? { color: bColor } : null]}>{m.name}</T>}
               {m.kind === 'sticker' ? (
                 asset ? (
                   <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" />
                 ) : (
-                  <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>
+                  <T style={[styles.msgText, mine && { color: C.onSon }, bColor ? { color: bColor } : null]}>
                     Nhãn dán chưa có trên thiết bị này
                   </T>
                 )
               ) : (
-                <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>{m.text}</T>
+                <T style={[styles.msgText, mine && { color: C.onSon }, bColor ? { color: bColor } : null]}>{m.text}</T>
               )}
             </View>
           </View>
@@ -1277,7 +1279,7 @@ export function ChatSheet({ game, players, onClose }: { game: Game; players: Pub
               style={[styles.stickerOption, sendingSticker && { opacity: 0.5 }]}
               onPress={async () => {
                 if (!ownsPack) {
-                  feed(game.user ? 'Bộ Chữ Lầy đang khóa 🔒 — mua 100 💎 trong Cửa hàng để dùng' : 'Bộ Chữ Lầy cần tài khoản và 100 💎 để mở khóa 🔒', 'info');
+                  feed(game.user ? 'Bộ Chữ Lầy đang khóa — mua 100 Ruby trong Cửa hàng để dùng' : 'Bộ Chữ Lầy cần tài khoản và 100 Ruby để mở khóa', 'info');
                   if (game.user) setShopOpen(true);
                   return;
                 }
@@ -1378,14 +1380,14 @@ export function Confetti() {
 }
 
 const styles = StyleSheet.create({
-  quota: { fontSize: 13, fontWeight: '800', color: C.jadeDeep },
+  quota: { fontSize: 12.5, fontWeight: '600', color: C.jadeDeep, fontVariant: ['tabular-nums'] },
   stickerLockPill: {
     position: 'absolute', right: 4, top: 4, width: 22, height: 22, borderRadius: 11,
-    backgroundColor: 'rgba(15,23,42,0.86)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.darkBg, alignItems: 'center', justifyContent: 'center',
   },
-  limitNote: { fontSize: 11, color: C.muted, lineHeight: 15, marginTop: -4 },
+  limitNote: { fontSize: 11, color: C.muted, lineHeight: 15, marginTop: -4, fontWeight: '400' },
   stickerRow: { gap: 8, paddingVertical: 4 },
-  stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 12 },
+  stickerOption: { width: 88, height: 92, alignItems: 'center', justifyContent: 'center', backgroundColor: C.paper, borderRadius: 11, borderWidth: 1, borderColor: C.borderSubtle },
   stickerThumb: { width: 80, height: 84 },
   messageSticker: { width: 130, height: 130 },
   bubbleSticker: { width: 130, height: 104 },
@@ -1393,54 +1395,55 @@ const styles = StyleSheet.create({
   fly: { position: 'absolute', fontSize: 44, zIndex: 90 },
   splat: { position: 'absolute', fontSize: 80, zIndex: 90 },
   bubble: {
-    position: 'absolute', backgroundColor: C.paper, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6,
+    position: 'absolute', backgroundColor: C.paper, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: C.borderSubtle,
     justifyContent: 'center', alignItems: 'center', zIndex: 90,
   },
-  bubbleName: { fontFamily: FONT, fontSize: 11, fontWeight: '900', color: C.son, alignSelf: 'stretch', textAlign: 'center' },
-  bubbleText: { fontFamily: FONT, fontWeight: '800', fontSize: 14, color: C.ink, textAlign: 'center' },
+  bubbleName: { fontFamily: FONT, fontSize: 11, fontWeight: '600', color: C.son, alignSelf: 'stretch', textAlign: 'center' },
+  bubbleText: { fontFamily: FONT, fontWeight: '500', fontSize: 13.5, color: C.ink, textAlign: 'center' },
   chatBubble: { backgroundColor: C.ink },
   tail: { position: 'absolute', top: -7, width: 12, height: 12, backgroundColor: C.paper, transform: [{ rotate: '45deg' }] },
   float: { position: 'absolute', fontSize: 44, zIndex: 92 },
   pow: {
-    fontFamily: FONT, fontSize: 26, fontWeight: '900', color: C.gold, textShadowColor: C.ink,
+    fontFamily: FONT, fontSize: 24, fontWeight: '600', color: C.gold, textShadowColor: C.ink,
     textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 0,
   },
-  ko: { fontSize: 40, color: C.danger, textShadowColor: '#fff' },
-  dmg: { fontFamily: FONT, fontSize: 18, fontWeight: '900', color: '#fff', textShadowColor: C.ink, textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 0 },
-  hpTrack: { width: 70, height: 9, borderRadius: 5, borderWidth: 2, borderColor: C.ink, backgroundColor: C.mist, overflow: 'hidden', marginTop: 2 },
+  ko: { fontSize: 36, color: C.danger, textShadowColor: '#fff' },
+  dmg: { fontFamily: FONT, fontSize: 17, fontWeight: '600', color: '#fff', textShadowColor: C.ink, textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 0 },
+  hpTrack: { width: 70, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: C.ink, backgroundColor: C.mist, overflow: 'hidden', marginTop: 2 },
   hpFill: { height: '100%' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 },
   cell: { width: '31%', alignItems: 'stretch' },
-  cellLabel: { textAlign: 'center', fontSize: 13, fontWeight: '700', color: C.muted },
-  sectionLabel: { fontSize: 14, fontWeight: '800', color: C.muted },
+  cellLabel: { textAlign: 'center', fontSize: 12.5, fontWeight: '500', color: C.muted },
+  sectionLabel: { fontSize: 13, fontWeight: '600', color: C.secondary },
   secHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: -4 },
   hits: { flexDirection: 'row', justifyContent: 'space-between' },
   trollLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 85, overflow: 'hidden' },
   squashed: { fontSize: 40, textAlign: 'center' },
-  inkHint: { position: 'absolute', alignSelf: 'center', top: '44%', fontFamily: FONT, fontWeight: '900', fontSize: 13, color: 'rgba(255,255,255,0.55)' },
+  inkHint: { position: 'absolute', alignSelf: 'center', top: '44%', fontFamily: FONT, fontWeight: '600', fontSize: 12.5, color: 'rgba(255,255,255,0.68)' },
   trolls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  troll: { width: '48.5%', minHeight: 54, paddingHorizontal: 8 },
+  troll: { width: '48.5%', minHeight: 50, paddingHorizontal: 8 },
   trollWide: { width: '100%' },
-  pane: { backgroundColor: C.mist, borderRadius: 14, padding: 10, gap: 8 },
-  paneTitle: { fontSize: 13, fontWeight: '800', color: C.muted },
+  pane: { backgroundColor: C.parchment, borderRadius: 12, padding: 10, gap: 8, borderWidth: 1, borderColor: C.borderSubtle },
+  paneTitle: { fontSize: 13, fontWeight: '600', color: C.secondary },
   paneRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   paneBtn: { flexGrow: 1 },
   hitCell: { width: '23%', alignItems: 'stretch' },
   taunts: { gap: 8, paddingRight: 8 },
   emojiRow: { gap: 6, paddingRight: 8 },
   emojiBtn: { minWidth: 48, paddingHorizontal: 6 },
-  chatList: { flexShrink: 1, maxHeight: 240, minHeight: 72, backgroundColor: C.mist, borderRadius: 14, paddingHorizontal: 8 },
-  empty: { color: C.muted, textAlign: 'center', paddingVertical: 20 },
+  chatList: { flexShrink: 1, maxHeight: 240, minHeight: 72, backgroundColor: C.parchment, borderRadius: 12, paddingHorizontal: 8, borderWidth: 1, borderColor: C.borderSubtle },
+  empty: { color: C.muted, textAlign: 'center', paddingVertical: 20, fontSize: 13, fontWeight: '400' },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  msgAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.ink },
-  msg: { maxWidth: '78%', backgroundColor: C.paper, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1.5, borderColor: C.ink },
-  msgMine: { backgroundColor: C.ink },
-  msgName: { fontSize: 12, fontWeight: '800', color: C.son },
-  msgText: { fontSize: 15, fontWeight: '600' },
+  msgAvatar: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderSubtle },
+  msg: { maxWidth: '78%', backgroundColor: C.paper, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: C.borderSubtle },
+  msgMine: { backgroundColor: C.ink, borderColor: C.ink },
+  msgName: { fontSize: 11.5, fontWeight: '600', color: C.son },
+  msgText: { fontSize: 14, fontWeight: '400', color: C.ink },
   chatInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   chatInput: {
-    flex: 1, minWidth: 0, fontFamily: FONT, backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, height: 46,
-    fontSize: 16, color: C.ink, borderWidth: 2, borderColor: C.ink,
+    flex: 1, minWidth: 0, fontFamily: FONT, backgroundColor: C.paper, borderRadius: 11, paddingHorizontal: 12, height: 44,
+    fontSize: 14.5, color: C.ink, borderWidth: 1, borderColor: C.borderStrong, fontWeight: '400',
   },
   comboBadge: {
     position: 'absolute',
@@ -1449,23 +1452,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#181016',
+    backgroundColor: C.darkBg,
     borderRadius: 99,
     paddingHorizontal: 14,
     paddingVertical: 5,
     zIndex: 98,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
   },
   comboText: {
     fontFamily: FONT,
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 12.5,
+    fontWeight: '600',
     color: C.gold,
+    fontVariant: ['tabular-nums'],
   },
   filterPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99,
-    backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.14)',
+    backgroundColor: C.mist, borderWidth: 1, borderColor: C.borderSubtle,
   },
   filterPillOn: { backgroundColor: C.ink, borderColor: C.ink },
-  filterPillTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
+  filterPillTxt: { fontSize: 12, fontWeight: '500', color: C.secondary },
 });

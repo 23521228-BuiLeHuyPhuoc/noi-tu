@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   LOTO_RHYMES,
   LOTO_TICKET_NUMBERS,
@@ -9,10 +8,9 @@ import {
   type LotoTicketColor,
   type LotoView,
 } from '../../../shared/src/loto';
-import { themeById } from '../../../shared/src/themes';
 import type { ActionError, PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { C, FONT, sticker } from '../theme';
+import { backdropPalette, C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { play } from '../sound';
 import { useOnChange, useStableWindow } from '../hooks';
@@ -23,13 +21,13 @@ import { Sheet } from '../components/Sheet';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { Confetti } from '../components/Fun';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { UiIcon } from '../components/Icons';
 
 const TICKET_PALETTES: Record<
   LotoTicketColor,
   {
     name: string;
-    headerGrad: readonly [string, string, string];
+    headerBg: string;
     frameBorder: string;
     blankBg: string;
     blankDot: string;
@@ -39,61 +37,61 @@ const TICKET_PALETTES: Record<
   }
 > = {
   rose: {
-    name: 'Vé Hồng Đào Đại Cát',
-    headerGrad: ['#9F1239', '#E11D48', '#FB7185'],
-    frameBorder: '#BE123C',
-    blankBg: '#FECDD3',
-    blankDot: 'rgba(159,18,57,0.22)',
-    cellBorder: '#FDA4AF',
-    paperBg: '#FFF1F2',
+    name: 'Vé Hồng Đào',
+    headerBg: '#9F2B36',
+    frameBorder: '#9F2B36',
+    blankBg: '#FDE8EA',
+    blankDot: 'rgba(159,43,54,0.22)',
+    cellBorder: 'rgba(159,43,54,0.24)',
+    paperBg: '#FFF5F6',
     numColor: '#4C0519',
   },
   gold: {
-    name: 'Vé Hoàng Kim Phú Quý',
-    headerGrad: ['#92400E', '#D97706', '#FBBF24'],
+    name: 'Vé Hoàng Kim',
+    headerBg: '#B45309',
     frameBorder: '#B45309',
-    blankBg: '#FDE68A',
-    blankDot: 'rgba(146,64,14,0.22)',
-    cellBorder: '#FCD34D',
-    paperBg: '#FFFBEB',
+    blankBg: '#FEF3C7',
+    blankDot: 'rgba(180,83,9,0.24)',
+    cellBorder: 'rgba(180,83,9,0.24)',
+    paperBg: '#FFFDF5',
     numColor: '#451A03',
   },
   jade: {
-    name: 'Vé Ngọc Bích Lộc Phát',
-    headerGrad: ['#065F46', '#059669', '#34D399'],
-    frameBorder: '#047857',
-    blankBg: '#A7F3D0',
-    blankDot: 'rgba(6,95,70,0.22)',
-    cellBorder: '#6EE7B7',
-    paperBg: '#ECFDF5',
-    numColor: '#022C22',
+    name: 'Vé Ngọc Bích',
+    headerBg: '#15803D',
+    frameBorder: '#15803D',
+    blankBg: '#DCFCE7',
+    blankDot: 'rgba(21,128,61,0.22)',
+    cellBorder: 'rgba(21,128,61,0.24)',
+    paperBg: '#F4FBF6',
+    numColor: '#052E16',
   },
   sky: {
-    name: 'Vé Thiên Thanh Vạn Sự',
-    headerGrad: ['#075985', '#0284C7', '#38BDF8'],
+    name: 'Vé Thiên Thanh',
+    headerBg: '#0369A1',
     frameBorder: '#0369A1',
-    blankBg: '#BAE6FD',
-    blankDot: 'rgba(7,89,133,0.22)',
-    cellBorder: '#7DD3FC',
-    paperBg: '#F0F9FF',
+    blankBg: '#E0F2FE',
+    blankDot: 'rgba(3,105,161,0.22)',
+    cellBorder: 'rgba(3,105,161,0.24)',
+    paperBg: '#F4FAFF',
     numColor: '#082F49',
   },
   violet: {
-    name: 'Vé Tím Huế Vinh Hoa',
-    headerGrad: ['#5B21B6', '#7C3AED', '#A78BFA'],
-    frameBorder: '#6D28D9',
-    blankBg: '#DDD6FE',
+    name: 'Vé Tím Huế',
+    headerBg: '#5B21B6',
+    frameBorder: '#5B21B6',
+    blankBg: '#EDE9FE',
     blankDot: 'rgba(91,33,182,0.22)',
-    cellBorder: '#C4B5FD',
-    paperBg: '#F5F3FF',
+    cellBorder: 'rgba(91,33,182,0.24)',
+    paperBg: '#F8F6FF',
     numColor: '#2E1065',
   },
 };
 
 const EXTRA_ERRORS: Partial<Record<ActionError, string>> = {
-  kinh_false: 'Hô KINH HỤT quê độ! Chưa đủ 5 số trúng trên hàng này — bị khóa bấm Kinh 2 lượt!',
-  kinh_locked: 'Đang bị khóa miệng vì hô Kinh hụt vừa nãy! Đợi qua thêm số nữa nhé!',
-  bad_action: 'Con số này chưa được đoàn lô tô kêu tới!',
+  kinh_false: 'Hô Kinh hụt. Chưa đủ 5 số trúng trên hàng này — tạm khóa bấm Kinh 2 lượt.',
+  kinh_locked: 'Đang tạm khóa hô Kinh do hô hụt. Đợi qua lượt gọi tiếp theo.',
+  bad_action: 'Con số này chưa được đoàn lô tô kêu tới.',
 };
 
 function errOf(reason: ActionError): string {
@@ -137,7 +135,7 @@ const LotoCallBar = memo(function LotoCallBar({
 export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as LotoView;
   const me = game.me ?? '';
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
+  const bp = backdropPalette(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
   const { width, height } = useStableWindow();
   const wide = width >= 720;
   const compactH = height < 720;
@@ -218,11 +216,11 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
     if (view.winnerId) {
       return (
         <View style={styles.footerInline}>
-          <EmojiIcon emoji="🎊" size={16} />
-          <T numberOfLines={1} style={[styles.footerTxt, { color: '#FDE047' }]}>
+          <UiIcon name="Trophy" size={14} color={bp.dark ? '#FDE68A' : C.goldDeep} />
+          <T numberOfLines={1} style={[styles.footerTxt, { color: bp.dark ? '#FDE68A' : C.ink }]}>
             {view.winnerId === me
-              ? 'Chúc mừng bạn đã KINH rực rỡ đêm hội chợ!'
-              : `${view.names[view.winnerId] ?? view.winnerId} KINH hàng ${(view.winningRow ?? 0) + 1}!`}
+              ? 'Chúc mừng bạn đã Kinh rực rỡ'
+              : `${view.names[view.winnerId] ?? view.winnerId} đã Kinh hàng ${(view.winningRow ?? 0) + 1}`}
           </T>
         </View>
       );
@@ -230,8 +228,8 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
 
     if (!hasMyTicket) {
       return (
-        <T numberOfLines={1} style={[styles.footerTxt, { color: theme.onBg }]}>
-          Đang xem ké vé @{view.names[ticketOwnerId] ?? 'hàng xóm'}
+        <T numberOfLines={1} style={[styles.footerTxt, { color: bp.text }]}>
+          Đang xem vé của @{view.names[ticketOwnerId] ?? 'hàng xóm'}
         </T>
       );
     }
@@ -239,13 +237,23 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
     const readyRowIdx = rowChecks.findIndex((c) => c.validKinh);
     return (
       <View style={styles.footerInline}>
-        <EmojiIcon emoji={readyRowIdx >= 0 ? '🎉' : '🎫'} size={15} />
-        <T numberOfLines={1} style={[styles.footerTxt, { color: readyRowIdx >= 0 ? '#4ADE80' : theme.onBg }]}>
+        <UiIcon
+          name={readyRowIdx >= 0 ? 'CheckCircle2' : 'Sparkles'}
+          size={14}
+          color={readyRowIdx >= 0 ? (bp.dark ? '#4ADE80' : C.jade) : bp.muted}
+        />
+        <T
+          numberOfLines={1}
+          style={[
+            styles.footerTxt,
+            { color: readyRowIdx >= 0 ? (bp.dark ? '#4ADE80' : C.jade) : bp.text },
+          ]}
+        >
           {readyRowIdx >= 0
-            ? `HÀNG ${readyRowIdx + 1} ĐỦ 5/5! BẤM KINH NGAY!`
+            ? `Hàng ${readyRowIdx + 1} đủ 5/5 · Bấm Kinh ngay`
             : view.autoMark
-              ? 'Tự chấm bật — đủ 5/5 số 1 hàng là bấm KINH!'
-              : 'Chạm chấm số đã kêu — đủ 5/5 hàng bấm KINH!'}
+              ? 'Tự chấm bật · Đủ 5/5 số 1 hàng là bấm Kinh'
+              : 'Chạm chấm số đã kêu · Đủ 5/5 hàng bấm Kinh'}
         </T>
       </View>
     );
@@ -263,156 +271,157 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
           activeId={view.winnerId}
           ring={(p: PublicPlayer) => {
             if (view.winnerId === p.id) return C.gold;
-            if (waitingSet.has(p.id)) return '#F97316';
+            if (waitingSet.has(p.id)) return C.danger;
             return TICKET_PALETTES[view.ticketColors[p.id] ?? 'rose']?.frameBorder;
           }}
           sub={(p: PublicPlayer) => {
-            if (view.winnerId === p.id) return 'KINH!';
-            if (waitingSet.has(p.id)) return 'ĐỢI!';
+            if (view.winnerId === p.id) return 'Kinh';
+            if (waitingSet.has(p.id)) return 'Đợi 4/5';
             const mLen = view.marked[p.id]?.length ?? 0;
             return `${mLen}/${LOTO_TICKET_NUMBERS}`;
           }}
         />
 
-        {/* SÂN KHẤU RAO SỐ GỌN NHẸ */}
-        <LinearGradient
-          colors={['#FACC15', '#F97316', '#EC4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.callerRim, sticker(3)]}
+        {/* BẢNG RAO SỐ INK DARK PARLOR */}
+        <View
+          testID="loto-caller"
+          style={[styles.callerBoard, sticker(1), compactH && styles.callerInnerCompact]}
         >
-          <LinearGradient
-            testID="loto-caller"
-            colors={['#2E073F', '#6B1143', '#3B0819']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.callerInner, compactH && styles.callerInnerCompact]}
-          >
-            {/* Thanh Đèn Lồng + Bộ đếm + Nút Soi vé cả xóm */}
-            <View style={styles.marqueeBar}>
-              <View style={styles.inlineRow}>
-                <EmojiIcon emoji="🏮" size={14} />
-                <T style={styles.marqueeTitle}>LÔ TÔ XÓM LẦY</T>
+          {/* Thanh tiêu đề + Bộ đếm + Nút Soi vé cả xóm */}
+          <View style={styles.marqueeBar}>
+            <View style={styles.inlineRow}>
+              <UiIcon name="Megaphone" size={13} color={C.gold} />
+              <T style={styles.marqueeTitle}>Lô tô Xóm Lầy</T>
+            </View>
+            <View style={styles.inlineRow}>
+              <View style={styles.countChip}>
+                <T style={styles.countChipTxt}>
+                  {view.called.length}/90 · Còn {view.remainingCount}
+                </T>
               </View>
-              <View style={styles.inlineRow}>
-                <View style={styles.countChip}>
-                  <T style={styles.countChipTxt}>
-                    {view.called.length}/90 · Còn {view.remainingCount}
-                  </T>
-                </View>
-                <Pressable
-                  testID="loto-peek-toggle"
-                  onPress={() => {
-                    play('pop');
-                    setPeekOpen(true);
-                  }}
-                  style={[styles.peekPillBtn, view.waitingIds.length > 0 && styles.peekPillBtnHot]}
+              <Pressable
+                testID="loto-peek-toggle"
+                onPress={() => {
+                  play('pop');
+                  setPeekOpen(true);
+                }}
+                style={[styles.peekPillBtn, view.waitingIds.length > 0 && styles.peekPillBtnHot]}
+              >
+                <UiIcon
+                  name="Eye"
+                  size={12}
+                  color={view.waitingIds.length > 0 ? C.ink : C.darkText}
+                />
+                <T
+                  style={[
+                    styles.peekPillTxt,
+                    view.waitingIds.length > 0 && { color: C.ink },
+                  ]}
                 >
-                  <EmojiIcon emoji="👀" size={12} />
-                  <T style={styles.peekPillTxt}>
-                    Soi vé{view.waitingIds.length > 0 ? ` (${view.waitingIds.length})` : ''}
-                  </T>
-                </Pressable>
+                  Soi vé{view.waitingIds.length > 0 ? ` (${view.waitingIds.length})` : ''}
+                </T>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Quả Cầu Lô Tô + Câu Vè */}
+          <View style={styles.callerStageRow}>
+            <View
+              style={[
+                styles.bingoBallOuter,
+                compactH && styles.bingoBallOuterCompact,
+                wide && styles.bingoBallOuterWide,
+              ]}
+            >
+              <View
+                style={[
+                  styles.bingoBallCore,
+                  compactH && styles.bingoBallCoreCompact,
+                  wide && styles.bingoBallCoreWide,
+                ]}
+              >
+                <T style={[styles.bingoBallNum, compactH && { fontSize: 21 }, wide && { fontSize: 30 }]}>
+                  {view.currentNum !== null ? String(view.currentNum) : '--'}
+                </T>
               </View>
             </View>
 
-            {/* Quả Cầu Lô Tô + Câu Vè */}
-            <View style={styles.callerStageRow}>
-              <LinearGradient
-                colors={['#FEF08A', '#F59E0B', '#DC2626']}
-                start={{ x: 0.15, y: 0.1 }}
-                end={{ x: 0.85, y: 0.95 }}
-                style={[styles.bingoBallOuter, compactH && styles.bingoBallOuterCompact, wide && styles.bingoBallOuterWide]}
-              >
-                <View style={[styles.bingoBallCore, compactH && styles.bingoBallCoreCompact, wide && styles.bingoBallCoreWide]}>
-                  <T style={[styles.bingoBallNum, compactH && { fontSize: 22 }, wide && { fontSize: 32 }]}>
-                    {view.currentNum !== null ? String(view.currentNum) : '--'}
+            <View style={styles.chantBox}>
+              {currentRhyme && (
+                <View style={styles.rhymeTitlePill}>
+                  <UiIcon name="Star" size={10} color="#FDE68A" />
+                  <T numberOfLines={1} style={styles.rhymeTitleTxt}>
+                    {currentRhyme.title}
                   </T>
                 </View>
-              </LinearGradient>
-
-              <View style={styles.chantBox}>
-                {currentRhyme && (
-                  <View style={styles.rhymeTitlePill}>
-                    <EmojiIcon emoji="✨" size={11} />
-                    <T numberOfLines={1} style={styles.rhymeTitleTxt}>
-                      {currentRhyme.title}
-                    </T>
-                  </View>
-                )}
-                <T numberOfLines={2} style={[styles.chantText, compactH && { fontSize: 12, lineHeight: 16 }]}>
-                  {view.currentChant ??
-                    'Cờ ra con mấy… Bà con trải vé chuẩn bị dò nha!'}
-                </T>
-              </View>
+              )}
+              <T numberOfLines={2} style={[styles.chantText, compactH && { fontSize: 12, lineHeight: 16 }]}>
+                {view.currentChant ??
+                  'Cờ ra con mấy… Bà con trải vé chuẩn bị dò số.'}
+              </T>
             </View>
+          </View>
 
-            {view.status === 'calling' && (
-              <LotoCallBar
-                nextCallAt={view.nextCallAt}
-                callIntervalMs={view.callIntervalMs}
-                clockOffset={game.clockOffset}
-              />
-            )}
+          {view.status === 'calling' && (
+            <LotoCallBar
+              nextCallAt={view.nextCallAt}
+              callIntervalMs={view.callIntervalMs}
+              clockOffset={game.clockOffset}
+            />
+          )}
 
-            {/* Dải 6 Con Số Vừa Kêu + Cảnh Báo 4/5 Sắp Kinh */}
-            <View style={styles.recentStrip}>
-              <T style={styles.recentLabel}>Vừa ra:</T>
-              <View style={styles.recentBallsWrap}>
-                {recentBalls.length === 0 ? (
-                  <T style={styles.recentEmpty}>Đang lắc lồng cầu…</T>
-                ) : (
-                  recentBalls.map((n, i) => {
-                    const isLatest = i === recentBalls.length - 1;
-                    return (
-                      <View
-                        key={`${n}-${i}`}
-                        style={[styles.miniBall, isLatest && styles.miniBallLatest]}
-                      >
-                        <T style={[styles.miniBallTxt, isLatest && styles.miniBallTxtLatest]}>
-                          {n}
-                        </T>
-                      </View>
-                    );
-                  })
-                )}
-              </View>
+          {/* Dải 6 Con Số Vừa Kêu + Cảnh Báo 4/5 Sắp Kinh */}
+          <View style={styles.recentStrip}>
+            <T style={styles.recentLabel}>Vừa ra:</T>
+            <View style={styles.recentBallsWrap}>
+              {recentBalls.length === 0 ? (
+                <T style={styles.recentEmpty}>Đang lắc lồng cầu…</T>
+              ) : (
+                recentBalls.map((n, i) => {
+                  const isLatest = i === recentBalls.length - 1;
+                  return (
+                    <View
+                      key={`${n}-${i}`}
+                      style={[styles.miniBall, isLatest && styles.miniBallLatest]}
+                    >
+                      <T style={[styles.miniBallTxt, isLatest && styles.miniBallTxtLatest]}>
+                        {n}
+                      </T>
+                    </View>
+                  );
+                })
+              )}
             </View>
+          </View>
 
-            {view.waitingIds.length > 0 ? (
-              <LinearGradient
-                colors={['#DC2626', '#EA580C', '#B91C1C']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.waitingAlertBar}
-              >
-                <EmojiIcon emoji="🔥" size={14} />
-                <T numberOfLines={1} style={styles.waitingAlertTxt}>
-                  SẮP KINH (4/5): {view.waitingIds.map((id) => `@${view.names[id] ?? id}`).join(', ')}
-                </T>
-              </LinearGradient>
-            ) : view.lastEvent ? (
-              <View style={styles.eventBanner}>
-                <EmojiIcon emoji="📢" size={12} />
-                <T numberOfLines={1} style={styles.eventBannerTxt}>{view.lastEvent}</T>
-              </View>
-            ) : null}
-          </LinearGradient>
-        </LinearGradient>
+          {view.waitingIds.length > 0 ? (
+            <View style={styles.waitingAlertBar}>
+              <UiIcon name="Flame" size={13} color="#FEF3C7" />
+              <T numberOfLines={1} style={styles.waitingAlertTxt}>
+                Sắp Kinh (4/5): {view.waitingIds.map((id) => `@${view.names[id] ?? id}`).join(', ')}
+              </T>
+            </View>
+          ) : view.lastEvent ? (
+            <View style={styles.eventBanner}>
+              <UiIcon name="Info" size={12} color={C.darkText} />
+              <T numberOfLines={1} style={styles.eventBannerTxt}>{view.lastEvent}</T>
+            </View>
+          ) : null}
+        </View>
 
         {/* THÔNG BÁO LỖI HOẶC PHẠT KHÓA KINH */}
         {err && (
-          <View style={[styles.errorBanner, sticker(2)]}>
-            <UiIcon name="AlertTriangle" size={14} color="#FEF08A" />
+          <View style={[styles.errorBanner, sticker(1)]}>
+            <UiIcon name="AlertTriangle" size={13} color="#FEF3C7" />
             <T numberOfLines={1} style={styles.errorBannerTxt}>{err}</T>
           </View>
         )}
 
         {isLocked && (
-          <View style={[styles.lockPenaltyBanner, sticker(2)]}>
-            <UiIcon name="Lock" size={14} color="#9A3412" />
+          <View style={[styles.lockPenaltyBanner, sticker(1)]}>
+            <UiIcon name="Lock" size={13} color={C.goldDeep} />
             <T numberOfLines={1} style={styles.lockPenaltyTxt}>
-              Khóa hô KINH còn {penaltyLeft} lượt gọi do hô hụt!
+              Tạm khóa hô Kinh còn {penaltyLeft} lượt gọi do hô hụt
             </T>
           </View>
         )}
@@ -423,21 +432,16 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
             testID="loto-ticket"
             style={[
               styles.ticketPaper,
-              sticker(3),
+              sticker(1),
               {
                 backgroundColor: pal.paperBg,
                 borderColor: pal.frameBorder,
               },
             ]}
           >
-            <LinearGradient
-              colors={[...pal.headerGrad]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.ticketHeader}
-            >
+            <View style={[styles.ticketHeader, { backgroundColor: pal.headerBg }]}>
               <View style={styles.inlineRow}>
-                <EmojiIcon emoji="🎟️" size={14} />
+                <UiIcon name="Layers" size={13} color="#FFFFFF" />
                 <T numberOfLines={1} style={styles.ticketHeaderTitle}>
                   {pal.name} · {LOTO_TICKET_NUMBERS} số
                 </T>
@@ -445,7 +449,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
               <View style={styles.modeTag}>
                 <T style={styles.modeTagTxt}>{view.autoMark ? 'Tự chấm' : 'Tự dò'}</T>
               </View>
-            </LinearGradient>
+            </View>
 
             <View style={styles.ticketRowsWrap}>
               {activeGrid.map((rowCells, rIdx) => {
@@ -505,7 +509,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                               styles.ticketNumCell,
                               { borderColor: pal.cellBorder },
                               isJustCalled && !stamped && styles.cellJustCalled,
-                              pressed && hasMyTicket && { transform: [{ scale: 0.93 }] },
+                              pressed && hasMyTicket && { transform: [{ scale: 0.94 }] },
                             ]}
                           >
                             <View
@@ -521,7 +525,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                                   styles.cellNumTxt,
                                   compactH && styles.cellNumTxtCompact,
                                   wide && styles.cellNumTxtWide,
-                                  { color: stamped ? '#BE123C' : pal.numColor },
+                                  { color: stamped ? C.son : pal.numColor },
                                 ]}
                               >
                                 {cell}
@@ -538,7 +542,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
           </View>
         </View>
 
-        {/* BỘ 6 NÚT HÔ KINH HÀNG 1..6 (2×3 TRÊN MOBILE, 1×6 TRÊN DESKTOP) */}
+        {/* BỘ 6 NÚT HÔ KINH HÀNG 1..6 */}
         {hasMyTicket && (
           <View style={[styles.kinhGrid, wide && styles.kinhGridWide]}>
             {Array.from({ length: rowCount }, (_, rIdx) => {
@@ -555,59 +559,47 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                   style={({ pressed }) => [
                     styles.kinhBtnOuter,
                     wide ? styles.kinhBtnOuterWide : styles.kinhBtnOuterCompact,
-                    sticker(ready ? 3 : 2),
-                    ready && styles.kinhBtnReadyGlow,
+                    waitFour && styles.kinhBtnWait,
+                    ready && styles.kinhBtnReady,
+                    isLocked && styles.kinhBtnLocked,
                     pressed && { transform: [{ translateY: 1 }] },
-                    isLocked && { opacity: 0.68 },
                   ]}
                 >
-                  <LinearGradient
-                    colors={
-                      isLocked
-                        ? ['#CBD5E1', '#94A3B8', '#64748B']
-                        : ready
-                          ? ['#FEF08A', '#FACC15', '#EA580C']
-                          : waitFour
-                            ? ['#FFEDD5', '#FED7AA', '#FDBA74']
-                            : ['#FFFFFF', '#F8FAFC', '#E2E8F0']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.kinhBtnInner}
-                  >
-                    <View style={styles.inlineRow}>
-                      {isLocked ? (
-                        <UiIcon name="Lock" size={11} color="#1E293B" />
-                      ) : (
-                        <EmojiIcon emoji={ready ? '🎉' : waitFour ? '🔥' : '🎫'} size={12} />
-                      )}
-                      <T
-                        numberOfLines={1}
-                        style={[
-                          styles.kinhBtnTitle,
-                          ready && { color: '#451A03' },
-                        ]}
-                      >
-                        KINH H{rIdx + 1}
-                      </T>
-                    </View>
+                  <View style={styles.inlineRow}>
+                    <UiIcon
+                      name={isLocked ? 'Lock' : ready ? 'CheckCircle2' : waitFour ? 'Flame' : 'Star'}
+                      size={11}
+                      color={isLocked ? C.muted : ready ? C.ink : waitFour ? C.goldDeep : C.secondary}
+                    />
                     <T
                       numberOfLines={1}
                       style={[
-                        styles.kinhBtnSub,
-                        ready && { color: '#7C2D12', fontWeight: '900' },
-                        waitFour && { color: '#C2410C', fontWeight: '900' },
+                        styles.kinhBtnTitle,
+                        ready && { color: C.ink },
+                        waitFour && { color: C.goldDeep },
+                        isLocked && { color: C.muted },
                       ]}
                     >
-                      {isLocked
-                        ? `Khóa (${penaltyLeft})`
-                        : ready
-                          ? 'ĐỦ 5/5 · HÔ!'
-                          : waitFour
-                            ? '4/5 · ĐỢI!'
-                            : `${info.hits}/5`}
+                      Kinh H{rIdx + 1}
                     </T>
-                  </LinearGradient>
+                  </View>
+                  <T
+                    numberOfLines={1}
+                    style={[
+                      styles.kinhBtnSub,
+                      ready && { color: C.ink, fontWeight: '600' },
+                      waitFour && { color: C.goldDeep, fontWeight: '600' },
+                      isLocked && { color: C.muted },
+                    ]}
+                  >
+                    {isLocked
+                      ? `Khóa (${penaltyLeft})`
+                      : ready
+                        ? 'Đủ 5/5 · Hô'
+                        : waitFour
+                          ? '4/5 · Đợi'
+                          : `${info.hits}/5`}
+                  </T>
                 </Pressable>
               );
             })}
@@ -618,7 +610,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
       {/* MODAL SOI VÉ CẢ XÓM MỞ QUA SHEET (KHÔNG CHIẾM CHIỀU DỌC MÀN CHÍNH) */}
       {peekOpen && (
         <Sheet
-          title={`👀 Soi Tiến Độ Cả Xóm (${view.order.length} tờ)`}
+          title={`Soi Tiến Độ Cả Xóm (${view.order.length} tờ)`}
           onClose={() => setPeekOpen(false)}
         >
           <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={styles.peekList}>
@@ -657,8 +649,8 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                         <T
                           style={[
                             styles.rowHitTxt,
-                            h >= 4 && { color: '#9A3412', fontWeight: '900' },
-                            h === 5 && { color: '#065F46', fontWeight: '900' },
+                            h >= 4 && { color: C.goldDeep, fontWeight: '600' },
+                            h === 5 && { color: C.jadeDeep, fontWeight: '600' },
                           ]}
                         >
                           H{ri + 1}:{h}
@@ -687,12 +679,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-  callerRim: {
-    borderRadius: 16,
-    padding: 2,
-  },
-  callerInner: {
+  callerBoard: {
+    backgroundColor: C.darkSurface,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     paddingHorizontal: 10,
     paddingVertical: 7,
     gap: 5,
@@ -709,23 +700,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   marqueeTitle: {
-    fontSize: 11.5,
-    fontWeight: '900',
-    color: '#FDE047',
-    letterSpacing: 0.4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.darkText,
   },
   countChip: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(253,224,71,0.35)',
+    borderColor: C.darkBorder,
   },
   countChipTxt: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#FEF9C3',
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
   peekPillBtn: {
     flexDirection: 'row',
@@ -734,18 +725,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2.5,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: C.darkBorder,
   },
   peekPillBtnHot: {
-    backgroundColor: '#EA580C',
-    borderColor: '#FEF08A',
+    backgroundColor: C.gold,
+    borderColor: C.goldDeep,
   },
   peekPillTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
 
   callerStageRow: {
@@ -754,33 +746,34 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   bingoBallOuter: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: C.gold,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: C.paper,
   },
   bingoBallOuterCompact: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   bingoBallOuterWide: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
   },
   bingoBallCore: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.paper,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(180,83,9,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(180,83,9,0.28)',
   },
   bingoBallCoreCompact: {
     width: 34,
@@ -788,15 +781,16 @@ const styles = StyleSheet.create({
     borderRadius: 17,
   },
   bingoBallCoreWide: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   bingoBallNum: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#991B1B',
+    fontSize: 23,
+    fontWeight: '600',
+    color: C.sonDark,
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   chantBox: {
     flex: 1,
@@ -807,25 +801,24 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 1.5,
     borderRadius: 999,
-    backgroundColor: 'rgba(250,204,21,0.2)',
+    backgroundColor: 'rgba(245, 158, 11, 0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(250,204,21,0.45)',
+    borderColor: 'rgba(245, 158, 11, 0.34)',
   },
   rhymeTitleTxt: {
     fontSize: 10,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FDE68A',
   },
   chantText: {
     fontSize: 12.5,
     lineHeight: 17,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    color: '#FDE047',
+    fontWeight: '500',
+    color: C.darkText,
   },
 
   callBarRow: {
@@ -835,37 +828,38 @@ const styles = StyleSheet.create({
   },
   callBarTrack: {
     flex: 1,
-    height: 6,
+    height: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
     overflow: 'hidden',
   },
   callBarFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#FACC15',
+    backgroundColor: C.gold,
   },
   callBarSec: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FDE68A',
     minWidth: 28,
     textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
 
   recentStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(15,23,42,0.42)',
-    borderRadius: 10,
+    backgroundColor: C.darkBg,
+    borderRadius: 9,
     paddingHorizontal: 7,
     paddingVertical: 3.5,
   },
   recentLabel: {
     fontSize: 10.5,
-    fontWeight: '800',
-    color: '#FBCFE8',
+    fontWeight: '500',
+    color: C.darkMuted,
   },
   recentBallsWrap: {
     flex: 1,
@@ -877,54 +871,56 @@ const styles = StyleSheet.create({
   },
   recentEmpty: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#CBD5E1',
-    fontStyle: 'italic',
+    fontWeight: '400',
+    color: C.darkMuted,
   },
   miniBall: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   miniBallLatest: {
-    backgroundColor: '#FACC15',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    backgroundColor: C.gold,
+    borderColor: C.paper,
   },
   miniBallTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#1E293B',
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
   miniBallTxtLatest: {
-    color: '#78350F',
+    color: C.ink,
   },
 
   waitingAlertBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 9,
+    borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    backgroundColor: C.danger,
     borderWidth: 1,
-    borderColor: '#FEF08A',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   waitingAlertTxt: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FEF3C7',
   },
   eventBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: C.darkSubtle,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -932,41 +928,42 @@ const styles = StyleSheet.create({
   eventBannerTxt: {
     flex: 1,
     fontSize: 10.5,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontWeight: '500',
+    color: C.darkText,
   },
 
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#991B1B',
-    borderRadius: 10,
+    backgroundColor: C.danger,
+    borderRadius: 9,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   errorBannerTxt: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '800',
-    color: '#FEF08A',
+    fontWeight: '500',
+    color: '#FEF3C7',
   },
   lockPenaltyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFEDD5',
-    borderRadius: 10,
+    backgroundColor: C.goldSoft,
+    borderRadius: 9,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderWidth: 1.5,
-    borderColor: '#F97316',
+    borderWidth: 1,
+    borderColor: C.gold,
   },
   lockPenaltyTxt: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '900',
-    color: '#9A3412',
+    fontWeight: '600',
+    color: C.goldDeep,
+    fontVariant: ['tabular-nums'],
   },
 
   ticketStage: {
@@ -975,8 +972,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ticketPaper: {
-    borderRadius: 14,
-    borderWidth: 2.5,
+    borderRadius: 13,
+    borderWidth: 1.5,
     overflow: 'hidden',
   },
   ticketHeader: {
@@ -989,20 +986,21 @@ const styles = StyleSheet.create({
   },
   ticketHeaderTitle: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
   modeTag: {
     paddingHorizontal: 7,
     paddingVertical: 1.5,
     borderRadius: 999,
-    backgroundColor: 'rgba(15,23,42,0.34)',
+    backgroundColor: 'rgba(17, 20, 28, 0.35)',
   },
   modeTagTxt: {
     fontSize: 10,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FEF3C7',
   },
 
   ticketRowsWrap: {
@@ -1011,7 +1009,7 @@ const styles = StyleSheet.create({
     gap: 2.5,
   },
   blockDivider: {
-    borderTopWidth: 1.5,
+    borderTopWidth: 1,
     borderStyle: 'dashed',
     marginVertical: 2,
     opacity: 0.45,
@@ -1022,11 +1020,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   ticketRowWin: {
-    backgroundColor: 'rgba(250, 204, 21, 0.35)',
+    backgroundColor: 'rgba(245, 158, 11, 0.24)',
     padding: 1,
   },
   ticketRowWait: {
-    backgroundColor: 'rgba(249, 115, 22, 0.14)',
+    backgroundColor: 'rgba(180, 83, 9, 0.10)',
   },
   ticketCell: {
     flex: 1,
@@ -1046,12 +1044,12 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   ticketNumCell: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.paper,
   },
   cellJustCalled: {
-    backgroundColor: '#FEF9C3',
-    borderColor: '#F59E0B',
-    borderWidth: 2,
+    backgroundColor: C.goldSoft,
+    borderColor: C.goldDeep,
+    borderWidth: 1.5,
   },
   blankOrnament: {
     width: 6,
@@ -1071,21 +1069,21 @@ const styles = StyleSheet.create({
     borderRadius: 11.5,
   },
   redLuckySeal: {
-    backgroundColor: 'rgba(225, 29, 72, 0.16)',
-    borderWidth: 2,
-    borderColor: '#E11D48',
+    backgroundColor: 'rgba(159, 43, 54, 0.12)',
+    borderWidth: 1.5,
+    borderColor: C.son,
   },
   redLuckySealWide: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 2.5,
+    borderWidth: 2,
   },
   cellNumTxt: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '600',
     fontFamily: FONT,
-    letterSpacing: -0.3,
+    fontVariant: ['tabular-nums'],
   },
   cellNumTxtCompact: {
     fontSize: 12.5,
@@ -1103,10 +1101,16 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   kinhBtnOuter: {
-    borderRadius: 11,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.18)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    backgroundColor: C.paper,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+    minHeight: 34,
   },
   kinhBtnOuterCompact: {
     flexBasis: '31.5%',
@@ -1116,30 +1120,31 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  kinhBtnReadyGlow: {
-    borderColor: '#EA580C',
-    borderWidth: 2,
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 0 14px rgba(250, 204, 21, 0.8)' } as object)
-      : null),
+  kinhBtnWait: {
+    backgroundColor: C.goldSoft,
+    borderColor: C.gold,
   },
-  kinhBtnInner: {
-    paddingVertical: 4,
-    paddingHorizontal: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-    minHeight: 34,
+  kinhBtnReady: {
+    backgroundColor: C.gold,
+    borderColor: C.goldDeep,
+    borderWidth: 1.5,
+  },
+  kinhBtnLocked: {
+    backgroundColor: C.mist,
+    borderColor: C.borderSubtle,
+    opacity: 0.72,
   },
   kinhBtnTitle: {
     fontSize: 10.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: C.ink,
+    fontVariant: ['tabular-nums'],
   },
   kinhBtnSub: {
     fontSize: 9.5,
-    fontWeight: '800',
-    color: '#475569',
+    fontWeight: '500',
+    color: C.secondary,
+    fontVariant: ['tabular-nums'],
   },
 
   peekList: {
@@ -1152,11 +1157,14 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 5,
     paddingHorizontal: 7,
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    borderRadius: 9,
+    backgroundColor: C.parchment,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   peekRowMe: {
-    backgroundColor: '#FEF9C3',
+    backgroundColor: C.goldSoft,
+    borderColor: 'rgba(180,83,9,0.25)',
   },
   colorSwatch: {
     width: 5,
@@ -1165,7 +1173,7 @@ const styles = StyleSheet.create({
   },
   peekName: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: C.ink,
   },
   peekHitsGroup: {
@@ -1179,18 +1187,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1.5,
     borderRadius: 5,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: C.mist,
   },
   rowHitChipHot: {
-    backgroundColor: '#FED7AA',
+    backgroundColor: C.goldSoft,
   },
   rowHitChipFull: {
-    backgroundColor: '#A7F3D0',
+    backgroundColor: C.jadeSoft,
   },
   rowHitTxt: {
     fontSize: 9.5,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: C.secondary,
+    fontVariant: ['tabular-nums'],
   },
 
   footerInline: {
@@ -1202,8 +1211,9 @@ const styles = StyleSheet.create({
   },
   footerTxt: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '500',
     textAlign: 'center',
     flexShrink: 1,
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -33,7 +33,7 @@ function PendingRow({ game, r, onDone }: { game: Game; r: TopupRequest; onDone: 
     setBusy(true);
     const res = await game.adminApprove(r.id, digits(amount));
     setBusy(false);
-    onDone(res.ok ? `Đã cộng 💎 ${fmtRuby(res.data.ruby)} cho ${r.username}` : res.error);
+    onDone(res.ok ? `Đã cộng ${fmtRuby(res.data.ruby)} Ruby cho ${r.username}` : res.error);
   };
   const reject = async () => {
     setBusy(true);
@@ -86,7 +86,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
     setBusy(true);
     const r = await game.adminCreditCode(code, digits(codeAmount), nonce);
     setBusy(false);
-    setMsg(r.ok ? `Đã cộng 💎 ${fmtRuby(r.data.ruby)} cho ${r.data.request.username} (số dư ${fmtRuby(r.data.balance)})` : r.error);
+    setMsg(r.ok ? `Đã cộng ${fmtRuby(r.data.ruby)} Ruby cho ${r.data.request.username} (số dư ${fmtRuby(r.data.balance)})` : r.error);
     if (r.ok) {
       setCode('');
       setCodeAmount('');
@@ -98,11 +98,11 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
     setBusy(true);
     const r = await game.adminAdjust(user.trim().toLowerCase(), n, reason);
     setBusy(false);
-    setMsg(r.ok ? `Xong, số dư của ${user} còn 💎 ${fmtRuby(r.data.balance)}` : r.error);
+    setMsg(r.ok ? `Xong, số dư của ${user} còn ${fmtRuby(r.data.balance)} Ruby` : r.error);
   };
 
   return (
-    <Sheet title="🛠️ Quản trị Ruby" onClose={onClose}>
+    <Sheet title="Quản trị Ruby" onClose={onClose}>
       <View style={styles.tabs}>
         {TABS.map((t) => (
           <Pressable
@@ -116,7 +116,7 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
             }}
             style={[styles.tab, tab === t.id && styles.tabOn]}
           >
-            <T style={[styles.tabText, tab === t.id && { color: C.gold }]}>{t.label}</T>
+            <T style={[styles.tabText, tab === t.id && { color: C.onSon }]}>{t.label}</T>
           </Pressable>
         ))}
       </View>
@@ -177,20 +177,20 @@ export function AdminSheet({ game, onClose }: { game: Game; onClose: () => void 
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 14, padding: 4, gap: 4 },
-  tab: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tabs: { flexDirection: 'row', backgroundColor: C.mist, borderRadius: 12, padding: 4, gap: 4, borderWidth: 1, borderColor: C.borderSubtle },
+  tab: { flex: 1, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   tabOn: { backgroundColor: C.ink },
-  tabText: { fontWeight: '800', fontSize: 13 },
-  muted: { color: C.muted, fontSize: 13 },
-  msg: { backgroundColor: '#D6F1E3', color: '#134E3A', padding: 10, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
-  card: { backgroundColor: C.mist, borderRadius: 16, padding: 12, gap: 6, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.12)' },
-  cardTitle: { fontWeight: '900', fontSize: 15 },
-  code: { fontWeight: '900', color: C.son },
+  tabText: { fontWeight: '600', fontSize: 13, color: C.secondary },
+  muted: { color: C.muted, fontSize: 12.5, fontVariant: ['tabular-nums'] },
+  msg: { backgroundColor: C.jadeSoft, color: C.jadeDeep, padding: 10, borderRadius: 10, fontWeight: '500', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(21,128,61,0.18)' },
+  card: { backgroundColor: C.parchment, borderRadius: 12, padding: 12, gap: 6, borderWidth: 1, borderColor: C.borderSubtle },
+  cardTitle: { fontWeight: '600', fontSize: 14.5, color: C.ink },
+  code: { fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: {
-    fontFamily: FONT, backgroundColor: C.paper, borderRadius: 12, paddingHorizontal: 12, height: 44, fontSize: 15, color: C.ink,
-    borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.18)', fontWeight: '600',
+    fontFamily: FONT, minWidth: 0, backgroundColor: C.paper, borderRadius: 10, paddingHorizontal: 12, height: 42, fontSize: 14.5, color: C.ink,
+    borderWidth: 1, borderColor: C.borderStrong, fontWeight: '400',
   },
-  rev: { fontSize: 16 },
-  revNum: { fontWeight: '900', color: C.son },
+  rev: { fontSize: 15, color: C.ink },
+  revNum: { fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
 });

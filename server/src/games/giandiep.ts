@@ -17,10 +17,10 @@ const DEFAULT_SEC: Record<GianDiepPhase, number> = {
   word_reveal: 10,
   clue_turn: 40,
   clue_summary: 10,
-  discussion: 50,
-  vote: 35,
-  defense: 28,
-  final_vote: 25,
+  discussion: 80,
+  vote: 40,
+  defense: 48,
+  final_vote: 40,
   mrwhite_guess: 25,
   spy_guess: 25,
   reveal_end: 12,
@@ -103,6 +103,10 @@ export class GianDiepGame implements GameEngine {
 
   private aliveConnected(): string[] {
     return [...this.alive].filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
+  }
+
+  private hasAliveConnectedHuman(): boolean {
+    return [...this.alive].some((id) => !this.ctx.isBot?.(id) && this.ctx.isConnected(id));
   }
 
   private isChatAllowedPhase(): boolean {
@@ -289,11 +293,28 @@ export class GianDiepGame implements GameEngine {
   private resolveVote(): void {
     if (this.finished) return;
     const tally = new Map<string, number>();
-    let skips = 0;
+    const votersByTarget = new Map<string, string[]>();
+    const skipVoters: string[] = [];
     for (const [voter, target] of this.votes) {
       if (!this.alive.has(voter)) continue;
-      if (target === 'skip') skips++;
-      else if (this.alive.has(target)) tally.set(target, (tally.get(target) ?? 0) + 1);
+      if (target === 'skip') {
+        skipVoters.push(this.seatTag(voter));
+      } else if (this.alive.has(target)) {
+        tally.set(target, (tally.get(target) ?? 0) + 1);
+        const list = votersByTarget.get(target) ?? [];
+        list.push(this.seatTag(voter));
+        votersByTarget.set(target, list);
+      }
+    }
+
+    if (votersByTarget.size > 0 || skipVoters.length > 0) {
+      const parts = [...tally.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([targetId]) => `${this.seatTag(targetId)} (${(votersByTarget.get(targetId) ?? []).join(', ')})`);
+      if (skipVoters.length > 0) {
+        parts.push(`Phiếu trắng (${skipVoters.join(', ')})`);
+      }
+      this.pushSystem(`Kết quả bỏ phiếu: ${parts.join(' · ')}`);
     }
 
     if (tally.size === 0) {
@@ -303,6 +324,7 @@ export class GianDiepGame implements GameEngine {
       return;
     }
 
+    const skips = skipVoters.length;
     const max = Math.max(...tally.values());
     if (max <= skips) {
       this.pushSystem(`Phiếu trắng áp đảo (${skips} phiếu) — sang vòng tiếp theo`);
@@ -362,13 +384,21 @@ export class GianDiepGame implements GameEngine {
     if (this.defendants.length === 1) {
       const acc = this.defendants[0];
       if (this.alive.has(acc)) {
-        let banishCount = 0;
-        let forgiveCount = 0;
+        const banishVoters: string[] = [];
+        const forgiveVoters: string[] = [];
         for (const [voter, v] of this.finalVotes) {
           if (!this.alive.has(voter)) continue;
-          if (v === 'banish') banishCount++;
-          else if (v === 'forgive') forgiveCount++;
+          if (v === 'banish') banishVoters.push(this.seatTag(voter));
+          else if (v === 'forgive') forgiveVoters.push(this.seatTag(voter));
         }
+        if (banishVoters.length > 0 || forgiveVoters.length > 0) {
+          const breakdown: string[] = [];
+          if (banishVoters.length > 0) breakdown.push(`Trục xuất (${banishVoters.join(', ')})`);
+          if (forgiveVoters.length > 0) breakdown.push(`Tha bổng (${forgiveVoters.join(', ')})`);
+          this.pushSystem(`Phiếu phán quyết: ${breakdown.join(' · ')}`);
+        }
+        const banishCount = banishVoters.length;
+        const forgiveCount = forgiveVoters.length;
         // Nếu người chơi bỏ phiếu Trục xuất >= Tha bổng (hoặc hết giờ không ai ấn Tha bổng khi đã bị vote cao nhất ở vòng trước)
         if (forgiveCount > banishCount) {
           this.pushSystem(`Tha bổng ${this.seatTag(acc)} (${forgiveCount} tha · ${banishCount} loại)`);
@@ -378,14 +408,27 @@ export class GianDiepGame implements GameEngine {
       }
     } else {
       const tally = new Map<string, number>();
-      let skips = 0;
+      const votersByTarget = new Map<string, string[]>();
+      const skipVoters: string[] = [];
       for (const [voter, v] of this.finalVotes) {
         if (!this.alive.has(voter)) continue;
-        if (v === 'skip') skips++;
-        else if (this.defendants.includes(v) && this.alive.has(v)) {
+        if (v === 'skip') {
+          skipVoters.push(this.seatTag(voter));
+        } else if (this.defendants.includes(v) && this.alive.has(v)) {
           tally.set(v, (tally.get(v) ?? 0) + 1);
+          const list = votersByTarget.get(v) ?? [];
+          list.push(this.seatTag(voter));
+          votersByTarget.set(v, list);
         }
       }
+      if (votersByTarget.size > 0 || skipVoters.length > 0) {
+        const parts = [...tally.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([targetId]) => `${this.seatTag(targetId)} (${(votersByTarget.get(targetId) ?? []).join(', ')})`);
+        if (skipVoters.length > 0) parts.push(`Tha cả nhóm (${skipVoters.join(', ')})`);
+        this.pushSystem(`Phiếu phán quyết: ${parts.join(' · ')}`);
+      }
+      const skips = skipVoters.length;
       if (tally.size > 0) {
         const max = Math.max(...tally.values());
         const top = [...tally.entries()].filter(([, c]) => c === max).map(([id]) => id);
@@ -567,7 +610,7 @@ export class GianDiepGame implements GameEngine {
     }
     if (this.phase === 'discussion') {
       const conn = this.aliveConnected();
-      if (this.readySkip.size >= Math.max(1, Math.ceil(conn.length / 2))) {
+      if (conn.length > 0 && conn.every((id) => this.readySkip.has(id))) {
         this.clearTimers();
         this.startVote();
         return true;
@@ -575,11 +618,14 @@ export class GianDiepGame implements GameEngine {
       return false;
     }
     if (this.phase === 'vote') {
-      const conn = this.aliveConnected();
-      if (conn.length > 0 && conn.every((id) => this.votes.has(id))) {
-        this.clearTimers();
-        this.resolveVote();
-        return true;
+      // Khi còn người chơi thật: luôn đợi hết giờ bỏ phiếu để mọi người tự do đổi phiếu và quan sát ai bầu ai
+      if (!this.hasAliveConnectedHuman()) {
+        const conn = this.aliveConnected();
+        if (conn.length > 0 && conn.every((id) => this.votes.has(id))) {
+          this.clearTimers();
+          this.resolveVote();
+          return true;
+        }
       }
       return false;
     }
@@ -595,11 +641,14 @@ export class GianDiepGame implements GameEngine {
       return false;
     }
     if (this.phase === 'final_vote') {
-      const connVoters = this.eligibleVerdictVoters().filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
-      if (connVoters.length > 0 && connVoters.every((id) => this.finalVotes.has(id))) {
-        this.clearTimers();
-        this.resolveFinalVote();
-        return true;
+      // Tương tự pha vote: khi còn người chơi thật, đợi hết giờ phán quyết để người chơi cân nhắc & đổi quyết định
+      if (!this.hasAliveConnectedHuman()) {
+        const connVoters = this.eligibleVerdictVoters().filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
+        if (connVoters.length > 0 && connVoters.every((id) => this.finalVotes.has(id))) {
+          this.clearTimers();
+          this.resolveFinalVote();
+          return true;
+        }
       }
       return false;
     }
@@ -895,9 +944,10 @@ export class GianDiepGame implements GameEngine {
         return { type: 'gd_chat', text: line };
       }
       if (!this.readySkip.has(playerId)) {
-        const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
+        const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id) && this.ctx.isConnected(id));
+        const allHumansReady = aliveHumans.length === 0 || aliveHumans.every((id) => this.readySkip.has(id));
         const waitMs = Math.min(7_000, Math.floor(this.msFor('discussion') * 0.5));
-        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
+        if (allHumansReady || Date.now() - this.phaseStartedAt >= waitMs) {
           return { type: 'gd_ready' };
         }
       }
@@ -922,8 +972,8 @@ export class GianDiepGame implements GameEngine {
       }
       if (!this.readySkip.has(playerId)) {
         const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
-        const waitMs = Math.min(4_500, Math.floor(this.msFor('defense') * 0.45));
-        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
+        // Nếu có người chơi thật, bot KHÔNG tự kết thúc sớm pha biện minh để cả phòng kịp đọc và thảo luận
+        if (aliveHumans.length === 0) {
           return { type: 'gd_ready' };
         }
       }

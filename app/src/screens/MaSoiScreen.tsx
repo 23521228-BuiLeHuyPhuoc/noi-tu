@@ -17,14 +17,14 @@ import {
 import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
-import { FONT } from '../theme';
+import { C, FONT } from '../theme';
 import { actionText } from '../messages';
 import { play } from '../sound';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { Portrait } from '../components/Avatar';
-import { EmojiIcon, GameIcon, UiIcon } from '../components/Icons';
+import { GameIcon, UiIcon } from '../components/Icons';
 
 const ROLE_GAME_ICON: Record<MaSoiRole, string> = {
   soi: 'wolf-head',
@@ -121,9 +121,9 @@ const MaSoiChatInputBar = memo(function MaSoiChatInputBar({
         <Pressable
           testID={sendTestID}
           onPress={() => void submit()}
-          style={[styles.sendBtn, wolf && { backgroundColor: '#EF4444' }]}
+          style={[styles.sendBtn, day && !wolf && styles.sendBtnDay, wolf && { backgroundColor: C.danger }]}
         >
-          <UiIcon name="Send" size={15} color={wolf ? '#FFFFFF' : '#0F172A'} />
+          <UiIcon name="Send" size={14} color={wolf ? '#FFFFFF' : day ? C.paper : C.darkBg} />
         </Pressable>
       </View>
     </KeyboardLift>
@@ -335,7 +335,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     // 3. Night — Wolf Pack: immediate 1-tap target selection / update (không cắn đồng bọn Sói)
     if (view.phase === 'night_active' && myRole === 'soi') {
       if (view.wolfPackIds?.includes(id)) {
-        setErr('Không thể chọn đồng bọn Ma Sói làm mồi!');
+        setErr('Không thể chọn đồng bọn Ma Sói làm mồi');
         return;
       }
       void act({ type: 'ms_night', target: id });
@@ -361,7 +361,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     ) {
       if (myRole === 'tientri' && id === me) return;
       if (myRole === 'baove' && id === view.guardLastId) {
-        setErr('Không được bảo vệ cùng 1 người 2 đêm liên tiếp!');
+        setErr('Không thể bảo vệ cùng 1 người 2 đêm liên tiếp');
         return;
       }
       setErr(null);
@@ -415,15 +415,15 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     [act, canChatWolf],
   );
 
-  // Context-aware Quick Wolvesville Deduction Chips (auto-inserting #X!)
+  // Context-aware Quick Wolvesville Deduction Chips (auto-inserting #X)
   const quickDeductionChips = useMemo(() => {
     const focusNum = lastFocusSeatId ? seatNumber.get(lastFocusSeatId) : undefined;
     if (commsTab === 'wolf' && canChatWolf) {
       const chips: string[] = [];
-      if (focusNum) chips.push(`🐾 Đêm nay cắn #${focusNum} đi!`);
-      chips.push('🐺 Ai giả Tiên Tri sáng mai nhảy ra?');
-      chips.push('🤫 Chia phiếu ban ngày tránh lộ bầy!');
-      chips.push('👀 Tìm Tiên Tri / Bảo Vệ thịt trước!');
+      if (focusNum) chips.push(`Đêm nay cắn #${focusNum}`);
+      chips.push('Ai giả Tiên Tri sáng mai nhảy ra?');
+      chips.push('Chia phiếu ban ngày tránh lộ bầy');
+      chips.push('Tìm Tiên Tri hoặc Bảo Vệ trước');
       return chips;
     }
 
@@ -434,75 +434,75 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       if (sNum) {
         chips.push(
           lastSeer.isWolf
-            ? `🔮 Tui Tiên Tri! Đêm qua soi #${sNum} là SÓI!`
-            : `🔮 Tui Tiên Tri! Đã soi #${sNum} phe Dân tốt!`,
+            ? `Tôi Tiên Tri, đêm qua soi #${sNum} là Sói`
+            : `Tôi Tiên Tri, đã soi #${sNum} phe Dân`,
         );
       }
     }
     if (focusNum) {
-      chips.push(`🤔 Nghi #${focusNum} lắm nha!`);
-      chips.push(`⚖️ Vote #${focusNum} đi mọi người!`);
+      chips.push(`Nghi #${focusNum}`);
+      chips.push(`Vote #${focusNum}`);
     }
     chips.push('Ai có thông tin gì không?');
-    chips.push('Tui dân thường nha');
-    chips.push('Tiên tri lộ diện đi!');
+    chips.push('Tôi dân thường');
+    chips.push('Tiên tri lộ diện đi');
     chips.push('Vote bỏ qua lượt này?');
     return chips;
   }, [commsTab, canChatWolf, lastFocusSeatId, seatNumber, myRole, view.seerHistory]);
 
   // Concise Phase Header Label & Instruction
   const headerInstruction = useMemo(() => {
-    if (err) return `⚠️ ${err}`;
+    if (err) return err;
     if (view.phase === 'hunter_shot') {
       return view.hunterId === me
-        ? '🏹 Chạm ô người chơi để bắn kéo theo!'
-        : `🏹 Thợ Săn #${seatNumber.get(view.hunterId ?? '') ?? '?'} đang ngắm bắn…`;
+        ? 'Chạm ô người chơi để bắn kéo theo'
+        : `Thợ Săn #${seatNumber.get(view.hunterId ?? '') ?? '?'} đang ngắm bắn…`;
     }
     if (view.phase === 'day_vote') {
       const myV = view.dayVotes[me];
-      if (!iAlive) return '⚖️ Làng đang bỏ phiếu treo cổ';
-      if (myV === 'skip') return '🏳️ Đã bỏ phiếu trắng (chạm ô để đổi)';
-      if (myV) return `🗳️ Đã bầu #${seatNumber.get(myV)} (chạm ô khác để đổi)`;
+      if (!iAlive) return 'Làng đang bỏ phiếu treo cổ';
+      if (myV === 'skip') return 'Đã bỏ phiếu trắng (chạm ô để đổi)';
+      if (myV) return `Đã bầu #${seatNumber.get(myV)} (chạm ô khác để đổi)`;
       return 'Chạm vào ô người chơi để bỏ phiếu';
     }
     if (view.phase === 'day_discuss') {
-      return '☀️ Thảo luận bên dưới · Ghim nghi vấn trên ô';
+      return 'Thảo luận bên dưới · Ghim nghi vấn trên ô';
     }
     if (view.phase === 'role_reveal') {
       return roleMeta
-        ? `🃏 Bạn là ${roleMeta.emoji} ${roleMeta.name} (${roleMeta.teamLabel})`
-        : '🃏 Nhận vai trò bí mật trước khi đêm xuống';
+        ? `Bạn là ${roleMeta.name} (${roleMeta.teamLabel})`
+        : 'Nhận vai trò bí mật trước khi đêm xuống';
     }
     if (view.phase === 'night_cupid') {
       return myRole === 'cupid' && iAlive && !view.myNightSubmitted
-        ? '💘 Chạm chọn 2 ô cư dân để ghép đôi'
-        : '💘 Thần Tình Yêu đang se duyên…';
+        ? 'Chạm chọn 2 ô cư dân để ghép đôi'
+        : 'Thần Tình Yêu đang se duyên…';
     }
     if (view.phase === 'night_witch') {
       if (myRole === 'phuthuy' && iAlive && !view.myNightSubmitted) {
         const vNum = view.witchState?.victimId ? seatNumber.get(view.witchState.victimId) : null;
         if (!view.witchState?.healLeft) {
           return view.witchState?.poisonLeft
-            ? '🧪 Hết thuốc cứu — chọn Độc hoặc Bỏ qua'
-            : '🧪 Hết bình phép — bấm Bỏ qua để tiếp tục';
+            ? 'Hết thuốc cứu · Chọn Độc hoặc Bỏ qua'
+            : 'Hết bình phép · Bấm Bỏ qua để tiếp tục';
         }
-        return vNum ? `🧪 #${vNum} bị Sói cắn — Cứu hoặc quăng Độc!` : '🧪 Đêm bình yên — dùng Độc hoặc bỏ qua';
+        return vNum ? `#${vNum} bị Sói cắn · Cứu hoặc quăng Độc` : 'Đêm bình yên · Dùng Độc hoặc bỏ qua';
       }
-      return '🧪 Phù Thủy đang pha chế bình thuốc…';
+      return 'Phù Thủy đang pha chế bình thuốc…';
     }
     // night_active
-    if (!iAlive) return '👻 Bạn đã hy sinh — theo dõi ván đấu';
+    if (!iAlive) return 'Bạn đã hy sinh · Theo dõi ván đấu';
     if (myRole === 'soi') {
       const cur = view.wolfVotes?.[me];
       return cur
-        ? `🐾 Đang chọn cắn #${seatNumber.get(cur)} (chạm ô khác để đổi)`
-        : '🐾 Chạm mục tiêu để Sói cắn';
+        ? `Đang chọn cắn #${seatNumber.get(cur)} (chạm ô khác để đổi)`
+        : 'Chạm mục tiêu để Sói cắn';
     }
-    if (view.myNightSubmitted) return '✓ Đã xong kỹ năng đêm — chờ trời sáng…';
-    if (myRole === 'tientri') return '🔮 Chạm 1 ô để Tiên Tri soi thân phận';
-    if (myRole === 'baove') return '🛡️ Chạm 1 ô để giương khiên bảo vệ';
-    if (myRole === 'thamtu') return '🕵️ Chạm 2 ô để điều tra cùng/khác phe';
-    return '🌙 Màn đêm buông xuống… hãy giữ im lặng';
+    if (view.myNightSubmitted) return 'Đã xong kỹ năng đêm · Chờ trời sáng…';
+    if (myRole === 'tientri') return 'Chạm 1 ô để Tiên Tri soi thân phận';
+    if (myRole === 'baove') return 'Chạm 1 ô để giương khiên bảo vệ';
+    if (myRole === 'thamtu') return 'Chạm 2 ô để điều tra cùng/khác phe';
+    return 'Màn đêm buông xuống · Hãy giữ im lặng';
   }, [
     err,
     view.phase,
@@ -544,9 +544,9 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
         <View style={styles.actionStripNight}>
           <T numberOfLines={1} style={styles.actionStripTxt}>
             {selected
-              ? `${myRole === 'tientri' ? '🔮 Soi' : '🛡️ Bảo vệ'} #${sNum} ${view.names[selected]}?`
+              ? `${myRole === 'tientri' ? 'Soi' : 'Bảo vệ'} #${sNum} ${view.names[selected]}?`
               : myRole === 'baove' && view.guardLastId
-                ? `🛡️ Chạm 1 ô (trừ #${seatNumber.get(view.guardLastId)} đêm trước)`
+                ? `Chạm 1 ô (trừ #${seatNumber.get(view.guardLastId)} đêm trước)`
                 : `Chạm 1 ô người chơi ở trên để ${myRole === 'tientri' ? 'soi' : 'bảo vệ'}`}
           </T>
           <Pressable
@@ -566,7 +566,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       return (
         <View style={styles.actionStripNight}>
           <T numberOfLines={1} style={styles.actionStripTxt}>
-            {myRole === 'cupid' ? '💘 Ghép đôi: ' : '🕵️ Điều tra: '}
+            {myRole === 'cupid' ? 'Ghép đôi: ' : 'Điều tra: '}
             {label || 'Chạm chọn đủ 2 ô trên lưới'}
           </T>
           <Pressable
@@ -597,18 +597,18 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
               style={[styles.witchPill, witchSave && styles.witchPillSaveActive]}
             >
               <T style={styles.witchPillTxt}>
-                {witchSave ? `💚 Đã cứu #${vNum}` : `💚 Cứu #${vNum}`}
+                {witchSave ? `Đã cứu #${vNum}` : `Cứu #${vNum}`}
               </T>
             </Pressable>
           ) : (
             <T numberOfLines={1} style={styles.actionStripTxt}>
-              {ws?.poisonLeft ? '🧪 Chạm ô để quăng Độc' : '🧪 Hết bình phép'}
+              {ws?.poisonLeft ? 'Chạm ô để quăng Độc' : 'Hết bình phép'}
             </T>
           )}
 
           {pNum && (
             <Pressable onPress={() => setWitchPoison(null)} style={styles.witchPillPoisonActive}>
-              <T style={styles.witchPillTxt}>☠️ Độc #{pNum} ✕</T>
+              <T style={styles.witchPillTxt}>Độc #{pNum} ×</T>
             </Pressable>
           )}
 
@@ -619,20 +619,21 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
             style={styles.confirmPill}
           >
             <T style={styles.confirmPillTxt}>
-              {witchSave || witchPoison ? '✓ Dùng bình' : '⏭️ Bỏ qua'}
+              {witchSave || witchPoison ? 'Dùng bình' : 'Bỏ qua'}
             </T>
           </Pressable>
         </View>
       );
     }
 
-    if (view.phase === 'role_reveal' && roleMeta) {
+    if (view.phase === 'role_reveal' && roleMeta && myRole) {
       return (
         <View style={[styles.actionStripNight, { borderColor: roleMeta.color }]}>
+          <GameIcon name={ROLE_GAME_ICON[myRole]} size={13} color="#FFFFFF" />
           <T numberOfLines={1} style={styles.actionStripTxt}>
             {roleHidden
-              ? '🃏 Đã ẩn vai trò trên màn hình'
-              : `${roleMeta.emoji} ${roleMeta.name}: ${roleMeta.shortDesc}`}
+              ? 'Đã ẩn vai trò trên màn hình'
+              : `${roleMeta.name}: ${roleMeta.shortDesc}`}
           </T>
           <Pressable onPress={() => setRoleHidden((v) => !v)} style={styles.subtleMiniBtn}>
             <T style={styles.subtleMiniBtnTxt}>{roleHidden ? 'Hiện' : 'Ẩn'}</T>
@@ -647,12 +648,16 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   return (
     <Shell game={game} room={room} scroll={false} hideStrip wide={wide}>
       <View style={styles.wolvesvilleRoot}>
-        {/* ZONE 1: COMPACT WOLVESVILLE DAY / NIGHT TOP HEADER (~44px) */}
+        {/* ZONE 1: COMPACT DAY / NIGHT TOP HEADER (~44px) */}
         <View style={[styles.topHeader, isNight ? styles.topHeaderNight : styles.topHeaderDay]}>
           <View style={styles.topHeaderRow}>
             {/* Phase Pill */}
             <View style={[styles.phasePill, isNight ? styles.phasePillNight : styles.phasePillDay]}>
-              <EmojiIcon emoji={isNight ? '🌙' : view.phase === 'hunter_shot' ? '🏹' : '☀️'} size={14} />
+              <UiIcon
+                name={isNight ? 'Moon' : view.phase === 'hunter_shot' ? 'Crosshair' : 'Sun'}
+                size={12}
+                color={isNight ? C.darkText : C.goldDeep}
+              />
               <T style={[styles.phasePillTxt, isNight ? styles.txtLight : styles.txtAmberInk]}>
                 {isNight ? `Đêm ${view.day}` : `Ngày ${view.day}`}
               </T>
@@ -664,7 +669,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
               style={[
                 styles.headerHintTxt,
                 isNight ? styles.headerHintNight : styles.headerHintDay,
-                err ? { color: '#F87171' } : null,
+                err ? { color: isNight ? '#FCA5A5' : C.danger } : null,
               ]}
             >
               {headerInstruction}
@@ -675,16 +680,25 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
               testID="masoi-timer"
               style={[
                 styles.timerBadge,
+                !isNight && styles.timerBadgeDay,
                 secLeft <= 8 && styles.timerBadgeUrgent,
               ]}
             >
-              <T style={styles.timerBadgeTxt}>{secLeft}s</T>
+              <T
+                style={[
+                  styles.timerBadgeTxt,
+                  !isNight && secLeft > 8 && { color: C.ink },
+                ]}
+              >
+                {secLeft}s
+              </T>
             </View>
 
             {/* Alive Counter */}
             <View style={[styles.aliveBadge, !isNight && styles.aliveBadgeDay]}>
+              <UiIcon name="Users" size={10} color={isNight ? C.darkText : C.goldDeep} />
               <T style={[styles.aliveBadgeTxt, !isNight && styles.txtAmberInk]}>
-                👤{view.alive.length}/{view.order.length}
+                {view.alive.length}/{view.order.length}
               </T>
             </View>
 
@@ -699,10 +713,10 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 <T style={styles.headerActBtnTxt}>
                   {view.phase === 'role_reveal'
                     ? myReady
-                      ? `✓ Đã xem ${readyCount}/${view.alive.length}`
-                      : '✓ Đã nhớ vai'
+                      ? `Đã xem ${readyCount}/${view.alive.length}`
+                      : 'Đã nhớ vai'
                     : myReady
-                      ? `✓ ${readyCount}/${needReady}`
+                      ? `Xong ${readyCount}/${needReady}`
                       : `Sẵn sàng ${readyCount}/${needReady}`}
                 </T>
               </Pressable>
@@ -717,7 +731,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                   view.dayVotes[me] === 'skip' && styles.headerActBtnDone,
                 ]}
               >
-                <T style={styles.headerActBtnTxt}>🏳️ Trắng</T>
+                <T style={styles.headerActBtnTxt}>Phiếu trắng</T>
               </Pressable>
             ) : view.phase === 'hunter_shot' && view.hunterId === me ? (
               <Pressable
@@ -728,15 +742,17 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
               >
                 <T style={styles.headerActBtnTxt}>Cất súng</T>
               </Pressable>
-            ) : roleMeta ? (
+            ) : roleMeta && myRole ? (
               <Pressable
                 testID="masoi-guide-open"
                 onPress={() => setCommsTab((t) => (t === 'role' ? 'village' : 'role'))}
                 style={[styles.roleMiniChip, { backgroundColor: roleMeta.color }]}
               >
-                <T style={styles.roleMiniChipTxt}>
-                  {roleHidden ? '🃏' : roleMeta.emoji}
-                </T>
+                {roleHidden ? (
+                  <UiIcon name="EyeOff" size={12} color="#FFFFFF" />
+                ) : (
+                  <GameIcon name={ROLE_GAME_ICON[myRole]} size={13} color="#FFFFFF" />
+                )}
               </Pressable>
             ) : null}
           </View>
@@ -748,7 +764,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 styles.progressFill,
                 {
                   width: `${Math.round(timerRatio * 100)}%`,
-                  backgroundColor: secLeft <= 8 ? '#EF4444' : isNight ? '#818CF8' : '#F59E0B',
+                  backgroundColor: secLeft <= 8 ? C.danger : isNight ? '#818CF8' : C.goldDeep,
                 },
               ]}
             />
@@ -757,7 +773,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
 
         {/* MAIN SPLIT: Vertical 3-Zone on Mobile, 2-Column Side-by-Side on Wide Desktop */}
         <View style={[styles.mainBody, wide && styles.mainBodyWide]}>
-          {/* ZONE 2: WOLVESVILLE NUMBERED 4-COLUMN VILLAGE GRID */}
+          {/* ZONE 2: NUMBERED 4-COLUMN VILLAGE GRID */}
           <View style={[styles.villageZone, wide && styles.villageZoneWide]}>
             <View style={styles.grid4Col}>
               {view.order.map((id) => {
@@ -819,7 +835,13 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                         isMePlot ? styles.seatBadgeMe : isNight ? styles.seatBadgeNight : styles.seatBadgeDay,
                       ]}
                     >
-                      <T style={[styles.seatBadgeTxt, isMePlot && styles.seatBadgeTxtMe]}>
+                      <T
+                        style={[
+                          styles.seatBadgeTxt,
+                          isNight && !isMePlot && { color: C.darkText },
+                          isMePlot && styles.seatBadgeTxtMe,
+                        ]}
+                      >
                         #{num}
                       </T>
                     </View>
@@ -828,36 +850,42 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     <View style={styles.topRightBadges}>
                       {isLover && (
                         <View style={styles.intelDotLover}>
-                          <T style={styles.intelDotEmoji}>💘</T>
+                          <UiIcon name="Heart" size={9} color="#FDF2F8" />
                         </View>
                       )}
                       {!alive ? (
                         <View style={styles.intelDotDead}>
-                          <T style={styles.intelDotEmoji}>
-                            {deadEntry?.revealedRole ? MASOI_ROLES[deadEntry.revealedRole].emoji : '🪦'}
-                          </T>
+                          {deadEntry?.revealedRole ? (
+                            <GameIcon name={ROLE_GAME_ICON[deadEntry.revealedRole]} size={10} color="#FFFFFF" />
+                          ) : (
+                            <UiIcon name="Skull" size={9} color="#E2E8F0" />
+                          )}
                         </View>
-                      ) : isMePlot && roleMeta ? (
+                      ) : isMePlot && roleMeta && myRole ? (
                         <View style={[styles.intelDotRole, { backgroundColor: roleMeta.color }]}>
-                          <T style={styles.intelDotEmoji}>{roleHidden ? '🃏' : roleMeta.emoji}</T>
+                          {roleHidden ? (
+                            <UiIcon name="EyeOff" size={9} color="#FFFFFF" />
+                          ) : (
+                            <GameIcon name={ROLE_GAME_ICON[myRole]} size={10} color="#FFFFFF" />
+                          )}
                         </View>
                       ) : isWolfAlly ? (
                         <View style={styles.intelDotWolf}>
-                          <T style={styles.intelDotEmoji}>🐺</T>
+                          <GameIcon name="wolf-head" size={10} color="#FECACA" />
                         </View>
                       ) : seerResult !== undefined ? (
                         <View
                           style={seerResult ? styles.intelDotWolf : styles.intelDotGood}
                         >
-                          <T style={styles.intelDotEmoji}>{seerResult ? '🐺' : '🧑'}</T>
+                          <GameIcon name={seerResult ? 'wolf-head' : 'farmer'} size={10} color="#FFFFFF" />
                         </View>
                       ) : isWitchVictim ? (
                         <View style={styles.intelDotWolf}>
-                          <T style={styles.intelDotEmoji}>🩸</T>
+                          <UiIcon name="AlertTriangle" size={9} color="#FECACA" />
                         </View>
                       ) : isGuarded ? (
                         <View style={styles.intelDotGuard}>
-                          <T style={styles.intelDotEmoji}>🛡️</T>
+                          <UiIcon name="Shield" size={9} color="#E0F2FE" />
                         </View>
                       ) : suspect !== 'none' ? (
                         <Pressable
@@ -868,14 +896,16 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                           }}
                           style={styles.intelDotSuspect}
                         >
-                          <T style={styles.intelDotEmoji}>
-                            {suspect === 'wolf' ? '❓' : suspect === 'trust' ? '✓' : '🤡'}
-                          </T>
+                          <UiIcon
+                            name={suspect === 'wolf' ? 'HelpCircle' : suspect === 'trust' ? 'Check' : 'AlertTriangle'}
+                            size={9}
+                            color={suspect === 'wolf' ? '#FCA5A5' : suspect === 'trust' ? '#86EFAC' : '#FDE047'}
+                          />
                         </Pressable>
                       ) : null}
                     </View>
 
-                    {/* Center Avatar with Gravestone Overlay or Target Ring */}
+                    {/* Center Avatar with Tombstone Overlay or Target Ring */}
                     <View
                       style={[
                         styles.plotAvatarWrap,
@@ -884,31 +914,31 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     >
                       {player ? (
                         <View style={!alive ? styles.deadAvatarDim : undefined}>
-                          <Portrait p={player} size={avatarSize} border={isPicked ? 2.5 : 1.5} />
+                          <Portrait p={player} size={avatarSize} border={isPicked ? 2 : 1} />
                         </View>
                       ) : (
                         <UiIcon
                           name={alive ? 'User' : 'Skull'}
                           size={Math.round(avatarSize * 0.7)}
-                          color="#94A3B8"
+                          color={C.muted}
                         />
                       )}
 
                       {!alive && (
                         <View pointerEvents="none" style={styles.tombstoneOverlay}>
-                          <T style={styles.tombstoneEmoji}>🪦</T>
+                          <UiIcon name="Skull" size={15} color="#CBD5E1" />
                         </View>
                       )}
 
-                      {/* Live Vote Tally Pill (🗳️ X) or Wolf Pack Claws (🐾 X) */}
+                      {/* Live Vote Tally Pill or Wolf Pack Targets */}
                       {alive && votes > 0 && (
                         <View style={styles.tallyOverlayVote}>
-                          <T style={styles.tallyOverlayTxt}>🗳️{votes}</T>
+                          <T style={styles.tallyOverlayTxt}>{votes}</T>
                         </View>
                       )}
                       {alive && wolfClaws > 0 && (
                         <View style={styles.tallyOverlayWolf}>
-                          <T style={styles.tallyOverlayTxt}>🐾{wolfClaws}</T>
+                          <T style={styles.tallyOverlayTxt}>{wolfClaws}</T>
                         </View>
                       )}
                     </View>
@@ -926,7 +956,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                         ? `${MASOI_ROLES[deadEntry.revealedRole].name}`
                         : view.phase === 'day_vote' && alive && votedWho
                           ? votedWho === 'skip'
-                            ? `${view.names[id] ?? id} ·🏳️`
+                            ? `${view.names[id] ?? id} · Trắng`
                             : `${view.names[id] ?? id} →#${seatNumber.get(votedWho)}`
                           : view.names[id] ?? id}
                     </T>
@@ -939,7 +969,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
             {renderGridActionStrip()}
           </View>
 
-          {/* ZONE 3: ALWAYS-VISIBLE WOLVESVILLE CHAT & VILLAGE LOG (flex: 1, Pinned Input) */}
+          {/* ZONE 3: ALWAYS-VISIBLE CHAT & VILLAGE LOG (flex: 1, Pinned Input) */}
           <View
             testID="masoi-comms-card"
             style={[
@@ -958,14 +988,28 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     (isNight ? styles.channelTabActiveNight : styles.channelTabActiveDay),
                 ]}
               >
+                <UiIcon
+                  name="MessageCircle"
+                  size={12}
+                  color={
+                    commsTab === 'village'
+                      ? isNight
+                        ? C.darkBg
+                        : C.paper
+                      : isNight
+                        ? C.darkMuted
+                        : C.muted
+                  }
+                />
                 <T
                   style={[
                     styles.channelTabTxt,
+                    !isNight && { color: C.secondary },
                     commsTab === 'village' &&
                       (isNight ? styles.channelTabTxtActiveNight : styles.channelTabTxtActiveDay),
                   ]}
                 >
-                  💬 Chat Làng
+                  Chat làng
                 </T>
               </Pressable>
 
@@ -978,14 +1022,15 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     commsTab === 'wolf' && styles.channelTabWolfActive,
                   ]}
                 >
+                  <GameIcon name="wolf-head" size={12} color={commsTab === 'wolf' ? '#FFFFFF' : '#F87171'} />
                   <T
                     style={[
                       styles.channelTabTxt,
-                      { color: '#F87171' },
+                      { color: isNight ? '#FCA5A5' : C.danger, fontVariant: ['tabular-nums'] },
                       commsTab === 'wolf' && { color: '#FFFFFF' },
                     ]}
                   >
-                    🐺 Kênh Sói ({view.wolfChat.length})
+                    Kênh Sói ({view.wolfChat.length})
                   </T>
                 </Pressable>
               )}
@@ -999,14 +1044,28 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     (isNight ? styles.channelTabActiveNight : styles.channelTabActiveDay),
                 ]}
               >
+                <UiIcon
+                  name="BookOpen"
+                  size={12}
+                  color={
+                    commsTab === 'role'
+                      ? isNight
+                        ? C.darkBg
+                        : C.paper
+                      : isNight
+                        ? C.darkMuted
+                        : C.muted
+                  }
+                />
                 <T
                   style={[
                     styles.channelTabTxt,
+                    !isNight && { color: C.secondary },
                     commsTab === 'role' &&
                       (isNight ? styles.channelTabTxtActiveNight : styles.channelTabTxtActiveDay),
                   ]}
                 >
-                  📜 Vai & Luật
+                  Vai & Luật
                 </T>
               </Pressable>
             </View>
@@ -1014,7 +1073,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
             {/* TAB 1: UNIFIED VILLAGE CHAT + SYSTEM EVENT BANNERS */}
             {commsTab === 'village' && (
               <View style={styles.chatContentFill}>
-                {/* Ghim tức thì kết quả Tiên Tri / Thám Tử ngay trên luồng chat để không bao giờ bỏ lỡ */}
+                {/* Ghim tức thì kết quả Tiên Tri / Thám Tử ngay trên luồng chat */}
                 {myRole === 'tientri' && view.seerHistory && view.seerHistory.length > 0 && (() => {
                   const last = view.seerHistory[view.seerHistory.length - 1];
                   return (
@@ -1025,9 +1084,10 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                         last.isWolf ? styles.intelPinWolf : styles.intelPinGood,
                       ]}
                     >
+                      <UiIcon name="Eye" size={12} color="#FFFFFF" />
                       <T numberOfLines={1} style={styles.intelPinTxt}>
-                        🔮 Đêm {last.day}: #{seatNumber.get(last.targetId)} {view.names[last.targetId]} là{' '}
-                        {last.isWolf ? '🐺 MA SÓI!' : '🧑‍🌾 PHE DÂN!'}
+                        Đêm {last.day}: #{seatNumber.get(last.targetId)} {view.names[last.targetId]} là{' '}
+                        {last.isWolf ? 'Ma Sói' : 'Phe Dân'}
                       </T>
                     </View>
                   );
@@ -1036,9 +1096,10 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                   const last = view.detectiveHistory[view.detectiveHistory.length - 1];
                   return (
                     <View testID="masoi-intel-banner" style={[styles.intelPinBanner, styles.intelPinGood]}>
+                      <UiIcon name="Search" size={12} color="#FFFFFF" />
                       <T numberOfLines={1} style={styles.intelPinTxt}>
-                        🕵️ Đêm {last.day}: #{seatNumber.get(last.a)} & #{seatNumber.get(last.b)} →{' '}
-                        {last.sameTeam ? 'CÙNG PHE' : 'KHÁC PHE'}
+                        Đêm {last.day}: #{seatNumber.get(last.a)} &amp; #{seatNumber.get(last.b)} ·{' '}
+                        {last.sameTeam ? 'Cùng phe' : 'Khác phe'}
                       </T>
                     </View>
                   );
@@ -1051,8 +1112,8 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                   keyboardShouldPersistTaps="handled"
                 >
                   {unifiedVillageFeed.length === 0 ? (
-                    <T style={[styles.emptyFeedTxt, !isNight && { color: '#64748B' }]}>
-                      Chưa có thông báo. Khi bình minh lên, hãy dùng #SốGhế để suy luận cùng dân làng!
+                    <T style={[styles.emptyFeedTxt, !isNight && { color: C.muted }]}>
+                      Chưa có thông báo. Khi bình minh lên, hãy dùng #SốGhế để suy luận cùng dân làng.
                     </T>
                   ) : (
                     unifiedVillageFeed.map((item) => {
@@ -1065,7 +1126,9 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                             style={[
                               styles.sysBanner,
                               isDawn
-                                ? styles.sysBannerDawn
+                                ? isNight
+                                  ? styles.sysBannerDawnNight
+                                  : styles.sysBannerDay
                                 : isHunter
                                   ? styles.sysBannerHunter
                                   : isNight
@@ -1076,10 +1139,10 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                             <T
                               style={[
                                 styles.sysBannerTxt,
-                                !isNight && !isDawn && !isHunter && { color: '#334155' },
+                                !isNight && !isHunter && { color: C.ink },
+                                !isNight && isHunter && { color: C.danger },
                               ]}
                             >
-                              {isDawn ? '☀️ ' : isHunter ? '🏹 ' : item.log.kind === 'vote' ? '⚖️ ' : '📢 '}
                               [Ngày {item.log.day}] {item.log.text}
                             </T>
                           </View>
@@ -1087,6 +1150,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                       }
 
                       const sNum = seatNumber.get(item.from);
+                      const sender = playerMap.get(item.from);
                       const isMine = item.from === me;
                       const senderDead = !aliveSet.has(item.from);
                       return (
@@ -1098,12 +1162,15 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                             isMine && (isNight ? styles.msgRowMineNight : styles.msgRowMineDay),
                           ]}
                         >
+                          <Portrait p={sender ?? { avatar: 0 }} size={22} />
                           <T numberOfLines={4} style={isNight ? styles.msgLineNight : styles.msgLineDay}>
                             <T
                               style={[
                                 styles.msgAuthor,
                                 isMine
-                                  ? styles.msgAuthorMe
+                                  ? isNight
+                                    ? { color: '#93C5FD' }
+                                    : styles.msgAuthorMe
                                   : isNight
                                     ? styles.msgAuthorNight
                                     : styles.msgAuthorDay,
@@ -1111,20 +1178,20 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                             >
                               {sNum ? `#${sNum} ` : ''}
                               {item.name}
-                              {senderDead ? '👻' : ''}:{' '}
+                              {senderDead ? ' (Đã mất)' : ''}:{' '}
                             </T>
                             {item.isSticker ? `[Nhãn dán ${item.stickerId}]` : item.text}
                           </T>
-                          <T style={styles.msgTime}>{fmtShortTime(item.at)}</T>
+                          <T style={[styles.msgTime, !isNight && { color: C.muted }]}>{fmtShortTime(item.at)}</T>
                         </View>
                       );
                     })
                   )}
                 </ScrollView>
 
-                {/* 1-Line Quick Wolvesville Deduction Chips */}
+                {/* 1-Line Quick Deduction Chips */}
                 {canChatVillage && (
-                  <View style={styles.quickStripWrap}>
+                  <View style={[styles.quickStripWrap, !isNight && { borderTopColor: C.borderSubtle }]}>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -1147,9 +1214,9 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
 
                 {/* Pinned Bottom Input Row */}
                 {!iAlive ? (
-                  <View style={styles.pinnedStatusRow}>
-                    <T style={styles.pinnedStatusTxt}>
-                      👻 Bạn đã hy sinh — đang xem làng suy luận
+                  <View style={[styles.pinnedStatusRow, !isNight && styles.pinnedStatusRowDay]}>
+                    <T style={[styles.pinnedStatusTxt, !isNight && { color: C.secondary }]}>
+                      Bạn đã hy sinh · Đang theo dõi làng suy luận
                     </T>
                   </View>
                 ) : isNight ? (
@@ -1159,13 +1226,13 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                       style={[styles.pinnedStatusRow, styles.pinnedWolfJump]}
                     >
                       <T style={[styles.pinnedStatusTxt, { color: '#FECACA' }]}>
-                        🐺 Đang là ban đêm — chạm mở Kênh Sói để bàn mưu!
+                        Đang là ban đêm · Chạm mở Kênh Sói để bàn mưu
                       </T>
                     </Pressable>
                   ) : (
                     <View style={styles.pinnedStatusRow}>
                       <T style={styles.pinnedStatusTxt}>
-                        🌙 Ban đêm cả làng giữ im lặng — chờ trời sáng để chat
+                        Ban đêm cả làng giữ im lặng · Chờ trời sáng để chat
                       </T>
                     </View>
                   )
@@ -1174,7 +1241,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     inputTestID="masoi-village-input"
                     sendTestID="masoi-village-send"
                     placeholder="Chat suy luận với làng (vd: Nghi #3 là Sói)..."
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={C.muted}
                     maxLength={200}
                     day={!isNight}
                     onSend={sendVillageChat}
@@ -1206,19 +1273,23 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 >
                   {view.wolfChat.length === 0 ? (
                     <T style={styles.emptyWolfTxt}>
-                      🐺 Kênh bí mật của bầy Sói! Bàn nhau chọn mồi hoặc giả danh Tiên Tri ngay tại đây.
+                      Kênh bí mật của bầy Sói. Bàn nhau chọn mồi hoặc giả danh Tiên Tri tại đây.
                     </T>
                   ) : (
-                    view.wolfChat.map((m) => (
-                      <View key={`wm-${m.id}`} style={styles.wolfMsgRow}>
-                        <T style={styles.wolfMsgTxt}>
-                          <T style={styles.wolfMsgAuthor}>
-                            #{seatNumber.get(m.from) ?? '?'} {m.name}:{' '}
+                    view.wolfChat.map((m) => {
+                      const wolfSender = playerMap.get(m.from);
+                      return (
+                        <View key={`wm-${m.id}`} style={styles.wolfMsgRow}>
+                          <Portrait p={wolfSender ?? { avatar: 0 }} size={22} />
+                          <T style={styles.wolfMsgTxt}>
+                            <T style={styles.wolfMsgAuthor}>
+                              #{seatNumber.get(m.from) ?? '?'} {m.name}:{' '}
+                            </T>
+                            {m.text}
                           </T>
-                          {m.text}
-                        </T>
-                      </View>
-                    ))
+                        </View>
+                      );
+                    })
                   )}
                 </ScrollView>
 
@@ -1256,7 +1327,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 ) : (
                   <View style={styles.pinnedStatusRow}>
                     <T style={styles.pinnedStatusTxt}>
-                      👻 Bạn đã hy sinh — chỉ xem lại mật thư bầy Sói
+                      Bạn đã hy sinh · Chỉ xem lại mật thư bầy Sói
                     </T>
                   </View>
                 )}
@@ -1287,20 +1358,22 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                       </View>
                       <Pressable
                         onPress={() => setRoleHidden((v) => !v)}
-                        style={styles.subtleMiniBtn}
+                        style={[styles.subtleMiniBtn, !isNight && { backgroundColor: C.mist }]}
                       >
-                        <T style={styles.subtleMiniBtnTxt}>
+                        <T style={[styles.subtleMiniBtnTxt, !isNight && { color: C.secondary }]}>
                           {roleHidden ? 'Hiện huy hiệu' : 'Ẩn huy hiệu'}
                         </T>
                       </Pressable>
                     </View>
-                    <T style={[styles.myRoleHow, !isNight && { color: '#1E293B' }]}>
+                    <T style={[styles.myRoleHow, !isNight && { color: C.ink }]}>
                       {roleMeta.howToPlay}
                     </T>
-                    <T style={styles.myRoleWin}>🏆 {roleMeta.winCond}</T>
+                    <T style={[styles.myRoleWin, !isNight && { color: C.goldDeep }]}>
+                      Mục tiêu: {roleMeta.winCond}
+                    </T>
                     {view.myPartnerId && (
                       <T style={styles.loverLine}>
-                        💘 Cặp đôi định mệnh với #{seatNumber.get(view.myPartnerId)}{' '}
+                        Cặp đôi định mệnh với #{seatNumber.get(view.myPartnerId)}{' '}
                         {view.names[view.myPartnerId]}
                       </T>
                     )}
@@ -1309,12 +1382,12 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
 
                 {/* Seer Inspection History */}
                 {view.seerHistory && view.seerHistory.length > 0 && (
-                  <View style={styles.intelHistoryCard}>
-                    <T style={styles.intelHistoryTitle}>🔮 Lịch Sử Tiên Tri Soi</T>
+                  <View style={[styles.intelHistoryCard, !isNight && styles.intelHistoryCardDay]}>
+                    <T style={[styles.intelHistoryTitle, !isNight && { color: C.ink }]}>Lịch sử Tiên Tri soi</T>
                     {view.seerHistory.map((h, i) => (
-                      <T key={`sh-${i}`} style={styles.intelHistoryItem}>
-                        • Đêm {h.day}: #{seatNumber.get(h.targetId)} {view.names[h.targetId]} →{' '}
-                        {h.isWolf ? '🐺 MA SÓI!' : '🧑 Phe Dân Làng'}
+                      <T key={`sh-${i}`} style={[styles.intelHistoryItem, !isNight && { color: C.ink }]}>
+                        · Đêm {h.day}: #{seatNumber.get(h.targetId)} {view.names[h.targetId]} →{' '}
+                        {h.isWolf ? 'Ma Sói' : 'Phe Dân Làng'}
                       </T>
                     ))}
                   </View>
@@ -1322,21 +1395,21 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
 
                 {/* Detective History */}
                 {view.detectiveHistory && view.detectiveHistory.length > 0 && (
-                  <View style={[styles.intelHistoryCard, { borderColor: '#10B981' }]}>
-                    <T style={[styles.intelHistoryTitle, { color: '#6EE7B7' }]}>
-                      🕵️ Hồ Sơ Thám Tử
+                  <View style={[styles.intelHistoryCard, { borderColor: C.jade }, !isNight && styles.intelHistoryCardDay]}>
+                    <T style={[styles.intelHistoryTitle, { color: isNight ? '#6EE7B7' : C.jadeDeep }]}>
+                      Hồ sơ Thám Tử
                     </T>
                     {view.detectiveHistory.map((h, i) => (
-                      <T key={`dh-${i}`} style={styles.intelHistoryItem}>
-                        • Đêm {h.day}: #{seatNumber.get(h.a)} & #{seatNumber.get(h.b)} →{' '}
-                        {h.sameTeam ? 'CÙNG PHE' : 'KHÁC PHE'}
+                      <T key={`dh-${i}`} style={[styles.intelHistoryItem, !isNight && { color: C.ink }]}>
+                        · Đêm {h.day}: #{seatNumber.get(h.a)} &amp; #{seatNumber.get(h.b)} →{' '}
+                        {h.sameTeam ? 'Cùng phe' : 'Khác phe'}
                       </T>
                     ))}
                   </View>
                 )}
 
                 {/* Room Role Deck */}
-                <T style={[styles.deckSectionTitle, !isNight && { color: '#475569' }]}>
+                <T style={[styles.deckSectionTitle, !isNight && { color: C.secondary }]}>
                   Bộ vai trò trong phòng ({view.order.length} người):
                 </T>
                 <View style={styles.deckGrid}>
@@ -1355,13 +1428,16 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                         ]}
                       >
                         <View style={styles.deckCardHead}>
-                          <T style={[styles.deckCardName, { color: m.color }]}>
-                            {m.emoji} {m.name} {deadCnt > 0 ? `(${remain}/${cnt})` : `×${cnt}`}
-                          </T>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <GameIcon name={ROLE_GAME_ICON[r]} size={13} color={m.color} />
+                            <T style={[styles.deckCardName, { color: m.color }]}>
+                              {m.name} {deadCnt > 0 ? `(${remain}/${cnt})` : `×${cnt}`}
+                            </T>
+                          </View>
                         </View>
                         <T
                           numberOfLines={2}
-                          style={[styles.deckCardDesc, !isNight && { color: '#334155' }]}
+                          style={[styles.deckCardDesc, !isNight && { color: C.secondary }]}
                         >
                           {m.shortDesc}
                         </T>
@@ -1388,20 +1464,20 @@ const styles = StyleSheet.create({
 
   /* ZONE 1: TOP HEADER (~44px) */
   topHeader: {
-    borderRadius: 14,
+    borderRadius: 13,
     paddingHorizontal: 8,
     paddingTop: 6,
     paddingBottom: 4,
     gap: 5,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   topHeaderNight: {
-    backgroundColor: '#111827',
-    borderColor: '#4F46E5',
+    backgroundColor: C.darkSurface,
+    borderColor: C.darkBorder,
   },
   topHeaderDay: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#F59E0B',
+    backgroundColor: C.paper,
+    borderColor: C.borderSubtle,
   },
   topHeaderRow: {
     flexDirection: 'row',
@@ -1411,90 +1487,103 @@ const styles = StyleSheet.create({
   phasePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 999,
   },
   phasePillNight: {
-    backgroundColor: '#1E1B4B',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: '#6366F1',
+    borderColor: C.darkBorder,
   },
   phasePillDay: {
-    backgroundColor: '#FDE68A',
+    backgroundColor: C.goldSoft,
     borderWidth: 1,
-    borderColor: '#D97706',
+    borderColor: 'rgba(180,83,9,0.2)',
   },
   phasePillTxt: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '600',
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   txtLight: {
-    color: '#F8FAFC',
+    color: C.darkText,
   },
   txtAmberInk: {
-    color: '#78350F',
+    color: C.goldDeep,
   },
   headerHintTxt: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '500',
     minWidth: 0,
   },
   headerHintNight: {
-    color: '#CBD5E1',
+    color: C.darkMuted,
   },
   headerHintDay: {
-    color: '#78350F',
+    color: C.secondary,
   },
   timerBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2.5,
-    borderRadius: 8,
-    backgroundColor: '#1E293B',
+    borderRadius: 7,
+    backgroundColor: C.darkSubtle,
+  },
+  timerBadgeDay: {
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   timerBadgeUrgent: {
-    backgroundColor: '#DC2626',
+    backgroundColor: C.danger,
   },
   timerBadgeTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FDE68A',
+    fontVariant: ['tabular-nums'],
   },
   aliveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     paddingHorizontal: 6,
     paddingVertical: 2.5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+    borderRadius: 7,
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
   },
   aliveBadgeDay: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
+    backgroundColor: C.goldSoft,
+    borderColor: 'rgba(180,83,9,0.2)',
   },
   aliveBadgeTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#E2E8F0',
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
   headerActBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#2563EB',
+    backgroundColor: C.son,
   },
   headerActBtnSkip: {
-    backgroundColor: '#475569',
+    backgroundColor: C.secondary,
   },
   headerActBtnDone: {
-    backgroundColor: '#059669',
+    backgroundColor: C.jade,
   },
   headerActBtnTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
   },
   roleMiniChip: {
     width: 26,
@@ -1503,13 +1592,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roleMiniChipTxt: {
-    fontSize: 13,
-  },
   progressTrack: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(148, 163, 184, 0.24)',
+    backgroundColor: 'rgba(123, 114, 102, 0.22)',
     overflow: 'hidden',
   },
   progressFill: {
@@ -1529,7 +1615,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  /* ZONE 2: WOLVESVILLE 4-COLUMN NUMBERED VILLAGE GRID */
+  /* ZONE 2: 4-COLUMN NUMBERED VILLAGE GRID */
   villageZone: {
     gap: 5,
     flexShrink: 0,
@@ -1552,8 +1638,8 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 4,
     paddingHorizontal: 3,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    borderRadius: 11,
+    borderWidth: 1,
     position: 'relative',
     ...(Platform.OS === 'web'
       ? ({
@@ -1566,42 +1652,42 @@ const styles = StyleSheet.create({
   plotCardCompact: {
     paddingTop: 11,
     paddingBottom: 3,
-    borderRadius: 10,
+    borderRadius: 9,
   },
   plotCardNight: {
-    backgroundColor: '#162038',
-    borderColor: '#2D3F66',
+    backgroundColor: C.darkSurface,
+    borderColor: C.darkBorder,
   },
   plotCardDay: {
-    backgroundColor: '#FFFDF7',
-    borderColor: '#D6D3D1',
+    backgroundColor: C.paper,
+    borderColor: C.borderSubtle,
   },
   plotCardDeadNight: {
-    backgroundColor: '#111625',
-    borderColor: '#334155',
-    opacity: 0.64,
+    backgroundColor: C.darkBg,
+    borderColor: C.darkBorder,
+    opacity: 0.62,
   },
   plotCardDeadDay: {
-    backgroundColor: '#E2E8F0',
-    borderColor: '#94A3B8',
-    opacity: 0.72,
+    backgroundColor: C.mist,
+    borderColor: C.borderSubtle,
+    opacity: 0.68,
   },
   plotSuspectWolf: {
-    borderColor: '#EF4444',
+    borderColor: C.danger,
   },
   plotSuspectTrust: {
-    borderColor: '#10B981',
+    borderColor: C.jade,
   },
   plotSuspectJester: {
-    borderColor: '#EAB308',
+    borderColor: C.gold,
   },
   plotCardSelected: {
-    borderColor: '#FACC15',
-    borderWidth: 2.5,
+    borderColor: C.goldDeep,
+    borderWidth: 2,
   },
   plotCardVictim: {
-    borderColor: '#F43F5E',
-    borderWidth: 2,
+    borderColor: C.danger,
+    borderWidth: 1.5,
   },
 
   seatBadge: {
@@ -1610,30 +1696,31 @@ const styles = StyleSheet.create({
     left: 3,
     paddingHorizontal: 4.5,
     paddingVertical: 1,
-    borderRadius: 6,
+    borderRadius: 5,
     zIndex: 2,
   },
   seatBadgeMe: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: C.gold,
   },
   seatBadgeNight: {
-    backgroundColor: '#1E293B',
+    backgroundColor: C.darkSubtle,
   },
   seatBadgeDay: {
-    backgroundColor: '#334155',
+    backgroundColor: C.mist,
   },
   seatBadgeTxt: {
     fontSize: 9.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.secondary,
+    fontVariant: ['tabular-nums'],
   },
   seatBadgeTxtMe: {
-    color: '#0F172A',
+    color: C.ink,
   },
 
   topRightBadges: {
     position: 'absolute',
-    top: 2,
+    top: 3,
     right: 3,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1642,47 +1729,44 @@ const styles = StyleSheet.create({
   },
   intelDotRole: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
+    paddingVertical: 1,
+    borderRadius: 5,
   },
   intelDotWolf: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
-    backgroundColor: '#991B1B',
+    paddingVertical: 1,
+    borderRadius: 5,
+    backgroundColor: C.danger,
   },
   intelDotGood: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
-    backgroundColor: '#065F46',
+    paddingVertical: 1,
+    borderRadius: 5,
+    backgroundColor: C.jade,
   },
   intelDotGuard: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
+    paddingVertical: 1,
+    borderRadius: 5,
     backgroundColor: '#0369A1',
   },
   intelDotLover: {
     paddingHorizontal: 3,
-    paddingVertical: 0.5,
-    borderRadius: 6,
-    backgroundColor: '#831843',
+    paddingVertical: 1,
+    borderRadius: 5,
+    backgroundColor: '#9D174D',
   },
   intelDotDead: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
-    backgroundColor: '#334155',
+    paddingVertical: 1,
+    borderRadius: 5,
+    backgroundColor: C.darkSubtle,
   },
   intelDotSuspect: {
     paddingHorizontal: 3.5,
-    paddingVertical: 0.5,
-    borderRadius: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-  },
-  intelDotEmoji: {
-    fontSize: 10,
+    paddingVertical: 1,
+    borderRadius: 5,
+    backgroundColor: C.darkSubtle,
   },
 
   plotAvatarWrap: {
@@ -1702,52 +1786,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tombstoneEmoji: {
-    fontSize: 16,
-  },
   tallyOverlayVote: {
     position: 'absolute',
     bottom: -3,
-    right: -8,
+    right: -7,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 999,
-    backgroundColor: '#0F172A',
+    backgroundColor: C.ink,
     borderWidth: 1,
-    borderColor: '#FACC15',
+    borderColor: C.gold,
   },
   tallyOverlayWolf: {
     position: 'absolute',
     bottom: -3,
-    right: -8,
+    right: -7,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 999,
-    backgroundColor: '#991B1B',
+    backgroundColor: C.danger,
     borderWidth: 1,
     borderColor: '#FCA5A5',
   },
   tallyOverlayTxt: {
     fontSize: 9,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '600',
+    color: '#FEF3C7',
+    fontVariant: ['tabular-nums'],
   },
 
   plotName: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '500',
     textAlign: 'center',
     maxWidth: '100%',
     marginTop: 1,
   },
   plotNameNight: {
-    color: '#F1F5F9',
+    color: C.darkText,
   },
   plotNameDay: {
-    color: '#1E293B',
+    color: C.ink,
   },
   plotNameDead: {
-    color: '#94A3B8',
+    color: C.muted,
     textDecorationLine: 'line-through',
   },
 
@@ -1758,123 +1840,126 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    borderRadius: 11,
-    backgroundColor: '#1E1B4B',
-    borderWidth: 1.5,
-    borderColor: '#6366F1',
+    borderRadius: 10,
+    backgroundColor: C.darkSurface,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
   },
   actionStripTxt: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '800',
-    color: '#E0E7FF',
+    fontWeight: '500',
+    color: C.darkText,
   },
   confirmPill: {
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     borderRadius: 999,
-    backgroundColor: '#FACC15',
+    backgroundColor: C.gold,
   },
   confirmPillDisabled: {
     opacity: 0.4,
   },
   confirmPillTxt: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#0F172A',
+    fontWeight: '600',
+    color: C.ink,
+    fontVariant: ['tabular-nums'],
   },
   witchPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: 'rgba(21, 128, 61, 0.25)',
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: C.jade,
   },
   witchPillSaveActive: {
-    backgroundColor: '#059669',
+    backgroundColor: C.jade,
   },
   witchPillPoisonActive: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#991B1B',
+    backgroundColor: C.danger,
     borderWidth: 1,
     borderColor: '#FCA5A5',
   },
   witchPillTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   subtleMiniBtn: {
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: 'rgba(148, 163, 184, 0.22)',
+    borderRadius: 7,
+    backgroundColor: C.darkSubtle,
   },
   subtleMiniBtnTxt: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#CBD5E1',
+    fontWeight: '500',
+    color: C.darkText,
   },
 
   /* ZONE 3: ALWAYS-VISIBLE CHAT & VILLAGE LOG (flex: 1) */
   chatZone: {
     flex: 1,
     minHeight: 0,
-    borderRadius: 15,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   chatZoneNight: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
+    backgroundColor: C.darkBg,
+    borderColor: C.darkBorder,
   },
   chatZoneDay: {
-    backgroundColor: '#FFFDF9',
-    borderColor: '#CBD5E1',
+    backgroundColor: C.paper,
+    borderColor: C.borderSubtle,
   },
   channelBar: {
     flexDirection: 'row',
     gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 5,
-    backgroundColor: '#1E293B',
+    backgroundColor: C.darkSurface,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(148, 163, 184, 0.2)',
+    borderBottomColor: C.darkBorder,
   },
   channelBarDay: {
-    backgroundColor: '#F1F5F9',
-    borderBottomColor: '#E2E8F0',
+    backgroundColor: C.parchment,
+    borderBottomColor: C.borderSubtle,
   },
   channelTab: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 5,
     paddingVertical: 4.5,
     paddingHorizontal: 6,
-    borderRadius: 9,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   channelTabActiveNight: {
-    backgroundColor: '#FACC15',
+    backgroundColor: C.gold,
   },
   channelTabActiveDay: {
-    backgroundColor: '#0F172A',
+    backgroundColor: C.ink,
   },
   channelTabWolfActive: {
-    backgroundColor: '#B91C1C',
+    backgroundColor: C.danger,
   },
   channelTabTxt: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#64748B',
+    fontWeight: '600',
+    color: C.darkMuted,
   },
   channelTabTxtActiveNight: {
-    color: '#0F172A',
+    color: C.ink,
   },
   channelTabTxtActiveDay: {
-    color: '#FFFFFF',
+    color: C.paper,
   },
 
   chatContentFill: {
@@ -1892,8 +1977,8 @@ const styles = StyleSheet.create({
   },
   emptyFeedTxt: {
     fontSize: 11.5,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontWeight: '400',
+    color: C.darkMuted,
     textAlign: 'center',
     paddingVertical: 14,
   },
@@ -1901,93 +1986,94 @@ const styles = StyleSheet.create({
   sysBanner: {
     paddingHorizontal: 8,
     paddingVertical: 4.5,
-    borderRadius: 9,
-    borderLeftWidth: 3,
+    borderRadius: 8,
+    borderLeftWidth: 2.5,
   },
-  sysBannerDawn: {
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
-    borderLeftColor: '#F59E0B',
+  sysBannerDawnNight: {
+    backgroundColor: 'rgba(217, 119, 6, 0.16)',
+    borderLeftColor: C.gold,
   },
   sysBannerHunter: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderLeftColor: '#EF4444',
+    backgroundColor: 'rgba(185, 28, 28, 0.16)',
+    borderLeftColor: C.danger,
   },
   sysBannerNight: {
-    backgroundColor: 'rgba(99, 102, 241, 0.18)',
+    backgroundColor: C.darkSurface,
     borderLeftColor: '#818CF8',
   },
   sysBannerDay: {
-    backgroundColor: '#FEF3C7',
-    borderLeftColor: '#D97706',
+    backgroundColor: C.goldSoft,
+    borderLeftColor: C.goldDeep,
   },
   sysBannerTxt: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#FDE68A',
     lineHeight: 16,
   },
 
   msgRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 9,
+    paddingVertical: 4.5,
+    borderRadius: 8,
   },
   msgRowNight: {
-    backgroundColor: 'rgba(30, 41, 59, 0.72)',
+    backgroundColor: C.darkSurface,
   },
   msgRowDay: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: C.parchment,
   },
   msgRowMineNight: {
-    backgroundColor: 'rgba(56, 189, 248, 0.16)',
-    borderLeftWidth: 2.5,
-    borderLeftColor: '#38BDF8',
+    backgroundColor: C.darkSubtle,
+    borderLeftWidth: 2,
+    borderLeftColor: C.gold,
   },
   msgRowMineDay: {
-    backgroundColor: '#E0F2FE',
-    borderLeftWidth: 2.5,
-    borderLeftColor: '#0284C7',
+    backgroundColor: C.goldSoft,
+    borderLeftWidth: 2,
+    borderLeftColor: C.goldDeep,
   },
   msgLineNight: {
     flex: 1,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#F1F5F9',
+    fontWeight: '400',
+    color: C.darkText,
     lineHeight: 16,
   },
   msgLineDay: {
     flex: 1,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: '400',
+    color: C.ink,
     lineHeight: 16,
   },
   msgAuthor: {
-    fontWeight: '900',
+    fontWeight: '600',
   },
   msgAuthorMe: {
-    color: '#0284C7',
+    color: C.son,
   },
   msgAuthorNight: {
-    color: '#FACC15',
+    color: '#FDE68A',
   },
   msgAuthorDay: {
-    color: '#B45309',
+    color: C.goldDeep,
   },
   msgTime: {
     fontSize: 9.5,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontWeight: '400',
+    color: C.darkMuted,
+    fontVariant: ['tabular-nums'],
   },
 
   quickStripWrap: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.16)',
-    paddingVertical: 3.5,
+    borderTopColor: C.darkBorder,
+    paddingVertical: 4,
   },
   quickStripScroll: {
     paddingHorizontal: 6,
@@ -1998,29 +2084,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 999,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: C.goldSoft,
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: 'rgba(180,83,9,0.2)',
   },
   quickChipNight: {
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    backgroundColor: 'rgba(217, 119, 6, 0.16)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
   },
   quickChipTxt: {
     fontSize: 10.5,
-    fontWeight: '800',
-    color: '#78350F',
+    fontWeight: '500',
+    color: C.goldDeep,
   },
   quickChipWolf: {
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 999,
-    backgroundColor: 'rgba(185, 28, 28, 0.26)',
+    backgroundColor: 'rgba(185, 28, 28, 0.22)',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: C.danger,
   },
   quickChipWolfTxt: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#FECACA',
   },
 
@@ -2031,55 +2118,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 5,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.2)',
+    borderTopColor: C.borderSubtle,
   },
   chatInput: {
     flex: 1,
+    minWidth: 0,
     height: 34,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: '#1E293B',
+    borderRadius: 9,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: '#475569',
-    color: '#F8FAFC',
+    borderColor: C.darkBorder,
+    color: C.darkText,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   chatInputDay: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CBD5E1',
-    color: '#0F172A',
+    backgroundColor: C.paper,
+    borderColor: C.borderStrong,
+    color: C.ink,
   },
   chatInputWolf: {
-    backgroundColor: '#2A0A0E',
-    borderColor: '#EF4444',
+    backgroundColor: '#260E12',
+    borderColor: C.danger,
     color: '#FEE2E2',
   },
   sendBtn: {
     width: 34,
     height: 34,
-    borderRadius: 10,
-    backgroundColor: '#FACC15',
+    borderRadius: 9,
+    backgroundColor: C.gold,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendBtnDay: {
+    backgroundColor: C.ink,
   },
 
   pinnedStatusRow: {
     paddingHorizontal: 8,
     paddingVertical: 7,
-    backgroundColor: 'rgba(30, 41, 59, 0.5)',
+    backgroundColor: C.darkSurface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.2)',
+    borderTopColor: C.darkBorder,
     alignItems: 'center',
+  },
+  pinnedStatusRowDay: {
+    backgroundColor: C.parchment,
+    borderTopColor: C.borderSubtle,
   },
   pinnedWolfJump: {
     backgroundColor: 'rgba(153, 27, 27, 0.45)',
   },
   pinnedStatusTxt: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
+    fontWeight: '500',
+    color: C.darkMuted,
     textAlign: 'center',
   },
 
@@ -2095,31 +2190,35 @@ const styles = StyleSheet.create({
   wolfPackStripTxt: {
     flex: 1,
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#FECACA',
   },
   emptyWolfTxt: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#FCA5A5',
     textAlign: 'center',
     paddingVertical: 14,
   },
   wolfMsgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 4.5,
-    borderRadius: 9,
-    backgroundColor: 'rgba(185, 28, 28, 0.24)',
-    borderLeftWidth: 2.5,
-    borderLeftColor: '#EF4444',
+    borderRadius: 8,
+    backgroundColor: 'rgba(185, 28, 28, 0.22)',
+    borderLeftWidth: 2,
+    borderLeftColor: C.danger,
   },
   wolfMsgTxt: {
+    flex: 1,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#FEE2E2',
   },
   wolfMsgAuthor: {
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FCA5A5',
   },
 
@@ -2130,13 +2229,13 @@ const styles = StyleSheet.create({
   },
   myRoleRefCard: {
     padding: 9,
-    borderRadius: 11,
-    backgroundColor: 'rgba(30, 41, 59, 0.72)',
-    borderWidth: 1.5,
+    borderRadius: 10,
+    backgroundColor: C.darkSurface,
+    borderWidth: 1,
     gap: 4,
   },
   myRoleRefCardDay: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: C.parchment,
   },
   myRoleRefHead: {
     flexDirection: 'row',
@@ -2154,67 +2253,75 @@ const styles = StyleSheet.create({
   },
   myRoleBadgeTxt: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   myRoleHow: {
     fontSize: 11.5,
-    fontWeight: '700',
-    color: '#E2E8F0',
+    fontWeight: '400',
+    color: C.darkText,
     lineHeight: 16,
   },
   myRoleWin: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#F59E0B',
+    fontWeight: '600',
+    color: '#FDE68A',
   },
   loverLine: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#F472B6',
   },
 
   intelHistoryCard: {
     padding: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(139, 92, 246, 0.16)',
+    borderRadius: 9,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
     borderColor: '#8B5CF6',
     gap: 2,
   },
+  intelHistoryCardDay: {
+    backgroundColor: C.parchment,
+    borderColor: C.borderStrong,
+  },
   intelHistoryTitle: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#C4B5FD',
   },
   intelPinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 4.5,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+    borderBottomColor: C.darkBorder,
   },
   intelPinWolf: {
-    backgroundColor: 'rgba(185, 28, 28, 0.88)',
+    backgroundColor: C.danger,
   },
   intelPinGood: {
-    backgroundColor: 'rgba(6, 95, 70, 0.88)',
+    backgroundColor: C.jade,
   },
   intelPinTxt: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
   },
   intelHistoryItem: {
     fontSize: 11.5,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontWeight: '500',
+    color: C.darkText,
   },
 
   deckSectionTitle: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#94A3B8',
+    fontWeight: '600',
+    color: C.darkMuted,
     marginTop: 2,
   },
   deckGrid: {
@@ -2224,14 +2331,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 9,
-    backgroundColor: 'rgba(30, 41, 59, 0.65)',
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
+    borderColor: C.darkBorder,
     gap: 2,
   },
   deckCardDay: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
+    backgroundColor: C.parchment,
+    borderColor: C.borderSubtle,
   },
   deckCardHead: {
     flexDirection: 'row',
@@ -2240,12 +2347,13 @@ const styles = StyleSheet.create({
   },
   deckCardName: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   deckCardDesc: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#CBD5E1',
+    fontWeight: '400',
+    color: C.darkMuted,
     lineHeight: 15,
   },
 });

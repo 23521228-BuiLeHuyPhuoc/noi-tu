@@ -12,17 +12,19 @@ import { actionText, quip } from '../messages';
 import { useOnNew, useSecondsLeft, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
-import { C, FONT, sticker } from '../theme';
+import { C, FONT, backdropPalette, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { TimerBar } from '../components/TimerBar';
 import { useShake } from '../components/Fun';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { UiIcon } from '../components/Icons';
 
 export function WordChainScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as WordChainView;
+  const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
+  const pal = backdropPalette(activeThemeId);
   const isEn = g.type === 'wordchain_en';
   const myTurn = g.currentPlayerId === game.me;
   const isSpectator = !g.order.includes(game.me ?? '');
@@ -32,14 +34,12 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   const feed = useFeed();
   const shake = useShake();
 
-  // chữ đầu đã khóa (= chữ cuối của từ trước), ô nhập chỉ chứa chữ thứ hai
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [rejected, setRejected] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
-  // sang lượt mới: xóa ô nhập (cập nhật ngay khi render, không dùng effect)
   const turnKey = `${g.currentPlayerId}|${word}`;
   const [prevTurnKey, setPrevTurnKey] = useState(turnKey);
   if (prevTurnKey !== turnKey) {
@@ -49,11 +49,6 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setRejected(null);
   }
 
-  /**
-   * ghép chữ đầu đã khóa với phần người chơi gõ.
-   * Tiếng Anh: luôn gửi "chữ khóa + phần gõ"; nếu người chơi lỡ gõ cả từ (xxmas) server tự bỏ chữ lặp,
-   * và tự dịch ngược chữ bị bộ gõ Telex thêm dấu (xmá -> xmas).
-   */
   const fullWord = (typed: string) => {
     if (isEn) {
       const clean = typed.normalize('NFC').trim().toLowerCase();
@@ -83,7 +78,6 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     lastTick.current = left;
   }, [left, myTurn]);
 
-  // câu bình luận + âm thanh cho sự kiện mới
   useOnNew(g.history, (h: WordHistoryItem) => {
     if (h.kind === 'word' && h.playerId !== game.me) play('pop');
     if (h.kind === 'eliminated') {
@@ -96,10 +90,10 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     if (h.kind === 'vote') {
       if (h.approved) {
         play('win');
-        feed(`Cả phòng duyệt “${h.word}”, thêm vào từ điển 📚`, 'good');
+        feed(`Cả phòng duyệt “${h.word}” và thêm vào từ điển`, 'good');
       } else {
         play('lose');
-        feed(`“${h.word}” không được duyệt ❌`, 'bad');
+        feed(`“${h.word}” chưa được duyệt`, 'bad');
       }
     }
   });
@@ -115,10 +109,9 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
       const viKeys = isEn && r.reason !== 'vi_keyboard' && hasVietMarks(text);
       setError(
         r.reason === 'format' && isEn
-          ? viKeys ? actionText.vi_keyboard : 'Từ phải là 1 từ đơn tiếng Anh (a–z), không dấu, không khoảng trắng.'
+          ? viKeys ? actionText.vi_keyboard : 'Từ phải là 1 từ đơn tiếng Anh (a–z), không dấu và không khoảng trắng.'
           : actionText[r.reason],
       );
-      // xin duyệt đúng từ server đã hiểu (vd gõ lại chữ đầu: "ttizz" -> "tizz")
       setRejected(r.reason === 'not_in_dictionary' ? r.word ?? w : null);
       play('error');
     } else play('coin');
@@ -134,7 +127,6 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     } else setError(actionText[r.reason]);
   };
 
-  // cứu trợ: server chọn một từ hợp lệ và nối luôn, không cần điền rồi bấm Gửi
   const [hinting, setHinting] = useState(false);
   const askHint = async () => {
     if (hinting) return;
@@ -143,15 +135,13 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     setHinting(false);
     if (r.ok && r.hint) {
       play('coin');
-      feed(`🆘 Cứu trợ nối hộ: ${r.hint}`, 'good');
+      feed(`Cứu trợ nối hộ: ${r.hint}`, 'good');
     } else if (!r.ok) setError(actionText[r.reason]);
   };
   const voting = g.vote !== null;
   const me = game.me ?? '';
   const myHints = g.hintsLeft?.[me] ?? (g.hintUsed.includes(me) ? 0 : 1);
   const myCorrect = g.correct?.[me] ?? 0;
-  // Nối từ Anh: lượt của mỗi người ngắn dần 30s -> 15s theo số từ tự nối đúng; mỗi 30 từ thêm 1 cứu trợ
-  // suy ra thời gian gốc từ lượt hiện tại (server có thể đặt khác 30s khi test)
   const curCorrect = g.correct?.[g.currentPlayerId ?? ''] ?? 0;
   const baseMs = g.currentPlayerId
     ? Math.round((g.turnSeconds * 1000) / (1 - (1 - EN_TURN_MIN_RATIO) * (Math.min(curCorrect, EN_RAMP_WORDS) / EN_RAMP_WORDS)) / 100) * 100
@@ -170,8 +160,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     <>
       {isSpectator ? null : meOut ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <T style={styles.out}>Bạn đã bay màu. Ngồi xem và ném dép cổ vũ nhé</T>
-          <EmojiIcon emoji="🩴" size={16} />
+          <T style={[styles.out, { color: pal.muted }]}>Bạn đã hết lượt. Theo dõi và cổ vũ mọi người</T>
         </View>
       ) : myTurn ? (
         <>
@@ -180,9 +169,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
               <View style={[styles.inputBox, voting && { opacity: 0.5 }]}>
                 <View testID="word-prefix" style={styles.prefix} accessibilityLabel={`Chữ đầu: ${last}`}>
                   <T style={styles.prefixText}>{last}</T>
-                  <View style={{ marginLeft: 3 }}>
-                    <UiIcon name="Lock" size={12} color="#FEF08A" />
-                  </View>
+                  <UiIcon name="Lock" size={12} color={C.goldSoft} strokeWidth={1.75} />
                 </View>
                 <TextInput
                   testID="word-input"
@@ -190,7 +177,6 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                   style={styles.input}
                   value={text}
                   editable={!voting}
-                  // tắt gợi ý/tự sửa của bàn phím; Android: bàn phím chữ thường không bộ gõ dấu
                   autoComplete="off"
                   spellCheck={false}
                   {...(isEn && Platform.OS === 'android' ? { keyboardType: 'visible-password' as const } : {})}
@@ -200,7 +186,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                     setError(null);
                     setRejected(null);
                   }}
-                  placeholder={isEn ? 'nối tiếp…' : 'chữ tiếp…'}
+                  placeholder={isEn ? 'nối tiếp' : 'chữ tiếp'}
                   placeholderTextColor={C.muted}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -209,23 +195,22 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
                   blurOnSubmit={false}
                 />
               </View>
-              {/* giữ con trỏ trong ô nhập khi bấm Gửi: trên Android, mất focus làm bàn phím đóng, nút tụt xuống và cú chạm trượt khỏi nút */}
               <View onPointerDown={(e) => { if (Platform.OS === 'web') e.preventDefault(); }}>
-                <Button testID="submit-btn" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 76, marginBottom: 0 }} />
+                <Button testID="submit-btn" variant="ink" title="Gửi" disabled={sending || voting} onPress={submit} style={{ minWidth: 74 }} />
               </View>
             </View>
             {error && <T testID="word-error" style={styles.error}>{error}</T>}
             {rejected && !voting && (
-              <Button testID="appeal-btn" small icon="🙋" title={`Xin cả phòng duyệt “${rejected}”`} variant="ink" onPress={appeal} />
+              <Button testID="appeal-btn" small iconNode={<UiIcon name="HelpCircle" size={14} color={C.ink} strokeWidth={1.65} />} title={`Xin cả phòng duyệt “${rejected}”`} variant="paper" onPress={appeal} />
             )}
           </KeyboardLift>
           {myHints > 0 && (
             <Button
               testID="hint-btn"
               small
-              variant="ghost"
-              icon="🆘"
-              title={hinting ? 'Đang cứu trợ…' : `Cứu trợ: nối hộ 1 từ (còn ${myHints})`}
+              variant="paper"
+              iconNode={<UiIcon name="Lightbulb" size={14} color={C.secondary} strokeWidth={1.65} />}
+              title={hinting ? 'Đang cứu trợ' : `Cứu trợ: nối hộ 1 từ (còn ${myHints})`}
               disabled={hinting || voting || sending}
               onPress={askHint}
             />
@@ -236,12 +221,12 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           <Button
             testID="poke-current"
             small
-            variant="ghost"
-            icon="⏰"
-            title={`Hối ${current.name}`}
+            variant="paper"
+            iconNode={<UiIcon name="Timer" size={14} color={C.secondary} strokeWidth={1.65} />}
+            title={`Nhắc ${current.name}`}
             onPress={async () => {
               const r = await game.sendFun({ kind: 'poke', to: current.id });
-              if (!r.ok && r.reason === 'limited') feed(`⏳ Hối từ từ thôi, chờ ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa`, 'info');
+              if (!r.ok && r.reason === 'limited') feed(`Nhắc nhẹ sau ${Math.ceil((r.retryMs ?? 1000) / 1000)} giây nữa`, 'info');
             }}
           />
         )
@@ -264,10 +249,11 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           game={game}
           order={g.order}
           activeId={g.currentPlayerId}
+          dark={pal.dark}
           dim={(p) => g.eliminated.includes(p.id)}
           sub={(p) => {
             const st = g.streaks?.[p.id] ?? 0;
-            return st >= 2 ? `🔥${st} · ${g.words[p.id] ?? 0}` : `${g.words[p.id] ?? 0} từ`;
+            return st >= 2 ? `x${st} · ${g.words[p.id] ?? 0}` : `${g.words[p.id] ?? 0} từ`;
           }}
         />
 
@@ -275,50 +261,47 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           {(g.difficulty && g.difficulty !== 'normal') || (g.rule && g.rule !== 'free') || (g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 ? (
             <View style={styles.challengeRow} testID="wordchain-badges">
               {g.difficulty && g.difficulty !== 'normal' && (
-                <View style={[styles.challengePill, g.difficulty === 'hell' ? styles.pillHell : g.difficulty === 'hard' ? styles.pillHard : styles.pillEasy]}>
-                  <EmojiIcon emoji={WORDCHAIN_DIFFICULTIES[g.difficulty].emoji} size={13} />
+                <View style={styles.challengePill}>
                   <T style={styles.challengeTxt}>{WORDCHAIN_DIFFICULTIES[g.difficulty].name}</T>
                 </View>
               )}
               {g.rule && g.rule !== 'free' && (
-                <View style={[styles.challengePill, g.ruleRelaxed ? styles.pillRelaxed : styles.pillRule]}>
-                  <EmojiIcon emoji={WORDCHAIN_RULES[g.rule].emoji} size={13} />
+                <View style={styles.challengePill}>
                   <T style={styles.challengeTxt}>
-                    {WORDCHAIN_RULES[g.rule].name}{g.ruleRelaxed ? ' (Tự nới lượt này!)' : ''}
+                    {WORDCHAIN_RULES[g.rule].name}{g.ruleRelaxed ? ' (Tạm nới)' : ''}
                   </T>
                 </View>
               )}
               {(g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 && (
                 <View style={[styles.challengePill, styles.pillStreak]}>
-                  <EmojiIcon emoji="🔥" size={13} />
-                  <T style={styles.challengeTxt}>Combo x{g.streaks?.[g.currentPlayerId ?? '']}</T>
+                  <T style={[styles.challengeTxt, { color: C.goldDeep }]}>Chuỗi x{g.streaks?.[g.currentPlayerId ?? '']}</T>
                 </View>
               )}
             </View>
           ) : null}
-          <T testID="turn-label" style={[styles.turn, compact && { fontSize: 15 }, myTurn && { color: C.jade }]}>
-            {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
+          <T testID="turn-label" style={[styles.turn, compact && { fontSize: 14 }, myTurn && { color: C.jade }]}>
+            {myTurn ? 'Tới lượt bạn' : current ? `Lượt của ${current.name}` : ''}
           </T>
           <T testID="current-word" style={[styles.word, compact && styles.wordCompact]} numberOfLines={1} adjustsFontSizeToFit>
             {isEn ? first : `${first} `}<T style={[styles.last, compact && styles.wordCompact]}>{last}</T>
           </T>
           <Definition definition={g.currentDefinition} current />
-          <T testID="next-count" style={[styles.count, compact && { fontSize: 13 }]}>
-            Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
+          <T testID="next-count" style={[styles.count, compact && { fontSize: 12.5 }]}>
+            Còn <T style={{ fontWeight: '600', color: C.ink }}>{g.nextCount}</T> từ có thể nối với “{last}”
           </T>
           {voting ? (
-            <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
+            <T style={styles.paused}>Đồng hồ tạm dừng khi cả phòng bỏ phiếu</T>
           ) : (
             <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
           )}
           {!voting && (g.turnBonusMs ?? 0) > 0 && (
             <T testID="turn-bonus" style={styles.bonus}>
-              ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
+              Bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} cho {myTurn ? 'bạn' : current?.name ?? 'người chơi'}
             </T>
           )}
           {isEn && !isSpectator && !meOut && (
             <T testID="en-progress" style={styles.progress}>
-              ⏱ Lượt bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm tới 15s)' : ''} · 🆘 {myHints} · +{toBonus} từ thêm 🆘
+              Lượt bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (tới 15s)' : ''} · Cứu trợ: {myHints} · +{toBonus} từ thêm cứu trợ
             </T>
           )}
         </Card>
@@ -348,26 +331,26 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
   };
   return (
     <View pointerEvents="box-none" style={styles.voteLayer}>
-      <View testID="vote-card" style={[styles.voteCard, sticker(6)]}>
+      <View testID="vote-card" style={[styles.voteCard, sticker(3)]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <EmojiIcon emoji="🗳️" size={16} />
+          <UiIcon name="BookOpen" size={16} color={C.secondary} strokeWidth={1.65} />
           <T style={styles.voteHead}>{vote.byId === me ? 'Bạn' : vote.byName} xin duyệt từ</T>
         </View>
         <T style={styles.voteWord}>“{vote.word}”</T>
         <T style={styles.voteSub}>
-          {canVote ? 'Từ này có nghĩa không?' : vote.byId === me ? 'Đang chờ cả phòng bỏ phiếu…' : 'Cả phòng đang bỏ phiếu…'} ({left}s)
+          {canVote ? 'Từ này có nghĩa không' : vote.byId === me ? 'Đang chờ cả phòng bỏ phiếu' : 'Cả phòng đang bỏ phiếu'} ({left}s)
         </T>
-        <View testID="vote-tally" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <View testID="vote-tally" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <EmojiIcon emoji="👍" size={14} />
+            <UiIcon name="Check" size={15} color={C.jade} strokeWidth={1.75} />
             <T style={styles.tally}>{vote.yes.length}</T>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <EmojiIcon emoji="👎" size={14} />
+            <UiIcon name="X" size={15} color={C.danger} strokeWidth={1.75} />
             <T style={styles.tally}>{vote.no.length}</T>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <EmojiIcon emoji="⏳" size={14} />
+            <UiIcon name="Timer" size={15} color={C.muted} strokeWidth={1.75} />
             <T style={styles.tally}>{vote.voters.length - vote.yes.length - vote.no.length}</T>
           </View>
         </View>
@@ -375,7 +358,7 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button
               testID="vote-yes"
-              icon="👍"
+              iconNode={<UiIcon name="Check" size={15} color={myVote === 'yes' ? '#FFFFFF' : C.jade} strokeWidth={1.75} />}
               title="Có nghĩa"
               variant={myVote === 'yes' ? 'jade' : 'paper'}
               style={{ flex: 1 }}
@@ -383,7 +366,7 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
             />
             <Button
               testID="vote-no"
-              icon="👎"
+              iconNode={<UiIcon name="X" size={15} color={myVote === 'no' ? C.onSon : C.danger} strokeWidth={1.75} />}
               title="Không"
               variant={myVote === 'no' ? 'ink' : 'paper'}
               style={{ flex: 1 }}
@@ -399,7 +382,6 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
 
 function Definition({ definition, current = false }: { definition?: WordDefinition; current?: boolean }) {
   const text = definition?.text.trim();
-  // server trả câu "Chưa có giải nghĩa" khi thiếu nghĩa: ẩn hẳn khung
   if (!text || text === 'Chưa có giải nghĩa') return null;
   return (
     <View style={[styles.definition, current && styles.currentDefinition]} testID={current ? 'current-definition' : 'history-definition'}>
@@ -425,12 +407,12 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
         </View>
       );
     case 'hint':
-      return <T style={styles.sys}>{isMe(item.playerId) ? 'Bạn' : item.name} đã gọi cứu trợ 🆘</T>;
+      return <T style={styles.sys}>{isMe(item.playerId) ? 'Bạn' : item.name} đã dùng cứu trợ</T>;
     case 'vote':
       return (
         <View style={styles.historyEntry}>
           <T style={[styles.sys, { color: item.approved ? C.jade : C.danger }]}>
-            {item.approved ? `✅ Cả phòng duyệt “${item.word}” (từ mới)` : `❌ “${item.word}” không được duyệt`}
+            {item.approved ? `Cả phòng duyệt “${item.word}” (từ mới)` : `“${item.word}” chưa được duyệt`}
           </T>
           <Definition definition={item.definition} />
         </View>
@@ -438,14 +420,14 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
     case 'eliminated':
       return (
         <T style={[styles.sys, { color: C.danger }]}>
-          {isMe(item.playerId) ? 'Bạn' : item.name} {item.reason === 'timeout' ? 'hết giờ, bay màu 💨' : 'đã rời phòng'}
+          {isMe(item.playerId) ? 'Bạn' : item.name} {item.reason === 'timeout' ? 'hết giờ' : 'đã rời phòng'}
         </T>
       );
     case 'word':
       return (
         <View style={styles.historyEntry}>
           <View style={styles.wordRow}>
-            <T style={styles.wordText}>{item.word}{item.hint ? ' 🆘' : ''}</T>
+            <T style={styles.wordText}>{item.word}{item.hint ? ' (Cứu trợ)' : ''}</T>
             <T style={styles.by}>{isMe(item.playerId) ? 'Bạn' : item.name}</T>
           </View>
           <Definition definition={item.definition} />
@@ -455,60 +437,53 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minHeight: 0, gap: 6 },
+  root: { flex: 1, minHeight: 0, gap: 8 },
   board: { alignItems: 'center', gap: 6, paddingVertical: 10 },
   boardCompact: { gap: 4, paddingVertical: 8, paddingHorizontal: 10 },
-  turn: { fontSize: 16, fontWeight: '800', color: C.muted, textAlign: 'center' },
-  word: { fontSize: 40, fontWeight: '900', letterSpacing: -1, lineHeight: 48, maxWidth: '100%' },
-  wordCompact: { fontSize: 32, lineHeight: 38 },
-  last: { color: C.son, fontSize: 40, fontWeight: '900' },
-  count: { color: C.muted, fontSize: 14, textAlign: 'center' },
-  out: { color: C.onSon, textAlign: 'center', fontWeight: '700', fontSize: 16 },
-  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  turn: { fontSize: 14.5, fontWeight: '600', color: C.secondary, textAlign: 'center' },
+  word: { fontSize: 36, fontWeight: '600', letterSpacing: -0.6, lineHeight: 44, maxWidth: '100%', color: C.ink },
+  wordCompact: { fontSize: 30, lineHeight: 36 },
+  last: { color: C.son, fontSize: 36, fontWeight: '600' },
+  count: { color: C.secondary, fontSize: 13.5, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  out: { textAlign: 'center', fontWeight: '500', fontSize: 14.5 },
+  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   inputBox: {
-    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: C.paper, borderRadius: 14, height: 50,
-    borderWidth: 2.5, borderColor: C.ink, paddingLeft: 6, overflow: 'hidden',
+    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: C.paper, borderRadius: 10, height: 46,
+    borderWidth: 1, borderColor: C.borderStrong, paddingLeft: 6, overflow: 'hidden',
   },
   prefix: {
-    flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: C.son, borderRadius: 10, paddingHorizontal: 10,
-    height: 36, flexShrink: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.ink, borderRadius: 7, paddingHorizontal: 10,
+    height: 34, flexShrink: 0,
   },
-  prefixText: { color: C.paper, fontSize: 19, fontWeight: '900' },
-  lock: { fontSize: 11, marginTop: -10 },
+  prefixText: { color: C.onSon, fontSize: 16, fontWeight: '600' },
   input: {
     flex: 1, minWidth: 0, fontFamily: FONT, paddingHorizontal: 10, height: '100%',
-    fontSize: 19, fontWeight: '700', color: C.ink, outlineStyle: 'none',
+    fontSize: 16.5, fontWeight: '500', color: C.ink, outlineStyle: 'none',
   } as object,
-  paused: { color: C.son, fontWeight: '800', fontSize: 14 },
-  bonus: { color: C.jade, fontWeight: '800', fontSize: 13, textAlign: 'center' },
-  progress: { color: C.muted, fontWeight: '700', fontSize: 12, textAlign: 'center' },
-  voteLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', padding: 16, zIndex: 75 },
-  voteCard: { backgroundColor: C.paper, borderRadius: 22, padding: 18, gap: 10, alignItems: 'stretch' },
-  voteHead: { fontSize: 16, fontWeight: '800', color: C.muted, textAlign: 'center' },
-  voteWord: { fontSize: 36, fontWeight: '900', textAlign: 'center', color: C.son },
-  voteSub: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  tally: { fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  paused: { color: C.son, fontWeight: '600', fontSize: 13 },
+  bonus: { color: C.jade, fontWeight: '600', fontSize: 12.5, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  progress: { color: C.muted, fontWeight: '500', fontSize: 12, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  voteLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', padding: 16, zIndex: 75, backgroundColor: 'rgba(28,25,23,0.45)' },
+  voteCard: { backgroundColor: C.paper, borderRadius: 16, padding: 16, gap: 10, alignItems: 'stretch' },
+  voteHead: { fontSize: 14.5, fontWeight: '600', color: C.secondary, textAlign: 'center' },
+  voteWord: { fontSize: 28, fontWeight: '600', textAlign: 'center', color: C.ink },
+  voteSub: { fontSize: 14, fontWeight: '500', color: C.secondary, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  tally: { fontSize: 17, fontWeight: '600', textAlign: 'center', fontVariant: ['tabular-nums'], color: C.ink },
   voteNote: { fontSize: 12, color: C.muted, textAlign: 'center' },
-  error: { color: C.ink, backgroundColor: C.gold, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
+  error: { color: C.danger, backgroundColor: C.dangerSoft, borderWidth: 1, borderColor: 'rgba(185,28,28,0.28)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, fontWeight: '500', fontSize: 13, overflow: 'hidden' },
   historyWrap: { flex: 1, minHeight: 56, paddingVertical: 6 },
   historyScroll: { flex: 1 },
   history: { gap: 2, paddingVertical: 4 },
-  historyEntry: { paddingVertical: 7, gap: 2, minWidth: 0 },
+  historyEntry: { paddingVertical: 6, gap: 2, minWidth: 0, borderBottomWidth: 1, borderBottomColor: C.borderSubtle },
   definition: { gap: 3, minWidth: 0, alignSelf: 'stretch' },
-  currentDefinition: { backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
-  definitionText: { color: C.ink, fontSize: 14, lineHeight: 21 },
-  definitionMissing: { color: C.muted, fontStyle: 'italic' },
-  wordRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 3 },
-  wordText: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
-  by: { flex: 1, color: C.muted, fontSize: 14, textAlign: 'right', wordBreak: 'break-word' } as object,
-  sys: { color: C.muted, fontSize: 14, fontStyle: 'italic', paddingVertical: 3 },
+  currentDefinition: { backgroundColor: C.mist, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  definitionText: { color: C.secondary, fontSize: 13.5, lineHeight: 19 },
+  wordRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 2 },
+  wordText: { fontSize: 15.5, fontWeight: '600', color: C.ink, flexShrink: 1 },
+  by: { flex: 1, color: C.muted, fontSize: 12.5, textAlign: 'right', wordBreak: 'break-word' } as object,
+  sys: { color: C.muted, fontSize: 13, paddingVertical: 3 },
   challengeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 2 },
-  challengePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: C.ink },
-  pillEasy: { backgroundColor: '#DCFCE7', borderColor: '#16A34A' },
-  pillHard: { backgroundColor: '#FFEDD5', borderColor: '#EA580C' },
-  pillHell: { backgroundColor: '#FEE2E2', borderColor: '#DC2626' },
-  pillRule: { backgroundColor: '#F3E8FF', borderColor: '#9333EA' },
-  pillRelaxed: { backgroundColor: '#FEF9C3', borderColor: '#CA8A04' },
-  pillStreak: { backgroundColor: '#FEF08A', borderColor: '#D97706' },
-  challengeTxt: { fontSize: 11.5, fontWeight: '900', color: C.ink },
+  challengePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: C.mist, borderWidth: 1, borderColor: C.borderSubtle },
+  pillStreak: { backgroundColor: C.goldSoft, borderColor: 'rgba(180,83,9,0.28)' },
+  challengeTxt: { fontSize: 11.5, fontWeight: '600', color: C.secondary, fontVariant: ['tabular-nums'] },
 });

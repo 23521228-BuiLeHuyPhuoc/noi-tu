@@ -9,7 +9,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
   Circle,
   Defs,
@@ -22,10 +21,9 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import type { CaSauToothState, CaSauView } from '../../../shared/src/casau';
-import { themeById } from '../../../shared/src/themes';
 import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { FONT } from '../theme';
+import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
 import { isMuted, play } from '../sound';
 import { useOnChange } from '../hooks';
@@ -34,7 +32,7 @@ import { Shell } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { Confetti } from '../components/Fun';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { UiIcon } from '../components/Icons';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const STAGE_VW = 440;
@@ -98,13 +96,13 @@ function playCrocJumpscareSfx(): void {
 }
 
 const EXTRA_ERRORS: Partial<Record<ActionError, string>> = {
-  not_your_turn: 'Chưa tới lượt khám răng của bạn!',
-  cell_occupied: 'Chiếc răng này đã nhấn rồi — chọn răng trắng nhé!',
-  bad_action: 'Hãy chọn 1 chiếc răng trắng nguyên vẹn!',
+  not_your_turn: 'Chưa tới lượt khám răng của bạn',
+  cell_occupied: 'Chiếc răng này đã nhấn rồi — chọn răng trắng nhé',
+  bad_action: 'Hãy chọn 1 chiếc răng trắng nguyên vẹn',
 };
 
 function errOf(reason: ActionError): string {
-  return EXTRA_ERRORS[reason] ?? actionText[reason] ?? 'Thao tác chưa hợp lệ.';
+  return EXTRA_ERRORS[reason] ?? actionText[reason] ?? 'Thao tác chưa hợp lệ';
 }
 
 interface ToothGeom {
@@ -224,7 +222,8 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as CaSauView;
   const me = game.me ?? '';
   const isHost = room.hostId === me;
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
+  const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
+  const pal = backdropPalette(activeThemeId);
   const { width, height } = useWindowDimensions();
   const wide = width >= 760;
   const compactMobile = height < 700;
@@ -491,14 +490,14 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   );
 
   const statusLine = err
-    ? `⚠️ ${err}`
+    ? err
     : isBite
-      ? `🐊 PHẬP!! Cá sấu đớp trúng tay ${view.names[view.bittenPlayerId ?? ''] ?? 'ai đó'} (Răng #${(view.trapTooth ?? 0) + 1})!`
+      ? `Cá sấu đớp tay ${view.names[view.bittenPlayerId ?? ''] ?? 'ai đó'} (răng #${(view.trapTooth ?? 0) + 1})`
       : isMyTurn
-        ? '🔥 Đến lượt bạn — nhấn 1 chiếc răng cá sấu!'
+        ? 'Đến lượt bạn — chọn 1 chiếc răng trắng để nhấn'
         : view.lastActionText
-          ? `${view.lastActionText} · Tới lượt ${view.names[view.currentPlayerId ?? ''] ?? '---'}`
-          : `Đang chờ ${view.names[view.currentPlayerId ?? ''] ?? 'người chơi'} run tay nhấn răng…`;
+          ? `${view.lastActionText.replace(/!+$/g, '')} · Tới lượt ${view.names[view.currentPlayerId ?? ''] ?? '---'}`
+          : `Đang chờ ${view.names[view.currentPlayerId ?? ''] ?? 'người chơi'} nhấn răng…`;
 
   const renderSvgTooth = (g: ToothGeom) => {
     const st: CaSauToothState = view.teeth[g.idx] ?? 'intact';
@@ -621,19 +620,19 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
       >
         {isSore ? (
           <View style={styles.toothBadgeSore}>
-            <T selectable={false} style={styles.toothBadgeSoreTxt}>⚡</T>
+            <UiIcon name="Zap" size={10} color="#FEF08A" strokeWidth={2} />
           </View>
         ) : st === 'gold' ? (
           <View style={styles.toothBadgeGold}>
-            <T selectable={false} style={styles.toothBadgeGoldTxt}>💎</T>
+            <UiIcon name="Diamond" size={10} color="#FDE047" strokeWidth={2} />
           </View>
         ) : st === 'reverse' ? (
           <View style={styles.toothBadgeRev}>
-            <T selectable={false} style={styles.toothBadgeRevTxt}>🔄</T>
+            <UiIcon name="RefreshCw" size={10} color="#7DD3FC" strokeWidth={2} />
           </View>
         ) : st === 'safe' ? (
           <View style={styles.toothBadgeSafe}>
-            <T selectable={false} style={styles.toothBadgeSafeTxt}>✓</T>
+            <UiIcon name="Check" size={10} color="#A7F3D0" strokeWidth={2.2} />
           </View>
         ) : (
           <T
@@ -664,29 +663,27 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
         ]}
       >
         {/* 1. COMPACT TOP TURN & SCORE STRIP */}
-        <LinearGradient
-          colors={
-            isBite
-              ? ['#7F1D1D', '#450A0A', '#1E1B4B']
-              : ['#064E3B', '#052E16', '#0F172A']
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.topStripCard, compactMobile && styles.topStripCardTight]}
+        <View
+          style={[
+            styles.topStripCard,
+            sticker(2),
+            { backgroundColor: pal.card, borderColor: pal.hairline },
+            compactMobile && styles.topStripCardTight,
+          ]}
           testID="casau-header"
         >
           {/* Row 1: Round + Direction + Remaining Teeth + Timer + Optional Host End */}
           <View style={styles.topRowMain}>
-            <View style={styles.roundPill}>
-              <EmojiIcon emoji="🐊" size={14} />
-              <T style={styles.roundPillTxt}>
-                Hiệp {view.round}/{view.maxRounds} {view.direction === 1 ? '➡️' : '⬅️'}
+            <View style={[styles.roundPill, { backgroundColor: pal.subtle, borderColor: pal.hairline }]}>
+              <UiIcon name={view.direction === 1 ? 'RefreshCw' : 'RotateCcw'} size={12} color={pal.muted} strokeWidth={1.65} />
+              <T style={[styles.roundPillTxt, { color: pal.text }]}>
+                Hiệp {view.round}/{view.maxRounds}
               </T>
             </View>
 
-            <View style={styles.teethPill}>
-              <EmojiIcon emoji="🦷" size={13} />
-              <T style={styles.teethPillTxt}>
+            <View style={[styles.teethPill, { backgroundColor: pal.subtle, borderColor: pal.hairline }]}>
+              <UiIcon name="Triangle" size={11} color={C.jade} strokeWidth={1.75} />
+              <T style={[styles.teethPillTxt, { color: pal.text }]}>
                 {intactCount}/{view.totalTeeth}
               </T>
             </View>
@@ -696,7 +693,7 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
                 endsAt={view.phaseEndsAt}
                 total={view.phaseSeconds}
                 clockOffset={game.clockOffset}
-                lightText
+                lightText={pal.dark}
                 testID="casau-timer"
               />
             </View>
@@ -706,10 +703,16 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
                 testID="casau-end-early"
                 onPress={() => void handleEarlyEnd()}
                 onLongPress={() => setConfirmEnd(false)}
-                style={[styles.hostEndChip, confirmEnd && styles.hostEndChipConfirm]}
+                style={[
+                  styles.hostEndChip,
+                  { backgroundColor: pal.dark ? 'rgba(185, 28, 28, 0.22)' : C.dangerSoft, borderColor: 'rgba(185, 28, 28, 0.30)' },
+                  confirmEnd && styles.hostEndChipConfirm,
+                ]}
               >
-                <UiIcon name="XCircle" size={12} color="#FEE2E2" />
-                <T style={styles.hostEndChipTxt}>{confirmEnd ? 'Chốt dừng?' : 'Kết thúc'}</T>
+                <UiIcon name="XCircle" size={12} color={confirmEnd ? '#FFFFFF' : C.danger} strokeWidth={1.65} />
+                <T style={[styles.hostEndChipTxt, { color: confirmEnd ? '#FFFFFF' : C.danger }]}>
+                  {confirmEnd ? 'Xác nhận dừng' : 'Kết thúc'}
+                </T>
               </Pressable>
             )}
           </View>
@@ -733,21 +736,27 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
                   key={pid}
                   style={[
                     styles.playerChip,
-                    isMeChip && styles.playerChipMe,
-                    isTurn && styles.playerChipTurn,
-                    isVictim && styles.playerChipBitten,
+                    { backgroundColor: pal.subtle, borderColor: pal.hairline },
+                    isMeChip && { borderColor: pal.dark ? 'rgba(251, 249, 245, 0.26)' : C.borderStrong },
+                    isTurn && (pal.dark ? styles.playerChipTurnDark : styles.playerChipTurn),
+                    isVictim && (pal.dark ? styles.playerChipBittenDark : styles.playerChipBitten),
                   ]}
                 >
                   {p ? (
-                    <Portrait p={p} size={22} border={1.5} active={isTurn} />
+                    <Portrait p={p} size={20} border={1.25} active={isTurn} />
                   ) : (
-                    <EmojiIcon emoji="🧑" size={16} />
+                    <UiIcon name="User" size={13} color={pal.muted} strokeWidth={1.65} />
                   )}
-                  <T numberOfLines={1} style={styles.playerChipName}>
+                  <T numberOfLines={1} style={[styles.playerChipName, { color: isTurn && !pal.dark ? C.ink : pal.text }]}>
                     {view.names[pid] ?? pid}
                   </T>
-                  <T style={styles.playerChipScore}>🦷{sc}</T>
-                  {bt > 0 && <T style={styles.playerChipBites}>🤕{bt}</T>}
+                  <T style={[styles.playerChipScore, { color: isTurn && !pal.dark ? C.jade : pal.muted }]}>{sc}đ</T>
+                  {bt > 0 && (
+                    <View style={styles.playerBiteRow}>
+                      <UiIcon name="AlertTriangle" size={10} color={C.danger} strokeWidth={1.75} />
+                      <T style={styles.playerChipBites}>{bt}</T>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -757,14 +766,30 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
           <View
             style={[
               styles.statusBanner,
-              err ? styles.statusBannerErr : isBite ? styles.statusBannerBite : isMyTurn ? styles.statusBannerTurn : null,
+              { backgroundColor: pal.subtle },
+              err
+                ? (pal.dark ? styles.statusBannerErrDark : styles.statusBannerErr)
+                : isBite
+                  ? (pal.dark ? styles.statusBannerBiteDark : styles.statusBannerBite)
+                  : isMyTurn
+                    ? (pal.dark ? styles.statusBannerTurnDark : styles.statusBannerTurn)
+                    : null,
             ]}
           >
-            <T numberOfLines={1} style={styles.statusBannerTxt}>
+            <T
+              numberOfLines={1}
+              style={[
+                styles.statusBannerTxt,
+                { color: pal.text },
+                err && { color: pal.dark ? '#FECACA' : C.danger },
+                !err && isBite && { color: pal.dark ? '#FECACA' : C.danger },
+                !err && !isBite && isMyTurn && { color: pal.dark ? '#86EFAC' : C.jade },
+              ]}
+            >
               {statusLine}
             </T>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* 2. GIANT SCULPTED 3D CROCODILE HEAD & HINGED OPEN JAWS */}
         <View
@@ -1164,8 +1189,8 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
                 <View style={[styles.jawSuspensePill, tension >= 0.6 && styles.jawSuspensePillHot]}>
                   <T selectable={false} style={styles.jawSuspenseTxt}>
                     {intactCount <= 4
-                      ? `⚡ Căng cực!! Còn ${intactCount} răng lành · 💎+40đ`
-                      : `🦷 Còn ${intactCount} răng lành · 💎 Vàng +40đ · 🔄 Đảo`}
+                      ? `Còn ${intactCount} răng lành · Răng vàng +40đ`
+                      : `Còn ${intactCount} răng lành · Vàng +40đ · Đảo chiều`}
                   </T>
                 </View>
               </View>
@@ -1193,10 +1218,10 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
                 </Svg>
                 <View style={styles.starburstTextWrap}>
                   <T selectable={false} style={styles.starburstTitle}>
-                    🐊 PHẬP!!
+                    PHẬP!!
                   </T>
                   <T selectable={false} numberOfLines={1} style={styles.starburstSub}>
-                    {view.names[view.bittenPlayerId ?? ''] ?? 'Trúng bẫy'} -25đ!
+                    {view.names[view.bittenPlayerId ?? ''] ?? 'Trúng bẫy'} (-25đ)
                   </T>
                 </View>
               </Animated.View>
@@ -1208,19 +1233,19 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
         {isOtherBitten ? (
           <View testID="casau-safe-tease-banner" style={styles.safeTeaseBanner}>
             <T numberOfLines={1} style={styles.safeTeaseTxt}>
-              🤣 Hú hồn! {view.names[view.bittenPlayerId ?? ''] ?? 'Đối thủ'} vừa bị Cá Sấu đớp Răng #{(view.trapTooth ?? 0) + 1} (-25đ)!
+              {view.names[view.bittenPlayerId ?? ''] ?? 'Đối thủ'} vừa trúng răng sâu #{(view.trapTooth ?? 0) + 1} (-25đ)
             </T>
           </View>
         ) : (
-          <T numberOfLines={1} style={[styles.microFooter, { color: theme.onBg }]}>
+          <T numberOfLines={1} style={[styles.microFooter, { color: pal.muted }]}>
             {isMyTurn
-              ? 'Chạm trực tiếp vào chiếc răng trắng trên hàm cá sấu để khám!'
-              : 'Răng nhấn an toàn cộng điểm tăng dần · Đụng trúng răng sâu cá sấu sập hàm!'}
+              ? 'Chạm trực tiếp vào chiếc răng trắng trên hàm cá sấu để khám'
+              : 'Răng nhấn an toàn cộng điểm tăng dần · Đụng trúng răng sâu cá sấu sập hàm'}
           </T>
         )}
       </Animated.View>
 
-      {/* LỚP PHỦ JUMPSCARE HÙ DỌA KINH HOÀNG — CHỈ HIỆN TRÊN MÁY NGƯỜI BỊ CÁ SẤU ĐỚP! */}
+      {/* LỚP PHỦ JUMPSCARE HÙ DỌA — CHỈ HIỆN TRÊN MÁY NGƯỜI BỊ CÁ SẤU ĐỚP */}
       {isMeBitten && (
         <View pointerEvents="none" testID="casau-jumpscare-overlay" style={styles.jumpscareWrap}>
           <Animated.View style={[styles.jumpscareRedVeil, { opacity: strobeOpacity }]} />
@@ -1252,9 +1277,9 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
           </Svg>
 
           <View style={styles.jumpscareCard}>
-            <T style={styles.jumpscareBoom}>💀 CÁP ĐỨT TAY RỒI!!</T>
+            <T style={styles.jumpscareBoom}>Cá sấu đã đớp trúng tay</T>
             <T style={styles.jumpscareSub}>
-              BẠN BẤM TRÚNG RĂNG BOM #{(view.trapTooth ?? 0) + 1} (-25Đ)
+              Bấm trúng răng sâu #{(view.trapTooth ?? 0) + 1} (-25đ)
             </T>
           </View>
         </View>
@@ -1267,20 +1292,18 @@ const styles = StyleSheet.create({
   rootFill: {
     flex: 1,
     minHeight: 0,
-    gap: 6,
+    gap: 8,
     marginHorizontal: -4,
   },
 
   topStripCard: {
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    gap: 5,
-    borderWidth: 1.5,
-    borderColor: 'rgba(74, 222, 128, 0.42)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
   },
   topStripCardTight: {
-    paddingVertical: 5,
+    paddingVertical: 6,
     gap: 4,
   },
   topRowMain: {
@@ -1294,32 +1317,28 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(134, 239, 172, 0.4)',
   },
   roundPillTxt: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#86EFAC',
+    fontSize: 11.5,
+    fontWeight: '600',
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   teethPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
+    gap: 4,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.4)',
   },
   teethPillTxt: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   timerInlineWrap: {
     flex: 1,
@@ -1328,22 +1347,19 @@ const styles = StyleSheet.create({
   hostEndChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
+    gap: 4,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(127, 29, 29, 0.75)',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(252, 165, 165, 0.45)',
   },
   hostEndChipConfirm: {
-    backgroundColor: '#DC2626',
-    borderColor: '#FEF08A',
+    backgroundColor: C.danger,
+    borderColor: '#991B1B',
   },
   hostEndChipTxt: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FEE2E2',
+    fontSize: 11,
+    fontWeight: '600',
   },
 
   playerStripScroll: {
@@ -1356,67 +1372,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.68)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(148, 163, 184, 0.25)',
-  },
-  playerChipMe: {
-    borderColor: 'rgba(250, 204, 21, 0.65)',
+    borderRadius: 8,
+    borderWidth: 1,
   },
   playerChipTurn: {
-    backgroundColor: 'rgba(20, 83, 45, 0.92)',
+    backgroundColor: C.jadeSoft,
+    borderColor: 'rgba(21, 128, 61, 0.35)',
+  },
+  playerChipTurnDark: {
+    backgroundColor: 'rgba(21, 128, 61, 0.28)',
     borderColor: '#4ADE80',
   },
   playerChipBitten: {
-    backgroundColor: 'rgba(153, 27, 27, 0.92)',
-    borderColor: '#FDA4AF',
+    backgroundColor: C.dangerSoft,
+    borderColor: 'rgba(185, 28, 28, 0.35)',
+  },
+  playerChipBittenDark: {
+    backgroundColor: 'rgba(185, 28, 28, 0.28)',
+    borderColor: '#FCA5A5',
   },
   playerChipName: {
     maxWidth: 68,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontSize: 11.5,
+    fontWeight: '500',
   },
   playerChipScore: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FDE047',
+    fontSize: 11,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  playerBiteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   playerChipBites: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FDA4AF',
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: C.danger,
+    fontVariant: ['tabular-nums'],
   },
 
   statusBanner: {
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(15, 23, 42, 0.62)',
+    borderRadius: 8,
     alignItems: 'center',
   },
   statusBannerTurn: {
-    backgroundColor: 'rgba(22, 101, 52, 0.85)',
+    backgroundColor: C.jadeSoft,
     borderWidth: 1,
-    borderColor: '#4ADE80',
+    borderColor: 'rgba(21, 128, 61, 0.25)',
+  },
+  statusBannerTurnDark: {
+    backgroundColor: 'rgba(21, 128, 61, 0.24)',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 222, 128, 0.4)',
   },
   statusBannerBite: {
-    backgroundColor: 'rgba(153, 27, 27, 0.92)',
+    backgroundColor: C.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: 'rgba(185, 28, 28, 0.28)',
+  },
+  statusBannerBiteDark: {
+    backgroundColor: 'rgba(185, 28, 28, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(252, 165, 165, 0.4)',
   },
   statusBannerErr: {
-    backgroundColor: '#991B1B',
+    backgroundColor: C.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FDE047',
+    borderColor: 'rgba(185, 28, 28, 0.35)',
+  },
+  statusBannerErrDark: {
+    backgroundColor: 'rgba(185, 28, 28, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(252, 165, 165, 0.5)',
   },
   statusBannerTxt: {
-    fontSize: 11.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
   },
 
@@ -1446,9 +1483,10 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : null),
   },
   toothIndexLbl: {
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 9.5,
+    fontWeight: '600',
     color: 'rgba(71, 85, 105, 0.78)',
+    fontVariant: ['tabular-nums'],
   },
   toothIndexLblActive: {
     color: '#854D0E',
@@ -1463,43 +1501,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toothBadgeSafeTxt: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#A7F3D0',
-  },
   toothBadgeGold: {
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: 'rgba(120, 53, 15, 0.92)',
     borderWidth: 1,
     borderColor: '#FACC15',
-  },
-  toothBadgeGoldTxt: {
-    fontSize: 9.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toothBadgeRev: {
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: 'rgba(12, 74, 110, 0.92)',
     borderWidth: 1,
     borderColor: '#38BDF8',
-  },
-  toothBadgeRevTxt: {
-    fontSize: 9.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toothBadgeSore: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#7F1D1D',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#FEF08A',
-  },
-  toothBadgeSoreTxt: {
-    fontSize: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   jawSuspensePillWrap: {
@@ -1510,21 +1540,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   jawSuspensePill: {
-    paddingHorizontal: 11,
-    paddingVertical: 3.5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(17, 20, 28, 0.86)',
     borderWidth: 1,
-    borderColor: 'rgba(134, 239, 172, 0.45)',
+    borderColor: 'rgba(251, 249, 245, 0.16)',
   },
   jawSuspensePillHot: {
-    backgroundColor: 'rgba(124, 45, 18, 0.9)',
-    borderColor: '#FACC15',
+    backgroundColor: 'rgba(159, 43, 54, 0.92)',
+    borderColor: 'rgba(254, 243, 199, 0.45)',
   },
   jawSuspenseTxt: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FEF9C3',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
   },
 
   starburstOverlay: {
@@ -1543,40 +1574,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   starburstTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: 19,
+    fontWeight: '600',
     color: '#7F1D1D',
     fontFamily: FONT,
-    letterSpacing: 0.4,
   },
   starburstSub: {
     fontSize: 10.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#450A0A',
     maxWidth: 145,
+    fontVariant: ['tabular-nums'],
   },
 
   microFooter: {
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '500',
     textAlign: 'center',
-    opacity: 0.82,
-    paddingBottom: 1,
+    paddingBottom: 2,
   },
   safeTeaseBanner: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(6, 78, 59, 0.92)',
-    borderRadius: 999,
+    backgroundColor: C.jadeSoft,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderWidth: 1.5,
-    borderColor: '#4ADE80',
+    borderWidth: 1,
+    borderColor: 'rgba(21, 128, 61, 0.30)',
   },
   safeTeaseTxt: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#DCFCE7',
+    fontWeight: '600',
+    color: C.jadeDeep,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   jumpscareWrap: {
     ...StyleSheet.absoluteFill,
@@ -1586,36 +1617,33 @@ const styles = StyleSheet.create({
   },
   jumpscareRedVeil: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(185, 28, 28, 0.56)',
-    borderWidth: 8,
-    borderColor: '#EF4444',
+    backgroundColor: 'rgba(185, 28, 28, 0.52)',
+    borderWidth: 6,
+    borderColor: C.danger,
   },
   jumpscareCard: {
-    backgroundColor: '#140408',
-    borderWidth: 3.5,
-    borderColor: '#FEF08A',
-    borderRadius: 18,
+    backgroundColor: C.darkBg,
+    borderWidth: 1.5,
+    borderColor: C.gold,
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 14,
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     marginHorizontal: 16,
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 0 36px rgba(239, 68, 68, 0.95)' } as object)
-      : null),
   },
   jumpscareBoom: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#F87171',
-    letterSpacing: 1,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FCA5A5',
     textAlign: 'center',
     fontFamily: FONT,
   },
   jumpscareSub: {
     fontSize: 13.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontWeight: '500',
+    color: C.goldSoft,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
 });

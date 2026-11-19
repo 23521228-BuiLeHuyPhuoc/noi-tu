@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GAME_INFO, type GameType } from '../../../shared/src/types';
-import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
+import { ROOM_THEMES } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { useStableWindow } from '../hooks';
 import { storage } from '../storage';
 import { getInviteCode } from '../web';
 import { GAME_META } from '../messages';
-import { C, FONT, sticker } from '../theme';
+import { C, FONT, backdropPalette, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { AuthSheet, GuestAvatarButton, ProfileCard, ProfileSheet } from '../components/Account';
 import { Portrait } from '../components/Avatar';
@@ -20,10 +19,9 @@ import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 import { MapBackdrop } from '../components/MapBackdrop';
 import { Sheet } from '../components/Sheet';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
-import { EmojiIcon, RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
-import { MotionSurface } from '../components/MotionPrimitives';
+import { RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
 
-// Sắp xếp chuẩn theo thứ tự thời gian ra mắt: Game Cũ ở trên → Game Mới ở dưới!
+// Sắp xếp chuẩn theo thứ tự ra mắt: Game cũ → Game mới
 const GAMES: GameType[] = [
   'wordchain',
   'wordchain_en',
@@ -44,53 +42,46 @@ const GAMES: GameType[] = [
 
 type HomeFragment = 'games' | 'rooms' | 'shop' | 'profile';
 
-const FRAGMENTS: { id: HomeFragment; label: string; emoji: string }[] = [
-  { id: 'games', label: 'Chơi ngay', emoji: '🎮' },
-  { id: 'rooms', label: 'Phòng mở', emoji: '🚪' },
-  { id: 'shop', label: 'Phú Hào', emoji: '💎' },
-  { id: 'profile', label: 'Cá nhân', emoji: '👑' },
+const FRAGMENTS: { id: HomeFragment; label: string; icon: UiIconName }[] = [
+  { id: 'games', label: 'Chơi ngay', icon: 'LayoutGrid' },
+  { id: 'rooms', label: 'Phòng mở', icon: 'Users' },
+  { id: 'shop', label: 'Cửa hàng', icon: 'ShoppingBag' },
+  { id: 'profile', label: 'Cá nhân', icon: 'User' },
 ];
 
 type Category = 'all' | 'party' | 'hidden' | 'coop' | 'word' | 'classic';
 const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[] }[] = [
   { id: 'all', label: 'Tất cả (15)', icon: 'LayoutGrid' },
-  { id: 'party', label: 'Party Lầy', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui', 'ca_sau', 'boom_online', 'uno_mercy'] },
-  { id: 'hidden', label: 'Ẩn Vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
-  { id: 'coop', label: 'Co-op & Cờ', icon: 'Swords', games: ['caro', 'croaksquad', 'boom_online'] },
-  { id: 'classic', label: 'Hội Chợ', icon: 'Dices', games: ['baucua', 'typhu', 'loto', 'uno_mercy'] },
-  { id: 'word', label: 'Từ Vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
+  { id: 'party', label: 'Nhóm đông', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui', 'ca_sau', 'boom_online', 'uno_mercy'] },
+  { id: 'hidden', label: 'Ẩn vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
+  { id: 'coop', label: 'Phối hợp & Cờ', icon: 'Swords', games: ['caro', 'croaksquad', 'boom_online'] },
+  { id: 'classic', label: 'Bàn hội chợ', icon: 'Dices', games: ['baucua', 'typhu', 'loto', 'uno_mercy'] },
+  { id: 'word', label: 'Từ vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
 ];
 
-const BADGE_FOR: Partial<Record<GameType, { text: string; grad: readonly [string, string] }>> = {
-  boom_online: { text: 'MỚI · VÒNG BO', grad: ['#EF4444', '#991B1B'] },
-  uno_mercy: { text: 'MỚI · NO MERCY', grad: ['#EA580C', '#7C2D12'] },
-  croaksquad: { text: 'CO-OP + BOT', grad: ['#10B981', '#047857'] },
-  ca_sau: { text: 'HÀM 3D MỚI', grad: ['#16A34A', '#14532D'] },
-  loto: { text: 'HỘI CHỢ', grad: ['#F59E0B', '#B45309'] },
-  caro: { text: 'BÀN KHỦNG', grad: ['#06B6D4', '#0E7490'] },
-  masoi: { text: 'WOLVESVILLE', grad: ['#7C3AED', '#4C1D95'] },
-  giandiep: { text: 'BIỆN MINH', grad: ['#4F46E5', '#312E81'] },
-  do_vui: { text: 'IT QUIZ', grad: ['#2563EB', '#1E3A8A'] },
-  baucua: { text: 'LỘC x3', grad: ['#EA580C', '#9A3412'] },
-  typhu: { text: 'MUA ĐỨT', grad: ['#16A34A', '#14532D'] },
+const GAME_ICON: Record<GameType, UiIconName> = {
+  wordchain: 'BookOpen',
+  wordchain_en: 'Globe',
+  baucua: 'Dices',
+  typhu: 'Diamond',
+  masoi: 'Moon',
+  giandiep: 'Fingerprint',
+  ve_doan: 'Brush',
+  bom_tu: 'Flame',
+  do_vui: 'HelpCircle',
+  loto: 'Layers',
+  caro: 'Crosshair',
+  croaksquad: 'Zap',
+  ca_sau: 'Triangle',
+  boom_online: 'Bomb',
+  uno_mercy: 'Swords',
 };
 
-const GAME_TILE_GRAD: Record<GameType, readonly [string, string]> = {
-  wordchain: ['#FEF08A', '#FACC15'],
-  wordchain_en: ['#E0E7FF', '#818CF8'],
-  baucua: ['#FED7AA', '#F97316'],
-  typhu: ['#A7F3D0', '#10B981'],
-  masoi: ['#DDD6FE', '#A78BFA'],
-  giandiep: ['#C7D2FE', '#818CF8'],
-  ve_doan: ['#F5D0FE', '#E879F9'],
-  bom_tu: ['#FED7AA', '#FB923C'],
-  do_vui: ['#BFDBFE', '#60A5FA'],
-  loto: ['#FDE68A', '#FBBF24'],
-  caro: ['#99F6E4', '#2DD4BF'],
-  croaksquad: ['#A7F3D0', '#34D399'],
-  ca_sau: ['#BBF7D0', '#22C55E'],
-  boom_online: ['#BAE6FD', '#0284C7'],
-  uno_mercy: ['#FECACA', '#EF4444'],
+const GAME_TAG: Partial<Record<GameType, string>> = {
+  boom_online: 'Mới',
+  uno_mercy: 'Mới',
+  croaksquad: 'Co-op',
+  ca_sau: '3D',
 };
 
 export function HomeScreen({ game }: { game: Game }) {
@@ -118,7 +109,7 @@ export function HomeScreen({ game }: { game: Game }) {
 
   const user = game.user;
   const activeThemeId = localTheme ?? user?.equipped?.roomTheme ?? 'son_mac_dinh';
-  const theme = themeById(activeThemeId);
+  const pal = backdropPalette(activeThemeId);
 
   useEffect(() => {
     storage.getName().then((n) => n && setName(n));
@@ -141,7 +132,7 @@ export function HomeScreen({ game }: { game: Game }) {
 
   const run = async (fn: () => Promise<string | null>) => {
     if (!trimmed) {
-      setError('Nhập tên của bạn trước đã nhé.');
+      setError('Nhập tên của bạn trước khi tạo hoặc vào phòng.');
       return;
     }
     setBusy(true);
@@ -157,7 +148,7 @@ export function HomeScreen({ game }: { game: Game }) {
     <Card style={styles.compactIdentity}>
       <View style={styles.nameRow}>
         <GuestAvatarButton game={game} onPress={() => setProfile(true)} />
-        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
           <TextInput
             testID="name-input"
             style={styles.input}
@@ -167,7 +158,7 @@ export function HomeScreen({ game }: { game: Game }) {
               setError(null);
               void storage.setName(t.trim());
             }}
-            placeholder="Nhập tên của bạn (vd: Phước)…"
+            placeholder="Nhập tên người chơi"
             placeholderTextColor={C.muted}
             maxLength={24}
             autoCorrect={false}
@@ -179,7 +170,7 @@ export function HomeScreen({ game }: { game: Game }) {
               onPress={() => setAuth('login')}
               style={styles.miniAuthPill}
             >
-              <UiIcon name="LogIn" size={13} color={C.ink} />
+              <UiIcon name="LogIn" size={13} color={C.secondary} strokeWidth={1.65} />
               <T style={styles.miniAuthTxt}>Đăng nhập</T>
             </Pressable>
             <Pressable
@@ -188,8 +179,8 @@ export function HomeScreen({ game }: { game: Game }) {
               onPress={() => setAuth('register')}
               style={[styles.miniAuthPill, styles.miniRegisterPill]}
             >
-              <RubyIcon size={13} />
-              <T style={[styles.miniAuthTxt, { color: '#271400' }]}>Đăng ký VIP</T>
+              <UiIcon name="UserPlus" size={13} color={C.ink} strokeWidth={1.65} />
+              <T style={styles.miniAuthTxt}>Đăng ký</T>
             </Pressable>
           </View>
         </View>
@@ -203,15 +194,16 @@ export function HomeScreen({ game }: { game: Game }) {
         <Pressable onPress={() => setProfile(true)}>
           <Portrait
             p={{ avatar: user.avatar, avatarUrl: user.avatarUrl }}
-            size={50}
+            size={48}
+            border={1.5}
             frame={eq.frame}
             aura={eq.aura}
             pet={eq.pet}
             active={!!eq.aura}
           />
         </Pressable>
-        <View style={{ flex: 1, minWidth: 155, gap: 3 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+        <View style={{ flex: 1, minWidth: 148, gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {(user.vipTier ?? 0) > 0 && <VipBadge tier={user.vipTier} compact />}
             <NameText fx={eq.nameFx} numberOfLines={1} style={styles.userMiniName}>
               {user.displayName}
@@ -223,7 +215,7 @@ export function HomeScreen({ game }: { game: Game }) {
             </View>
           )}
           <Pressable onPress={() => setWalletOpen(true)} style={styles.rubyInlinePill}>
-            <RubyIcon size={14} />
+            <RubyIcon size={13} />
             <T testID="home-ruby" style={styles.rubyInlineTxt}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           </Pressable>
         </View>
@@ -233,7 +225,7 @@ export function HomeScreen({ game }: { game: Game }) {
               testID="checkin-open"
               small
               variant="gold"
-              icon="🎁"
+              iconNode={<UiIcon name="Gift" size={14} color={C.ink} strokeWidth={1.65} />}
               title="Quà ngày"
               disabled={!online}
               onPress={() => setCheckinOpen(true)}
@@ -244,7 +236,7 @@ export function HomeScreen({ game }: { game: Game }) {
             testID="shop-open"
             small
             variant="paper"
-            icon="🛍️"
+            iconNode={<UiIcon name="ShoppingBag" size={14} color={C.secondary} strokeWidth={1.65} />}
             title="Shop"
             onPress={() => setShopOpen(true)}
           />
@@ -253,8 +245,8 @@ export function HomeScreen({ game }: { game: Game }) {
               testID="admin-open-home"
               small
               variant="ink"
-              icon="🛠"
-              title="Admin"
+              iconNode={<UiIcon name="Settings2" size={14} color={C.onSon} strokeWidth={1.65} />}
+              title="Quản trị"
               onPress={() => setAdminOpen(true)}
             />
           )}
@@ -263,26 +255,25 @@ export function HomeScreen({ game }: { game: Game }) {
     </Card>
   );
 
+  const utilBg = pal.dark ? C.darkSurface : C.paper;
+  const utilBd = pal.dark ? C.darkBorder : C.borderSubtle;
+  const utilStroke = pal.dark ? C.darkText : C.secondary;
+
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <View style={{ flex: 1, backgroundColor: pal.bg }}>
       <MapBackdrop themeId={activeThemeId} smooth={smooth} />
 
       <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
-        {/* Thanh Thương Hiệu Gọn Gàng + Nút Đổi Map / Bảng Vàng / Siêu Mượt */}
+        {/* Header thương hiệu gọn gàng + 3 tiện ích */}
         <View style={styles.topRow}>
           <View style={styles.brandGroup}>
-            <LinearGradient
-              colors={['#FACC15', '#EC4899', '#8B5CF6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.brandEmblem}
-            >
-              <EmojiIcon emoji={theme.emoji} size={26} />
-            </LinearGradient>
-            <View style={{ flex: 1, minWidth: 120 }}>
-              <T style={[styles.logo, { color: theme.accent }]}>Xóm Lầy</T>
-              <T style={[styles.tagline, { color: theme.onBg }]} numberOfLines={1}>
-                15 đại tiệc trò chơi · Phú Hào Lố Lăng
+            <View style={[styles.brandEmblem, pal.dark && { backgroundColor: C.darkSurface, borderColor: C.darkBorder }]}>
+              <T style={styles.brandMono}>XL</T>
+            </View>
+            <View style={{ flex: 1, minWidth: 120, gap: 1 }}>
+              <T style={[styles.logo, { color: pal.text }]}>Xóm Lầy</T>
+              <T style={[styles.tagline, { color: pal.muted }]} numberOfLines={1}>
+                15 trò chơi bàn hội tụ họp bạn bè
               </T>
             </View>
           </View>
@@ -292,33 +283,37 @@ export function HomeScreen({ game }: { game: Game }) {
               testID="leaderboard-open"
               accessibilityLabel="Bảng vàng"
               onPress={() => setBoard(true)}
-              style={styles.iconPill}
+              style={[styles.iconPill, { backgroundColor: utilBg, borderColor: utilBd }]}
             >
-              <EmojiIcon emoji="🏆" size={17} />
+              <UiIcon name="Trophy" size={16} color={utilStroke} strokeWidth={1.65} />
             </Pressable>
             <Pressable
               testID="home-map-open"
               accessibilityLabel="Đổi Map"
               onPress={() => setMapOpen(true)}
-              style={styles.iconPill}
+              style={[styles.iconPill, { backgroundColor: utilBg, borderColor: utilBd }]}
             >
-              <EmojiIcon emoji="🗺️" size={17} />
+              <UiIcon name="Map" size={16} color={utilStroke} strokeWidth={1.65} />
             </Pressable>
             <Pressable
               testID="smooth-toggle"
               accessibilityLabel="Chế độ siêu mượt"
               onPress={() => setSmooth(!smooth)}
-              style={[styles.iconPill, smooth && styles.iconPillActive]}
+              style={[
+                styles.iconPill,
+                { backgroundColor: utilBg, borderColor: utilBd },
+                smooth && { backgroundColor: C.jadeSoft, borderColor: C.jade },
+              ]}
             >
-              <UiIcon name="Gauge" size={16} color={smooth ? '#0F172A' : '#F8FAFC'} />
+              <UiIcon name="Gauge" size={16} color={smooth ? C.jadeDeep : utilStroke} strokeWidth={1.65} />
             </Pressable>
           </View>
         </View>
 
         {!online && (
           <View testID="connecting" style={styles.status}>
-            <ActivityIndicator color={C.gold} />
-            <T style={styles.statusText}>Đang gọi server dậy… lần đầu có thể mất khoảng 1 phút.</T>
+            <ActivityIndicator color={C.ink} />
+            <T style={styles.statusText}>Đang kết nối máy chủ, vui lòng chờ giây lát.</T>
           </View>
         )}
         {game.notice && <T style={styles.notice}>{game.notice}</T>}
@@ -328,9 +323,7 @@ export function HomeScreen({ game }: { game: Game }) {
           </T>
         )}
 
-        {/* ============================================================ */}
-        {/* FRAGMENT 1: CHƠI NGAY (14 TRÒ CHƠI PHÂN LOẠI GỌN ĐẸP)        */}
-        {/* ============================================================ */}
+        {/* FRAGMENT 1: CHƠI NGAY (15 TRÒ CHƠI) */}
         {fragment === 'games' && (
           <View style={{ gap: 12 }} testID="fragment-games">
             {user ? userMiniHud : guestNameBar}
@@ -346,27 +339,21 @@ export function HomeScreen({ game }: { game: Game }) {
                     onPress={() => setCat(c.id)}
                     style={[
                       styles.catPill,
-                      on && { backgroundColor: theme.accent, borderColor: '#0F172A' },
+                      on && styles.catPillActive,
                     ]}
                   >
-                    {c.icon && <UiIcon name={c.icon} size={14} color={on ? theme.accentText : C.ink} />}
-                    <T style={[styles.catTxt, on && { color: theme.accentText }]}>{c.label}</T>
+                    {c.icon && <UiIcon name={c.icon} size={14} color={on ? C.onSon : C.secondary} strokeWidth={1.65} />}
+                    <T style={[styles.catTxt, on && styles.catTxtActive]}>{c.label}</T>
                   </Pressable>
                 );
               })}
             </ScrollView>
 
             <View style={twoCols ? styles.gameGridWide : styles.gameGridSingle}>
-              {visibleGames.map((g, idx) => {
-                const badge = BADGE_FOR[g];
-                const tileGrad = GAME_TILE_GRAD[g];
+              {visibleGames.map((g) => {
+                const tag = GAME_TAG[g];
                 return (
-                  <MotionSurface
-                    key={g}
-                    delay={Math.min(idx * 0.025, 0.22)}
-                    hoverLift
-                    style={twoCols ? styles.gameSlotWide : undefined}
-                  >
+                  <View key={g} style={twoCols ? styles.gameSlotWide : undefined}>
                     <Pressable
                       testID={`create-${g}`}
                       accessibilityRole="button"
@@ -374,51 +361,38 @@ export function HomeScreen({ game }: { game: Game }) {
                       onPress={() => void run(() => game.createRoom(trimmed, g))}
                       style={({ pressed }) => [
                         styles.gameCard,
-                        sticker(pressed ? 1 : 3),
-                        pressed && { transform: [{ translateY: 2 }] },
-                        (!online || busy) && { opacity: 0.5 },
+                        sticker(pressed ? 1 : 2),
+                        pressed && styles.gameCardPressed,
+                        (!online || busy) && { opacity: 0.52 },
                       ]}
                     >
-                      <LinearGradient colors={[...tileGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gameMedallion}>
-                        <EmojiIcon emoji={GAME_META[g].emoji} size={32} />
-                      </LinearGradient>
+                      <View style={styles.gameIconBox}>
+                        <UiIcon name={GAME_ICON[g]} size={20} color={C.ink} strokeWidth={1.65} />
+                      </View>
                       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                         <View style={styles.gameTitleRow}>
                           <T style={styles.gameTitle} numberOfLines={1}>{GAME_INFO[g].name}</T>
-                          {badge && (
-                            <LinearGradient colors={[...badge.grad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.newBadge}>
-                              <T style={styles.newBadgeTxt}>{badge.text}</T>
-                            </LinearGradient>
-                          )}
+                          {tag && <T style={styles.quietTag}>{tag}</T>}
                         </View>
-                        <T style={styles.gameTag} numberOfLines={2}>{GAME_META[g].tagline}</T>
-                        <View style={styles.playerChip}>
-                          <UiIcon name="Users" size={12} color={C.jadeDeep} />
-                          <T style={styles.gamePlayers}>{GAME_META[g].players}</T>
-                        </View>
+                        <T style={styles.gameTag} numberOfLines={1}>{GAME_META[g].tagline}</T>
+                        <T style={styles.gamePlayers}>{GAME_META[g].players}</T>
                       </View>
-                      <View style={styles.goPill}>
-                        <UiIcon name="ChevronRight" size={18} color={C.son} strokeWidth={2.6} />
-                      </View>
+                      <UiIcon name="ChevronRight" size={16} color={C.muted} strokeWidth={1.65} />
                     </Pressable>
-                  </MotionSurface>
+                  </View>
                 );
               })}
             </View>
           </View>
         )}
 
-        {/* ============================================================ */}
-        {/* FRAGMENT 2: PHÒNG MỞ & VÀO BẰNG MÃ 6 KÝ TỰ                   */}
-        {/* ============================================================ */}
+        {/* FRAGMENT 2: PHÒNG MỞ & VÀO BẰNG MÃ 6 KÝ TỰ */}
         {fragment === 'rooms' && (
           <View style={{ gap: 12 }} testID="fragment-rooms">
             {!user && guestNameBar}
             <Card style={styles.joinCard}>
               <View style={styles.cardHeaderRow}>
-                <View style={[styles.badgeCircle, { backgroundColor: '#FEF3C7' }]}>
-                  <UiIcon name="KeyRound" size={16} color="#B45309" />
-                </View>
+                <UiIcon name="KeyRound" size={16} color={C.secondary} strokeWidth={1.65} />
                 <T testID={invite ? 'invite-hint' : undefined} style={styles.h2}>
                   {invite ? `Lời mời vào phòng ${invite}` : 'Nhập mã 6 ký tự vào phòng'}
                 </T>
@@ -429,7 +403,7 @@ export function HomeScreen({ game }: { game: Game }) {
                   style={[styles.input, styles.codeInput]}
                   value={code}
                   onChangeText={(t) => setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                  placeholder="MÃ PHÒNG"
+                  placeholder="Mã phòng"
                   placeholderTextColor={C.muted}
                   maxLength={6}
                   autoCapitalize="characters"
@@ -437,27 +411,25 @@ export function HomeScreen({ game }: { game: Game }) {
                 />
                 <Button
                   testID="join-btn"
-                  title="Vào ngay"
-                  iconNode={<UiIcon name="LogIn" size={16} color={invite ? '#271400' : C.gold} />}
+                  title="Vào phòng"
+                  iconNode={<UiIcon name="LogIn" size={15} color={invite ? C.ink : C.onSon} strokeWidth={1.65} />}
                   variant={invite ? 'gold' : 'ink'}
                   disabled={!online || busy || code.length !== 6}
-                  style={{ minWidth: 108 }}
+                  style={{ minWidth: 112 }}
                   onPress={() => void run(() => game.joinRoom(code, trimmed))}
                 />
               </View>
             </Card>
 
             <View style={styles.sectionHeader}>
-              <UiIcon name="Globe" size={16} color={theme.accent} />
-              <T style={[styles.section, { color: theme.onBg }]}>Sảnh phòng công khai đang mở</T>
+              <UiIcon name="Globe" size={15} color={pal.muted} strokeWidth={1.65} />
+              <T style={[styles.section, { color: pal.text }]}>Phòng công khai đang mở</T>
             </View>
             <OpenRooms game={game} disabled={!online || busy} onJoin={(c) => void run(() => game.joinRoom(c, trimmed))} />
           </View>
         )}
 
-        {/* ============================================================ */}
-        {/* FRAGMENT 3: CỬA HÀNG PHÚ HÀO & SÂN KHẤU HÓA TRANG ĐẠI GIA    */}
-        {/* ============================================================ */}
+        {/* FRAGMENT 3: CỬA HÀNG */}
         {fragment === 'shop' && (
           <View style={{ gap: 12 }} testID="fragment-shop">
             <Card style={{ gap: 10 }}>
@@ -471,9 +443,7 @@ export function HomeScreen({ game }: { game: Game }) {
           </View>
         )}
 
-        {/* ============================================================ */}
-        {/* FRAGMENT 4: HỒ SƠ CÁ NHÂN, THÀNH TÍCH 14 GAME & KHO MAP      */}
-        {/* ============================================================ */}
+        {/* FRAGMENT 4: HỒ SƠ CÁ NHÂN & CÀI ĐẶT */}
         {fragment === 'profile' && (
           <View style={{ gap: 12 }} testID="fragment-profile">
             {user ? (
@@ -487,28 +457,29 @@ export function HomeScreen({ game }: { game: Game }) {
             ) : (
               <>
                 {guestNameBar}
-                <Card style={{ gap: 8 }}>
-                  <T style={styles.h2}>🌟 Tạo tài khoản Phú Hào Xóm Lầy</T>
-                  <T style={{ color: C.muted, fontSize: 13, lineHeight: 19 }}>
-                    Lưu thành tích 15 trò chơi, điểm danh nhận Ruby miễn phí mỗi ngày, mở khóa 146 vật phẩm Hóa Trang Lố Lăng & danh hiệu Thiên Đế Chí Tôn!
+                <Card style={{ gap: 10 }}>
+                  <T style={styles.h2}>Tạo tài khoản Xóm Lầy</T>
+                  <T style={{ color: C.secondary, fontSize: 13.5, lineHeight: 20 }}>
+                    Lưu thành tích 15 trò chơi, nhận Ruby mỗi ngày và mở khóa khung đại diện hoặc chủ đề bàn chơi.
                   </T>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Button style={{ flex: 1 }} variant="gold" title="Đăng ký miễn phí" onPress={() => setAuth('register')} />
+                    <Button style={{ flex: 1 }} variant="ink" title="Đăng ký" onPress={() => setAuth('register')} />
                     <Button style={{ flex: 1 }} variant="paper" title="Đăng nhập" onPress={() => setAuth('login')} />
                   </View>
                 </Card>
               </>
             )}
 
-            <Card style={{ gap: 8 }}>
-              <T style={styles.h2}>⚙️ Tiện Ích & Kho Map Nền ({ROOM_THEMES.length} Map)</T>
+            <Card style={{ gap: 10 }}>
+              <T style={styles.h2}>Tiện ích & Chủ đề ({ROOM_THEMES.length})</T>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                <Button small variant="gold" icon="🏆" title="Bảng Vàng Cao Thủ" onPress={() => setBoard(true)} />
-                <Button small variant="paper" icon="🗺️" title="Đổi Map & Bảng Màu" onPress={() => setMapOpen(true)} />
+                <Button small variant="paper" iconNode={<UiIcon name="Trophy" size={14} color={C.secondary} strokeWidth={1.65} />} title="Bảng vàng" onPress={() => setBoard(true)} />
+                <Button small variant="paper" iconNode={<UiIcon name="Map" size={14} color={C.secondary} strokeWidth={1.65} />} title="Đổi Map nền" onPress={() => setMapOpen(true)} />
                 <Button
                   small
                   variant={smooth ? 'jade' : 'paper'}
-                  title={smooth ? '⚡ Siêu mượt: ĐANG BẬT' : '⚡ Bật chế độ Siêu mượt'}
+                  iconNode={<UiIcon name="Gauge" size={14} color={smooth ? '#FFFFFF' : C.secondary} strokeWidth={1.65} />}
+                  title={smooth ? 'Siêu mượt: Bật' : 'Chế độ Siêu mượt'}
                   onPress={() => setSmooth(!smooth)}
                 />
               </View>
@@ -517,14 +488,15 @@ export function HomeScreen({ game }: { game: Game }) {
         )}
       </ScrollView>
 
-      {/* Thanh Điều Hướng 4 Mảnh (Bottom Navigation Bar) Chuẩn Điện Thoại */}
+      {/* Bottom Navigation Bar chuẩn giấy ngà / tối neo gọn đáy */}
       <View
         testID="home-bottom-nav"
-        style={styles.bottomNavWrap}
+        style={[styles.bottomNavWrap, { backgroundColor: pal.card, borderTopColor: pal.hairline }]}
       >
         <View style={styles.bottomNavInner}>
           {FRAGMENTS.map((f) => {
             const active = fragment === f.id;
+            const fgColor = active ? pal.text : pal.muted;
             return (
               <Pressable
                 key={f.id}
@@ -532,10 +504,10 @@ export function HomeScreen({ game }: { game: Game }) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 onPress={() => setFragment(f.id)}
-                style={[styles.navItem, active && styles.navItemActive]}
+                style={[styles.navItem, active && { backgroundColor: pal.subtle }]}
               >
-                <EmojiIcon emoji={f.emoji} size={active ? 22 : 19} glow={active} />
-                <T style={[styles.navLabel, active && styles.navLabelActive]} numberOfLines={1}>
+                <UiIcon name={f.icon} size={18} color={fgColor} strokeWidth={active ? 1.9 : 1.6} />
+                <T style={[styles.navLabel, { color: fgColor }, active && { fontWeight: '600' }]} numberOfLines={1}>
                   {f.label}
                 </T>
                 {f.id === 'profile' && canCheckin && <View style={styles.navDot} />}
@@ -545,16 +517,17 @@ export function HomeScreen({ game }: { game: Game }) {
         </View>
       </View>
 
-      {/* Hộp thoại Chọn Map Nhanh Trang Chủ */}
+      {/* Chọn Map nền */}
       {mapOpen && (
-        <Sheet title="🎨 Chọn Map & Bảng Màu (15 Map)" onClose={() => setMapOpen(false)}>
+        <Sheet title="Chọn Map nền" onClose={() => setMapOpen(false)}>
           <T style={styles.mapNote}>
-            5 Map miễn phí ai cũng dùng được ngay. 10 Map Đại Gia Ruby tạo bầu trời hiệu ứng riêng cực cháy!
+            5 chủ đề cơ bản mở sẵn cho mọi người, 10 chủ đề đặc biệt mở khóa trong Cửa hàng.
           </T>
           <View style={{ gap: 8 }}>
             {ROOM_THEMES.map((t) => {
               const freeOrOwned = t.price === 0 || ownedSet.has(t.id);
               const active = activeThemeId === t.id;
+              const isDefault = t.id === 'son_mac_dinh';
               return (
                 <Pressable
                   key={t.id}
@@ -577,8 +550,23 @@ export function HomeScreen({ game }: { game: Game }) {
                   }}
                   style={[styles.mapRow, active && styles.mapRowOn]}
                 >
-                  <View style={[styles.mapSwatch, { backgroundColor: t.bg, borderColor: t.accent }]}>
-                    <EmojiIcon emoji={t.emoji} size={22} />
+                  <View
+                    style={[
+                      styles.mapSwatch,
+                      {
+                        backgroundColor: isDefault ? C.parchment : t.bg,
+                        borderColor: isDefault ? C.borderStrong : t.accent,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: isDefault ? C.son : t.accent,
+                      }}
+                    />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <T style={styles.mapName}>{t.name}</T>
@@ -587,15 +575,15 @@ export function HomeScreen({ game }: { game: Game }) {
                   <View style={styles.mapActionWrap}>
                     {active ? (
                       <>
-                        <UiIcon name="CheckCircle2" size={15} color={C.jadeDeep} />
+                        <UiIcon name="CheckCircle2" size={15} color={C.jadeDeep} strokeWidth={1.75} />
                         <T style={[styles.mapAction, { color: C.jadeDeep }]}>Đang dùng</T>
                       </>
                     ) : freeOrOwned ? (
                       <T style={styles.mapAction}>Chọn</T>
                     ) : (
                       <>
-                        <UiIcon name="Lock" size={13} color={C.son} />
-                        <RubyIcon size={14} />
+                        <UiIcon name="Lock" size={13} color={C.goldDeep} strokeWidth={1.65} />
+                        <RubyIcon size={13} />
                         <T style={styles.mapAction}>{t.price}</T>
                       </>
                     )}
@@ -635,178 +623,169 @@ export function HomeScreen({ game }: { game: Game }) {
 
 const styles = StyleSheet.create({
   screen: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 98,
+    paddingBottom: 88,
     gap: 12,
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   brandGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
   brandEmblem: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#FEF08A',
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: C.ink,
+    borderWidth: 1,
+    borderColor: C.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: { fontSize: 25, fontWeight: '900', letterSpacing: -0.6, lineHeight: 30, fontFamily: FONT },
-  tagline: { fontSize: 12, fontWeight: '800', opacity: 0.92 },
+  brandMono: { color: C.onSon, fontSize: 15, fontWeight: '600', letterSpacing: -0.2, fontFamily: FONT },
+  logo: { fontSize: 20, fontWeight: '600', letterSpacing: -0.2, lineHeight: 24, fontFamily: FONT },
+  tagline: { fontSize: 12.5, fontWeight: '400' },
 
   topPills: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   iconPill: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: 'rgba(15, 23, 42, 0.52)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.24)',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconPillActive: { backgroundColor: '#4ADE80', borderColor: '#FEF08A' },
 
-  compactIdentity: { padding: 11, gap: 8 },
+  compactIdentity: { padding: 12, gap: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  guestAuthRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  guestAuthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   miniAuthPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: C.mist,
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.14)',
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
-  miniRegisterPill: { backgroundColor: '#FACC15', borderColor: '#CA8A04' },
-  miniAuthTxt: { fontSize: 11.5, fontWeight: '900', color: C.ink },
+  miniRegisterPill: { backgroundColor: C.goldSoft, borderColor: 'rgba(180, 83, 9, 0.25)' },
+  miniAuthTxt: { fontSize: 12, fontWeight: '600', color: C.ink },
 
   userMiniRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  userMiniName: { fontSize: 16, fontWeight: '900', color: C.ink },
+  userMiniName: { fontSize: 15.5, fontWeight: '600', color: C.ink },
   rubyInlinePill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#FFF1F2',
+    backgroundColor: C.goldSoft,
     borderWidth: 1,
-    borderColor: '#FECDD3',
+    borderColor: 'rgba(180, 83, 9, 0.22)',
     paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 999,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  rubyInlineTxt: { fontSize: 12, fontWeight: '900', color: C.son },
+  rubyInlineTxt: { fontSize: 12, fontWeight: '600', color: C.goldDeep, fontVariant: ['tabular-nums'] },
   userMiniActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  dot: { position: 'absolute', top: -3, right: -3, width: 11, height: 11, borderRadius: 6, backgroundColor: C.danger, borderWidth: 2, borderColor: '#FFFFFF' },
+  dot: { position: 'absolute', top: -3, right: -3, width: 9, height: 9, borderRadius: 4.5, backgroundColor: C.danger, borderWidth: 1.5, borderColor: C.paper },
 
-  status: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: 'rgba(15,23,42,0.72)', padding: 12, borderRadius: 14 },
-  statusText: { color: '#FFFFFF', flex: 1, fontSize: 13, fontWeight: '700' },
-  notice: { backgroundColor: C.gold, color: C.ink, padding: 12, borderRadius: 14, fontWeight: '800' },
-  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 10, borderRadius: 12, fontWeight: '800', textAlign: 'center' },
+  status: {
+    flexDirection: 'row', gap: 10, alignItems: 'center',
+    backgroundColor: C.paper, borderWidth: 1, borderColor: C.borderSubtle,
+    padding: 12, borderRadius: 12,
+  },
+  statusText: { color: C.secondary, flex: 1, fontSize: 13, fontWeight: '500' },
+  notice: { backgroundColor: C.goldSoft, borderWidth: 1, borderColor: 'rgba(180, 83, 9, 0.28)', color: C.ink, padding: 12, borderRadius: 12, fontWeight: '500', fontSize: 13 },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 10, borderRadius: 10, fontWeight: '600', fontSize: 13, textAlign: 'center' },
 
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badgeCircle: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  h2: { fontSize: 16, fontWeight: '900', color: C.ink, flex: 1 },
+  h2: { fontSize: 15.5, fontWeight: '600', color: C.ink, flex: 1 },
   input: {
+    minWidth: 0,
     fontFamily: FONT,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(15, 23, 42, 0.2)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
     paddingHorizontal: 12,
-    height: 44,
-    fontSize: 15,
-    fontWeight: '800',
+    height: 42,
+    fontSize: 14.5,
+    fontWeight: '500',
     color: C.ink,
   },
   joinCard: { gap: 10 },
   joinRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  codeInput: { flex: 1, minWidth: 0, letterSpacing: 4, fontWeight: '900', textAlign: 'center', height: 48, fontSize: 17 },
+  codeInput: { flex: 1, minWidth: 0, letterSpacing: 4, fontWeight: '600', textAlign: 'center', height: 44, fontSize: 16, fontVariant: ['tabular-nums'] },
 
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  section: { fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
-  catRow: { gap: 7, paddingVertical: 2 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 2 },
+  section: { fontSize: 14, fontWeight: '600' },
+  catRow: { gap: 8, paddingVertical: 2 },
   catPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.16)',
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
-  catTxt: { fontSize: 12.5, fontWeight: '900', color: C.ink },
+  catPillActive: {
+    backgroundColor: C.ink,
+    borderColor: C.ink,
+  },
+  catTxt: { fontSize: 13, fontWeight: '500', color: C.secondary },
+  catTxtActive: { color: C.onSon, fontWeight: '600' },
 
-  gameGridSingle: { gap: 10 },
-  gameGridWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
-  gameSlotWide: { flexBasis: '48.8%', flexGrow: 0 },
+  gameGridSingle: { gap: 8 },
+  gameGridWide: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
+  gameSlotWide: { flexBasis: '49%', flexGrow: 0 },
   gameCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 13,
+    backgroundColor: C.paper,
+    borderRadius: 12,
+    padding: 12,
   },
-  gameMedallion: {
-    width: 58,
-    height: 58,
-    borderRadius: 17,
-    borderWidth: 1.5,
-    borderColor: 'rgba(15,23,42,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gameTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  gameTitle: { fontSize: 16.5, fontWeight: '900', color: C.ink, fontFamily: FONT },
-  newBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
-  newBadgeTxt: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '900', letterSpacing: 0.4 },
-  gameTag: { color: C.muted, fontSize: 12.5, lineHeight: 17, fontWeight: '600' },
-  playerChip: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 1,
-  },
-  gamePlayers: { color: C.jadeDeep, fontSize: 11, fontWeight: '800' },
-  goPill: {
-    width: 30,
-    height: 30,
+  gameCardPressed: { opacity: 0.85 },
+  gameIconBox: {
+    width: 44,
+    height: 44,
     borderRadius: 10,
-    backgroundColor: '#FFF1F2',
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  gameTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gameTitle: { fontSize: 15, fontWeight: '600', color: C.ink, fontFamily: FONT, flexShrink: 1 },
+  quietTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.goldDeep,
+    backgroundColor: C.goldSoft,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  gameTag: { color: C.secondary, fontSize: 12.5, lineHeight: 17, fontWeight: '400' },
+  gamePlayers: { color: C.muted, fontSize: 11.5, fontWeight: '500', fontVariant: ['tabular-nums'] },
 
   bottomNavWrap: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    bottom: 8,
-    borderRadius: 22,
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-    borderWidth: 2,
-    borderColor: 'rgba(250, 204, 21, 0.45)',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: 1,
     paddingVertical: 6,
-    paddingHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 12,
+    paddingHorizontal: 12,
   },
   bottomNavInner: {
     flexDirection: 'row',
@@ -821,36 +800,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 4,
-    borderRadius: 15,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 10,
     gap: 2,
     position: 'relative',
   },
-  navItemActive: {
-    backgroundColor: 'rgba(250, 204, 21, 0.2)',
-    borderWidth: 1,
-    borderColor: '#FACC15',
-  },
-  navLabel: { fontSize: 11, fontWeight: '800', color: '#CBD5E1' },
-  navLabelActive: { color: '#FEF08A', fontWeight: '900' },
-  navDot: { position: 'absolute', top: 4, right: '26%', width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444' },
+  navLabel: { fontSize: 11.5, fontWeight: '500' },
+  navDot: { position: 'absolute', top: 5, right: '26%', width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.danger },
 
-  mapNote: { fontSize: 12.5, color: C.muted, lineHeight: 18, marginBottom: 4 },
+  mapNote: { fontSize: 12.5, color: C.secondary, lineHeight: 18, marginBottom: 4 },
   mapRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: 10,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: C.mist,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
-  mapRowOn: { borderColor: C.jade, backgroundColor: '#ECFDF5' },
-  mapSwatch: { width: 44, height: 44, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  mapName: { fontSize: 14, fontWeight: '900', color: C.ink },
-  mapDesc: { fontSize: 12, color: C.muted },
+  mapRowOn: { borderColor: C.jade, backgroundColor: C.jadeSoft },
+  mapSwatch: { width: 38, height: 38, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  mapName: { fontSize: 14, fontWeight: '600', color: C.ink },
+  mapDesc: { fontSize: 12, color: C.secondary },
   mapActionWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  mapAction: { fontSize: 12, fontWeight: '900', color: C.son },
+  mapAction: { fontSize: 12, fontWeight: '600', color: C.secondary, fontVariant: ['tabular-nums'] },
 });

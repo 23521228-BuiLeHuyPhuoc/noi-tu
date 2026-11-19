@@ -13,7 +13,7 @@ import { Portrait } from '../components/Avatar';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
-import { C, FONT, sticker } from '../theme';
+import { C, FONT, backdropPalette, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
 import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
@@ -22,7 +22,7 @@ import { compactXu } from '../format';
 import { rectOf, type Rect } from '../components/Fun';
 import { setMood } from '../funState';
 import { coinFrontUri, coinTiltedUri } from '../coins';
-import { EmojiIcon, RankMedal } from '../components/Icons';
+import { EmojiIcon, RankMedal, UiIcon } from '../components/Icons';
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 const PAPER = '#F7E7C1';
@@ -264,9 +264,7 @@ function Drop({ x, d, delay }: { x: number; d: number; delay: number }) {
     };
   }, [t, d, delay]);
   return (
-    <Animated.View style={{ position: 'absolute', left: x, top: t.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }}>
-      <EmojiIcon emoji="💧" size={18} />
-    </Animated.View>
+    <Animated.View style={[styles.rainDrop, { left: x, top: t.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }]} />
   );
 }
 
@@ -324,8 +322,8 @@ function Reveal({ dice, myBets, delta, onDone }: {
       style={[StyleSheet.absoluteFill, { zIndex: 70, opacity: fade, overflow: 'hidden' }]}
     >
       {/* View thường (không phải Animated) để đo vị trí trên web */}
-      <View ref={root} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(42,10,16,0.84)' }]} />
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(38,40,52,0.9)', opacity: sad }]} />
+      <View ref={root} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(31, 20, 18, 0.88)' }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(26, 30, 40, 0.92)', opacity: sad }]} />
       {box && (
         <>
           {!lost && (
@@ -334,7 +332,7 @@ function Reveal({ dice, myBets, delta, onDone }: {
               <View style={styles.glow} />
             </View>
           )}
-          <T style={[styles.revealTitle, { top: cy - size - 40 }]}>{lost && phase === 'after' ? '' : 'MỞ BÁT!'}</T>
+          <T style={[styles.revealTitle, { top: cy - size - 40 }]}>{lost && phase === 'after' ? '' : 'Mở bát'}</T>
           {dice.map((s, i) => (
             <RevealDie
               key={i}
@@ -350,16 +348,16 @@ function Reveal({ dice, myBets, delta, onDone }: {
           {phase === 'after' && (
             <View style={[styles.revealMsg, { top: cy + size / 2 + 26 }]}>
               {lost ? (
-                <View testID="bc-sad" style={{ alignItems: 'center', gap: 4 }}>
-                  <EmojiIcon emoji="😭" size={62} />
-                  <T style={styles.sadText}>Trật lất hết rồi…</T>
+                <View testID="bc-sad" style={{ alignItems: 'center', gap: 6 }}>
+                  <UiIcon name="XCircle" size={44} color="#CBD5E1" strokeWidth={1.5} />
+                  <T style={styles.sadText}>Trật hết rồi</T>
                 </View>
               ) : delta && delta > 0 ? (
-                <T style={styles.winText}>Trúng rồi! +{fmt(delta)} xu 🤑</T>
+                <T style={styles.winText}>Trúng +{fmt(delta)} xu</T>
               ) : delta && delta < 0 ? (
-                <T style={styles.meh}>Trúng mà vẫn lỗ {fmt(-delta)} xu 😅</T>
+                <T style={styles.meh}>Trúng mà lỗ {fmt(-delta)} xu</T>
               ) : anyBet && delta === 0 ? (
-                <T style={styles.meh}>Huề vốn 😌</T>
+                <T style={styles.meh}>Huề vốn</T>
               ) : !anyBet ? (
                 <T style={styles.meh}>Bạn không cược ván này</T>
               ) : null}
@@ -379,21 +377,6 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disable
   stakes: Stake[]; total: number; glow: boolean; compact: boolean; disabled?: boolean;
   luckyMult?: 2 | 3 | null; freq?: number; onPress: () => void;
 }) {
-  const pulse = useState(() => new Animated.Value(0))[0];
-  useEffect(() => {
-    if (!glow) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 420, useNativeDriver: false }),
-        Animated.timing(pulse, { toValue: 0.35, duration: 420, useNativeDriver: false }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      pulse.setValue(0);
-    };
-  }, [glow, pulse]);
   const tileRef = useMeasuredView(`sym-${s}`);
   const result = step === 'result';
   return (
@@ -408,23 +391,23 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disable
       style={({ pressed }) => [
         styles.tile,
         compact && styles.tileCompact,
-        sticker(pressed ? 1 : 4),
-        pressed && { transform: [{ translateY: 3 }] },
-        result && hits === 0 && { opacity: 0.4 },
-        result && hits > 0 && !glow && { borderColor: C.jade, borderWidth: 4 },
-        !!luckyMult && { borderColor: '#FACC15', borderWidth: 3.5, backgroundColor: '#FEF9C3' },
+        sticker(pressed ? 1 : 2),
+        pressed && { transform: [{ translateY: 2 }] },
+        result && hits === 0 && { opacity: 0.42 },
+        result && hits > 0 && !glow && { borderColor: C.jade, borderWidth: 2.5 },
+        glow && { borderColor: C.gold, borderWidth: 2.5, backgroundColor: '#FEF9C3' },
+        !!luckyMult && { borderColor: C.goldDeep, borderWidth: 2, backgroundColor: C.goldSoft },
       ]}
     >
-      {glow && <Animated.View pointerEvents="none" style={[styles.tileGlow, { opacity: pulse }]} />}
       <View style={styles.tileInner}>
         <Image source={{ uri: ART[s] }} style={[styles.tileArt, compact && { width: '62%' }]} resizeMode="contain" />
-        <View style={[styles.banner, !!luckyMult && { backgroundColor: '#B45309' }]}>
+        <View style={[styles.banner, !!luckyMult && { backgroundColor: C.goldDeep }]}>
           <T style={styles.bannerText}>{SYMBOL[s].name}</T>
         </View>
       </View>
       {!!luckyMult && (
         <View testID={`bc-lucky-${s}`} style={styles.luckyTag}>
-          <T style={styles.luckyTagTxt}>LỘC ×{luckyMult}</T>
+          <T style={styles.luckyTagTxt}>Lộc ×{luckyMult}</T>
         </View>
       )}
       {freq !== undefined && freq > 0 && !mine && step === 'betting' && (
@@ -575,8 +558,11 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const favSymbol: BauCuaSymbol = g.luckySymbol
     ?? (BAUCUA_SYMBOLS.find((sym) => (myBets[sym] ?? 0) > 0) ?? 'bau');
 
+  const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
+  const pal = backdropPalette(activeThemeId);
+
   const stepText =
-    g.step === 'betting' ? `Đặt cược đi! Máy lắc sau ${left}s` : g.step === 'rolling' ? 'Máy đang lắc bát…' : 'Mở bát!';
+    g.step === 'betting' ? `Đặt cược · Lắc bát sau ${left}s` : g.step === 'rolling' ? 'Máy đang lắc bát…' : 'Mở bát';
 
   return (
     <Shell
@@ -607,17 +593,25 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   accessibilityRole="button"
                   accessibilityState={{ selected: chip === v }}
                   onPress={() => setChip(v)}
-                  style={[styles.chip, compact && styles.chipCompact, sticker(chip === v ? 4 : 2), chip === v && styles.chipOn]}
+                  style={[styles.chip, compact && styles.chipCompact, sticker(chip === v ? 2 : 1), chip === v && styles.chipOn]}
                 >
                   <View style={[styles.chipRing, compact && styles.chipRingCompact]}>
-                    <T style={[styles.chipText, compact && { fontSize: 13 }]}>{v}</T>
+                    <T style={[styles.chipText, compact && { fontSize: 12.5 }]}>{v}</T>
                   </View>
                 </Pressable>
               ))}
             </View>
             <View style={styles.row}>
               {available < 10 && staked === 0 ? (
-                <Button testID="loan-btn" small icon="💸" title="Vay nóng 500 xu" variant="ink" style={{ flex: 1 }} onPress={() => act({ type: 'loan' })} />
+                <Button
+                  testID="loan-btn"
+                  small
+                  iconNode={<UiIcon name="Wallet" size={15} color={C.onSon} strokeWidth={1.65} />}
+                  title="Vay nóng 500 xu"
+                  variant="ink"
+                  style={{ flex: 1 }}
+                  onPress={() => act({ type: 'loan' })}
+                />
               ) : (
                 <>
                   <Button
@@ -633,7 +627,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                     <Button
                       testID="bc-rebet"
                       small
-                      icon="🔁"
+                      iconNode={<UiIcon name="RotateCcw" size={14} color={C.secondary} strokeWidth={1.65} />}
                       title="Đặt lại"
                       variant="ghost"
                       disabled={g.step !== 'betting'}
@@ -644,7 +638,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                     <Button
                       testID="bc-double"
                       small
-                      icon="⚡"
+                      iconNode={<UiIcon name="Zap" size={14} color={C.secondary} strokeWidth={1.65} />}
                       title="Gấp x2"
                       variant="ghost"
                       disabled={g.step !== 'betting' || available < staked}
@@ -655,7 +649,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   <Button
                     testID="bc-allin"
                     small
-                    icon="🔥"
+                    iconNode={<UiIcon name="Flame" size={14} color={C.onSon} strokeWidth={1.65} />}
                     title="Tất tay"
                     variant="ink"
                     disabled={g.step !== 'betting' || available <= 0}
@@ -675,11 +669,12 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
           room={room}
           game={game}
           order={rankedIds}
+          dark={pal.dark}
           rank={(p) => (p.id in g.balances ? rankOf(p.id) : undefined)}
-          sub={(p) => (p.id in g.balances ? `${compactXu(g.balances[p.id])}${g.debts[p.id] ? '💸' : ''}` : undefined)}
+          sub={(p) => (p.id in g.balances ? `${compactXu(g.balances[p.id])}${g.debts[p.id] ? ' · nợ' : ''}` : undefined)}
         />
 
-        <Card style={[styles.table, compact && { paddingVertical: 6, paddingHorizontal: 10, gap: 4 }]}>
+        <Card style={[styles.table, compact && { paddingVertical: 8, paddingHorizontal: 12, gap: 4 }]}>
           <View style={styles.tableHead}>
             <T testID="bc-round" style={styles.round}>Ván {g.round}/{g.maxRounds}</T>
             <T testID="bc-step" numberOfLines={1} style={styles.step}>{stepText}</T>
@@ -691,13 +686,13 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
           </View>
           {g.mode === 'jackpot' && (
             <View style={styles.jackpotBanner} testID="bc-jackpot-banner">
-              <EmojiIcon emoji="🎰" size={14} />
+              <UiIcon name="Sparkles" size={14} color={C.goldDeep} strokeWidth={1.65} />
               <T numberOfLines={1} style={styles.jackpotTxt}>
                 {g.tripleStorm
-                  ? `🌪️ BÃO TAM HOA NỔ HŨ (+1x THƯỞNG)!`
+                  ? 'Bão tam hoa nổ hũ (+1× thưởng)'
                   : g.luckySymbol
-                    ? `Ô Lộc Trời: ${SYMBOL[g.luckySymbol].name.toUpperCase()} ×${g.luckyMult}!`
-                    : 'Chế độ Lộc Trời Nổ Hũ ×2/×3'}
+                    ? `Ô lộc trời: ${SYMBOL[g.luckySymbol].name} ×${g.luckyMult}`
+                    : 'Chế độ Lộc trời nổ hũ ×2/×3'}
               </T>
             </View>
           )}
@@ -717,33 +712,33 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
             </View>
           )}
           {g.step === 'result' && myDelta !== undefined && (
-            <T testID="bc-delta" style={[styles.delta, compact && { fontSize: 17 }, { color: myDelta > 0 ? C.jade : myDelta < 0 ? C.danger : C.muted }]}>
+            <T testID="bc-delta" style={[styles.delta, compact && { fontSize: 16 }, { color: myDelta > 0 ? C.jade : myDelta < 0 ? C.danger : C.muted }]}>
               {myDelta > 0
-                ? `+${fmt(myDelta)} xu 🤑`
+                ? `+${fmt(myDelta)} xu`
                 : myDelta < 0
-                  ? `${fmt(myDelta)} xu 😭`
+                  ? `${fmt(myDelta)} xu`
                   : Object.values(roundBets).some((v) => (v ?? 0) > 0)
-                    ? 'Huề vốn 😌'
+                    ? 'Huề vốn'
                     : 'Không cược ván này'}
             </T>
           )}
           <View style={styles.infoRow}>
             {!isSpectator && (
               <T numberOfLines={1} style={styles.wallet}>
-                <T style={{ fontWeight: '900', color: C.son }}>#{rankOf(me)}/{rankedIds.length}</T> · Ví{' '}
-                <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
+                <T style={{ fontWeight: '600', color: C.son }}>#{rankOf(me)}/{rankedIds.length}</T> · Ví{' '}
+                <T style={{ fontWeight: '600', color: C.ink }}>{fmt(balance)} xu</T>
                 {staked > 0 ? `, cược ${fmt(staked)}` : ''}
                 {g.debts[me] ? `, nợ ${g.debts[me]}` : ''}
               </T>
             )}
-            <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={[styles.bxhBtn, sticker(2), { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <EmojiIcon emoji="🏆" size={13} />
-              <T style={styles.bxhText}>BXH</T>
+            <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={styles.bxhBtn}>
+              <UiIcon name="Trophy" size={13} color={C.goldDeep} strokeWidth={1.65} />
+              <T style={styles.bxhText}>Xếp hạng</T>
             </Pressable>
           </View>
         </Card>
 
-        <View style={[styles.board, compact && styles.boardCompact, sticker(4)]}>
+        <View style={[styles.board, compact && styles.boardCompact, sticker(2)]}>
           {BAUCUA_SYMBOLS.map((s) => {
             const stakes = stakesOf(s);
             return (
@@ -769,7 +764,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 
         {g.recent.length > 0 && (
           <View style={styles.recent}>
-            <T style={styles.recentLabel}>Gần đây:</T>
+            <T style={[styles.recentLabel, { color: pal.muted }]}>Gần đây</T>
             <View style={styles.recentRow}>
               {[...g.recent].reverse().slice(0, 4).map((r, i) => (
                 <View key={i} style={styles.recentItem}>
@@ -784,7 +779,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
       </View>
 
       {boardOpen && (
-        <Sheet title="🏆 Bảng xếp hạng xu" onClose={() => setBoardOpen(false)}>
+        <Sheet title="Bảng xếp hạng xu" onClose={() => setBoardOpen(false)}>
           <View testID="bc-leaderboard" style={{ gap: 6 }}>
             {rankedIds.map((id, idx) => {
               const rank = idx + 1;
@@ -804,7 +799,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   <View style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
                     <RankMedal rank={rank} size={22} />
                   </View>
-                  <Portrait p={playerOf(id) ?? { avatar: 0 }} size={30} border={2} />
+                  <Portrait p={playerOf(id) ?? { avatar: 0 }} size={30} border={1.5} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <T style={styles.rankName}>
                       {nameOf(id)}
@@ -833,8 +828,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
       )}
 
       {ending && (
-        <Sheet title="Tổng kết sòng?" onClose={() => setEnding(false)}>
-          <T style={{ color: C.muted }}>Ván sẽ dừng lại và xếp hạng mọi người theo số xu (trừ tiền nợ).</T>
+        <Sheet title="Tổng kết sòng" onClose={() => setEnding(false)}>
+          <T style={{ color: C.secondary, fontSize: 13.5, lineHeight: 19 }}>
+            Ván sẽ dừng lại và xếp hạng mọi người theo số xu hiện có (trừ tiền nợ).
+          </T>
           <Button testID="end-confirm" title="Tổng kết" variant="ink" onPress={() => act({ type: 'end' })} />
           <Button title="Chơi tiếp" variant="paper" onPress={() => setEnding(false)} />
         </Sheet>
@@ -844,119 +841,114 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minHeight: 0, gap: 5, justifyContent: 'space-between' },
+  root: { flex: 1, minHeight: 0, gap: 6, justifyContent: 'space-between' },
   table: { gap: 4, alignItems: 'center' },
   tableHead: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
-  round: { fontWeight: '900', fontSize: 13, color: C.muted },
-  step: { flex: 1, fontWeight: '900', fontSize: 15, textAlign: 'center' },
-  endLink: { color: C.son, fontWeight: '800', textDecorationLine: 'underline', fontSize: 13 },
-  timeTrack: { alignSelf: 'stretch', height: 6, borderRadius: 4, backgroundColor: C.mist, overflow: 'hidden', borderWidth: 1.5, borderColor: C.ink },
+  round: { fontWeight: '600', fontSize: 13, color: C.muted, fontVariant: ['tabular-nums'] },
+  step: { flex: 1, fontWeight: '600', fontSize: 14.5, color: C.ink, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  endLink: { color: C.son, fontWeight: '600', fontSize: 13 },
+  timeTrack: { alignSelf: 'stretch', height: 4, borderRadius: 2, backgroundColor: C.mist, overflow: 'hidden' },
   timeFill: { height: '100%', backgroundColor: C.jade },
   plateSmall: { height: 48, minWidth: 130 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', justifyContent: 'space-between' },
-  bxhBtn: { backgroundColor: C.gold, borderRadius: 10, paddingHorizontal: 10, minHeight: 30, justifyContent: 'center' },
-  bxhText: { fontWeight: '900', fontSize: 13 },
+  bxhBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.mist, borderWidth: 1, borderColor: C.borderSubtle,
+    borderRadius: 8, paddingHorizontal: 10, minHeight: 30, justifyContent: 'center',
+  },
+  bxhText: { fontWeight: '600', fontSize: 12.5, color: C.ink },
   plate: {
-    flexDirection: 'row', gap: 10, height: 86, minWidth: 220, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.mist, borderRadius: 60, paddingHorizontal: 18, borderWidth: 2.5, borderColor: C.ink,
+    flexDirection: 'row', gap: 10, height: 84, minWidth: 220, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.mist, borderRadius: 44, paddingHorizontal: 18, borderWidth: 1, borderColor: C.borderStrong,
   },
   face: { backgroundColor: PAPER, alignItems: 'center', justifyContent: 'center' },
-  delta: { fontSize: 20, fontWeight: '900' },
-  wallet: { color: C.muted, fontSize: 13, flex: 1 },
-  rankCard: { paddingVertical: 10, paddingHorizontal: 12 },
-  rankTitle: { fontSize: 14, fontWeight: '900', color: C.son },
+  delta: { fontSize: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  wallet: { color: C.secondary, fontSize: 12.5, flex: 1, fontVariant: ['tabular-nums'] },
   rankRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, paddingHorizontal: 8,
-    backgroundColor: C.mist, borderRadius: 10, borderLeftWidth: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10,
+    backgroundColor: C.mist, borderRadius: 10, borderWidth: 1, borderColor: C.borderSubtle, borderLeftWidth: 3,
   },
-  rankRowMe: { backgroundColor: '#FFF3BF' },
-  rankMedal: { fontWeight: '900', fontSize: 13, minWidth: 36 },
-  rankAvatar: {
-    width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  rankName: { fontWeight: '800', fontSize: 14 },
-  rankSub: { fontSize: 11, color: C.muted, fontWeight: '600' },
-  rankXu: { fontWeight: '900', fontSize: 14, color: C.ink },
-  rankDelta: { fontWeight: '800', fontSize: 11 },
-  spectatorNote: { color: C.gold, fontWeight: '800', fontSize: 14, textAlign: 'center', paddingVertical: 8 },
+  rankRowMe: { backgroundColor: C.goldSoft, borderColor: 'rgba(180, 83, 9, 0.25)' },
+  rankName: { fontWeight: '600', fontSize: 14, color: C.ink },
+  rankSub: { fontSize: 11, color: C.muted, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  rankXu: { fontWeight: '600', fontSize: 14, color: C.ink, fontVariant: ['tabular-nums'] },
+  rankDelta: { fontWeight: '600', fontSize: 11, fontVariant: ['tabular-nums'] },
   // chiếu bầu cua: khung đỏ son, 6 ô giấy dó
   board: {
-    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 7, padding: 7,
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, padding: 8,
     backgroundColor: '#8E0D14', borderRadius: 16,
   },
-  boardCompact: { rowGap: 5, padding: 5, borderRadius: 14 },
+  boardCompact: { rowGap: 6, padding: 6, borderRadius: 14 },
   tile: { width: '32%', aspectRatio: 0.9, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
   tileCompact: { aspectRatio: 1.24 },
   tileInner: {
-    flex: 1, borderWidth: 1.5, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
+    flex: 1, borderWidth: 1, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 2, overflow: 'hidden',
   },
   tileArt: { width: '88%', aspectRatio: 1, flexShrink: 1 },
-  tileGlow: {
-    position: 'absolute', top: -6, left: -6, right: -6, bottom: -6, borderRadius: 16, borderWidth: 4, borderColor: C.gold,
-    backgroundColor: 'rgba(255,214,80,0.35)', shadowColor: '#FFD650', shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: 0 },
-    zIndex: -1,
-  },
-  banner: { alignSelf: 'stretch', backgroundColor: C.son, paddingVertical: 1 },
-  bannerText: { color: PAPER, fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 1 },
+  banner: { alignSelf: 'stretch', backgroundColor: C.son, paddingVertical: 2 },
+  bannerText: { color: PAPER, fontWeight: '600', fontSize: 13.5, textAlign: 'center' },
   pileAnchor: { position: 'absolute', left: 0, right: 0, bottom: 22, alignItems: 'center' },
   pileWrap: { alignItems: 'center' },
   pileTotal: {
-    fontSize: 11, fontWeight: '900', color: '#fff', backgroundColor: 'rgba(42,10,16,0.82)', paddingHorizontal: 6,
-    borderRadius: 8, overflow: 'hidden', marginBottom: 2,
+    fontSize: 11, fontWeight: '600', color: '#FFFFFF', backgroundColor: 'rgba(31, 27, 22, 0.85)', paddingHorizontal: 6,
+    borderRadius: 8, overflow: 'hidden', marginBottom: 2, fontVariant: ['tabular-nums'],
   },
   pileRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  pileShadow: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(30,8,8,0.42)', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
+  pileShadow: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(31, 27, 22, 0.28)' },
   mine: {
-    position: 'absolute', top: -10, right: -6, backgroundColor: C.gold, borderWidth: 2, borderColor: C.ink,
-    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 1, fontWeight: '900', fontSize: 13, overflow: 'hidden',
+    position: 'absolute', top: -8, right: -4, backgroundColor: C.gold, borderWidth: 1, borderColor: C.borderStrong,
+    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1, fontWeight: '600', fontSize: 12, color: C.ink, overflow: 'hidden',
+    fontVariant: ['tabular-nums'],
   },
   hit: {
-    position: 'absolute', top: -10, left: -6, backgroundColor: C.jade, color: '#fff', borderWidth: 2, borderColor: C.ink,
-    borderRadius: 14, paddingHorizontal: 8, fontWeight: '900', fontSize: 15, overflow: 'hidden',
+    position: 'absolute', top: -8, left: -4, backgroundColor: C.jade, color: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1, fontWeight: '600', fontSize: 13, overflow: 'hidden',
+    fontVariant: ['tabular-nums'],
   },
   recent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  recentRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 5, overflow: 'hidden' },
-  recentLabel: { color: C.onSon, fontWeight: '700', fontSize: 12 },
-  recentItem: { flexDirection: 'row', backgroundColor: PAPER, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, borderWidth: 1.5, borderColor: C.ink },
+  recentRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 6, overflow: 'hidden' },
+  recentLabel: { fontWeight: '500', fontSize: 12 },
+  recentItem: { flexDirection: 'row', backgroundColor: PAPER, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: C.borderSubtle },
   chips: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
-  chip: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
-  chipCompact: { width: 46, height: 46, borderRadius: 23 },
+  chip: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  chipCompact: { width: 44, height: 44, borderRadius: 22 },
   chipRing: {
-    width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', borderColor: C.son,
+    width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.son,
     alignItems: 'center', justifyContent: 'center',
   },
-  chipRingCompact: { width: 34, height: 34, borderRadius: 17 },
-  chipOn: { backgroundColor: C.gold, transform: [{ translateY: -4 }] },
-  chipText: { fontWeight: '900', fontSize: 15 },
-  row: { flexDirection: 'row', gap: 10 },
-  error: { color: C.ink, backgroundColor: C.gold, padding: 6, borderRadius: 8, fontWeight: '700', fontSize: 13, textAlign: 'center' },
-  // mở bát
-  halo: { position: 'absolute', backgroundColor: 'rgba(255,214,80,0.5)', shadowColor: '#FFD650', shadowOpacity: 1, shadowRadius: 30, shadowOffset: { width: 0, height: 0 } },
-  glow: {
-    width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(255,194,26,0.28)',
-    shadowColor: '#FFC21A', shadowOpacity: 0.9, shadowRadius: 70, shadowOffset: { width: 0, height: 0 },
+  chipRingCompact: { width: 32, height: 32, borderRadius: 16 },
+  chipOn: { backgroundColor: C.goldSoft, borderColor: C.goldDeep, transform: [{ translateY: -3 }] },
+  chipText: { fontWeight: '600', fontSize: 14, color: C.ink, fontVariant: ['tabular-nums'] },
+  row: { flexDirection: 'row', gap: 8 },
+  error: {
+    color: C.danger, backgroundColor: C.dangerSoft, borderWidth: 1, borderColor: 'rgba(185, 28, 28, 0.28)',
+    padding: 8, borderRadius: 8, fontWeight: '500', fontSize: 13, textAlign: 'center',
   },
+  // mở bát
+  halo: { position: 'absolute', backgroundColor: 'rgba(245, 158, 11, 0.24)' },
+  glow: { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(245, 158, 11, 0.16)' },
+  rainDrop: { position: 'absolute', width: 2, height: 12, borderRadius: 1, backgroundColor: 'rgba(148, 163, 184, 0.65)' },
   revealTitle: {
-    position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 34, fontWeight: '900', color: C.gold,
-    letterSpacing: 2, fontFamily: FONT,
+    position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 28, fontWeight: '600', color: C.gold,
+    fontFamily: FONT,
   },
   revealMsg: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
-  winText: { fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center' },
-  sadText: { fontSize: 22, fontWeight: '900', color: '#C9D1E0', textAlign: 'center' },
-  meh: { fontSize: 20, fontWeight: '800', color: C.onSon, textAlign: 'center' },
+  winText: { fontSize: 22, fontWeight: '600', color: C.gold, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  sadText: { fontSize: 20, fontWeight: '600', color: '#E2E8F0', textAlign: 'center' },
+  meh: { fontSize: 18, fontWeight: '600', color: C.onSon, textAlign: 'center', fontVariant: ['tabular-nums'] },
   jackpotBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'stretch',
-    backgroundColor: '#FEF08A', borderWidth: 2, borderColor: '#CA8A04', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 8,
+    backgroundColor: C.goldSoft, borderWidth: 1, borderColor: 'rgba(180, 83, 9, 0.30)', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8,
   },
-  jackpotTxt: { fontSize: 12.5, fontWeight: '900', color: '#78350F' },
+  jackpotTxt: { fontSize: 12.5, fontWeight: '600', color: C.goldDeep },
   luckyTag: {
-    position: 'absolute', top: -10, left: 4, backgroundColor: '#DC2626', borderWidth: 1.5, borderColor: '#FEF08A',
-    borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1,
+    position: 'absolute', top: -8, left: 4, backgroundColor: C.son, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1,
   },
-  luckyTagTxt: { fontSize: 10, fontWeight: '900', color: '#FEF08A' },
+  luckyTagTxt: { fontSize: 10, fontWeight: '600', color: C.onSon, fontVariant: ['tabular-nums'] },
   freqTag: {
-    position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(15,23,42,0.68)', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1,
+    position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(31, 27, 22, 0.72)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
   },
-  freqTagTxt: { fontSize: 9.5, fontWeight: '800', color: '#F8FAFC' },
+  freqTagTxt: { fontSize: 9.5, fontWeight: '600', color: C.onSon, fontVariant: ['tabular-nums'] },
 });

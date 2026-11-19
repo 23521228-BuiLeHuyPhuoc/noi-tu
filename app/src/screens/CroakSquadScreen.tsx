@@ -10,6 +10,7 @@ import {
   CROAK_MAX_FALL,
   CROAK_MOVE_SPEED,
   CROAK_STAGES,
+  CROAK_TONGUE_RANGE,
   computeSpitArc,
   getSolidRects,
   moveAndCollideFrog,
@@ -26,11 +27,11 @@ import { PLAYER_COLORS, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { isMuted } from '../sound';
 import { ViewportContext, useStableWindow } from '../hooks';
-import { C, FONT, sticker } from '../theme';
+import { C, FONT } from '../theme';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
 import { Rotator } from '../components/Rotator';
-import { EmojiIcon, UiIcon, emojiSvgUri } from '../components/Icons';
+import { UiIcon, emojiSvgUri } from '../components/Icons';
 import { Confetti } from '../components/Fun';
 
 // ============================================================================
@@ -393,10 +394,10 @@ function drawKenneyWoodPlank(
 // ============================================================================
 
 const AIM_PRESETS: { id: string; label: string; angleRight: number; angleLeft: number; power: number }[] = [
-  { id: 'high_left', label: '↖ Cao Trái', angleRight: -Math.PI * 0.68, angleLeft: -Math.PI * 0.68, power: 0.88 },
-  { id: 'up', label: '↑ Thẳng Lên', angleRight: -Math.PI * 0.5, angleLeft: -Math.PI * 0.5, power: 0.92 },
-  { id: 'high_right', label: '↗ Cao Phải', angleRight: -Math.PI * 0.32, angleLeft: -Math.PI * 0.32, power: 0.88 },
-  { id: 'far_fwd', label: '➡ Bắn Xa', angleRight: -Math.PI * 0.2, angleLeft: -Math.PI * 0.8, power: 0.96 },
+  { id: 'high_left', label: '↖ Cao trái', angleRight: -Math.PI * 0.68, angleLeft: -Math.PI * 0.68, power: 0.88 },
+  { id: 'up', label: '↑ Thẳng lên', angleRight: -Math.PI * 0.5, angleLeft: -Math.PI * 0.5, power: 0.92 },
+  { id: 'high_right', label: '↗ Cao phải', angleRight: -Math.PI * 0.32, angleLeft: -Math.PI * 0.32, power: 0.88 },
+  { id: 'far_fwd', label: '→ Bắn xa', angleRight: -Math.PI * 0.2, angleLeft: -Math.PI * 0.8, power: 0.96 },
 ];
 
 interface UiHudMeta {
@@ -502,9 +503,14 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
   const moveDirRef = useRef<-1 | 0 | 1>(0);
   const lastJumpAtRef = useRef<number>(0);
   const jumpBufferUntilRef = useRef<number>(0);
-  const srvTargetRef = useRef<{ x: number; y: number; vx: number; vy: number; onGround: boolean } | null>(null);
   const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const seqRef = useRef<number>(1);
+  const pendingInputsRef = useRef<{ seq: number; moveX: -1 | 0 | 1; jump?: boolean; dtAccum: number }[]>([]);
+  const visualOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastMoveEmitAtRef = useRef<number>(0);
+  const localTongueRef = useRef<{ activeUntil: number; endX: number; endY: number } | null>(null);
+  const localSpitFxRef = useRef<{ bornAt: number; x: number; y: number; angle: number } | null>(null);
+  const lastLocalSfxRef = useRef<{ tongue: number; spit: number }>({ tongue: 0, spit: 0 });
   const aimRef = useRef<{ angle: number; power: number }>({ angle: aimAngle, power: aimPower });
   useEffect(() => {
     aimRef.current = { angle: aimAngle, power: aimPower };
@@ -581,17 +587,15 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         currAt: now,
       };
 
-      // Hòa giải (reconcile) mềm mại vị trí dự đoán với trọng tài Server (không kéo giật ngược khi đang chạy/nhảy!)
+      // Server Reconciliation theo ackSeq: replay các input chưa được ack từ vị trí trọng tài server
       const srvMe = payload.frogs.find((f) => f.id === me);
       if (srvMe) {
         const pr = predRef.current;
-        srvTargetRef.current = {
-          x: srvMe.x,
-          y: srvMe.y,
-          vx: srvMe.vx,
-          vy: srvMe.vy,
-          onGround: srvMe.onGround,
-        };
+        const ackSeq = payload.acks?.[me];
+        if (typeof ackSeq === 'number') {
+          pendingInputsRef.current = pendingInputsRef.current.filter((inp) => inp.seq > ackSeq);
+        }
+
         const hardSync =
           !pr.initialized ||
           pr.stageIndex !== payload.stageIndex ||
@@ -599,8 +603,8 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           srvMe.state === 'launched' ||
           srvMe.state === 'dead' ||
           srvMe.state === 'finished';
-        const dist = Math.hypot(srvMe.x - pr.x, srvMe.y - pr.y);
-        if (hardSync || dist > 125) {
+
+        if (hardSync) {
           pr.stageIndex = payload.stageIndex;
           pr.initialized = true;
           pr.x = srvMe.x;
@@ -609,10 +613,58 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           pr.vy = srvMe.vy;
           pr.facing = srvMe.facing;
           pr.onGround = srvMe.onGround;
-        } else if (srvMe.vy < -600 && pr.vy > -450) {
-          // Bật trúng nấm lò xo trên server -> đồng bộ lực nảy tức thì
-          pr.vy = srvMe.vy;
-          pr.onGround = false;
+          pendingInputsRef.current = [];
+          visualOffsetRef.current = { x: 0, y: 0 };
+        } else {
+          const stgReplay = CROAK_STAGES[Math.max(0, Math.min(CROAK_STAGES.length - 1, payload.stageIndex))];
+          const elapsedSecReplay = payload.tick * CROAK_DT;
+          const solids = getSolidRects(stgReplay, payload.switchesOn, payload.keysCollected, elapsedSecReplay);
+          const replayPred: PredictedMe = {
+            stageIndex: payload.stageIndex,
+            initialized: true,
+            x: srvMe.x,
+            y: srvMe.y,
+            vx: srvMe.vx,
+            vy: srvMe.vy,
+            facing: srvMe.facing,
+            onGround: srvMe.onGround,
+          };
+          const carrying = srvMe.state === 'carrying';
+          for (const inp of pendingInputsRef.current) {
+            if (inp.jump && replayPred.onGround) {
+              replayPred.vy = CROAK_JUMP_VY;
+              replayPred.onGround = false;
+            }
+            let rem = Math.min(0.18, inp.dtAccum);
+            while (rem > 1e-4) {
+              const chunk = Math.min(CROAK_DT, rem);
+              rem -= chunk;
+              stepPredictedFrog(replayPred, inp.moveX, carrying, solids, chunk);
+            }
+          }
+
+          const diffX = pr.x - replayPred.x;
+          const diffY = pr.y - replayPred.y;
+          const errDist = Math.hypot(diffX, diffY);
+          pr.x = replayPred.x;
+          pr.y = replayPred.y;
+          pr.vx = replayPred.vx;
+          pr.vy = replayPred.vy;
+          pr.onGround = replayPred.onGround;
+          if (errDist > 125) {
+            visualOffsetRef.current = { x: 0, y: 0 };
+          } else if (errDist > 0.5) {
+            const nextOx = visualOffsetRef.current.x + diffX;
+            const nextOy = visualOffsetRef.current.y + diffY;
+            const mag = Math.hypot(nextOx, nextOy);
+            const scale = mag > 48 ? 48 / mag : 1;
+            visualOffsetRef.current = { x: nextOx * scale, y: nextOy * scale };
+          }
+          if (srvMe.vy < -600 && pr.vy > -450) {
+            // Bật trúng nấm lò xo trên server -> đồng bộ lực nảy tức thì
+            pr.vy = srvMe.vy;
+            pr.onGround = false;
+          }
         }
       }
 
@@ -620,7 +672,13 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         for (const ev of payload.events) {
           if (ev.id > lastEventIdRef.current) {
             lastEventIdRef.current = ev.id;
-            playCroakSfx(ev.sfx);
+            const suppressDupLocal =
+              ev.actorId === me &&
+              ((ev.sfx === 'tongue' && now - lastLocalSfxRef.current.tongue < 250) ||
+                (ev.sfx === 'spit' && now - lastLocalSfxRef.current.spit < 250));
+            if (!suppressDupLocal) {
+              playCroakSfx(ev.sfx);
+            }
             if (ev.text) setToastText(ev.text);
           }
         }
@@ -696,8 +754,8 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
 
   const sendInput = useCallback(
     (patch: Partial<CroakInput>) => {
+      const now = performance.now();
       if (patch.jump && hud.myState !== 'swallowed') {
-        const now = performance.now();
         if (predRef.current.onGround) {
           predRef.current.vy = CROAK_JUMP_VY;
           predRef.current.onGround = false;
@@ -709,11 +767,41 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           jumpBufferUntilRef.current = now + 130;
         }
       }
+      if (patch.tongue && hud.myState === 'normal') {
+        const pr = predRef.current;
+        const startX = pr.x + CROAK_FROG_W * 0.5 + pr.facing * 8;
+        const startY = pr.y + CROAK_FROG_H * 0.5 + 2;
+        localTongueRef.current = {
+          activeUntil: now + 180,
+          endX: startX + pr.facing * CROAK_TONGUE_RANGE,
+          endY: startY - 4,
+        };
+        lastLocalSfxRef.current.tongue = now;
+        playCroakSfx('tongue');
+      }
+      if (patch.spit && hud.myState === 'carrying') {
+        const pr = predRef.current;
+        const curAim = aimRef.current;
+        localSpitFxRef.current = {
+          bornAt: now,
+          x: pr.x + CROAK_FROG_W * 0.5,
+          y: pr.y + CROAK_FROG_H * 0.5,
+          angle: patch.aimAngle ?? curAim.angle,
+        };
+        lastLocalSfxRef.current.spit = now;
+        playCroakSfx('spit');
+      }
       const curAim = aimRef.current;
       const includeAim = patch.spit || patch.aimAngle !== undefined;
+      const mv = (patch.moveX ?? moveDirRef.current) as -1 | 0 | 1;
+      const seq = seqRef.current++;
+      lastMoveEmitAtRef.current = now;
+      const q = pendingInputsRef.current;
+      q.push({ seq, moveX: mv, ...(patch.jump ? { jump: true } : {}), dtAccum: 0 });
+      if (q.length > 60) q.splice(0, q.length - 60);
       const payload: CroakInput = {
-        seq: seqRef.current++,
-        moveX: patch.moveX ?? moveDirRef.current,
+        seq,
+        moveX: mv,
         ...(includeAim ? { aimAngle: patch.aimAngle ?? curAim.angle, aimPower: patch.aimPower ?? curAim.power } : {}),
         ...(patch.jump ? { jump: true } : {}),
         ...(patch.tongue ? { tongue: true } : {}),
@@ -738,10 +826,15 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         nextAngle = -Math.PI - curAim.angle;
         setAimAngle(nextAngle);
       }
+      const seq = seqRef.current++;
+      lastMoveEmitAtRef.current = performance.now();
+      const q = pendingInputsRef.current;
+      q.push({ seq, moveX: dir, dtAccum: 0 });
+      if (q.length > 60) q.splice(0, q.length - 60);
       void game.act({
         type: 'cs_input',
         input: {
-          seq: seqRef.current++,
+          seq,
           moveX: dir,
           ...(hud.myState === 'carrying' ? { aimAngle: nextAngle, aimPower: curAim.power } : {}),
         },
@@ -852,18 +945,32 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
       const interpTick = prev ? prev.tick + (curr.tick - prev.tick) * Math.min(1, alpha) : curr.tick;
       const elapsedSec = interpTick * CROAK_DT;
 
-      // Bước dự đoán Client-Side Prediction mượt 60fps + hòa giải mềm không giật ngược!
+      // Bước dự đoán Client-Side Prediction mượt 60fps + server ack reconciliation không giật ngược!
       const srvMe = curr.frogs.find((f) => f.id === env.me);
       if (
         srvMe &&
         predRef.current.initialized &&
         (srvMe.state === 'normal' || srvMe.state === 'carrying' || srvMe.state === 'tongue')
       ) {
+        const mv = moveDirRef.current;
+        if (mv !== 0 && now - lastMoveEmitAtRef.current >= 32) {
+          const seq = seqRef.current++;
+          lastMoveEmitAtRef.current = now;
+          const q = pendingInputsRef.current;
+          q.push({ seq, moveX: mv, dtAccum: 0 });
+          if (q.length > 60) q.splice(0, q.length - 60);
+          void game.act({ type: 'cs_input', input: { seq, moveX: mv } });
+        }
+        const tailInp = pendingInputsRef.current.at(-1);
+        if (tailInp) {
+          tailInp.dtAccum = Math.min(0.18, tailInp.dtAccum + rawDt);
+        }
+
         const pr = predRef.current;
         const solids = getSolidRects(stg, curr.switchesOn, curr.keysCollected, elapsedSec);
         stepPredictedFrog(
           pr,
-          moveDirRef.current,
+          mv,
           srvMe.state === 'carrying',
           solids,
           rawDt,
@@ -877,20 +984,17 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           jumpBufferUntilRef.current = 0;
           playCroakSfx('jump');
         }
+      }
 
-        const tgt = srvTargetRef.current;
-        if (tgt) {
-          const errX = tgt.x - pr.x;
-          const errY = tgt.y - pr.y;
-          const moving = moveDirRef.current !== 0;
-          // Khi đang chạy liên tục trên mobile, server trễ ~1-2 tick tự nhiên -> chỉ kéo nhẹ nếu lệch > 14px
-          if (!moving || Math.abs(errX) > 14) {
-            pr.x += errX * Math.min(1, rawDt * (moving ? 5.5 : 13));
-          }
-          const recentlyJumped = now - lastJumpAtRef.current < 190;
-          if (!recentlyJumped && Math.abs(errY) > (pr.onGround ? 2 : 16)) {
-            pr.y += errY * Math.min(1, rawDt * 9);
-          }
+      // Làm tắt dần offset hình ảnh (visual smoothing) không kéo giật vị trí vật lý
+      const vo = visualOffsetRef.current;
+      if (vo.x !== 0 || vo.y !== 0) {
+        const decay = Math.exp(-rawDt * 18);
+        vo.x *= decay;
+        vo.y *= decay;
+        if (Math.hypot(vo.x, vo.y) < 0.25) {
+          vo.x = 0;
+          vo.y = 0;
         }
       }
 
@@ -915,8 +1019,8 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         ) {
           return {
             ...cf,
-            x: predRef.current.x,
-            y: predRef.current.y,
+            x: predRef.current.x + visualOffsetRef.current.x,
+            y: predRef.current.y + visualOffsetRef.current.y,
             vx: predRef.current.vx,
             vy: predRef.current.vy,
             facing: predRef.current.facing,
@@ -1241,24 +1345,59 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           return;
         }
 
-        // Lưỡi hồng co giãn đàn hồi
-        if (f.tongueTicks > 0) {
+        // Lưỡi hồng co giãn đàn hồi (+ phản hồi 0ms cục bộ khi vừa bấm phóng lưỡi)
+        const optTongue =
+          isMe &&
+          f.tongueTicks === 0 &&
+          localTongueRef.current &&
+          localTongueRef.current.activeUntil > now
+            ? localTongueRef.current
+            : null;
+        if (f.tongueTicks > 0 || optTongue) {
+          const txEnd = f.tongueTicks > 0 ? f.tongueEndX : optTongue!.endX;
+          const tyEnd = f.tongueTicks > 0 ? f.tongueEndY : optTongue!.endY;
           ctx.save();
           ctx.beginPath();
           ctx.moveTo(cx + f.facing * 8, cy + 2);
-          ctx.lineTo(f.tongueEndX, f.tongueEndY);
+          ctx.lineTo(txEnd, tyEnd);
           ctx.strokeStyle = '#FB7185';
           ctx.lineWidth = 6.5;
           ctx.lineCap = 'round';
           ctx.stroke();
           ctx.beginPath();
-          ctx.arc(f.tongueEndX, f.tongueEndY, 6.5, 0, Math.PI * 2);
+          ctx.arc(txEnd, tyEnd, 6.5, 0, Math.PI * 2);
           ctx.fillStyle = '#F43F5E';
           ctx.fill();
           ctx.strokeStyle = '#FFE4E6';
           ctx.lineWidth = 1.5;
           ctx.stroke();
           ctx.restore();
+        }
+
+        // Hiệu ứng luồng gió bắn đồng đội 0ms cục bộ ngay khi bấm Nhả
+        if (isMe && localSpitFxRef.current) {
+          const age = now - localSpitFxRef.current.bornAt;
+          if (age > 220) {
+            localSpitFxRef.current = null;
+          } else {
+            const sfx = localSpitFxRef.current;
+            const prog = age / 220;
+            const px = sfx.x + Math.cos(sfx.angle) * (20 + prog * 42);
+            const py = sfx.y + Math.sin(sfx.angle) * (20 + prog * 42);
+            ctx.save();
+            ctx.globalAlpha = (1 - prog) * 0.85;
+            ctx.strokeStyle = '#FEF08A';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(sfx.x, sfx.y);
+            ctx.lineTo(px, py);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(px, py, 8 * (1 - prog * 0.4), 0, Math.PI * 2);
+            ctx.fillStyle = '#FDE047';
+            ctx.fill();
+            ctx.restore();
+          }
         }
 
         // Vòng hào quang nhận diện màu đội & bản thân dưới chân ếch
@@ -1341,7 +1480,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
 
     rafId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [game]);
 
   // ============================================================================
   // TAY CẦM CẢM ỨNG TRƯỢT MƯỢT CHUẨN CẢ KHI AUTO-LANDSCAPE ROTATOR XOAY 90°!
@@ -1455,20 +1594,20 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           <View style={{ flex: 1 }} />
         )}
 
-        {/* Thanh HUD siêu gọn 1 dòng nổi phía trên (Bỏ hẳn hộp hướng dẫn to choán màn hình!) */}
+        {/* Thanh HUD siêu gọn 1 dòng nổi phía trên */}
         <View pointerEvents="box-none" style={styles.hudTopOverlay} testID="croak-stage-bar">
           <View style={styles.hudPill}>
             <View style={styles.stageBadge}>
-              <EmojiIcon emoji="🐸" size={14} />
+              <UiIcon name="Map" size={12} color={C.ink} strokeWidth={1.65} />
               <T style={styles.stageBadgeTxt}>
-                MÀN {hud.stageIndex + 1}/{CROAK_STAGES.length}
+                Màn {hud.stageIndex + 1}/{CROAK_STAGES.length}
               </T>
             </View>
             <T style={styles.stageTitle} numberOfLines={1}>
               {stage.name.replace(/^Màn \d+:\s*/, '')}
             </T>
             <View style={styles.goalCounter}>
-              <EmojiIcon emoji="🪷" size={13} />
+              <UiIcon name="Trophy" size={12} color={C.gold} strokeWidth={1.65} />
               <T style={styles.goalCounterTxt}>
                 {hud.finishedCount}/{hud.connectedCount}
               </T>
@@ -1478,8 +1617,8 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               onPress={() => setFullMap((v) => !v)}
               style={[styles.mapToggle, fullMap && styles.mapToggleActive]}
             >
-              <UiIcon name={fullMap ? 'Minimize2' : 'Maximize2'} size={12} color={fullMap ? '#0F172A' : '#E2E8F0'} />
-              <T style={[styles.mapToggleTxt, fullMap && { color: '#0F172A' }]}>
+              <UiIcon name={fullMap ? 'Minimize2' : 'Maximize2'} size={12} color={fullMap ? C.ink : C.darkText} strokeWidth={1.65} />
+              <T style={[styles.mapToggleTxt, fullMap && { color: C.ink }]}>
                 {fullMap ? 'Gần' : 'Bản đồ'}
               </T>
             </Pressable>
@@ -1488,7 +1627,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               onPress={() => setShowHint((v) => !v)}
               style={[styles.mapToggle, showHint && styles.mapToggleActive]}
             >
-              <T style={[styles.mapToggleTxt, showHint && { color: '#0F172A' }]}>?</T>
+              <UiIcon name="HelpCircle" size={13} color={showHint ? C.ink : C.darkText} strokeWidth={1.65} />
             </Pressable>
             {isHost && (
               <>
@@ -1497,7 +1636,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                   onPress={() => void game.act({ type: 'cs_reset_stage' })}
                   style={styles.mapToggle}
                 >
-                  <T style={styles.mapToggleTxt}>🔄</T>
+                  <UiIcon name="RotateCcw" size={13} color={C.darkText} strokeWidth={1.65} />
                 </Pressable>
                 <Pressable
                   testID="croak-end"
@@ -1513,14 +1652,17 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           {(toastText || showHint) && (
             <View style={styles.toastPill}>
               <T numberOfLines={2} style={styles.stageHint}>
-                {toastText ?? stage.subtitle}
+                {(toastText ?? stage.subtitle).replace(/!+$/g, '')}
               </T>
             </View>
           )}
 
           {hud.myState === 'carrying' && (
             <View style={styles.aimBar} testID="croak-aim-bar">
-              <T style={styles.aimTitle}>🎯 Ngắm bắn:</T>
+              <View style={styles.aimTitleRow}>
+                <UiIcon name="Crosshair" size={13} color={C.gold} strokeWidth={1.65} />
+                <T style={styles.aimTitle}>Ngắm bắn</T>
+              </View>
               {AIM_PRESETS.map((p) => (
                 <Pressable
                   key={p.id}
@@ -1623,9 +1765,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               >
                 <UiIcon
                   name="ChevronLeft"
-                  size={28}
-                  color={thumbDir === -1 ? '#042F2E' : '#F8FAFC'}
-                  strokeWidth={3}
+                  size={26}
+                  color="#FFFFFF"
+                  strokeWidth={2.5}
                 />
               </Pressable>
 
@@ -1652,9 +1794,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               >
                 <UiIcon
                   name="ChevronRight"
-                  size={28}
-                  color={thumbDir === 1 ? '#042F2E' : '#F8FAFC'}
-                  strokeWidth={3}
+                  size={26}
+                  color="#FFFFFF"
+                  strokeWidth={2.5}
                 />
               </Pressable>
             </View>
@@ -1672,9 +1814,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                   onPress={() => triggerActionFallbackPress('spit', () => sendInput({ spit: true }))}
                   style={({ pressed }) => [styles.spitBtn, pressed && styles.btnPressed]}
                 >
-                  <EmojiIcon emoji="🚀" size={20} />
-                  <T selectable={false} style={[styles.actionBtnTxt, { color: '#0F172A' }]}>
-                    BẮN!
+                  <UiIcon name="Send" size={18} color={C.ink} strokeWidth={1.75} />
+                  <T selectable={false} style={[styles.actionBtnTxt, { color: C.ink }]}>
+                    Bắn
                   </T>
                 </Pressable>
               ) : (
@@ -1688,9 +1830,9 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                   onPress={() => triggerActionFallbackPress('tongue', () => sendInput({ tongue: true }))}
                   style={({ pressed }) => [styles.tongueBtn, pressed && styles.btnPressed]}
                 >
-                  <EmojiIcon emoji="👅" size={20} />
+                  <UiIcon name="Zap" size={18} color="#FFFFFF" strokeWidth={1.75} />
                   <T selectable={false} style={styles.actionBtnTxt}>
-                    NUỐT
+                    Nuốt
                   </T>
                 </Pressable>
               )}
@@ -1705,17 +1847,18 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                 onPress={() => triggerActionFallbackPress('jump', () => sendInput({ jump: true }))}
                 style={({ pressed }) => [styles.jumpBtn, pressed && styles.btnPressed]}
               >
-                <EmojiIcon emoji="🐸" size={22} />
+                <UiIcon name="ChevronUp" size={20} color="#FFFFFF" strokeWidth={2.2} />
                 <T selectable={false} style={styles.actionBtnTxt}>
-                  {hud.myState === 'swallowed' ? 'GIÃY!' : 'NHẢY'}
+                  {hud.myState === 'swallowed' ? 'Giãy' : 'Nhảy'}
                 </T>
               </Pressable>
             </View>
           </View>
         ) : (
-          <View style={[styles.spectatorBanner, sticker(2)]}>
+          <View style={styles.spectatorBanner}>
+            <UiIcon name="Eye" size={14} color={C.gold} strokeWidth={1.65} />
             <T style={styles.spectatorTxt}>
-              Đang xem đội Ếch vượt đầm lầy ở chế độ Khán Giả.
+              Đang xem đội Ếch vượt đầm lầy
             </T>
           </View>
         )}
@@ -1736,12 +1879,12 @@ const styles = StyleSheet.create({
   landscapeStage: {
     flex: 1,
     minHeight: 0,
-    backgroundColor: '#051523',
-    borderRadius: 16,
+    backgroundColor: C.darkBg,
+    borderRadius: 14,
     overflow: 'hidden',
     position: 'relative',
-    borderWidth: 2,
-    borderColor: 'rgba(52, 211, 153, 0.5)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
   },
   hudTopOverlay: {
     position: 'absolute',
@@ -1756,10 +1899,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(6, 28, 36, 0.84)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(45, 212, 191, 0.55)',
-    borderRadius: 999,
+    backgroundColor: 'rgba(26, 30, 40, 0.90)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
     maxWidth: '100%',
@@ -1768,16 +1911,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#14B8A6',
+    backgroundColor: C.goldSoft,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 8,
   },
-  stageBadgeTxt: { fontSize: 11, fontWeight: '900', color: '#042F2E', fontFamily: FONT },
+  stageBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.ink,
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
   stageTitle: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#F0FDFA',
+    fontWeight: '600',
+    color: C.darkText,
     maxWidth: 180,
     fontFamily: FONT,
   },
@@ -1785,61 +1934,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(250, 204, 21, 0.2)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: '#FACC15',
-    paddingHorizontal: 7,
+    borderColor: C.darkBorder,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 8,
   },
-  goalCounterTxt: { fontSize: 11, fontWeight: '900', color: '#FEF08A' },
+  goalCounterTxt: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.darkText,
+    fontVariant: ['tabular-nums'],
+  },
   mapToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    gap: 4,
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 7,
+    borderColor: C.darkBorder,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
+    borderRadius: 8,
   },
-  mapToggleActive: { backgroundColor: '#FACC15', borderColor: '#FEF08A' },
-  mapToggleTxt: { fontSize: 10.5, fontWeight: '800', color: '#E2E8F0' },
+  mapToggleActive: { backgroundColor: C.paper, borderColor: C.paper },
+  mapToggleTxt: { fontSize: 11, fontWeight: '500', color: C.darkText },
   toastPill: {
-    backgroundColor: 'rgba(6, 28, 36, 0.88)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(26, 30, 40, 0.92)',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.45)',
+    borderColor: C.darkBorder,
     maxWidth: '92%',
   },
-  stageHint: { fontSize: 11.5, fontWeight: '800', color: '#99F6E4', textAlign: 'center' },
+  stageHint: { fontSize: 11.5, fontWeight: '500', color: C.darkText, textAlign: 'center' },
 
   aimBar: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(49, 16, 47, 0.88)',
-    borderWidth: 1.5,
-    borderColor: '#F472B6',
-    borderRadius: 999,
+    gap: 6,
+    backgroundColor: 'rgba(26, 30, 40, 0.92)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  aimTitle: { fontSize: 11, fontWeight: '900', color: '#FBCFE8' },
+  aimTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  aimTitle: { fontSize: 11, fontWeight: '600', color: C.goldSoft },
   aimChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(244, 114, 182, 0.28)',
+    borderRadius: 8,
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: '#F472B6',
+    borderColor: C.darkBorder,
   },
-  aimChipTxt: { fontSize: 11, fontWeight: '900', color: '#FDF2F8' },
+  aimChipTxt: { fontSize: 11, fontWeight: '600', color: C.darkText },
 
   arcadeOverlay: {
     position: 'absolute',
@@ -1854,10 +2013,10 @@ const styles = StyleSheet.create({
   thumbTrack: {
     width: 158,
     height: 62,
-    borderRadius: 31,
-    backgroundColor: 'rgba(15, 23, 42, 0.76)',
-    borderWidth: 2,
-    borderColor: 'rgba(148, 163, 184, 0.65)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(17, 20, 28, 0.84)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1871,7 +2030,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   thumbHalfActive: {
-    backgroundColor: 'rgba(45, 212, 191, 0.88)',
+    backgroundColor: C.jade,
   },
   thumbDivider: {
     position: 'absolute',
@@ -1887,57 +2046,61 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(226, 232, 240, 0.32)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(251, 249, 245, 0.24)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 249, 245, 0.45)',
   },
 
   actionCluster: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   jumpBtn: {
     width: 78,
-    height: 68,
-    borderRadius: 22,
-    backgroundColor: 'rgba(22, 163, 74, 0.9)',
-    borderWidth: 2.2,
-    borderColor: '#86EFAC',
+    height: 66,
+    borderRadius: 16,
+    backgroundColor: C.jade,
+    borderWidth: 1.5,
+    borderColor: 'rgba(134, 239, 172, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: 2,
   },
   tongueBtn: {
     width: 74,
     height: 60,
-    borderRadius: 20,
-    backgroundColor: 'rgba(219, 39, 119, 0.88)',
-    borderWidth: 2,
-    borderColor: '#F9A8D4',
+    borderRadius: 14,
+    backgroundColor: C.son,
+    borderWidth: 1.5,
+    borderColor: 'rgba(254, 202, 202, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: 2,
   },
   spitBtn: {
     width: 82,
-    height: 66,
-    borderRadius: 20,
-    backgroundColor: 'rgba(250, 204, 21, 0.95)',
-    borderWidth: 2.5,
-    borderColor: '#FEF9C3',
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: C.gold,
+    borderWidth: 1.5,
+    borderColor: 'rgba(254, 243, 199, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: 2,
   },
-  btnPressed: { transform: [{ scale: 0.94 }], opacity: 0.92 },
-  actionBtnTxt: { fontSize: 11, fontWeight: '900', color: '#FFFFFF', fontFamily: FONT },
+  btnPressed: { transform: [{ scale: 0.96 }], opacity: 0.9 },
+  actionBtnTxt: { fontSize: 11.5, fontWeight: '600', color: '#FFFFFF', fontFamily: FONT },
 
   spectatorBanner: {
     position: 'absolute',
     bottom: 10,
     alignSelf: 'center',
-    backgroundColor: 'rgba(30, 41, 59, 0.88)',
-    borderColor: '#64748B',
-    borderRadius: 999,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.darkSurface,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  spectatorTxt: { fontSize: 12, fontWeight: '800', color: C.paper, textAlign: 'center' },
+  spectatorTxt: { fontSize: 12, fontWeight: '500', color: C.darkText, textAlign: 'center' },
 });

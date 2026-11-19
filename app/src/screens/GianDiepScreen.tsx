@@ -965,16 +965,18 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
 
   // Pha Thảo Luận / Vote / Biện Minh (người nghe) / Phán Quyết (cả bị cáo lẫn cử tri): Chat luôn mở!
   const myReady = view.readySkip.includes(me);
-  const needReady = Math.max(1, Math.ceil(view.alive.length / 2));
+  const needReady = Math.max(1, view.alive.length);
   const chatReady = Boolean(inputVal.trim()) && !busy;
   const placeholder =
-    (view.phase === 'final_vote' || view.phase === 'defense') && iAmDefendant
-      ? 'Nhắn tin biện minh...'
-      : view.phase === 'vote'
-        ? 'Nhắn tin trong lúc bỏ phiếu'
-        : view.phase === 'final_vote'
-          ? 'Nhắn tin trước phán quyết'
-          : 'Nhắn tin thảo luận';
+    view.phase === 'defense' && !iAmDefendant
+      ? 'Nhắn tin trao đổi với bị cáo'
+      : (view.phase === 'final_vote' || view.phase === 'defense') && iAmDefendant
+        ? 'Nhắn tin biện minh'
+        : view.phase === 'vote'
+          ? 'Nhắn tin trong lúc bỏ phiếu'
+          : view.phase === 'final_vote'
+            ? 'Nhắn tin trước phán quyết'
+            : 'Nhắn tin thảo luận';
 
   return (
     <View style={styles.dock}>

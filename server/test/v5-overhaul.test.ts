@@ -141,11 +141,13 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     expect(g.view('p0').phase).toBe('clue_summary');
     for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
     expect(g.view('p0').phase).toBe('discussion');
-    for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
+    for (const id of g.view('p0').alive) g.action(id, { type: 'gd_ready' });
     for (const id of ['p0', 'p1', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p2' });
     g.action('p2', { type: 'gd_vote', target: 'p0' });
+    vi.advanceTimersByTime(2100);
     g.action('p2', { type: 'gd_ready' });
     for (const id of ['p0', 'p1', 'p3', 'p4']) g.action(id, { type: 'gd_verdict', verdict: 'banish' });
+    vi.advanceTimersByTime(2100);
 
     // Còn 2 Dân vs 2 Hidden -> game VẪN TIẾP TỤC sang Vòng 2!
     const vR2 = g.view('p3');
@@ -174,11 +176,13 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     expect(g.view('p0').phase).toBe('clue_summary');
     for (const id of ['p0', 'p1']) g.action(id, { type: 'gd_ready' });
     expect(g.view('p0').phase).toBe('discussion');
-    for (const id of ['p0', 'p1']) g.action(id, { type: 'gd_ready' });
+    for (const id of g.view('p0').alive) g.action(id, { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3']) g.action(id, { type: 'gd_vote', target: 'p0' });
     g.action('p0', { type: 'gd_vote', target: 'p1' });
+    vi.advanceTimersByTime(2100);
     g.action('p0', { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3']) g.action(id, { type: 'gd_verdict', verdict: 'banish' });
+    vi.advanceTimersByTime(2100);
 
     expect(g.view('p0').phase).toBe('spy_guess');
     expect(g.view('p1').mrWhiteId).toBe('p0');
@@ -200,11 +204,13 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     vi.advanceTimersByTime(2100);
     for (let i = 0; i < 5; i++) g1.action(g1.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý A${i}` });
     for (const id of ['p0', 'p1', 'p2']) g1.action(id, { type: 'gd_ready' });
-    for (const id of ['p0', 'p1', 'p2']) g1.action(id, { type: 'gd_ready' });
+    for (const id of g1.view('p0').alive) g1.action(id, { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3', 'p4']) g1.action(id, { type: 'gd_vote', target: 'p0' });
     g1.action('p0', { type: 'gd_vote', target: 'p2' });
+    vi.advanceTimersByTime(2100);
     g1.action('p0', { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3', 'p4']) g1.action(id, { type: 'gd_verdict', verdict: 'banish' });
+    vi.advanceTimersByTime(2100);
 
     expect(g1.view('p0').phase).toBe('spy_guess');
     expect(g1.view('p1').mrWhiteId).toBe('p0');
@@ -222,11 +228,13 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     vi.advanceTimersByTime(2100);
     for (let i = 0; i < 6; i++) g2.action(g2.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý B${i}` });
     for (const id of ['p0', 'p1', 'p2']) g2.action(id, { type: 'gd_ready' });
-    for (const id of ['p0', 'p1', 'p2']) g2.action(id, { type: 'gd_ready' });
+    for (const id of g2.view('p0').alive) g2.action(id, { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3', 'p4', 'p5']) g2.action(id, { type: 'gd_vote', target: 'p0' });
     g2.action('p0', { type: 'gd_vote', target: 'p2' });
+    vi.advanceTimersByTime(2100);
     g2.action('p0', { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3', 'p4', 'p5']) g2.action(id, { type: 'gd_verdict', verdict: 'banish' });
+    vi.advanceTimersByTime(2100);
 
     expect(g2.view('p0').phase).toBe('spy_guess');
     expect(g2.action('p0', { type: 'gd_guess', word: danWord })).toEqual({ ok: true });

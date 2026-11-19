@@ -225,7 +225,7 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     vi.useRealTimers();
   });
 
-  it('thời gian mặc định clue_turn >= 40s, discussion >= 45s, vote >= 35s, mrwhite/spy_guess >= 25s', () => {
+  it('thời gian mặc định clue_turn >= 40s, discussion = 80s, vote >= 35s, mrwhite/spy_guess >= 25s', () => {
     vi.useFakeTimers();
     const { ctx } = makeCtx(seededRng(5001));
     const g = new GianDiepGame(ctx);
@@ -239,6 +239,14 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     const vClue = g.view('p0') as GianDiepView;
     expect(vClue.phase).toBe('clue_turn');
     expect(vClue.phaseSeconds).toBe(40);
+
+    for (let i = 0; i < 4; i++) {
+      g.action(g.view().currentSpeakerId!, { type: 'gd_clue', text: `Goi y ${i}` });
+    }
+    vi.advanceTimersByTime(10_200);
+    const vDisc = g.view('p0') as GianDiepView;
+    expect(vDisc.phase).toBe('discussion');
+    expect(vDisc.phaseSeconds).toBe(80);
     g.dispose();
   });
 
@@ -307,9 +315,13 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
       });
     }
 
-    // Chuyển vote -> chat vẫn mở khi bỏ phiếu
+    // Phải đủ cả phòng còn sống & kết nối đồng ý sang vote (2/4 chưa chuyển); chat vẫn mở khi bỏ phiếu
     expect(room.action(h.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
     expect(room.action(p1.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('discussion');
+    expect(room.action(p2.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('discussion');
+    expect(room.action(p3.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
     expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('vote');
     expect(room.action(h.playerId, { type: 'gd_chat', text: 'Chot phieu nha' })).toEqual({ ok: true });
     expect(room.addChat(p1.playerId, 'Dang vote roi')).not.toBeNull();
@@ -317,21 +329,70 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     expect(room.action(h.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
     expect(room.action(p1.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
     expect(room.action(p2.playerId, { type: 'gd_vote', target: p1.playerId })).toEqual({ ok: true });
-    // p3 rời/mất kết nối khi còn là người cuối chưa vote -> tự chuyển sang defense ngay!
+    // Có người chơi thật -> dù người cuối rời/vote hết vẫn đợi hết giờ để đổi phiếu tự do!
     room.setConnected(p3.playerId, false);
-    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('defense');
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('vote');
+    // Kiểm tra đổi phiếu trước khi hết giờ (Host & Ban1 đổi sang p1 -> p1 lên thớt thay cho p2!)
+    expect(room.action(h.playerId, { type: 'gd_vote', target: p1.playerId })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
+    expect((room.toPublic(h.playerId).game as GianDiepView).votes[h.playerId]).toBe(p1.playerId);
+    expect(room.action(h.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
+
+    vi.advanceTimersByTime(40_500);
+    const vDefense = room.toPublic(h.playerId).game as GianDiepView;
+    expect(vDefense.phase).toBe('defense');
+    expect(vDefense.phaseSeconds).toBeGreaterThanOrEqual(45);
+    expect(vDefense.timeline.some((it) => it.kind === 'system' && it.text.includes('Kết quả bỏ phiếu:') && it.text.includes('Host'))).toBe(true);
     // Trong defense: cả bị cáo lẫn người khác đều chat được
     expect(room.addChat(h.playerId, 'Nghe bien minh ne')).not.toBeNull();
     expect(room.action(p2.playerId, { type: 'gd_chat', text: 'Minh la dan thuong' })).toEqual({ ok: true });
     expect(room.action(p2.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
 
-    // Trong final_vote: cả bị cáo lẫn cử tri vẫn chat & biện minh bình thường!
-    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('final_vote');
+    // Trong final_vote: cả bị cáo lẫn cử tri vẫn chat & biện minh bình thường, được đổi phán quyết trước khi hết giờ!
+    const vFinal = room.toPublic(h.playerId).game as GianDiepView;
+    expect(vFinal.phase).toBe('final_vote');
+    expect(vFinal.phaseSeconds).toBeGreaterThanOrEqual(35);
     expect(room.action(p2.playerId, { type: 'gd_chat', text: 'Dung truc xuat minh ma!' })).toEqual({ ok: true });
     expect(room.action(h.playerId, { type: 'gd_chat', text: 'De minh xem lai loi khai' })).toEqual({ ok: true });
     expect(room.addChat(p1.playerId, 'Chot phan quyet')).not.toBeNull();
+    expect(room.action(h.playerId, { type: 'gd_verdict', verdict: 'banish' })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_verdict', verdict: 'banish' })).toEqual({ ok: true });
+    // Không tự chuyển sớm khi vẫn còn người chơi thật -> đổi sang tha bổng hết và chờ hết giờ
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('final_vote');
+    expect(room.action(h.playerId, { type: 'gd_verdict', verdict: 'forgive' })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_verdict', verdict: 'forgive' })).toEqual({ ok: true });
+    vi.advanceTimersByTime(40_500);
+    const vAfterVerdict = room.toPublic(h.playerId).game as GianDiepView;
+    expect(vAfterVerdict.timeline.some((it) => it.kind === 'system' && it.text.includes('Phiếu phán quyết:') && it.text.includes('Tha bổng'))).toBe(true);
 
     room.dispose();
+  });
+
+  it('bot bị cáo gửi lời biện minh nhưng KHÔNG bấm gd_ready cắt ngắn defense khi có người chơi thật', () => {
+    vi.useFakeTimers();
+    const bots = new Set(['p1', 'p2', 'p3', 'p4']);
+    const { ctx } = makeCtx(seededRng(5003), { giandiepMrWhite: false, giandiepSpies: 1 }, undefined, bots);
+    const g = new GianDiepGame(ctx);
+    g.start(makePlayers(5));
+    vi.advanceTimersByTime(10_500); // word_reveal -> clue_turn
+    for (let i = 0; i < 5; i++) {
+      const sp = g.view().currentSpeakerId!;
+      g.action(sp, { type: 'gd_clue', text: `Goi y ${i}` });
+    }
+    vi.advanceTimersByTime(10_500); // clue_summary -> discussion
+    vi.advanceTimersByTime(80_500); // discussion -> vote
+    for (const id of ['p0', 'p2', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p1' });
+    g.action('p1', { type: 'gd_vote', target: 'p0' });
+    vi.advanceTimersByTime(40_500); // vote -> defense (bị cáo là bot p1)
+    expect(g.view('p0').phase).toBe('defense');
+    expect(g.view('p0').defendants).toEqual(['p1']);
+    const defAct1 = g.botAction('p1');
+    expect(defAct1?.type).toBe('gd_defense');
+    if (defAct1) expect(g.action('p1', defAct1).ok).toBe(true);
+    vi.advanceTimersByTime(10_000);
+    expect(g.botAction('p1')).toBeNull();
+    expect(g.view('p0').phase).toBe('defense');
+    g.dispose();
   });
 
   it('botReadyTimer tự đánh thức bot ready ở discussion/clue_summary khi có mặt người chơi thật', () => {

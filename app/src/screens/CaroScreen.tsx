@@ -1,18 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Circle as SvgCircle } from 'react-native-svg';
 import type { CaroSymbol, CaroView } from '../../../shared/src/caro';
-import { themeById } from '../../../shared/src/themes';
 import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { C, FONT, sticker } from '../theme';
+import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
 import { play } from '../sound';
 import { useOnChange, useStableWindow } from '../hooks';
@@ -22,7 +19,7 @@ import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { Confetti } from '../components/Fun';
-import { EmojiIcon, UiIcon, type UiIconName } from '../components/Icons';
+import { UiIcon, type UiIconName } from '../components/Icons';
 
 const SYMBOL_META: Record<
   CaroSymbol,
@@ -177,7 +174,8 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as CaroView;
   const me = game.me ?? '';
   const isHost = room.hostId === me;
-  const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
+  const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
+  const pal = backdropPalette(activeThemeId);
   const { width, height } = useStableWindow();
   const wide = width >= 720;
   const compact = height < 700 || width < 380;
@@ -345,36 +343,36 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
       <View style={styles.bottomStatusRow}>
         {view.winnerId ? (
           <>
-            <EmojiIcon emoji="🏆" size={16} />
-            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#FDE047' }]}>
+            <UiIcon name="Trophy" size={15} color={C.goldDeep} strokeWidth={1.65} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: pal.text }]}>
               {view.winnerId === me
-                ? 'Bạn đã nối đủ 5 quân chiến thắng!'
-                : `${view.names[view.winnerId] ?? view.winnerId} nối 5 quân thắng!`}
+                ? `Bạn nối đủ ${view.winLine?.length ?? 5} quân chiến thắng`
+                : `${view.names[view.winnerId] ?? view.winnerId} nối ${view.winLine?.length ?? 5} quân thắng`}
             </T>
           </>
         ) : view.isDraw ? (
           <>
-            <EmojiIcon emoji="🤝" size={16} />
-            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#BAE6FD' }]}>
-              Bàn {view.size}×{view.size} kín đặc — Hòa cờ!
+            <UiIcon name="LayoutGrid" size={14} color={pal.muted} strokeWidth={1.65} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: pal.muted }]}>
+              Bàn {view.size}×{view.size} đầy · Hòa cờ
             </T>
           </>
         ) : isMyTurn && mySymbol ? (
           <>
             <CaroEmblem symbol={mySymbol} size={15} />
-            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#4ADE80' }]}>
-              Lượt bạn ({mySymbol}) — Chạm ô trống để đánh!
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: C.jade }]}>
+              Lượt bạn ({mySymbol}) · Chạm ô trống để đánh
             </T>
           </>
         ) : mySymbol ? (
           <>
-            <UiIcon name="Timer" size={14} color="#CBD5E1" />
-            <T numberOfLines={1} style={[styles.bottomTxt, { color: theme.onBg }]}>
-              Đang chờ @{view.names[view.currentPlayerId ?? ''] ?? 'đối thủ'}…
+            <UiIcon name="Timer" size={14} color={pal.muted} strokeWidth={1.65} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: pal.muted }]}>
+              Chờ {view.names[view.currentPlayerId ?? ''] ?? 'đối thủ'}
             </T>
           </>
         ) : (
-          <T numberOfLines={1} style={[styles.bottomTxt, { color: theme.onBg }]}>
+          <T numberOfLines={1} style={[styles.bottomTxt, { color: pal.muted }]}>
             Đang xem Caro {view.order.length} phe ({view.size}×{view.size})
           </T>
         )}
@@ -493,23 +491,19 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
       <View style={styles.root}>
         {view.winnerId !== null && <Confetti />}
 
-        {/* THANH ĐIỀU KHIỂN LƯỢT ĐÁNH GỌN NHẸ — KHÔNG CHIẾM DIỆN TÍCH BÀN CỜ */}
-        <LinearGradient
-          colors={['#042F2E', '#0F172A', '#1E293B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.arenaHeader, compact && styles.arenaHeaderCompact, sticker(3)]}
-        >
+        {/* Thanh HUD lượt đánh gọn nhẹ trên thẻ giấy ngà */}
+        <View style={[styles.arenaHeader, compact && styles.arenaHeaderCompact, sticker(1)]}>
           <View style={styles.headerTopRow}>
             <View style={styles.activeTurnWrap}>
               {activePlayer ? (
                 <Portrait
                   p={activePlayer}
                   size={24}
+                  border={1}
                   frame={activePlayer.cosmetics?.frame}
                 />
               ) : (
-                <EmojiIcon emoji="⚔️" size={16} />
+                <UiIcon name="Swords" size={15} color={C.secondary} strokeWidth={1.65} />
               )}
               {activeSymbol && !gameEnded && (
                 <CaroEmblem symbol={activeSymbol} size={14} />
@@ -520,30 +514,26 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
                 style={styles.activePlayerName}
               >
                 {view.winnerId
-                  ? `${view.names[view.winnerId] ?? view.winnerId} thắng!`
+                  ? `${view.names[view.winnerId] ?? view.winnerId} thắng`
                   : view.isDraw
-                    ? 'Hòa cờ!'
+                    ? 'Hòa cờ'
                     : (view.names[view.currentPlayerId ?? ''] ?? '---')}
               </NameText>
             </View>
 
             <View style={styles.inlineBadges}>
               <View testID="caro-size-badge" style={styles.sizePill}>
-                <UiIcon name="LayoutGrid" size={10} color="#5EEAD4" />
+                <UiIcon name="LayoutGrid" size={10} color={C.secondary} strokeWidth={1.65} />
                 <T style={styles.sizePillTxt}>
                   {view.size}×{view.size}
                 </T>
               </View>
-              <View
-                style={[
-                  styles.rulePill,
-                  view.blockTwoEnds ? styles.rulePillBlock : styles.rulePillFree,
-                ]}
-              >
+              <View style={styles.rulePill}>
                 <UiIcon
                   name={view.blockTwoEnds ? 'Shield' : 'Zap'}
                   size={10}
-                  color={view.blockTwoEnds ? '#FDE047' : '#67E8F9'}
+                  color={view.blockTwoEnds ? C.goldDeep : C.secondary}
+                  strokeWidth={1.65}
                 />
                 <T style={styles.rulePillTxt}>
                   {view.blockTwoEnds ? 'Chặn 2' : 'Tự do'}
@@ -565,16 +555,12 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
                   key={pid}
                   style={[
                     styles.factionChip,
-                    {
-                      backgroundColor: m.pillBg,
-                      borderColor: isTurn ? m.pillBorder : 'rgba(255,255,255,0.14)',
-                    },
-                    isTurn && styles.factionChipActive,
+                    isTurn && { borderColor: m.fill, backgroundColor: C.goldSoft },
                   ]}
                 >
                   {pl && <Portrait p={pl} size={18} border={1} />}
                   <CaroEmblem symbol={sym} size={12} />
-                  <T numberOfLines={1} style={styles.factionNameTxt}>
+                  <T numberOfLines={1} style={[styles.factionNameTxt, isTurn && { fontWeight: '600' }]}>
                     {view.names[pid] ?? pid}
                   </T>
                 </View>
@@ -587,36 +573,32 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
               endsAt={view.turnEndsAt}
               total={view.turnSeconds}
               clockOffset={game.clockOffset}
-              lightText
               testID="caro-timer"
             />
           )}
-        </LinearGradient>
+        </View>
 
         {view.winLine && view.winnerId && (
-          <LinearGradient
+          <View
             testID="caro-win-reveal-banner"
-            colors={['#78350F', '#B45309', '#92400E']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.winRevealBanner, sticker(3)]}
+            style={[styles.winRevealBanner, sticker(1)]}
           >
             <View style={styles.winRevealTop}>
-              <EmojiIcon emoji="🎯" size={18} />
+              <UiIcon name="Trophy" size={16} color={C.goldDeep} strokeWidth={1.65} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <T numberOfLines={1} style={styles.winRevealTitle}>
                   {view.winnerId === me
-                    ? `CHIẾN THẮNG! Nối đủ ${view.winLine.length} quân!`
-                    : `🏆 ${view.names[view.winnerId] ?? view.winnerId} nối ${view.winLine.length} quân thắng!`}
+                    ? `Chiến thắng · Nối đủ ${view.winLine.length} quân`
+                    : `${view.names[view.winnerId] ?? view.winnerId} nối ${view.winLine.length} quân thắng`}
                 </T>
                 <T numberOfLines={1} style={styles.winRevealSub}>
-                  {view.winLine.map(([r, c]) => `(${r + 1},${c + 1})`).join('→')}
+                  {view.winLine.map(([r, c]) => `(${r + 1},${c + 1})`).join(' · ')}
                 </T>
               </View>
               <Button
                 testID="caro-finish-reveal"
                 small
-                variant="gold"
+                variant="ink"
                 disabled={busy}
                 title="Tổng kết"
                 onPress={() => void act({ type: 'caro_finish_reveal' })}
@@ -627,28 +609,27 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
                 endsAt={view.revealEndsAt}
                 total={5}
                 clockOffset={game.clockOffset}
-                lightText
               />
             )}
-          </LinearGradient>
+          </View>
         )}
 
         {err && (
-          <View style={[styles.errBanner, sticker(2)]}>
-            <UiIcon name="AlertTriangle" size={14} color="#FEF08A" />
+          <View style={[styles.errBanner, sticker(1)]}>
+            <UiIcon name="AlertTriangle" size={14} color={C.danger} strokeWidth={1.7} />
             <T style={styles.errBannerTxt}>{err}</T>
           </View>
         )}
 
-        {/* THANH ĐỊNH VỊ TÂM CỜ & ZOOM GỌN TRÊN 1 DÒNG */}
+        {/* Thanh định vị tâm cờ & zoom trên 1 dòng */}
         <View style={styles.boardToolbar}>
           <View style={styles.lastMoveInfo}>
-            <UiIcon name="Crosshair" size={13} color={theme.onBg} />
-            <T numberOfLines={1} style={[styles.lastMoveInfoTxt, { color: theme.onBg }]}>
+            <UiIcon name="Crosshair" size={13} color={pal.muted} strokeWidth={1.65} />
+            <T numberOfLines={1} style={[styles.lastMoveInfoTxt, { color: pal.muted }]}>
               {view.lastMove
-                ? `Vừa đánh (${view.lastMove.row + 1},${view.lastMove.col + 1}) · @${view.names[view.lastMove.playerId] ?? ''}`
+                ? `Vừa đánh (${view.lastMove.row + 1},${view.lastMove.col + 1}) · ${view.names[view.lastMove.playerId] ?? ''}`
                 : isLargeBoard
-                  ? `Đại chiến ${view.size}×${view.size} (${view.size * view.size} ô)`
+                  ? `Bàn ${view.size}×${view.size} (${view.size * view.size} ô)`
                   : `Bàn cờ ${view.size}×${view.size} sẵn sàng`}
             </T>
           </View>
@@ -668,7 +649,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
                 }}
                 style={styles.centerBtn}
               >
-                <UiIcon name="Crosshair" size={12} color="#FDE047" />
+                <UiIcon name="Crosshair" size={12} color={C.secondary} strokeWidth={1.65} />
                 <T style={styles.centerBtnTxt}>Tâm cờ</T>
               </Pressable>
             )}
@@ -681,9 +662,10 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
               <UiIcon
                 name={zoomMode === 'zoom' ? 'ZoomOut' : 'ZoomIn'}
                 size={12}
-                color={zoomMode === 'zoom' ? '#022C22' : '#E2E8F0'}
+                color={zoomMode === 'zoom' ? C.onSon : C.secondary}
+                strokeWidth={1.65}
               />
-              <T style={[styles.zoomToggleTxt, zoomMode === 'zoom' && { color: '#022C22' }]}>
+              <T style={[styles.zoomToggleTxt, zoomMode === 'zoom' && { color: C.onSon }]}>
                 {zoomBtnLabel}
               </T>
             </Pressable>
@@ -741,12 +723,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   arenaHeader: {
-    borderRadius: 16,
+    borderRadius: 12,
+    backgroundColor: C.paper,
     paddingHorizontal: 10,
     paddingVertical: 7,
     gap: 5,
-    borderWidth: 1.5,
-    borderColor: 'rgba(45, 212, 191, 0.36)',
   },
   arenaHeaderCompact: {
     paddingHorizontal: 8,
@@ -770,58 +751,54 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 13.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.ink,
     fontFamily: FONT,
   },
   sizePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
     borderWidth: 1,
-    backgroundColor: 'rgba(20, 184, 166, 0.2)',
-    borderColor: 'rgba(94, 234, 212, 0.5)',
+    backgroundColor: C.mist,
+    borderColor: C.borderSubtle,
   },
   sizePillTxt: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#99F6E4',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.secondary,
+    fontVariant: ['tabular-nums'],
   },
   rulePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
     borderWidth: 1,
-  },
-  rulePillBlock: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    borderColor: 'rgba(250, 204, 21, 0.5)',
-  },
-  rulePillFree: {
-    backgroundColor: 'rgba(6, 182, 212, 0.2)',
-    borderColor: 'rgba(103, 232, 249, 0.5)',
+    backgroundColor: C.mist,
+    borderColor: C.borderSubtle,
   },
   rulePillTxt: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.secondary,
   },
   moveCounterTxt: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: C.muted,
+    fontVariant: ['tabular-nums'],
   },
 
   factionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   factionChip: {
     flexDirection: 'row',
@@ -829,17 +806,16 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    backgroundColor: C.mist,
     maxWidth: 120,
   },
-  factionChipActive: {
-    borderWidth: 2,
-  },
   factionNameTxt: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: C.ink,
     flexShrink: 1,
   },
 
@@ -847,40 +823,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#991B1B',
+    backgroundColor: C.dangerSoft,
     borderRadius: 10,
+    borderColor: 'rgba(185,28,28,0.28)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   winRevealBanner: {
-    borderRadius: 14,
+    borderRadius: 12,
+    backgroundColor: C.goldSoft,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 8,
     gap: 5,
-    borderWidth: 2,
-    borderColor: '#FEF08A',
+    borderColor: 'rgba(180,83,9,0.35)',
   },
   winRevealTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
   },
   winRevealTitle: {
-    fontSize: 12.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.ink,
     fontFamily: FONT,
   },
   winRevealSub: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#FDE68A',
+    fontSize: 11,
+    fontWeight: '500',
+    color: C.goldDeep,
+    fontVariant: ['tabular-nums'],
   },
   errBannerTxt: {
     flex: 1,
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#FEF08A',
+    fontSize: 12,
+    fontWeight: '500',
+    color: C.danger,
   },
 
   boardToolbar: {
@@ -898,13 +876,14 @@ const styles = StyleSheet.create({
   },
   lastMoveInfoTxt: {
     flex: 1,
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 11.5,
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
   },
   toolbarBtns: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   centerBtn: {
     flexDirection: 'row',
@@ -912,15 +891,15 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(253, 224, 71, 0.55)',
+    borderRadius: 8,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   centerBtnTxt: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FEF08A',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.ink,
   },
   zoomToggleBtn: {
     flexDirection: 'row',
@@ -928,19 +907,19 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.78)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(94, 234, 212, 0.5)',
+    borderRadius: 8,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
   },
   zoomToggleBtnOn: {
-    backgroundColor: '#2DD4BF',
-    borderColor: '#99F6E4',
+    backgroundColor: C.ink,
+    borderColor: C.ink,
   },
   zoomToggleTxt: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.secondary,
   },
 
   boardArenaWrap: {
@@ -949,11 +928,11 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: '#0B192C',
+    borderRadius: 12,
+    backgroundColor: C.darkBg,
     padding: 4,
-    borderWidth: 2,
-    borderColor: '#14B8A6',
+    borderWidth: 1,
+    borderColor: C.borderStrong,
   },
   fitCenterWrap: {
     alignItems: 'center',
@@ -965,27 +944,27 @@ const styles = StyleSheet.create({
   },
 
   boardGrid: {
-    backgroundColor: '#0F2439',
-    borderRadius: 10,
+    backgroundColor: C.darkSurface,
+    borderRadius: 8,
     padding: 3,
     borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.3)',
+    borderColor: C.darkBorder,
   },
   boardRow: {
     flexDirection: 'row',
   },
   cell: {
     borderWidth: 0.5,
-    borderColor: 'rgba(94, 234, 212, 0.22)',
+    borderColor: 'rgba(251, 249, 245, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15, 36, 57, 0.92)',
+    backgroundColor: '#161B26',
   },
   cellPressed: {
-    backgroundColor: 'rgba(45, 212, 191, 0.28)',
+    backgroundColor: 'rgba(251, 249, 245, 0.14)',
   },
   cellLastMove: {
-    backgroundColor: 'rgba(56, 189, 248, 0.24)',
+    backgroundColor: 'rgba(245, 158, 11, 0.16)',
   },
   lastMoveRing: {
     position: 'absolute',
@@ -993,23 +972,20 @@ const styles = StyleSheet.create({
     left: 1,
     right: 1,
     bottom: 1,
-    borderRadius: 4,
+    borderRadius: 3,
     borderWidth: 1.5,
-    borderColor: '#FDE047',
+    borderColor: C.gold,
   },
   cellWinLaser: {
-    backgroundColor: 'rgba(250, 204, 21, 0.38)',
-    borderWidth: 1.5,
-    borderColor: '#FEF08A',
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: 'inset 0 0 10px rgba(250, 204, 21, 0.85)' } as object)
-      : null),
+    backgroundColor: 'rgba(250, 204, 21, 0.28)',
+    borderWidth: 1,
+    borderColor: C.gold,
   },
   starDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(94, 234, 212, 0.48)',
+    backgroundColor: 'rgba(251, 249, 245, 0.35)',
   },
 
   bottomWrap: {
@@ -1025,8 +1001,8 @@ const styles = StyleSheet.create({
   bottomTxt: {
     flex: 1,
     minWidth: 0,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
   hostInlineBtns: {
     flexDirection: 'row',

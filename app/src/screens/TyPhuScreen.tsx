@@ -18,7 +18,7 @@ import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
 import { play } from '../sound';
 import { vibrate } from '../web';
-import { C } from '../theme';
+import { C, sticker } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Shell, useShellTools } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
@@ -27,7 +27,7 @@ import { TyPhuCenter, type CardFx } from '../components/TyPhuCenter';
 import { ANNOUNCE_MS, TyPhuAnnounce, type Announce } from '../components/TyPhuAnnounce';
 import { Pawn, TyPhuFxLayer, fxEnd, type Fx } from '../components/TyPhuFx';
 import { ThrowSheet, useShake } from '../components/Fun';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { UiIcon } from '../components/Icons';
 
 /** màu dự phòng theo thứ tự lượt nếu người chơi chưa có character */
 export const TOKEN_COLORS = PLAYER_COLORS.map((c) => c.hex);
@@ -258,9 +258,9 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       const houses = g.houses[i] ?? 0;
       const cell = TYPHU_BOARD[i];
       if (owner && prevOwnersRef.current[i] !== owner && !bankruptNow) {
-        adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: 'ĐÃ MUA!', color: colorOf(owner) });
+        adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: 'Đã mua', color: colorOf(owner) });
         const price = isTyPhuProperty(cell) ? cell.price : 0;
-        // thông báo mua to chỉ hiện cho chính người mua; người khác chỉ thấy dấu "ĐÃ MUA" trên ô
+        // thông báo mua to chỉ hiện cho chính người mua; người khác chỉ thấy dấu "Đã mua" trên ô
         if (owner === me) announce('buy', t0, {
           title: cell.name, sub: `${nameOf(owner)} · ${fmt(price)}$`, amount: price, portrait: portraitUriOf(owner), color: colorOf(owner), icon: ICON_BY_CELL[i],
         });
@@ -269,7 +269,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         if (station) adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: '★'.repeat(houses), color: colorOf(owner) });
         else adds.push({ k: 'build', id: seqId(), at: t0, cell: i, level: houses });
         if (owner === me) announce('build', t0, {
-          title: station ? `Ga lên ${houses} sao!` : houses >= TYPHU_MAX_HOUSES ? 'Lên khách sạn!' : `Xây nhà cấp ${houses}!`, sub: `${nameOf(owner)} · ${cell.name}`, level: station ? undefined : houses, color: colorOf(owner),
+          title: station ? `Ga lên ${houses} sao` : houses >= TYPHU_MAX_HOUSES ? 'Lên khách sạn' : `Xây nhà cấp ${houses}`, sub: `${nameOf(owner)} · ${cell.name}`, level: station ? undefined : houses, color: colorOf(owner),
         });
       }
       prevOwnersRef.current[i] = owner ?? '';
@@ -298,7 +298,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         const reach = t0 + msUntilReach(0);
         adds.push({ k: 'start', id: seqId(), at: reach });
         if (mine) {
-          announce('reward', reach, { title: 'Qua Xuất phát!', amount: TYPHU_PASS_START, portrait: portraitUriOf(who), color: colorOf(who) });
+          announce('reward', reach, { title: 'Qua Xuất phát', amount: TYPHU_PASS_START, portrait: portraitUriOf(who), color: colorOf(who) });
         }
       } else if (l.kind === 'card') {
         const text = g.card?.text ?? l.text;
@@ -310,11 +310,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         const cardDelta = netWho !== 0 ? netWho : good ? parsed : -parsed;
         const cardAt = t0 + (movement?.kind === 'card' || movement?.kind === 'fly' ? 0 : msUntilArrive()) + Math.round(450 / speed);
         if (mine) {
-          if (good) announce('reward', cardAt, { title: 'Thẻ Cơ hội!', sub: text, amount: cardDelta > 0 ? cardDelta : undefined, portrait: portraitUriOf(who), color: colorOf(who) });
-          else announce('loss', cardAt, { title: 'Thẻ Rủi ro!', sub: text, amount: cardDelta < 0 ? cardDelta : undefined, portrait: portraitUriOf(who), color: colorOf(who) });
+          if (good) announce('reward', cardAt, { title: 'Thẻ Cơ hội', sub: text, amount: cardDelta > 0 ? cardDelta : undefined, portrait: portraitUriOf(who), color: colorOf(who) });
+          else announce('loss', cardAt, { title: 'Thẻ Rủi ro', sub: text, amount: cardDelta < 0 ? cardDelta : undefined, portrait: portraitUriOf(who), color: colorOf(who) });
         } else if (/mỗi người/i.test(text) && (deltas[me] ?? 0) !== 0) {
           const myDelta = deltas[me];
-          if (myDelta > 0) announce('reward', cardAt, { title: `${nameOf(who)} mừng cưới!`, sub: text, amount: myDelta, portrait: portraitUriOf(me), color: colorOf(me) });
+          if (myDelta > 0) announce('reward', cardAt, { title: `${nameOf(who)} mừng cưới`, sub: text, amount: myDelta, portrait: portraitUriOf(me), color: colorOf(me) });
           else if (myDelta < 0) announce('loss', cardAt, { title: `Mừng sinh nhật ${nameOf(who)}`, sub: text, amount: myDelta, portrait: portraitUriOf(me), color: colorOf(me) });
         }
       } else if (l.kind === 'tax') {
@@ -328,7 +328,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         later(delay, () => play('siren'));
         feed(l.text, 'bad');
         if (mine) {
-          announce('loss', t0 + delay, { title: 'VÀO TÙ!', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
+          announce('loss', t0 + delay, { title: 'Vào tù', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
           shake();
         }
       } else if (l.kind === 'bankrupt') {
@@ -376,7 +376,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       const kindCell = TYPHU_BOARD[movement?.kind === 'card' || movement?.kind === 'fly' ? movement.from : g.pos[g.currentPlayerId ?? ''] ?? 0];
       const delay = movement?.kind === 'card' || movement?.kind === 'fly' ? 0 : msUntilArrive();
       const risky = g.card.good === false || (g.card.good === undefined && kindCell?.kind === 'community');
-      setCardFx({ id: g.card.id, text: g.card.text, title: risky ? 'RỦI RO' : 'CƠ HỘI', at: t0 + delay });
+      setCardFx({ id: g.card.id, text: g.card.text, title: risky ? 'Rủi ro' : 'Cơ hội', at: t0 + delay });
       later(delay, () => play('flip'));
     }
     if (adds.length && !reducedMotion) setFx((old) => [...old.filter((f) => fxEnd(f) > t0), ...adds]);
@@ -453,23 +453,23 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     ? g.step === 'roll'
       ? inJail
         ? `Bạn đang ở tù: trả ${fmt(TYPHU_JAIL_FINE)}$ / dùng vé để đổ, hoặc ở lại`
-        : 'Tới lượt bạn, đổ xúc xắc đi!'
+        : 'Tới lượt bạn, đổ xúc xắc'
       : g.step === 'ticket'
-        ? `Mua vé ra tù giá ${fmt(TYPHU_JAIL_TICKET)}$ không?`
+        ? `Mua vé ra tù giá ${fmt(TYPHU_JAIL_TICKET)}$`
       : g.step === 'buy'
-        ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)}$?` : 'Mua miếng đất này không?'
+        ? pending && isTyPhuProperty(pending) ? `Mua ${pending.name} giá ${fmt(pending.price)}$` : 'Mua miếng đất này'
         : g.step === 'upgrade'
-          ? pending?.kind === 'station' ? 'Nâng sao cho nhà ga của bạn?' : 'Nâng cấp nhà ở đất của bạn?'
+          ? pending?.kind === 'station' ? 'Nâng sao cho nhà ga của bạn' : 'Nâng cấp nhà ở đất của bạn'
           : g.step === 'buyout' && g.buyoutOffer
-            ? `Thâu tóm ${TYPHU_BOARD[g.buyoutOffer.cell].name} với giá ${fmt(g.buyoutOffer.price)}$?`
+            ? `Thâu tóm ${TYPHU_BOARD[g.buyoutOffer.cell].name} với giá ${fmt(g.buyoutOffer.price)}$`
           : g.step === 'debt' && g.debt
             ? `Thiếu ${fmt(Math.max(0, g.debt.amount - (g.cash[me] ?? 0)))}$: chọn lô để bán`
             : 'Chờ chút…'
     : g.step === 'debt' ? `${curName} thiếu tiền, đang bán nhà đất…`
-    : g.step === 'buyout' ? `${curName} đang cân nhắc Thâu Tóm đất!`
+    : g.step === 'buyout' ? `${curName} đang cân nhắc thâu tóm đất`
     : g.step === 'ticket' ? `${curName} đang tính mua vé ra tù`
     : g.step === 'roll' && g.currentPlayerId && g.currentPlayerId in g.jail ? `${curName} đang ở tù`
-    : g.step === 'roll' && g.extraRoll ? `${curName} đổ đôi, được tung tiếp 🎲` : `Lượt của ${curName}`;
+    : g.step === 'roll' && g.extraRoll ? `${curName} đổ đôi, được tung tiếp` : `Lượt của ${curName}`;
 
   const d = detail !== null ? TYPHU_BOARD[detail] : null;
   const landscape = true;
@@ -573,7 +573,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 boost={viewMode === 'tilt' && geo.side[i] === 'bottom' ? 1.3 : 1}
                 airportDestName={
                   TYPHU_BOARD[i].kind === 'airport' && g.airportDest !== undefined && TYPHU_BOARD[g.airportDest]
-                    ? TYPHU_BOARD[g.airportDest].name.replace(/^Ga\s+/i, '').toUpperCase()
+                    ? TYPHU_BOARD[g.airportDest].name.replace(/^Ga\s+/i, '')
                     : null
                 }
               />
@@ -592,16 +592,16 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 width: geo.rect[g.festivalCell].w + 4,
                 height: geo.rect[g.festivalCell].h + 4,
                 borderRadius: 6,
-                borderWidth: 2.5,
-                borderColor: '#EC4899',
-                backgroundColor: 'rgba(236,72,153,0.14)',
+                borderWidth: 2,
+                borderColor: C.lotus,
+                backgroundColor: 'rgba(190, 24, 93, 0.14)',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
                 zIndex: 18,
               }}
             >
-              <View style={{ backgroundColor: '#DB2777', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 0.5, marginBottom: 1 }}>
-                <T style={{ fontSize: 8.5, fontWeight: '900', color: '#FEF08A' }}>🎉 x2</T>
+              <View style={{ backgroundColor: C.lotus, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginBottom: 1 }}>
+                <T style={{ fontSize: 8.5, fontWeight: '600', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>×2</T>
               </View>
             </View>
           )}
@@ -680,7 +680,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
           {/* đang bán tài sản: tối cả bàn, chỉ sáng ô đang hỏi bán */}
           {focusCell !== null && !activeAnn && detail === null && (
-            <SellSpotlight rect={geo.rect[focusCell]} W={boardW - 4} H={boardH - 4} now={now} />
+            <SellSpotlight rect={geo.rect[focusCell]} W={boardW - 4} H={boardH - 4} />
           )}
         </View>
 
@@ -727,15 +727,15 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                 <T style={styles.detailKind}>{d.kind === 'land' ? 'Địa danh' : d.kind === 'station' ? 'Nhà ga' : d.kind === 'utility' ? 'Tiện ích' : d.kind === 'tax' ? 'Thuế' : d.kind === 'chance' ? 'Cơ hội (thẻ tốt)' : d.kind === 'community' ? 'Rủi ro (thẻ xấu)' : d.kind === 'airport' ? 'Sân bay' : 'Ô đặc biệt'}</T>
               </View>
           {d.kind === 'land' ? (
-            <View style={{ gap: 6 }}>
+            <View style={{ gap: 8 }}>
               <View style={[styles.detailBand, { backgroundColor: TYPHU_GROUPS[d.group].color }]}>
                 <T style={styles.detailGroup}>{TYPHU_GROUPS[d.group].name}</T>
               </View>
-              <T>
-                Giá đất: <T style={{ fontWeight: '900' }}>{fmt(d.price)}$</T>, xây mỗi nhà {fmt(TYPHU_GROUPS[d.group].house)}$. Bán lại: đất và từng nhà đều được nửa giá.
+              <T style={{ fontVariant: ['tabular-nums'] }}>
+                Giá đất: <T style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>{fmt(d.price)}$</T>, xây mỗi nhà {fmt(TYPHU_GROUPS[d.group].house)}$. Bán lại: đất và từng nhà đều được nửa giá.
               </T>
               <T>
-                Chủ: <T style={{ fontWeight: '900' }}>{g.owners[detail] ? nameOf(g.owners[detail]) : 'chưa có'}</T>
+                Chủ: <T style={{ fontWeight: '600' }}>{g.owners[detail] ? nameOf(g.owners[detail]) : 'chưa có'}</T>
                 {g.houses[detail] ? `, ${g.houses[detail] === TYPHU_MAX_HOUSES ? 'có khách sạn' : `nhà cấp ${g.houses[detail]}`}` : ''}
               </T>
               <View style={styles.rents}>
@@ -745,13 +745,13 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   ...TYPHU_HOUSE_MULT.map((m, k) => [k === 3 ? 'Khách sạn (Cấp 4)' : `Nhà cấp ${k + 1} (${k + 1} nhà)`, d.rent * m] as [string, number]),
                 ].map(([label, v]) => (
                   <View key={label} style={styles.rentRow}>
-                    <T style={{ color: C.muted }}>{label}</T>
-                    <T style={{ fontWeight: '800' }}>{fmt(v as number)}$</T>
+                    <T style={{ color: C.muted, fontSize: 13 }}>{label}</T>
+                    <T style={{ fontWeight: '600', fontSize: 13, fontVariant: ['tabular-nums'] }}>{fmt(v as number)}$</T>
                   </View>
                 ))}
               </View>
               {g.owners[detail] && (
-                <T style={{ color: C.muted }}>
+                <T style={{ color: C.muted, fontVariant: ['tabular-nums'] }}>
                   Tiền thuê hiện tại: {fmt(rentOf(detail, g.houses[detail] ?? 0, ownsGroup(g.owners[detail], detail)))}$
                   {g.owners[detail] in g.jail ? ' (chủ đang ở tù: không thu được)' : ''}
                 </T>
@@ -759,7 +759,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
               {canBuild(detail) && (
                 <Button
                   testID="build-btn"
-                  icon="🏠"
+                  iconNode={<UiIcon name="Plus" size={15} color={C.onSon} strokeWidth={1.65} />}
                   disabled={(g.cash[me] ?? 0) < TYPHU_GROUPS[d.group].house}
                   title={`Xây ${(g.houses[detail] ?? 0) === TYPHU_MAX_HOUSES - 1 ? 'khách sạn' : 'nhà'} (${fmt(TYPHU_GROUPS[d.group].house)}$)`}
                   onPress={() => { void act({ type: 'build', cell: detail }).then((ok) => { if (ok) setDetail(null); }); }}
@@ -770,15 +770,15 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   testID="sell-btn"
                   small
                   variant="paper"
-                  icon="💰"
-                  title="Bán nhà / đất ở ô này…"
+                  iconNode={<UiIcon name="Wallet" size={14} color={C.ink} strokeWidth={1.65} />}
+                  title="Bán nhà / đất ở ô này"
                   onPress={() => { setSellFocus(detail); setSellOpen(true); setDetail(null); }}
                 />
               )}
             </View>
           ) : d.kind === 'station' || d.kind === 'utility' ? (
             <View style={{ gap: 10 }}>
-              <T>Giá mua: {fmt(d.price)}$ (bán lại nửa giá)</T>
+              <T style={{ fontVariant: ['tabular-nums'] }}>Giá mua: {fmt(d.price)}$ (bán lại nửa giá)</T>
               <T>Chủ: {g.owners[detail] ? nameOf(g.owners[detail]) : 'Chưa có'}</T>
               <T>
                 {d.kind === 'station'
@@ -786,10 +786,10 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   : 'Công ty điện / nước là loại đất đặc biệt: không xây nhà được, tiền thuê tính theo xúc xắc. Ai dừng ở đây trả cho chủ: tổng xúc xắc vừa đổ × 8 (chủ có cả 2 công ty: × 20). Ví dụ đổ được 7: trả 56$, nếu chủ có cả 2 công ty thì 140$.'}
               </T>
               {d.kind === 'station' && g.owners[detail] && (
-                <T>Ga này: <T style={{ fontWeight: '900', color: '#E67700' }}>{(g.houses[detail] ?? 0) > 0 ? '★'.repeat(g.houses[detail] ?? 0) : 'chưa có sao'}</T></T>
+                <T>Ga này: <T style={{ fontWeight: '600', color: C.goldDeep }}>{(g.houses[detail] ?? 0) > 0 ? '★'.repeat(g.houses[detail] ?? 0) : 'chưa có sao'}</T></T>
               )}
               {g.owners[detail] && (
-                <T>
+                <T style={{ fontVariant: ['tabular-nums'] }}>
                   Thuê theo lượt đổ hiện tại:{' '}
                   {fmt(
                     d.kind === 'station'
@@ -806,8 +806,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
                   testID="sell-btn"
                   small
                   variant="paper"
-                  icon="💰"
-                  title="Bán nhà / đất ở ô này…"
+                  iconNode={<UiIcon name="Wallet" size={14} color={C.ink} strokeWidth={1.65} />}
+                  title="Bán nhà / đất ở ô này"
                   onPress={() => { setSellFocus(detail); setSellOpen(true); setDetail(null); }}
                 />
               )}
@@ -819,7 +819,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
               {d.kind === 'airport' && (
                 `Dừng ở đây là lên máy bay bay thẳng tới ô đang mở chuyến hiện tại: «${
                   g.airportDest !== undefined && TYPHU_BOARD[g.airportDest] ? TYPHU_BOARD[g.airportDest].name : 'ngẫu nhiên'
-                }» rồi xử lý ô đó (mua đất, trả thuê, rút thẻ…). Ngay sau khi bay xong, sân bay sẽ mở chuyến ngẫu nhiên mới cho lượt tiếp theo! (Bay không tính thưởng qua Xuất phát).`
+                }» rồi xử lý ô đó (mua đất, trả thuê, rút thẻ…). Ngay sau khi bay xong, sân bay sẽ mở chuyến ngẫu nhiên mới cho lượt tiếp theo (bay không tính thưởng qua Xuất phát).`
               )}
               {d.kind === 'gotojail' && 'Dừng ở đây là vào tù ngay.'}
               {d.kind === 'community' && 'Rút thẻ Rủi ro, luôn xấu: nộp phạt, lùi lại, vào tù, sửa nhà hoặc bị gọi lên Cục thuế.'}
@@ -838,7 +838,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       )}
 
       {pokeOpen && (
-        <Sheet title="Chọc ai?" onClose={() => setPokeOpen(false)}>
+        <Sheet title="Chọn người để chọc" onClose={() => setPokeOpen(false)}>
           <View style={styles.pokeRow}>
             {g.order.filter((id) => id !== me && playerById.get(id)).map((id) => (
               <Pressable
@@ -865,8 +865,8 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       )}
 
       {ending && (
-        <Sheet title="Tổng kết ván cờ?" onClose={() => setEnding(false)}>
-          <T style={{ color: C.muted }}>Ván sẽ dừng lại và xếp hạng theo tổng tài sản (tiền mặt + đất + nhà).</T>
+        <Sheet title="Tổng kết ván cờ" onClose={() => setEnding(false)}>
+          <T style={{ color: C.secondary, fontSize: 13.5, lineHeight: 19 }}>Ván sẽ dừng lại và xếp hạng theo tổng tài sản (tiền mặt + đất + nhà).</T>
           <Button testID="end-confirm" title="Tổng kết" variant="ink" disabled={moving} onPress={() => act({ type: 'end' })} />
           <Button title="Chơi tiếp" variant="paper" onPress={() => setEnding(false)} />
         </Sheet>
@@ -878,12 +878,12 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
 
 export type Reaction = { text: string; kind: 'gain' | 'loss'; from: number; until: number };
 const REACT_LOSS = [
-  'Đ*t! Cay vãi 🤬', 'Mẹ nó, mất tiền rồi! 😡', 'Đ* má, xui vãi 🤬', 'Đ*o chịu nổi! 😤', 'Cay như ớt hiểm 🌶️',
-  'Trời ơi tiền của tui 😭', 'Vãi c*, nghèo rồi 😩', 'Ức chế vãi chưởng 😤', 'Thôi xong, đ*t mẹ 🤬',
+  'Cay thế nhỉ', 'Mất tiền rồi', 'Xui thật sự', 'Khó đỡ nổi', 'Cay như ớt hiểm',
+  'Trời ơi tiền của tui', 'Nghèo luôn rồi', 'Ức chế quá đi', 'Thôi xong rồi',
 ];
 const REACT_GAIN = [
-  'Phê vãi! 🤑', 'Sướng vãi chưởng 😎', 'Sướng vãi l*n 🤑', 'Tiền về, phê pha 💸', 'Sướng tê người 😍',
-  'Giàu rồi anh em ơi! 🤑', 'Ngon lành cành đào 😎', 'Phê như con tê tê 🤤',
+  'Quá đã', 'Sướng thật sự', 'Trúng mánh rồi', 'Tiền về tới tấp', 'Ngon lành',
+  'Giàu rồi anh em ơi', 'Quá êm', 'Quá đã luôn',
 ];
 
 const RULES = [
@@ -909,14 +909,13 @@ const money = (n: number) => n.toLocaleString('vi-VN');
  * Phủ tối cả bàn, chỉ chừa sáng đúng ô đang chọn bán + viền vàng nhấp nháy (vẽ trong bàn nên nghiêng theo bàn),
  * để người chơi nhìn rõ lô đất / ngôi nhà nào đang được hỏi bán.
  */
-function SellSpotlight({ rect, W, H, now }: { rect: Rect; W: number; H: number; now: number }) {
-  const dim = 'rgba(10,10,20,0.62)';
+function SellSpotlight({ rect, W, H }: { rect: Rect; W: number; H: number }) {
+  const dim = 'rgba(31, 27, 22, 0.58)';
   const pad = 3;
   const x = Math.max(0, rect.x - pad);
   const y = Math.max(0, rect.y - pad);
   const w = Math.min(W - x, rect.w + pad * 2);
   const h = Math.min(H - y, rect.h + pad * 2);
-  const glow = 0.55 + 0.45 * Math.abs(Math.sin(now / 260));
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]}>
       <View style={{ position: 'absolute', left: 0, top: 0, width: W, height: y, backgroundColor: dim }} />
@@ -926,8 +925,8 @@ function SellSpotlight({ rect, W, H, now }: { rect: Rect; W: number; H: number; 
       <View
         testID="sell-focus"
         style={{
-          position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 5, borderWidth: 3.5,
-          borderColor: `rgba(255,212,59,${glow})`, boxShadow: `0px 0px ${Math.round(8 + 10 * glow)}px rgba(255,212,59,${glow})`,
+          position: 'absolute', left: x, top: y, width: w, height: h, borderRadius: 6, borderWidth: 2.5,
+          borderColor: C.gold,
         }}
       />
     </View>
@@ -942,10 +941,10 @@ function SellOpt(p: { testID: string; label: string; sub?: string; amount: numbe
       accessibilityRole="button"
       accessibilityLabel={`${p.label}${p.sub ? ` (${p.sub})` : ''}, nhận ${p.amount}$`}
       onPress={() => { play('pop'); p.onPress(); }}
-      style={({ pressed }) => [dc.opt, p.tone === 'lot' ? dc.optLot : dc.optHouse, pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] }]}
+      style={({ pressed }) => [dc.opt, p.tone === 'lot' ? dc.optLot : dc.optHouse, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
     >
-      <T numberOfLines={1} style={[dc.optTxt, p.tone === 'lot' && { color: '#fff' }]}>{p.label}</T>
-      <T numberOfLines={1} style={[dc.optAmt, p.tone === 'lot' && { color: '#FFE066' }]}>+{money(p.amount)}${p.sub ? <T style={[dc.optSub, p.tone === 'lot' && { color: '#FFE3E3' }]}> · {p.sub}</T> : null}</T>
+      <T numberOfLines={1} style={[dc.optTxt, p.tone === 'lot' && { color: '#FFFFFF' }]}>{p.label}</T>
+      <T numberOfLines={1} style={[dc.optAmt, p.tone === 'lot' && { color: C.goldSoft }]}>+{money(p.amount)}${p.sub ? <T style={[dc.optSub, p.tone === 'lot' && { color: '#FEE2E2' }]}> · {p.sub}</T> : null}</T>
     </Pressable>
   );
 }
@@ -953,7 +952,6 @@ function SellOpt(p: { testID: string; label: string; sub?: string; amount: numbe
 /**
  * Bảng bán tài sản kiểu "từng lô một": bàn cờ chiếu sáng đúng ô đang hỏi, bảng nhỏ nằm giữa bàn (không che ô đó)
  * hỏi bán gì ở lô này: bán 1 nhà, 2 nhà, … hết nhà (giữ đất), hoặc bán cả lô (đất + nhà). Mọi thứ nửa giá mua.
- * "Bỏ qua ▶" chuyển sang lô tiếp theo (không phải huỷ bán); "◀" quay lại lô trước.
  */
 function SellPicker(p: {
   g: TyPhuView;
@@ -988,22 +986,22 @@ function SellPicker(p: {
   const short = p.debt && p.total < (g.debt?.amount ?? 0);
   return (
     <View style={dc.pickWrap} pointerEvents="box-none">
-      <View testID="sell-picker" style={dc.pick}>
+      <View testID="sell-picker" style={[dc.pick, sticker(3)]}>
         <View style={[dc.pickHead, { backgroundColor: color }]}>
-          <T style={dc.headSub}>{p.debt ? 'THIẾU TIỀN · ' : ''}BÁN TÀI SẢN · LÔ {idx + 1}/{list.length}</T>
-          <T testID="sell-picker-name" numberOfLines={1} style={dc.pickName}>{c.name.toUpperCase()}</T>
+          <T style={dc.headSub}>{p.debt ? 'Thiếu tiền · ' : ''}Bán tài sản · Lô {idx + 1}/{list.length}</T>
+          <T testID="sell-picker-name" numberOfLines={1} style={dc.pickName}>{c.name}</T>
         </View>
         <View style={dc.pickBody}>
           <View style={dc.rentRow}>
             <T style={dc.cashK}>Đang có <T style={dc.cashV}>{money(cash)}$</T></T>
             {p.need !== null && (p.need > 0
-              ? <T testID="sell-need" style={[dc.cashK, { color: C.danger, fontWeight: '900' }]}>{p.debt ? 'Còn thiếu' : 'Cần thêm'} {money(p.need)}$</T>
-              : <T testID="sell-need" style={[dc.cashK, { color: '#2B8A3E', fontWeight: '900' }]}>Đã đủ tiền ✓</T>)}
+              ? <T testID="sell-need" style={[dc.cashK, { color: C.danger, fontWeight: '600', fontVariant: ['tabular-nums'] }]}>{p.debt ? 'Còn thiếu' : 'Cần thêm'} {money(p.need)}$</T>
+              : <T testID="sell-need" style={[dc.cashK, { color: C.jade, fontWeight: '600' }]}>Đã đủ tiền</T>)}
           </View>
           <T style={dc.pickInfo}>
             {lvName} · đất {money(c.price)}$ (bán {money(c.price / 2)}$){per > 0 && lv > 0 ? ` · mỗi ${unit} ${money(per)}$ (bán ${money(per / 2)}$)` : ''}
           </T>
-          {short && <T style={[dc.pickInfo, { color: C.danger, fontWeight: '800' }]}>Bán hết cũng chưa đủ: bán xong món cuối là phá sản.</T>}
+          {short && <T style={[dc.pickInfo, { color: C.danger, fontWeight: '600' }]}>Bán hết cũng chưa đủ: bán xong món cuối là phá sản.</T>}
           <View style={dc.opts}>
             {Array.from({ length: lv }, (_, k) => k + 1).map((k) => (
               <SellOpt
@@ -1018,8 +1016,26 @@ function SellPicker(p: {
             <SellOpt testID="sell-lot" tone="lot" label={lotLabel} sub={lotSub} amount={sellValueOf(cell, lv, { land: true })} onPress={() => p.onSell({ land: true })} />
           </View>
           <View style={dc.btns}>
-            <Button testID="sell-prev" small variant="paper" title="◀" disabled={list.length < 2} style={{ width: 44 }} onPress={() => go(-1)} />
-            <Button testID="sell-next" small variant="paper" title="Bỏ qua, lô tiếp ▶" disabled={list.length < 2} style={{ flex: 1 }} onPress={() => go(1)} />
+            <Button
+              testID="sell-prev"
+              small
+              variant="paper"
+              iconNode={<UiIcon name="ChevronLeft" size={15} color={C.ink} strokeWidth={1.65} />}
+              title=""
+              accessibilityLabel="Lô trước"
+              disabled={list.length < 2}
+              style={{ width: 44 }}
+              onPress={() => go(-1)}
+            />
+            <Button
+              testID="sell-next"
+              small
+              variant="paper"
+              title="Bỏ qua, lô tiếp"
+              disabled={list.length < 2}
+              style={{ flex: 1 }}
+              onPress={() => go(1)}
+            />
             {p.onClose && <Button testID="sell-done" small variant="jade" title="Xong" style={{ width: 64 }} onPress={p.onClose} />}
           </View>
         </View>
@@ -1029,15 +1045,14 @@ function SellPicker(p: {
 }
 
 /** Thẻ quyết định kiểu "giấy chủ quyền": mua đất / bỏ qua, nâng cấp, ở tù, mua vé ra tù. */
-/** Bảng quyết định che mất nút 💬 ở giữa bàn (màn ngang thấp): thêm nút nhỏ ở góc để vẫn nhắn tin được khi đang cân nhắc */
 function DecisionCard(p: Parameters<typeof DecisionBody>[0] & { onPoke?: () => void }) {
   const tools = useShellTools();
   return (
     <>
       <DecisionBody {...p} />
       {p.onPoke && (
-        <Pressable testID="poke-open-dialog" accessibilityRole="button" accessibilityLabel="Chọc đối thủ" onPress={p.onPoke} hitSlop={6} style={[dc.chatPeek, { top: 50 }]}>
-          <EmojiIcon emoji="😈" size={16} />
+        <Pressable testID="poke-open-dialog" accessibilityRole="button" accessibilityLabel="Chọc đối thủ" onPress={p.onPoke} hitSlop={6} style={[dc.chatPeek, sticker(2), { top: 50 }]}>
+          <UiIcon name="Zap" size={15} color={C.son} strokeWidth={1.65} />
         </Pressable>
       )}
       {tools && (
@@ -1047,10 +1062,10 @@ function DecisionCard(p: Parameters<typeof DecisionBody>[0] & { onPoke?: () => v
           accessibilityLabel="Trò chuyện"
           onPress={tools.openChat}
           hitSlop={6}
-          style={dc.chatPeek}
+          style={[dc.chatPeek, sticker(2)]}
         >
-          <UiIcon name="MessageCircle" size={16} color={C.ink} />
-          {tools.unread > 0 && <View style={dc.chatPeekBadge}><T style={{ fontSize: 9, fontWeight: '900' }}>{tools.unread > 9 ? '9+' : tools.unread}</T></View>}
+          <UiIcon name="MessageCircle" size={15} color={C.ink} strokeWidth={1.65} />
+          {tools.unread > 0 && <View style={dc.chatPeekBadge}><T style={{ fontSize: 9, fontWeight: '600', color: C.goldDeep, fontVariant: ['tabular-nums'] }}>{tools.unread > 9 ? '9+' : tools.unread}</T></View>}
         </Pressable>
       )}
     </>
@@ -1068,7 +1083,7 @@ function DecisionBody(p: {
   const { g } = p;
   const cash = g.cash[p.me] ?? 0;
   const sellBtn = (need: number) => (p.onOpenSell
-    ? <Button testID="open-sell" small variant="paper" icon="💰" title={`Bán tài sản (thiếu ${money(need)}$) ▶`} onPress={p.onOpenSell} />
+    ? <Button testID="open-sell" small variant="paper" iconNode={<UiIcon name="Wallet" size={14} color={C.ink} strokeWidth={1.65} />} title={`Bán tài sản (thiếu ${money(need)}$)`} onPress={p.onOpenSell} />
     : <T style={[dc.note, { color: C.danger }]}>Không còn gì để bán</T>);
   if (g.step === 'roll' && p.me in g.jail) {
     const sat = g.jail[p.me] ?? 0;
@@ -1076,22 +1091,22 @@ function DecisionBody(p: {
     const afford = cash >= TYPHU_JAIL_FINE;
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="jail-card" style={dc.card}>
-          <View style={[dc.head, { backgroundColor: '#343A40' }]}>
-            <T style={dc.headSub}>LƯỢT Ở TÙ THỨ {sat + 1}/{TYPHU_JAIL_MAX}</T>
-            <T numberOfLines={1} style={dc.headName}>NHÀ TÙ</T>
+        <View testID="jail-card" style={[dc.card, sticker(3)]}>
+          <View style={[dc.head, { backgroundColor: '#374151' }]}>
+            <T style={dc.headSub}>Lượt ở tù thứ {sat + 1}/{TYPHU_JAIL_MAX}</T>
+            <T numberOfLines={1} style={dc.headName}>Nhà tù</T>
           </View>
           <View style={dc.body}>
             <T style={dc.note}>Phải trả {money(TYPHU_JAIL_FINE)}$ (hoặc dùng vé) mới được đổ xúc xắc. Ở lại thì mất lượt này; ngồi đủ {TYPHU_JAIL_MAX} lượt là bắt buộc trả.</T>
             <View testID="decision-cash" style={dc.cashBox}>
               <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
-              {tix > 0 && <View style={dc.rentRow}><T style={dc.cashK}>Vé ra tù</T><T style={dc.cashV}>🎫 x{tix}</T></View>}
+              {tix > 0 && <View style={dc.rentRow}><T style={dc.cashK}>Vé ra tù</T><T style={dc.cashV}>×{tix}</T></View>}
             </View>
             {!afford && !tix && sellBtn(TYPHU_JAIL_FINE - cash)}
             <View style={dc.btns}>
               <Button testID="stay-jail" small variant="paper" title="Ở lại" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'stayJail' })} />
               {tix > 0 ? (
-                <Button testID="use-ticket" small variant="jade" icon="🎫" title="Dùng vé" style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'useTicket' })} />
+                <Button testID="use-ticket" small variant="jade" iconNode={<UiIcon name="KeyRound" size={14} color="#FFFFFF" strokeWidth={1.65} />} title="Dùng vé" style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'useTicket' })} />
               ) : (
                 <Button testID="pay-jail" small variant="jade" disabled={!afford} title={`Trả ${money(TYPHU_JAIL_FINE)}$`} style={{ flex: 1.4 }} onPress={() => p.onAct({ type: 'payJail' })} />
               )}
@@ -1105,10 +1120,13 @@ function DecisionBody(p: {
     const afford = cash >= TYPHU_JAIL_TICKET;
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="ticket-card" style={dc.card}>
-          <View style={[dc.head, { backgroundColor: '#2B8A3E' }]}>
-            <T style={dc.headSub}>THẺ CƠ HỘI · NỬA GIÁ</T>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><EmojiIcon emoji="🎫" size={16} /><T numberOfLines={1} style={dc.headName}>VÉ RA TÙ</T></View>
+        <View testID="ticket-card" style={[dc.card, sticker(3)]}>
+          <View style={[dc.head, { backgroundColor: C.jade }]}>
+            <T style={dc.headSub}>Thẻ Cơ hội · Nửa giá</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <UiIcon name="KeyRound" size={15} color="#FFFFFF" strokeWidth={1.75} />
+              <T numberOfLines={1} style={dc.headName}>Vé ra tù</T>
+            </View>
           </View>
           <View style={dc.body}>
             <T style={dc.note}>Mua vé {money(TYPHU_JAIL_TICKET)}$ (ra tù bình thường {money(TYPHU_JAIL_FINE)}$). Vé cất trong túi, lúc vào tù dùng để ra ngay không mất tiền.</T>
@@ -1138,10 +1156,10 @@ function DecisionBody(p: {
     const rows = afford ? fullRows : fullRows.slice(0, 2);
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View style={dc.card}>
+        <View style={[dc.card, sticker(3)]}>
           <View style={[dc.head, { backgroundColor: color }]}>
-            <T style={dc.headSub}>{c.kind === 'land' ? TYPHU_GROUPS[c.group].name.toUpperCase() : c.kind === 'station' ? 'NHÀ GA' : 'CÔNG TY'}</T>
-            <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
+            <T style={dc.headSub}>{c.kind === 'land' ? TYPHU_GROUPS[c.group].name : c.kind === 'station' ? 'Nhà ga' : 'Công ty'}</T>
+            <T numberOfLines={1} style={dc.headName}>{c.name}</T>
           </View>
           <View style={dc.body}>
             {rows.map(([k, v]) => (
@@ -1188,13 +1206,13 @@ function DecisionBody(p: {
     // mỗi lần dừng chỉ lên đúng 1 cấp: đất trống -> cấp 1 -> 2 -> 3 -> khách sạn; ga: 1 -> 2 -> 3 sao
     const afford = cash >= cost;
     const label = (lv: number) => (station ? `${lv} sao` : lv >= TYPHU_MAX_HOUSES ? 'Khách sạn' : `Nhà cấp ${lv}`);
-    const now = station ? (h === 0 ? 'CHƯA CÓ SAO' : '★'.repeat(h)) : h === 0 ? 'ĐẤT TRỐNG' : label(h).toUpperCase();
+    const now = station ? (h === 0 ? 'Chưa có sao' : '★'.repeat(h)) : h === 0 ? 'Đất trống' : label(h);
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="upgrade-card" style={dc.card}>
+        <View testID="upgrade-card" style={[dc.card, sticker(3)]}>
           <View style={[dc.head, { backgroundColor: station ? '#495057' : TYPHU_GROUPS[c.group].color }]}>
-            <T style={dc.headSub}>{station ? 'NHÀ GA CỦA BẠN' : 'ĐẤT CỦA BẠN'} · {now}</T>
-            <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
+            <T style={dc.headSub}>{station ? 'Nhà ga của bạn' : 'Đất của bạn'} · {now}</T>
+            <T numberOfLines={1} style={dc.headName}>{c.name}</T>
           </View>
           <View style={dc.body}>
             <View style={dc.rentRow}><T style={dc.rentK}>Tiền thuê hiện tại{full ? ' (đủ bộ x2)' : ''}</T><T style={dc.rentV}>{money(rentAt(h))}$</T></View>
@@ -1208,7 +1226,6 @@ function DecisionBody(p: {
             </View>
             {!afford && sellBtn(cost - cash)}
             {afford && h + 1 < maxLevelOf(i) && <T style={dc.note}>Lần sau dừng ở đây mới lên tiếp {label(h + 2)}</T>}
-            {/* nút Nâng cấp nằm bên phải nút Để sau, cùng một hàng cho dễ thấy */}
             <View style={dc.btns}>
               <Button testID="skip-btn" small variant="paper" title="Để sau" style={{ flex: 1 }} onPress={() => p.onAct({ type: 'skip' })} />
               <Button
@@ -1235,14 +1252,14 @@ function DecisionBody(p: {
     const prevName = g.names[ownerId] ?? 'đối thủ';
     return (
       <View style={dc.wrap} pointerEvents="box-none">
-        <View testID="buyout-card" style={dc.card}>
-          <View style={[dc.head, { backgroundColor: '#B91C1C' }]}>
-            <T style={dc.headSub}>🔥 THÂU TÓM ĐỊA BÀN (GIÁ 160%)</T>
-            <T numberOfLines={1} style={dc.headName}>{c.name.toUpperCase()}</T>
+        <View testID="buyout-card" style={[dc.card, sticker(3)]}>
+          <View style={[dc.head, { backgroundColor: C.danger }]}>
+            <T style={dc.headSub}>Thâu tóm địa bàn (giá 160%)</T>
+            <T numberOfLines={1} style={dc.headName}>{c.name}</T>
           </View>
           <View style={dc.body}>
             <T style={dc.note}>
-              Cơ hội cướp trắng sổ đỏ {c.name}{lv > 0 ? ` (kèm ${lv} cấp đã xây!)` : ''} từ tay <T style={{ fontWeight: '900' }}>{prevName}</T>!
+              Cơ hội mua lại sổ đỏ {c.name}{lv > 0 ? ` (kèm ${lv} cấp đã xây)` : ''} từ <T style={{ fontWeight: '600' }}>{prevName}</T>.
             </T>
             <View testID="decision-cash" style={dc.cashBox}>
               <View style={dc.rentRow}><T style={dc.cashK}>Bạn đang có</T><T style={dc.cashV}>{money(cash)}$</T></View>
@@ -1258,7 +1275,7 @@ function DecisionBody(p: {
                 testID="buyout-btn"
                 small
                 variant="ink"
-                icon="🔥"
+                iconNode={<UiIcon name="Flame" size={14} color={C.onSon} strokeWidth={1.65} />}
                 disabled={!afford}
                 title={`Mua đứt -${money(price)}$`}
                 style={{ flex: 1.5 }}
@@ -1274,37 +1291,35 @@ function DecisionBody(p: {
 }
 
 const dc = StyleSheet.create({
-  chatPeek: { position: 'absolute', left: 8, top: 8, zIndex: 45, width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', borderWidth: 2, borderColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  chatPeekBadge: { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, borderWidth: 1.5, borderColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  wrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40, backgroundColor: 'rgba(0,0,0,0.25)' },
-  card: { width: 260, backgroundColor: '#FFFDF6', borderRadius: 12, borderWidth: 2.5, borderColor: '#111', overflow: 'hidden', boxShadow: '0px 10px 24px rgba(0,0,0,0.4)' },
-  cardWide: { width: 300 },
-  head: { paddingVertical: 6, alignItems: 'center', borderBottomWidth: 2, borderColor: '#111' },
-  headSub: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 2 },
-  headName: { color: '#fff', fontSize: 17, lineHeight: 22, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 3 },
-  body: { padding: 8, gap: 3 },
+  chatPeek: { position: 'absolute', left: 8, top: 8, zIndex: 45, width: 34, height: 34, borderRadius: 10, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  chatPeekBadge: { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.goldSoft, borderWidth: 1, borderColor: C.goldDeep, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  wrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40, backgroundColor: 'rgba(28, 25, 23, 0.28)' },
+  card: { width: 260, backgroundColor: C.paper, borderRadius: 14, overflow: 'hidden' },
+  head: { paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', borderBottomWidth: 1, borderColor: C.borderSubtle },
+  headSub: { color: 'rgba(255, 255, 255, 0.92)', fontSize: 10.5, lineHeight: 14, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  headName: { color: '#FFFFFF', fontSize: 16, lineHeight: 20, fontWeight: '600' },
+  body: { padding: 10, gap: 4 },
   rentRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  rentK: { fontSize: 11, lineHeight: 15, color: C.muted, fontWeight: '700' },
-  rentV: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '800' },
-  note: { fontSize: 11, lineHeight: 15, color: C.muted, textAlign: 'center' },
+  rentK: { fontSize: 11.5, lineHeight: 15, color: C.muted, fontWeight: '500' },
+  rentV: { fontSize: 12, lineHeight: 16, color: C.ink, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  note: { fontSize: 11.5, lineHeight: 15, color: C.secondary, textAlign: 'center' },
   btns: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  cashBox: { backgroundColor: '#FFF3BF', borderRadius: 8, borderWidth: 1.5, borderColor: '#111', paddingHorizontal: 8, paddingVertical: 4, marginTop: 4, gap: 1 },
-  cashK: { fontSize: 12, lineHeight: 16, color: '#111', fontWeight: '700' },
-  cashV: { fontSize: 13, lineHeight: 17, color: '#B45309', fontWeight: '900' },
-  dot: { width: 12, height: 12, borderRadius: 3, borderWidth: 1, borderColor: '#111' },
+  cashBox: { backgroundColor: C.goldSoft, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(180, 83, 9, 0.25)', paddingHorizontal: 8, paddingVertical: 5, marginTop: 4, gap: 2 },
+  cashK: { fontSize: 12, lineHeight: 16, color: C.ink, fontWeight: '500' },
+  cashV: { fontSize: 13, lineHeight: 17, color: C.goldDeep, fontWeight: '600', fontVariant: ['tabular-nums'] },
   pickWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 40 },
-  pick: { width: 272, backgroundColor: '#FFFDF6', borderRadius: 12, borderWidth: 2.5, borderColor: '#111', overflow: 'hidden', boxShadow: '0px 10px 24px rgba(0,0,0,0.5)' },
-  pickHead: { paddingVertical: 4, alignItems: 'center', borderBottomWidth: 2, borderColor: '#111' },
-  pickName: { color: '#fff', fontSize: 15, lineHeight: 19, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 3 },
-  pickBody: { paddingHorizontal: 7, paddingVertical: 5, gap: 3 },
-  pickInfo: { fontSize: 10.5, lineHeight: 13, color: '#495057', fontWeight: '700' },
-  opts: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
-  opt: { flexGrow: 1, flexBasis: '46%', borderRadius: 8, borderWidth: 2, borderColor: '#111', paddingVertical: 3, paddingHorizontal: 4, alignItems: 'center' },
-  optHouse: { backgroundColor: '#FFE8A3' },
-  optLot: { backgroundColor: '#C92A2A' },
-  optTxt: { fontSize: 11, lineHeight: 14, fontWeight: '900', color: '#111' },
-  optAmt: { fontSize: 11, lineHeight: 14, fontWeight: '900', color: '#2B8A3E' },
-  optSub: { fontSize: 9.5, fontWeight: '700', color: '#495057' },
+  pick: { width: 272, backgroundColor: C.paper, borderRadius: 14, overflow: 'hidden' },
+  pickHead: { paddingVertical: 6, paddingHorizontal: 10, alignItems: 'center', borderBottomWidth: 1, borderColor: C.borderSubtle },
+  pickName: { color: '#FFFFFF', fontSize: 15, lineHeight: 19, fontWeight: '600' },
+  pickBody: { paddingHorizontal: 8, paddingVertical: 6, gap: 4 },
+  pickInfo: { fontSize: 11, lineHeight: 14, color: C.secondary, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  opts: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  opt: { flexGrow: 1, flexBasis: '46%', borderRadius: 8, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 6, alignItems: 'center' },
+  optHouse: { backgroundColor: C.goldSoft, borderColor: 'rgba(180, 83, 9, 0.28)' },
+  optLot: { backgroundColor: C.danger, borderColor: '#991B1B' },
+  optTxt: { fontSize: 11.5, lineHeight: 15, fontWeight: '600', color: C.ink },
+  optAmt: { fontSize: 11.5, lineHeight: 15, fontWeight: '600', color: C.jade, fontVariant: ['tabular-nums'] },
+  optSub: { fontSize: 10, fontWeight: '500', color: C.secondary },
 });
 
 /** góc nghiêng bàn cờ 3D (nhìn từ phía người chơi) */
@@ -1335,24 +1350,24 @@ function fitTilted(availW: number, availH: number, deg: number): { S: number; dy
 const styles = StyleSheet.create({
   pokeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
   pokePick: { alignItems: 'center', gap: 4, width: 96 },
-  pokeFace: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, backgroundColor: '#fff' },
-  pokeName: { fontWeight: '800', textAlign: 'center' },
+  pokeFace: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, backgroundColor: C.paper },
+  pokeName: { fontWeight: '600', textAlign: 'center', color: C.ink },
   stageWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  board: { backgroundColor: '#CDE6D0', borderWidth: 2, borderColor: '#111', position: 'relative', boxShadow: '0px 18px 24px rgba(0,0,0,0.35)' },
+  board: { backgroundColor: '#CDE6D0', borderWidth: 1, borderColor: C.borderStrong, position: 'relative', boxShadow: '0px 12px 24px rgba(31, 27, 22, 0.22)' },
   center: {
     position: 'absolute', zIndex: 4,
   },
-  detailPhoto: { borderRadius: 12, borderWidth: 2, borderColor: C.ink },
+  detailPhoto: { borderRadius: 12, borderWidth: 1, borderColor: C.borderSubtle },
   // ảnh gốc 116x80: chỉ phóng tối đa ~1,7 lần
   detailPhotoTop: { width: 197, height: 136, alignSelf: 'center', marginBottom: 8 },
   detailPhotoSide: { width: 140, height: 97 },
   detailRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   detailIconRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   detailIcon: { width: 44, height: 44 },
-  detailKind: { fontWeight: '800', color: C.muted },
+  detailKind: { fontWeight: '600', color: C.secondary },
   credit: { fontSize: 11, color: C.muted, marginTop: 4 },
-  detailBand: { borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 2, borderColor: C.ink },
-  detailGroup: { color: '#fff', fontWeight: '900' },
-  rents: { backgroundColor: C.mist, borderRadius: 12, padding: 10, gap: 3 },
+  detailBand: { borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: C.borderSubtle },
+  detailGroup: { color: '#FFFFFF', fontWeight: '600' },
+  rents: { backgroundColor: C.mist, borderRadius: 10, borderWidth: 1, borderColor: C.borderSubtle, padding: 10, gap: 4 },
   rentRow: { flexDirection: 'row', justifyContent: 'space-between' },
 });

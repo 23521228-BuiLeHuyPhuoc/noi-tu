@@ -188,6 +188,8 @@ export interface CroakWorld {
 export interface CroakTickPayload {
   stageIndex: number;
   tick: number;
+  /** Số thứ tự input cuối đã xử lý cho từng người chơi (dùng cho Server Reconciliation) */
+  acks?: Record<string, number>;
   switchesOn: Record<string, boolean>;
   keysCollected: Record<string, boolean>;
   activeCheckpointId: string | null;
@@ -1083,10 +1085,15 @@ export function stepCroakWorld(
   return world.recentEvents.filter((e) => e.id > prevEventSeq);
 }
 
-export function toCroakTickPayload(world: CroakWorld, newEvents: CroakEvent[] = []): CroakTickPayload {
+export function toCroakTickPayload(
+  world: CroakWorld,
+  newEvents: CroakEvent[] = [],
+  acks?: Record<string, number>,
+): CroakTickPayload {
   return {
     stageIndex: world.stageIndex,
     tick: world.tick,
+    ...(acks ? { acks } : {}),
     switchesOn: { ...world.switchesOn },
     keysCollected: { ...world.keysCollected },
     activeCheckpointId: world.activeCheckpointId,

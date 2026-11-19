@@ -79,6 +79,8 @@ interface AvatarProps {
   editable?: boolean;
   /** phòng đông (>= 6 người): tự động giảm hiệu ứng xoay liên tục của người đang chờ lượt */
   crowded?: boolean;
+  /** nền phía sau là tông tối hay giấy sáng để chỉnh độ tương phản chữ */
+  darkBg?: boolean;
 }
 
 function sameCosmetics(a: PublicPlayer['cosmetics'], b: PublicPlayer['cosmetics']): boolean {
@@ -125,6 +127,7 @@ function areAvatarPropsEqual(prev: AvatarProps, next: AvatarProps): boolean {
     prev.rank === next.rank &&
     prev.editable === next.editable &&
     prev.crowded === next.crowded &&
+    prev.darkBg === next.darkBg &&
     prev.onPress === next.onPress &&
     prev.onSelectPlayer === next.onSelectPlayer &&
     samePlayerVisual(prev.player, next.player)
@@ -132,7 +135,7 @@ function areAvatarPropsEqual(prev: AvatarProps, next: AvatarProps): boolean {
 }
 
 export const Avatar = memo(function Avatar({
-  player, size = 52, active, dim, host, sub, me, onPress, onSelectPlayer, ring, rank, editable, crowded,
+  player, size = 52, active, dim, host, sub, me, onPress, onSelectPlayer, ring, rank, editable, crowded, darkBg = false,
 }: AvatarProps) {
   const face = useFace(player.id);
   const avatarRef = useMeasuredView(`avatar-${player.id}`);
@@ -337,13 +340,23 @@ export const Avatar = memo(function Avatar({
           {cos?.title ? <TitleBadge title={cos.title} /> : null}
         </View>
       )}
-      <NameText fx={cos?.nameFx} testID={`avatar-name-${player.id}`} style={[styles.name, active && { color: C.gold, marginTop: cos?.title || player.vipTier ? 1 : 7 }]}>
+      <NameText
+        fx={cos?.nameFx}
+        testID={`avatar-name-${player.id}`}
+        style={[
+          styles.name,
+          { color: darkBg ? C.darkText : C.ink },
+          active && { color: darkBg ? C.gold : C.goldDeep, fontWeight: '600', marginTop: cos?.title || player.vipTier ? 1 : 5 },
+        ]}
+      >
         {face.morph === 'flipname' ? Array.from(player.name).reverse().join('') : player.name}{me ? ' (bạn)' : ''}
       </NameText>
       {face.nick && (
         <Text testID={`nick-${player.id}`} numberOfLines={2} style={styles.nick}>{nickText(face.nick).replace(/\s*\p{Extended_Pictographic}\uFE0F?$/u, '')}</Text>
       )}
-      {sub !== undefined && <Text style={styles.sub}>{sub}</Text>}
+      {sub !== undefined && (
+        <Text style={[styles.sub, { color: darkBg ? C.darkMuted : C.secondary }]}>{sub}</Text>
+      )}
     </Pressable>
   );
 }, areAvatarPropsEqual);
@@ -352,9 +365,8 @@ const styles = StyleSheet.create({
   wrap: { alignItems: 'center', gap: 3 },
   circle: { alignItems: 'center', justifyContent: 'center' },
   active: {
-    shadowColor: C.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 0,
-    borderColor: C.gold, transform: [{ scale: 1.08 }],
-    outlineWidth: 3.5, outlineColor: C.gold, outlineStyle: 'solid', outlineOffset: 2,
+    borderColor: C.goldDeep,
+    borderWidth: 2.5,
   } as object,
   doodle: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
   blackoutMask: {
@@ -396,10 +408,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: 'rgba(28,32,36,0.25)', alignItems: 'center', justifyContent: 'center',
   },
   name: {
-    fontFamily: FONT, fontSize: 12, lineHeight: 15, fontWeight: '700', color: C.onSon, maxWidth: '100%', textAlign: 'center',
+    fontFamily: FONT, fontSize: 12, lineHeight: 15, fontWeight: '600', color: C.ink, maxWidth: '100%', textAlign: 'center',
     wordBreak: 'break-word', overflowWrap: 'anywhere',
   } as object,
-  sub: { fontFamily: FONT, fontSize: 12, fontWeight: '600', color: C.onSon, opacity: 0.85, textAlign: 'center' },
+  sub: { fontFamily: FONT, fontSize: 11.5, fontWeight: '500', color: C.secondary, textAlign: 'center', fontVariant: ['tabular-nums'] },
 });
 
 /** Chân dung tròn dùng chung (kết quả, trò chuyện, tài khoản): cùng cách vẽ như trong ván. */

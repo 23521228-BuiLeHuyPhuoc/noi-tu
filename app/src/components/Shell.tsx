@@ -2,12 +2,11 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRe
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GAME_INFO, type ChatMsg, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
-import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
+import { ROOM_THEMES } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { isMuted, setMuted } from '../sound';
 import { copyText } from '../web';
-import { GAME_META } from '../messages';
-import { C } from '../theme';
+import { C, backdropPalette } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
@@ -20,7 +19,7 @@ import { PokeLayer } from './PokeFx';
 import { PokeSideLayer } from './PokeSideFx';
 import { Sheet } from './Sheet';
 import { ProfileSheet } from './Account';
-import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
+import { RubyIcon, UiIcon } from './Icons';
 
 export interface StripOptions {
   sub?: (p: PublicPlayer) => string | undefined;
@@ -136,7 +135,7 @@ export function Shell({
   const [smooth, setSmooth] = useSmoothMode();
   const [localTheme, setLocalTheme] = useLocalTheme();
   const activeThemeId = room.settings.roomTheme ?? localTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
-  const theme = themeById(activeThemeId);
+  const pal = backdropPalette(activeThemeId);
 
   const iconOnly = width < 440 || fullscreen;
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
@@ -209,11 +208,21 @@ export function Shell({
         size={stripSize}
         editable={p.id === game.me}
         crowded={crowded}
+        darkBg={pal.dark}
         onPress={p.id === game.me ? openMyProfile : undefined}
         onSelectPlayer={p.id !== game.me && !meIsSpectator ? handleSelectPlayer : undefined}
       />
     </View>
   ));
+
+  const iconBtnBg = pal.dark ? C.darkSubtle : C.mist;
+  const iconBtnBorder = pal.dark ? C.darkBorder : C.borderSubtle;
+  const iconStroke = pal.dark ? C.darkText : C.secondary;
+  const compactIconBtnStyle = [
+    styles.topIconBtn,
+    iconOnly && styles.iconTight,
+    { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
+  ];
 
   return (
     <ToolsCtx.Provider value={{
@@ -227,7 +236,7 @@ export function Shell({
       chaos,
       chaosHits,
     }}>
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <View style={{ flex: 1, backgroundColor: pal.bg }}>
       <MapBackdrop themeId={activeThemeId} smooth={smooth || room.phase === 'playing'} />
       <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen, webKbInset > 0 && { paddingBottom: webKbInset }]}>
         {!bare && (<>
@@ -237,31 +246,31 @@ export function Shell({
             compactLandscape && styles.topLandscape,
             tightHeight && styles.topTightVertical,
             iconOnly && styles.topTight,
+            { backgroundColor: pal.card, borderColor: pal.hairline },
           ]}
         >
-          <Button
+          <Pressable
             testID="room-chip"
-            small
-            variant="paper"
-            iconNode={<UiIcon name="Copy" size={13} color={C.ink} />}
-            title={iconOnly ? room.code : `Phòng ${room.code}`}
-            style={[styles.chip, iconOnly && styles.chipTight]}
+            accessibilityRole="button"
             onPress={async () => (await copyText(room.code)) && feed('Đã sao chép mã phòng')}
-          />
-          {iconOnly && chaos ? (
-            <View style={styles.spacer} />
-          ) : iconOnly ? (
-            <View accessibilityLabel={GAME_INFO[room.gameType].name} style={[styles.gameIconWrap, compactLandscape && { flex: 0 }]}>
-              <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={20} />
-            </View>
-          ) : (
-            <View style={[styles.gameNameWrap, compactLandscape && styles.gameNameLandscape]}>
-              <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={20} />
-              <T numberOfLines={1} style={[styles.gameName, { color: theme.onBg }]}>
-                {GAME_INFO[room.gameType].name}
-              </T>
-            </View>
-          )}
+            style={({ pressed }) => [
+              styles.chipBtn,
+              { backgroundColor: iconBtnBg, borderColor: iconBtnBorder },
+              pressed && { opacity: 0.78 },
+            ]}
+          >
+            <UiIcon name="Copy" size={13} color={iconStroke} strokeWidth={1.65} />
+            <T style={[styles.chipTxt, { color: pal.text }]}>
+              {iconOnly ? room.code : `Phòng ${room.code}`}
+            </T>
+          </Pressable>
+
+          <View style={[styles.gameNameWrap, compactLandscape && styles.gameNameLandscape]}>
+            <T numberOfLines={1} style={[styles.gameName, { color: pal.text }]}>
+              {GAME_INFO[room.gameType].name}
+            </T>
+          </View>
+
           {!hideStrip && inlineStrip && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
               {stripItems}
@@ -271,20 +280,20 @@ export function Shell({
             <View>
               <IconButton
                 testID="chaos-btn"
-                icon="🌪️"
-                iconNode={<UiIcon name="Flame" size={iconOnly ? 17 : 19} color="#EA580C" />}
-                label={`Chọc loạn xạ cả phòng (💎${CHAOS_POKE_RUBY})`}
-                style={iconOnly && styles.iconTight}
+                icon="Flame"
+                iconNode={<UiIcon name="Flame" size={15} color="#B45309" strokeWidth={1.65} />}
+                label={`Chọc loạn xạ cả phòng (${CHAOS_POKE_RUBY} Ruby)`}
+                style={compactIconBtnStyle}
                 onPress={chaos}
               />
               {chaosHits > 0 && <ChaosFloat key={chaosHits} style={styles.chaosFloatTop} />}
             </View>
           )}
-          <IconButton testID="room-visual-open" icon="🎨" iconNode={<UiIcon name="Palette" size={iconOnly ? 16 : 19} color={C.violet} />} label="Map phòng & Siêu mượt" style={iconOnly && styles.iconTight} onPress={() => setVisualOpen(true)} />
-          <IconButton testID="profile-open" icon="✏️" iconNode={<UiIcon name="Pencil" size={iconOnly ? 16 : 18} color={C.ink} />} label="Sửa tên & ảnh" style={iconOnly && styles.iconTight} onPress={openMyProfile} />
+          <IconButton testID="room-visual-open" icon="Palette" iconNode={<UiIcon name="Palette" size={15} color={iconStroke} strokeWidth={1.65} />} label="Map phòng & Siêu mượt" style={compactIconBtnStyle} onPress={() => setVisualOpen(true)} />
+          <IconButton testID="profile-open" icon="Pencil" iconNode={<UiIcon name="Pencil" size={15} color={iconStroke} strokeWidth={1.65} />} label="Sửa tên & ảnh" style={compactIconBtnStyle} onPress={openMyProfile} />
           {!hideChat && (
             <View>
-              <IconButton testID="chat-open" icon="💬" iconNode={<UiIcon name="MessageCircle" size={iconOnly ? 16 : 19} color={C.ink} />} label="Trò chuyện" style={iconOnly && styles.iconTight} onPress={() => setChatOpen(true)} />
+              <IconButton testID="chat-open" icon="MessageCircle" iconNode={<UiIcon name="MessageCircle" size={15} color={iconStroke} strokeWidth={1.65} />} label="Trò chuyện" style={compactIconBtnStyle} onPress={() => setChatOpen(true)} />
               {unread > 0 && (
                 <View testID="chat-badge" pointerEvents="none" style={styles.badge}>
                   <T style={styles.badgeText}>{unread > 9 ? '9+' : unread}</T>
@@ -293,16 +302,16 @@ export function Shell({
             </View>
           )}
           <IconButton
-            icon={muted ? '🔇' : '🔊'}
-            iconNode={<UiIcon name={muted ? 'VolumeX' : 'Volume2'} size={iconOnly ? 16 : 19} color={muted ? C.danger : C.ink} />}
+            icon="Volume2"
+            iconNode={<UiIcon name={muted ? 'VolumeX' : 'Volume2'} size={15} color={muted ? C.danger : iconStroke} strokeWidth={1.65} />}
             label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-            style={iconOnly && styles.iconTight}
+            style={compactIconBtnStyle}
             onPress={() => {
               setMuted(!muted);
               setMutedState(!muted);
             }}
           />
-          <IconButton testID="leave-open" icon="🚪" iconNode={<UiIcon name="LogOut" size={iconOnly ? 16 : 18} color={C.son} />} label="Rời phòng" style={iconOnly && styles.iconTight} onPress={() => setLeaving(true)} />
+          <IconButton testID="leave-open" icon="LogOut" iconNode={<UiIcon name="LogOut" size={15} color={C.danger} strokeWidth={1.65} />} label="Rời phòng" style={compactIconBtnStyle} onPress={() => setLeaving(true)} />
         </View>
 
         {!hideStrip && !compactLandscape && (
@@ -319,9 +328,9 @@ export function Shell({
         </>)}
 
         {meIsSpectator && (
-          <View testID="spectator-banner" style={styles.spectatorBanner}>
-            <UiIcon name="Eye" size={14} color={C.gold} />
-            <T style={styles.spectatorText}>Bạn đang xem ván này. Ván sau sẽ được chơi!</T>
+          <View testID="spectator-banner" style={[styles.spectatorBanner, { backgroundColor: pal.card, borderColor: pal.hairline }]}>
+            <UiIcon name="Eye" size={14} color={C.goldDeep} strokeWidth={1.65} />
+            <T style={[styles.spectatorText, { color: pal.text }]}>Bạn đang xem ván này. Ván sau sẽ được chơi.</T>
           </View>
         )}
 
@@ -334,7 +343,7 @@ export function Shell({
         )}
 
         {bottom ? (
-          <View style={[styles.bottom, tightHeight && styles.bottomTight, { borderTopColor: 'rgba(255,255,255,0.12)' }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
+          <View style={[styles.bottom, tightHeight && styles.bottomTight, { borderTopColor: pal.hairline }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
         ) : (
           <View onLayout={() => setFeedInset(12)} />
         )}
@@ -345,34 +354,35 @@ export function Shell({
         {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
         {profileOpen && <ProfileSheet game={game} room={room} onClose={() => setProfileOpen(false)} />}
         {visualOpen && (
-          <Sheet title="🎨 Giao Diện & Chống Lag" onClose={() => setVisualOpen(false)}>
+          <Sheet title="Giao diện & Chống lag" onClose={() => setVisualOpen(false)}>
             <View style={styles.smoothBox}>
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <UiIcon name="Gauge" size={16} color={C.jadeDeep} />
-                  <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>Chế độ Siêu Mượt</T>
+                  <UiIcon name="Gauge" size={16} color={C.jadeDeep} strokeWidth={1.65} />
+                  <T style={{ fontWeight: '600', fontSize: 14, color: C.ink }}>Chế độ Siêu mượt</T>
                 </View>
-                <T style={{ fontSize: 12, color: C.muted }}>Tắt hạt bay nền & giảm pháo giấy để máy yếu / phòng 12 người mượt 60fps.</T>
+                <T style={{ fontSize: 12, color: C.secondary }}>Giảm hiệu ứng pháo giấy để máy yếu hoặc phòng 12 người mượt 60fps.</T>
               </View>
               <Button
                 testID="room-smooth-toggle"
                 small
                 variant={smooth ? 'jade' : 'paper'}
-                title={smooth ? 'ĐANG BẬT' : 'Tắt'}
+                title={smooth ? 'Đang bật' : 'Tắt'}
                 onPress={() => setSmooth(!smooth)}
               />
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <UiIcon name="Map" size={16} color={C.ink} />
-              <T style={{ fontWeight: '900', fontSize: 14, color: C.ink }}>
-                {isHost ? 'Đổi Map cho cả phòng (kể cả giữa ván)' : 'Đổi Map hiển thị trên máy bạn'}
+              <UiIcon name="Map" size={16} color={C.secondary} strokeWidth={1.65} />
+              <T style={{ fontWeight: '600', fontSize: 14, color: C.ink }}>
+                {isHost ? 'Đổi Map cho cả phòng' : 'Đổi Map hiển thị trên máy bạn'}
               </T>
             </View>
             <View style={{ gap: 6 }}>
               {ROOM_THEMES.map((t) => {
                 const canUse = !isHost ? true : t.price === 0 || ownedSet.has(t.id);
                 const selected = activeThemeId === t.id;
+                const isDefaultMap = t.id === 'son_mac_dinh';
                 return (
                   <Pressable
                     key={t.id}
@@ -393,25 +403,40 @@ export function Shell({
                     }}
                     style={[styles.mapItem, selected && styles.mapItemOn, !canUse && { opacity: 0.5 }]}
                   >
-                    <View style={[styles.mapSwatch, { backgroundColor: t.bg, borderColor: t.accent }]}>
-                      <EmojiIcon emoji={t.emoji} size={20} />
+                    <View
+                      style={[
+                        styles.mapSwatch,
+                        {
+                          backgroundColor: isDefaultMap ? C.parchment : t.bg,
+                          borderColor: isDefaultMap ? C.borderStrong : t.accent,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: 6,
+                          backgroundColor: isDefaultMap ? C.son : t.accent,
+                        }}
+                      />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <T style={{ fontWeight: '900', fontSize: 13 }}>{t.name}</T>
-                      <T style={{ fontSize: 11, color: C.muted }}>{t.desc}</T>
+                      <T style={{ fontWeight: '600', fontSize: 13.5, color: C.ink }}>{t.name}</T>
+                      <T style={{ fontSize: 11.5, color: C.secondary }}>{t.desc}</T>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       {selected ? (
                         <>
-                          <UiIcon name="CheckCircle2" size={14} color={C.jadeDeep} />
-                          <T style={{ fontWeight: '900', fontSize: 12, color: C.jadeDeep }}>Dùng</T>
+                          <UiIcon name="CheckCircle2" size={14} color={C.jadeDeep} strokeWidth={1.75} />
+                          <T style={{ fontWeight: '600', fontSize: 12, color: C.jadeDeep }}>Đang dùng</T>
                         </>
                       ) : canUse ? (
-                        <T style={{ fontWeight: '900', fontSize: 12, color: C.son }}>Chọn</T>
+                        <T style={{ fontWeight: '600', fontSize: 12, color: C.secondary }}>Chọn</T>
                       ) : (
                         <>
                           <RubyIcon size={13} />
-                          <T style={{ fontWeight: '900', fontSize: 12, color: C.son }}>{t.price}</T>
+                          <T style={{ fontWeight: '600', fontSize: 12, color: C.goldDeep, fontVariant: ['tabular-nums'] }}>{t.price}</T>
                         </>
                       )}
                     </View>
@@ -422,8 +447,8 @@ export function Shell({
           </Sheet>
         )}
         {leaving && (
-          <Sheet title="Rời phòng?" onClose={() => setLeaving(false)}>
-            <T style={{ color: C.muted }}>
+          <Sheet title="Rời phòng" onClose={() => setLeaving(false)}>
+            <T style={{ color: C.secondary, fontSize: 14 }}>
               {room.phase === 'playing' ? 'Bạn đang trong ván, rời bây giờ là tính như bỏ cuộc.' : 'Bạn có thể vào lại bằng mã phòng.'}
             </T>
             <Button testID="leave-confirm" title="Rời phòng" variant="danger" onPress={game.leave} />
@@ -470,19 +495,25 @@ const styles = StyleSheet.create({
   top: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginHorizontal: 10, marginTop: 8, paddingHorizontal: 8, paddingVertical: 6,
-    borderRadius: 18, backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12, backgroundColor: C.paper,
+    borderWidth: 1, borderColor: C.borderSubtle,
   },
-  topLandscape: { marginTop: 3, paddingVertical: 3, paddingHorizontal: 8, gap: 6 },
-  chip: { flexShrink: 0 },
+  topLandscape: { marginTop: 4, paddingVertical: 4, paddingHorizontal: 8, gap: 6 },
+  chipBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, height: 30, borderRadius: 8, borderWidth: 1, flexShrink: 0,
+  },
+  chipTxt: { fontSize: 12.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
   gameNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
-  gameName: { color: C.onSon, fontWeight: '800', fontSize: 15, flexShrink: 1 },
-  gameIconWrap: { flex: 1, minWidth: 28, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  gameName: { color: C.ink, fontWeight: '600', fontSize: 14, flexShrink: 1 },
   gameNameLandscape: { flex: 0, marginRight: 4 },
+  topIconBtn: {
+    width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
   stripScroll: { flexGrow: 0, flexShrink: 0 },
   stripScrollRow: { flexGrow: 0, flexShrink: 0, maxHeight: 68, minHeight: 68 },
   stripScrollLandscape: { flex: 1, flexGrow: 1, maxHeight: 54 },
-  strip: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 6, gap: 2 },
+  strip: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4, gap: 2 },
   stripLandscape: { alignItems: 'center', paddingVertical: 0, gap: 0 },
   avatarRow: { transform: [{ scale: 0.78 }], marginHorizontal: -7, marginVertical: -9 },
   avatarCompact: { transform: [{ scale: 0.56 }], marginHorizontal: -12, marginVertical: -18 },
@@ -495,25 +526,22 @@ const styles = StyleSheet.create({
   spectatorBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginHorizontal: 12, marginTop: 4, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 10,
-    backgroundColor: 'rgba(15, 23, 42, 0.78)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,197,61,0.55)',
+    backgroundColor: C.paper, borderRadius: 10, borderWidth: 1, borderColor: C.borderSubtle,
   },
-  spectatorText: { color: C.gold, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  spectatorText: { color: C.ink, fontSize: 12, fontWeight: '500', textAlign: 'center' },
   badge: {
-    position: 'absolute', top: -5, right: -5, minWidth: 19, height: 19, borderRadius: 9.5, backgroundColor: '#EF4444',
-    borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 8.5, backgroundColor: C.danger,
+    borderWidth: 1.5, borderColor: C.paper, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
-  badgeText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
-  chaosSmall: { width: 34, height: 34, borderRadius: 12 },
-  iconTight: { width: 34, height: 34, borderRadius: 11 },
+  badgeText: { fontSize: 10, fontWeight: '600', color: '#FFFFFF', fontVariant: ['tabular-nums'] },
+  iconTight: { width: 28, height: 28, borderRadius: 7 },
   topTight: { gap: 4, marginHorizontal: 8, paddingHorizontal: 6 },
-  chipTight: {},
-  spacer: { flex: 1 },
-  chaosFloatTop: { position: 'absolute', top: 42, left: -10, right: -10, zIndex: 60 },
-  chaosFloatText: { fontSize: 13, fontWeight: '900', color: C.gold, textShadowColor: C.ink, textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
+  chaosFloatTop: { position: 'absolute', top: 38, left: -10, right: -10, zIndex: 60 },
+  chaosFloatText: { fontSize: 12.5, fontWeight: '600', color: C.goldDeep, fontVariant: ['tabular-nums'] },
   bottom: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
   bottomTight: { paddingHorizontal: 10, paddingTop: 5, paddingBottom: 7, gap: 5 },
-  smoothBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(217,119,6,0.28)', padding: 12 },
-  mapItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.08)' },
-  mapItemOn: { borderColor: C.jade, backgroundColor: '#ECFDF5' },
-  mapSwatch: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  smoothBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.goldSoft, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(180,83,9,0.22)', padding: 12 },
+  mapItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: C.mist, borderWidth: 1, borderColor: C.borderSubtle },
+  mapItemOn: { borderColor: C.jade, backgroundColor: C.jadeSoft },
+  mapSwatch: { width: 34, height: 34, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 });

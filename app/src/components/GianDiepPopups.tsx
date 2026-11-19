@@ -23,6 +23,22 @@ export function portraitSrc(pl?: PublicPlayer, seatNo?: number): PortraitSource 
   return pl ?? { avatar: seatNo ?? 0 };
 }
 
+function formatVoterList(
+  ids: string[],
+  names: Record<string, string>,
+  seatIndexMap: Map<string, number>,
+  me: string,
+): string {
+  return ids
+    .map((id) => {
+      if (id === me) return 'Bạn';
+      const seat = seatIndexMap.get(id);
+      const name = names[id] ?? id;
+      return seat !== undefined ? `#${seat} ${name}` : name;
+    })
+    .join(', ');
+}
+
 /**
  * Bảng màu & token theo hướng Dossier Giấy Ấm + Mực (unslop):
  * - Bề mặt trung tính ấm áp, tương phản rõ, loại bỏ neon glow và emoji trang trí.
@@ -496,6 +512,19 @@ export const VoteLivePanel = memo(function VoteLivePanel({
   const votedCount = view.alive.filter((id) => Boolean(view.votes[id])).length;
   const cols = width >= 340 ? 2 : 1;
 
+  const votersByTarget: Record<string, string[]> = {};
+  const skipVoters: string[] = [];
+  for (const voterId of view.order) {
+    if (!view.alive.includes(voterId)) continue;
+    const target = view.votes[voterId];
+    if (!target) continue;
+    if (target === 'skip') skipVoters.push(voterId);
+    else {
+      votersByTarget[target] ??= [];
+      votersByTarget[target].push(voterId);
+    }
+  }
+
   if (collapsed || kbOpen) {
     const pickedLabel =
       myVote === 'skip'
@@ -557,8 +586,10 @@ export const VoteLivePanel = memo(function VoteLivePanel({
           </Pressable>
         </View>
 
+        <T style={styles.liveSubtleNote}>Đổi phiếu tự do tới khi hết giờ ({sec}s)</T>
+
         <ScrollView
-          style={{ maxHeight: compact ? 136 : Math.min(188, height * 0.25) }}
+          style={{ maxHeight: compact ? 150 : Math.min(204, height * 0.27) }}
           contentContainerStyle={styles.voteGrid}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
@@ -566,7 +597,8 @@ export const VoteLivePanel = memo(function VoteLivePanel({
           {candidates.map((id) => {
             const pl = playerMap.get(id);
             const seatNo = seatIndexMap.get(id);
-            const votes = voteTally[id] ?? 0;
+            const voters = votersByTarget[id] ?? [];
+            const votes = voteTally[id] ?? voters.length;
             const selected = myVote === id;
             const clueText = latestClueByPlayer.get(id);
             return (
@@ -609,6 +641,11 @@ export const VoteLivePanel = memo(function VoteLivePanel({
                       {selected ? 'Đang chọn' : 'Chạm để bầu'}
                     </T>
                   )}
+                  {voters.length > 0 && (
+                    <T testID={`gd-voters-${id}`} numberOfLines={2} style={styles.voterNamesTxt}>
+                      Bầu: {formatVoterList(voters, view.names, seatIndexMap, me)}
+                    </T>
+                  )}
                 </View>
                 {selected && <UiIcon name="Check" size={14} color={GD.accent} strokeWidth={2} />}
               </Pressable>
@@ -627,14 +664,26 @@ export const VoteLivePanel = memo(function VoteLivePanel({
           }}
           style={({ pressed }) => [
             styles.skipVoteBtn,
+            skipVoters.length > 0 && { height: 'auto', minHeight: 36, paddingVertical: 6 },
             myVote === 'skip' && styles.skipVoteBtnSelected,
             pressed && styles.pressedSoft,
           ]}
         >
-          {myVote === 'skip' && <UiIcon name="Check" size={14} color={GD.accent} strokeWidth={1.8} />}
-          <T style={[styles.skipVoteTxt, myVote === 'skip' && { color: GD.accent }]}>
-            {myVote === 'skip' ? 'Đã chọn bỏ phiếu trắng' : 'Bỏ phiếu trắng'}
-          </T>
+          <View style={styles.skipVoteInner}>
+            <View style={styles.skipVoteTopRow}>
+              {myVote === 'skip' && <UiIcon name="Check" size={14} color={GD.accent} strokeWidth={1.8} />}
+              <T style={[styles.skipVoteTxt, myVote === 'skip' && { color: GD.accent }]}>
+                {myVote === 'skip'
+                  ? `Đã chọn bỏ phiếu trắng${skipVoters.length ? ` (${skipVoters.length})` : ''}`
+                  : `Bỏ phiếu trắng${skipVoters.length ? ` (${skipVoters.length})` : ''}`}
+              </T>
+            </View>
+            {skipVoters.length > 0 && (
+              <T testID="gd-voters-skip" numberOfLines={1} style={styles.voterNamesTxt}>
+                {formatVoterList(skipVoters, view.names, seatIndexMap, me)}
+              </T>
+            )}
+          </View>
         </Pressable>
       </View>
     </View>
@@ -679,8 +728,28 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
   const accId = defs[0] ?? '';
   const accName = view.names[accId] ?? accId;
   const accSeat = seatIndexMap.get(accId);
-  const banishVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'banish').length;
-  const forgiveVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'forgive').length;
+  const banishVoters: string[] = [];
+  const forgiveVoters: string[] = [];
+  const tieVotersByTarget: Record<string, string[]> = {};
+  const tieSkipVoters: string[] = [];
+
+  for (const voterId of view.order) {
+    if (!view.alive.includes(voterId)) continue;
+    const v = view.finalVotes?.[voterId];
+    if (!v) continue;
+    if (isSingle) {
+      if (v === 'banish') banishVoters.push(voterId);
+      else if (v === 'forgive') forgiveVoters.push(voterId);
+    } else {
+      if (v === 'skip') tieSkipVoters.push(voterId);
+      else {
+        tieVotersByTarget[v] ??= [];
+        tieVotersByTarget[v].push(voterId);
+      }
+    }
+  }
+  const banishVotes = banishVoters.length;
+  const forgiveVotes = forgiveVoters.length;
 
   if (collapsed || kbOpen) {
     return (
@@ -748,6 +817,8 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
             </Pressable>
           </View>
 
+          <T style={styles.liveSubtleNote}>Đổi quyết định tự do tới khi hết giờ ({sec}s)</T>
+
           <View style={styles.accusedCompactRow}>
             <Portrait p={portraitSrc(accPlayer, accSeat)} size={34} border={1} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -760,6 +831,21 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
                   {latestDef ? `Biện minh: “${latestDef}”` : `Gợi ý: “${quoteText}”`}
                 </T>
               )}
+            </View>
+          </View>
+
+          <View testID="gd-verdict-voters" style={styles.verdictLedgerBox}>
+            <View style={styles.verdictLedgerRow}>
+              <T style={[styles.verdictLedgerLabel, { color: GD.danger }]}>Trục xuất ({banishVotes}):</T>
+              <T numberOfLines={2} style={styles.verdictLedgerNames}>
+                {banishVoters.length > 0 ? formatVoterList(banishVoters, view.names, seatIndexMap, me) : 'Chưa có'}
+              </T>
+            </View>
+            <View style={styles.verdictLedgerRow}>
+              <T style={[styles.verdictLedgerLabel, { color: GD.positive }]}>Tha bổng ({forgiveVotes}):</T>
+              <T numberOfLines={2} style={styles.verdictLedgerNames}>
+                {forgiveVoters.length > 0 ? formatVoterList(forgiveVoters, view.names, seatIndexMap, me) : 'Chưa có'}
+              </T>
             </View>
           </View>
 
@@ -845,8 +931,10 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
           </Pressable>
         </View>
 
+        <T style={styles.liveSubtleNote}>Đổi quyết định tự do tới khi hết giờ ({sec}s)</T>
+
         <ScrollView
-          style={{ maxHeight: Math.min(160, height * 0.24) }}
+          style={{ maxHeight: Math.min(170, height * 0.25) }}
           contentContainerStyle={{ gap: 6 }}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
@@ -854,7 +942,8 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
           {defs.filter((id) => id !== me).map((id) => {
             const pl = playerMap.get(id);
             const seatNo = seatIndexMap.get(id);
-            const votes = voteTally[id] ?? 0;
+            const voters = tieVotersByTarget[id] ?? [];
+            const votes = voteTally[id] ?? voters.length;
             const selected = myVerdict === id;
             const clueText = latestClueByPlayer.get(id);
             return (
@@ -881,6 +970,11 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
                     <T numberOfLines={1} style={styles.voteTileName}>{view.names[id] ?? id}</T>
                   </View>
                   {clueText && <T numberOfLines={1} style={styles.voteTileClue}>“{clueText}”</T>}
+                  {voters.length > 0 && (
+                    <T testID={`gd-verdict-voters-${id}`} numberOfLines={2} style={styles.voterNamesTxt}>
+                      Bầu: {formatVoterList(voters, view.names, seatIndexMap, me)}
+                    </T>
+                  )}
                 </View>
                 <T style={[styles.voteCountTabular, selected && { color: GD.accent }]}>
                   {selected ? `Đã chọn · ${votes}` : `${votes}`}
@@ -901,13 +995,25 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
           }}
           style={({ pressed }) => [
             styles.skipVoteBtn,
+            tieSkipVoters.length > 0 && { height: 'auto', minHeight: 36, paddingVertical: 6 },
             myVerdict === 'skip' && styles.skipVoteBtnSelected,
             pressed && styles.pressedSoft,
           ]}
         >
-          <T style={[styles.skipVoteTxt, myVerdict === 'skip' && { color: GD.accent }]}>
-            {myVerdict === 'skip' ? 'Đã chọn tha cả nhóm' : 'Tha bổng tất cả'}
-          </T>
+          <View style={styles.skipVoteInner}>
+            <View style={styles.skipVoteTopRow}>
+              <T style={[styles.skipVoteTxt, myVerdict === 'skip' && { color: GD.accent }]}>
+                {myVerdict === 'skip'
+                  ? `Đã chọn tha cả nhóm${tieSkipVoters.length ? ` (${tieSkipVoters.length})` : ''}`
+                  : `Tha bổng tất cả${tieSkipVoters.length ? ` (${tieSkipVoters.length})` : ''}`}
+              </T>
+            </View>
+            {tieSkipVoters.length > 0 && (
+              <T testID="gd-verdict-voters-skip" numberOfLines={1} style={styles.voterNamesTxt}>
+                {formatVoterList(tieSkipVoters, view.names, seatIndexMap, me)}
+              </T>
+            )}
+          </View>
         </Pressable>
       </View>
     </View>
@@ -1344,6 +1450,62 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
     fontFamily: FONT,
+  },
+  liveSubtleNote: {
+    color: GD.textMuted,
+    fontSize: 11,
+    fontWeight: '400',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  voterNamesTxt: {
+    color: GD.textMuted,
+    fontSize: 10.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+    lineHeight: 14,
+  },
+  skipVoteInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    width: '100%',
+  },
+  skipVoteTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  verdictLedgerBox: {
+    backgroundColor: GD.feedBg,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 3,
+  },
+  verdictLedgerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  verdictLedgerLabel: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 0,
+  },
+  verdictLedgerNames: {
+    flex: 1,
+    minWidth: 0,
+    color: GD.textSecondary,
+    fontSize: 11.5,
+    fontWeight: '400',
+    fontFamily: FONT,
+    lineHeight: 15,
   },
 
   skipVoteBtn: {

@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Platform, Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type TextProps, type ViewStyle } from 'react-native';
-import { C, FONT, GRADS, sticker } from './theme';
+import { C, FONT, sticker } from './theme';
 import { play } from './sound';
 import { EmojiIcon, UiIcon, splitEdgeEmoji, type UiIconName } from './components/Icons';
 
@@ -18,30 +17,30 @@ export function T({ style, selectable, ...rest }: TextProps) {
   );
 }
 
-// ---------- Nút bấm gradient & bề mặt tactile ----------
+// ---------- Nút bấm phẳng tinh tế & bề mặt hairline ----------
 
 export type Variant = 'gold' | 'paper' | 'ink' | 'jade' | 'ghost' | 'danger' | 'royal';
 
 const VARIANTS: Record<
   Variant,
-  { colors: readonly [string, string, string]; fg: string; lip: string; rim: string }
+  { bg: string; fg: string; bd: string }
 > = {
-  gold: { colors: GRADS.gold, fg: '#271400', lip: '#D97706', rim: 'rgba(255,255,255,0.55)' },
-  paper: { colors: GRADS.paper, fg: C.ink, lip: '#CBD5E1', rim: 'rgba(255,255,255,0.9)' },
-  ink: { colors: GRADS.ink, fg: C.gold, lip: '#090D12', rim: 'rgba(255,255,255,0.16)' },
-  jade: { colors: GRADS.jade, fg: '#FFFFFF', lip: '#0F6E56', rim: 'rgba(255,255,255,0.35)' },
-  danger: { colors: GRADS.danger, fg: '#FFFFFF', lip: '#9F1239', rim: 'rgba(255,255,255,0.32)' },
-  royal: { colors: GRADS.royal, fg: '#FFFFFF', lip: '#3730A3', rim: 'rgba(255,255,255,0.34)' },
-  ghost: { colors: ['transparent', 'transparent', 'transparent'], fg: C.onSon, lip: 'transparent', rim: 'transparent' },
+  gold: { bg: '#F59E0B', fg: C.ink, bd: 'rgba(180, 83, 9, 0.36)' },
+  paper: { bg: C.mist, fg: C.ink, bd: C.borderSubtle },
+  ink: { bg: C.ink, fg: C.onSon, bd: C.ink },
+  jade: { bg: C.jade, fg: '#FFFFFF', bd: C.jadeDeep },
+  danger: { bg: C.danger, fg: '#FFFFFF', bd: '#991B1B' },
+  royal: { bg: C.violet, fg: '#FFFFFF', bd: '#4C1D95' },
+  ghost: { bg: 'transparent', fg: C.secondary, bd: C.borderSubtle },
 };
 
 export function Button({
-  title, variant = 'gold', small, disabled, style, onPress, icon, iconNode, big, ...rest
+  title, variant = 'ink', small, disabled, style, onPress, icon, iconNode, big, ...rest
 }: Omit<PressableProps, 'style'> & {
   title: string;
   variant?: Variant;
   small?: boolean;
-  /** chữ thật to (vd: nút chỉ có icon) */
+  /** chữ thật to (vd: nút chỉ có icon picker) */
   big?: boolean;
   icon?: string;
   iconNode?: ReactNode;
@@ -49,10 +48,12 @@ export function Button({
 }) {
   const v = VARIANTS[variant];
   const split = splitEdgeEmoji(title);
-  const effectiveLead = icon ?? split.leading;
-  const effectiveTrail = !icon ? split.trailing : undefined;
-  const cleanTitle = icon ? title : split.text;
-  const iconSz = big ? 28 : small ? 16 : 19;
+  const rawLabel = (icon ? title : split.text).replace(/!+$/g, '').trim();
+  const hasLabel = rawLabel.length > 0;
+  // Giữ icon emoji thuần khi nút CHỈ là ô chọn emoji (không có nhãn chữ); các nút có nhãn chữ bỏ emoji trang trí
+  const emojiOnly = !hasLabel ? (icon ?? split.leading ?? split.trailing) : undefined;
+  const fg = disabled ? C.muted : v.fg;
+  const iconSz = big ? 26 : small ? 15 : 18;
 
   return (
     <Pressable
@@ -65,59 +66,39 @@ export function Button({
         onPress?.(e);
       }}
       style={({ pressed }) => [
-        styles.btnOuter,
-        small && styles.btnOuterSmall,
-        variant !== 'ghost' && [
-          styles.btnElevated,
-          { backgroundColor: v.lip },
-          Platform.OS === 'web' && !pressed
-            ? ({ boxShadow: '0 6px 14px -4px rgba(15,23,42,0.28), 0 2px 0 ' + v.lip } as object)
-            : null,
-        ],
-        variant === 'ghost' && styles.ghost,
-        pressed && variant !== 'ghost' && { transform: [{ translateY: 2 }] },
-        disabled && styles.disabled,
+        styles.btnBase,
+        small && styles.btnSmall,
+        {
+          backgroundColor: disabled ? '#E5DFD3' : v.bg,
+          borderColor: disabled ? C.borderSubtle : v.bd,
+        },
+        pressed && !disabled && styles.btnPressed,
         style,
       ]}
       {...rest}
     >
-      {variant === 'ghost' ? (
-        <View style={[styles.btnInner, small && styles.btnInnerSmall]}>
-          {iconNode}
-          {!iconNode && effectiveLead && <EmojiIcon emoji={effectiveLead} size={iconSz} />}
-          {cleanTitle ? (
-            <Text selectable={false} numberOfLines={small ? 2 : 1} style={[styles.btnText, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
-              {cleanTitle}
-            </Text>
-          ) : null}
-          {effectiveTrail && <EmojiIcon emoji={effectiveTrail} size={iconSz} />}
-        </View>
-      ) : (
-        <LinearGradient
-          colors={[...v.colors]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+      {iconNode}
+      {!iconNode && emojiOnly && <EmojiIcon emoji={emojiOnly} size={iconSz} />}
+      {hasLabel ? (
+        <Text
+          selectable={false}
+          numberOfLines={small ? 2 : 1}
           style={[
-            styles.btnInner,
-            small && styles.btnInnerSmall,
-            { borderTopWidth: 1, borderTopColor: v.rim },
+            styles.btnText,
+            small && { textAlign: 'center' },
+            small && styles.btnTextSmall,
+            big && styles.btnTextBig,
+            { color: fg },
           ]}
         >
-          {iconNode}
-          {!iconNode && effectiveLead && <EmojiIcon emoji={effectiveLead} size={iconSz} />}
-          {cleanTitle ? (
-            <Text selectable={false} numberOfLines={small ? 2 : 1} style={[styles.btnText, small && { textAlign: 'center' }, small && styles.btnTextSmall, big && styles.btnTextBig, { color: v.fg }]}>
-              {cleanTitle}
-            </Text>
-          ) : null}
-          {effectiveTrail && <EmojiIcon emoji={effectiveTrail} size={iconSz} />}
-        </LinearGradient>
-      )}
+          {rawLabel}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
 
-/** Nút tròn/squircle nhỏ gọn chỉ có biểu tượng vector (≥ 42px dễ chạm) */
+/** Nút vuông bo góc nhẹ chỉ có biểu tượng vector */
 export function IconButton({ icon, iconNode, label, onPress, style, testID }: {
   icon: string; iconNode?: ReactNode; label: string; onPress: () => void; style?: StyleProp<ViewStyle>; testID?: string;
 }) {
@@ -131,15 +112,15 @@ export function IconButton({ icon, iconNode, label, onPress, style, testID }: {
         onPress();
       }}
       hitSlop={6}
-      style={({ pressed }) => [styles.icon, sticker(pressed ? 1 : 2), pressed && { transform: [{ translateY: 2 }] }, style]}
+      style={({ pressed }) => [styles.icon, pressed && styles.btnPressed, style]}
     >
-      {iconNode ?? <EmojiIcon emoji={icon} size={20} />}
+      {iconNode ?? <EmojiIcon emoji={icon} size={18} />}
     </Pressable>
   );
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, sticker(3), style]}>{children}</View>;
+  return <View style={[styles.card, sticker(2), style]}>{children}</View>;
 }
 
 // ---------- Dòng thông báo nổi (sự kiện trong game) ----------
@@ -158,10 +139,10 @@ export const useFeedInset = () => useContext(FeedInsetCtx);
 const FEED_DEFAULT_INSET = 16;
 
 const FEED_STYLE: Record<FeedItem['tone'], { bg: string; bd: string; fg: string; icon: UiIconName; icColor: string }> = {
-  info: { bg: 'rgba(255,255,255,0.96)', bd: 'rgba(28,32,36,0.16)', fg: C.ink, icon: 'Info', icColor: '#2563EB' },
-  good: { bg: '#E6F7ED', bd: '#56BA9F', fg: '#134E3A', icon: 'CheckCircle2', icColor: '#208368' },
-  bad: { bg: '#DC2626', bd: '#991B1B', fg: '#FFFFFF', icon: 'AlertTriangle', icColor: '#FEF08A' },
-  fun: { bg: '#FFF0F6', bd: '#F472B6', fg: '#831843', icon: 'Sparkles', icColor: '#DB2777' },
+  info: { bg: C.paper, bd: C.borderStrong, fg: C.ink, icon: 'Info', icColor: C.secondary },
+  good: { bg: C.jadeSoft, bd: 'rgba(21, 128, 61, 0.30)', fg: '#14532D', icon: 'CheckCircle2', icColor: C.jade },
+  bad: { bg: C.dangerSoft, bd: 'rgba(185, 28, 28, 0.30)', fg: '#7F1D1D', icon: 'AlertTriangle', icColor: C.danger },
+  fun: { bg: C.goldSoft, bd: 'rgba(180, 83, 9, 0.32)', fg: '#78350F', icon: 'Sparkles', icColor: C.goldDeep },
 };
 
 export function FeedProvider({ children }: { children: ReactNode }) {
@@ -170,7 +151,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const [inset, setInset] = useState(FEED_DEFAULT_INSET);
   const push = useCallback((text: string, tone: FeedItem['tone'] = 'info') => {
     const id = ++seq.current;
-    setItems((xs) => [...xs.slice(-1), { id, text, tone }]);
+    const clean = text.replace(/!+$/g, '').trim();
+    setItems((xs) => [...xs.slice(-1), { id, text: clean, tone }]);
     setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 3200);
   }, []);
   return (
@@ -185,12 +167,11 @@ export function FeedProvider({ children }: { children: ReactNode }) {
               key={it.id}
               style={[
                 styles.feedItem,
-                sticker(2),
+                sticker(1),
                 { backgroundColor: st.bg, borderColor: st.bd },
-                Platform.OS === 'web' ? ({ backdropFilter: 'blur(8px)' } as object) : null,
               ]}
             >
-              <UiIcon name={st.icon} size={15} color={st.icColor} />
+              <UiIcon name={st.icon} size={15} color={st.icColor} strokeWidth={1.75} />
               <Text testID="feed" style={[styles.feedText, { color: st.fg }]}>{it.text}</Text>
             </View>
           );
@@ -202,53 +183,50 @@ export function FeedProvider({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  text: { fontFamily: FONT, color: C.ink, fontSize: 16 },
-  btnOuter: {
-    borderRadius: 16,
-    paddingBottom: 3,
-    overflow: 'hidden',
-  },
-  btnOuterSmall: {
-    borderRadius: 12,
-    paddingBottom: 2,
-  },
-  btnElevated: {
+  text: { fontFamily: FONT, color: C.ink, fontSize: 15 },
+  btnBase: {
+    minHeight: 44,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.22)',
-  },
-  btnInner: {
-    minHeight: 50,
-    borderRadius: 15,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  btnInnerSmall: {
-    minHeight: 40,
-    borderRadius: 11,
+  btnSmall: {
+    minHeight: 36,
+    borderRadius: 8,
     paddingHorizontal: 12,
     gap: 6,
   },
-  ghost: {
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,247,237,0.65)',
-    borderStyle: 'dashed',
-    paddingBottom: 0,
+  btnPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.985 }],
   },
-  btnText: { fontFamily: FONT, fontSize: 16, fontWeight: '800', letterSpacing: 0.1 },
-  btnTextSmall: { fontSize: 14 },
-  btnTextBig: { fontSize: 26, lineHeight: 34 },
-  disabled: { opacity: 0.45 },
+  btnText: { fontFamily: FONT, fontSize: 15, fontWeight: '600' },
+  btnTextSmall: { fontSize: 13.5, fontWeight: '600' },
+  btnTextBig: { fontSize: 24, lineHeight: 30 },
   icon: {
-    width: 42, height: 42, borderRadius: 14, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  card: { backgroundColor: C.paper, borderRadius: 22, padding: 16 },
+  card: { backgroundColor: C.paper, borderRadius: 14, padding: 16 },
   feed: { position: 'absolute', left: 12, right: 12, alignItems: 'center', gap: 6, zIndex: 50 },
   feedItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7, maxWidth: 460,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 460,
   },
-  feedText: { fontFamily: FONT, fontWeight: '700', fontSize: 13, flexShrink: 1 },
+  feedText: { fontFamily: FONT, fontWeight: '500', fontSize: 13, flexShrink: 1 },
 });

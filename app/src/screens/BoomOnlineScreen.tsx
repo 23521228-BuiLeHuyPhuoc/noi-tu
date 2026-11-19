@@ -28,7 +28,7 @@ import type { Game } from '../useGame';
 import { ViewportContext, useOnChange, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
 import { Shell, useShellTools } from '../components/Shell';
-import { EmojiIcon, UiIcon } from '../components/Icons';
+import { UiIcon } from '../components/Icons';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -1271,6 +1271,16 @@ function BoomOnlineInner({
     winnerTextRef.current = view.roundWinnerText;
   }, [view.roundWinnerText]);
 
+  const gridCacheRef = useRef<{ round: number; grid: BoomTile[] }>({
+    round: view.snapshot.round,
+    grid: [...view.snapshot.grid],
+  });
+  const pendingInputsRef = useRef<{ seq: number; dx: number; dy: number; dtAccum: number }[]>([]);
+  const visualOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastMoveEmitAtRef = useRef<number>(0);
+  const ghostBombsRef = useRef<{ tx: number; ty: number; placedAt: number; range: number }[]>([]);
+  const lastLocalBombAtRef = useRef<number>(0);
+
   const spawnBurstParticles = useCallback(
     (wx: number, wy: number, colors: string[], count: number, speedScale = 1, addRing = false) => {
       const arr = particlesRef.current;
@@ -1347,6 +1357,12 @@ function BoomOnlineInner({
   useEffect(() => {
     const snap = view.snapshot;
     if (snap.round !== snapRef.current.curr.round || snap.tick > snapRef.current.curr.tick) {
+      gridCacheRef.current = { round: snap.round, grid: [...snap.grid] };
+      if (snap.round !== snapRef.current.curr.round) {
+        pendingInputsRef.current = [];
+        visualOffsetRef.current = { x: 0, y: 0 };
+        ghostBombsRef.current = [];
+      }
       snapRef.current = {
         prev: snap.round === snapRef.current.curr.round ? snapRef.current.curr : null,
         curr: snap,
@@ -1360,53 +1376,159 @@ function BoomOnlineInner({
     syncHudSmart(view.snapshot, view.roundWinnerText);
   });
 
-  // Luồng 20Hz từ Server
+  // Luồng 20Hz từ Server (Reconciliation chuẩn theo ackSeq + gridDiff)
   useEffect(() => {
     return game.onBoomTick((payload) => {
       const now = performance.now();
-      const oldGrid = snapRef.current.prevGrid;
+      const sameRound = payload.round === snapRef.current.curr.round;
+      const oldGrid = sameRound ? gridCacheRef.current.grid : snapRef.current.prevGrid;
 
-      // Phát hiện thùng gỗ vừa vỡ để tung mảnh gỗ bay đẹp mắt
-      if (oldGrid && oldGrid.length === payload.grid.length && payload.round === snapRef.current.curr.round) {
-        for (let i = 0; i < payload.grid.length; i++) {
-          if (oldGrid[i] === 2 && payload.grid[i] === 0) {
-            const tx = i % payload.width;
-            const ty = Math.floor(i / payload.width);
-            spawnBurstParticles(tx + 0.5, ty + 0.5, ['#F59E0B', '#D97706', '#FEF3C7'], 6, 0.85);
+      let resolvedGrid: BoomTile[];
+      if (payload.grid && payload.grid.length > 0) {
+        resolvedGrid = payload.grid;
+        if (oldGrid && oldGrid.length === resolvedGrid.length && sameRound) {
+          for (let i = 0; i < resolvedGrid.length; i++) {
+            if (oldGrid[i] === 2 && resolvedGrid[i] === 0) {
+              const tx = i % payload.width;
+              const ty = Math.floor(i / payload.width);
+              spawnBurstParticles(tx + 0.5, ty + 0.5, ['#F59E0B', '#D97706', '#FEF3C7'], 6, 0.85);
+            }
           }
         }
+        gridCacheRef.current = { round: payload.round, grid: [...resolvedGrid] };
+      } else {
+        const base =
+          gridCacheRef.current.round === payload.round && gridCacheRef.current.grid.length === payload.width * payload.height
+            ? [...gridCacheRef.current.grid]
+            : [...(snapRef.current.curr.grid ?? [])];
+        if (payload.gridDiff && payload.gridDiff.length > 0 && base.length === payload.width * payload.height) {
+          for (const [idx, nextTile] of payload.gridDiff) {
+            if (idx >= 0 && idx < base.length) {
+              if (base[idx] === 2 && nextTile === 0) {
+                const tx = idx % payload.width;
+                const ty = Math.floor(idx / payload.width);
+                spawnBurstParticles(tx + 0.5, ty + 0.5, ['#F59E0B', '#D97706', '#FEF3C7'], 6, 0.85);
+              }
+              base[idx] = nextTile;
+            }
+          }
+        }
+        resolvedGrid = base;
+        gridCacheRef.current = { round: payload.round, grid: base };
       }
 
+      const resolvedPayload: BoomTickPayload = {
+        ...payload,
+        grid: resolvedGrid,
+      };
+
       snapRef.current = {
-        prev: snapRef.current.curr.round === payload.round ? snapRef.current.curr : null,
-        curr: payload,
-        prevGrid: payload.grid,
+        prev: sameRound ? snapRef.current.curr : null,
+        curr: resolvedPayload,
+        prevGrid: resolvedGrid,
         currAt: now,
       };
 
-      // Hòa giải vị trí dự đoán của bản thân với Server (deadzone 0.18 để không giật khựng khi đi mượt)
-      const srvMe = payload.players.find((p) => p.id === me);
+      // Dọn ghost bomb đã được server xác nhận hoặc quá hạn
+      ghostBombsRef.current = ghostBombsRef.current.filter((gb) => {
+        if (now - gb.placedAt > 450) return false;
+        return !resolvedPayload.bombs.some(
+          (b) => !b.lob && Math.floor(b.x) === gb.tx && Math.floor(b.y) === gb.ty,
+        );
+      });
+
+      // Server Reconciliation theo ackSeq: replay các input đang bay trên mạng thay vì kéo ngược về quá khứ
+      const srvMe = resolvedPayload.players.find((p) => p.id === me);
       if (srvMe) {
         const pr = predRef.current;
-        const dist = Math.hypot(srvMe.x - pr.x, srvMe.y - pr.y);
-        if (!pr.initialized || pr.round !== payload.round || srvMe.state === 'ufo' || dist > 1.35) {
-          pr.round = payload.round;
+        const ackSeq = resolvedPayload.acks?.[me];
+        if (typeof ackSeq === 'number') {
+          pendingInputsRef.current = pendingInputsRef.current.filter((inp) => inp.seq > ackSeq);
+        }
+
+        const hardSync =
+          !pr.initialized ||
+          pr.round !== resolvedPayload.round ||
+          resolvedPayload.phase !== 'playing' ||
+          srvMe.state === 'ufo';
+
+        if (hardSync) {
+          pr.round = resolvedPayload.round;
           pr.initialized = true;
           pr.x = srvMe.x;
           pr.y = srvMe.y;
           pr.dir = srvMe.dir;
-        } else if (dist > 0.18) {
-          pr.x += (srvMe.x - pr.x) * 0.24;
-          pr.y += (srvMe.y - pr.y) * 0.24;
+          pendingInputsRef.current = [];
+          visualOffsetRef.current = { x: 0, y: 0 };
+        } else {
+          let rx = srvMe.x;
+          let ry = srvMe.y;
+          const spd = getBoomPlayerSpeed(srvMe.speedLvl, srvMe.state);
+          const isSolidForReplay = (tx: number, ty: number) => {
+            if (tx < 0 || tx >= resolvedPayload.width || ty < 0 || ty >= resolvedPayload.height) return true;
+            if (resolvedGrid[ty * resolvedPayload.width + tx] !== 0) return true;
+            for (const b of resolvedPayload.bombs) {
+              if (b.lob) continue;
+              const btx = Math.floor(b.x);
+              const bty = Math.floor(b.y);
+              if (btx === tx && bty === ty) {
+                const overlaps = Math.abs(rx - (btx + 0.5)) < 0.86 && Math.abs(ry - (bty + 0.5)) < 0.86;
+                if (!overlaps) return true;
+              }
+            }
+            return false;
+          };
+
+          for (const inp of pendingInputsRef.current) {
+            let rem = Math.min(0.25, inp.dtAccum);
+            while (rem > 1e-4) {
+              const chunk = Math.min(0.05, rem);
+              rem -= chunk;
+              const stepped = moveBoomPlayerWithSlide(
+                rx,
+                ry,
+                inp.dx,
+                inp.dy,
+                spd,
+                chunk,
+                resolvedPayload.width,
+                resolvedPayload.height,
+                isSolidForReplay,
+              );
+              rx = stepped.x;
+              ry = stepped.y;
+            }
+          }
+
+          const diffX = pr.x - rx;
+          const diffY = pr.y - ry;
+          const errDist = Math.hypot(diffX, diffY);
+          pr.x = rx;
+          pr.y = ry;
+          if (errDist > 1.35) {
+            visualOffsetRef.current = { x: 0, y: 0 };
+          } else if (errDist > 0.01) {
+            const nextOx = visualOffsetRef.current.x + diffX;
+            const nextOy = visualOffsetRef.current.y + diffY;
+            const mag = Math.hypot(nextOx, nextOy);
+            const scale = mag > 0.55 ? 0.55 / mag : 1;
+            visualOffsetRef.current = { x: nextOx * scale, y: nextOy * scale };
+          }
         }
       }
 
-      // Xử lý âm thanh & hiệu ứng hạt từ sự kiện mới
-      for (const ev of payload.events) {
+      // Xử lý âm thanh & hiệu ứng hạt từ sự kiện mới (khử trùng lặp âm đặt bom đã phát cục bộ 0ms)
+      for (const ev of resolvedPayload.events) {
         if (ev.id <= lastEventIdRef.current) continue;
         lastEventIdRef.current = ev.id;
         const related = ev.actorId === me || ev.targetId === me;
-        triggerBoomSfx(ev.kind, related);
+        const suppressDupPlace =
+          ev.kind === 'place' &&
+          ev.actorId === me &&
+          now - lastLocalBombAtRef.current < 400;
+        if (!suppressDupPlace) {
+          triggerBoomSfx(ev.kind, related);
+        }
 
         if (ev.kind === 'explode' && ev.x !== undefined && ev.y !== undefined) {
           spawnBurstParticles(ev.x, ev.y, ['#38BDF8', '#BAE6FD', '#FFFFFF'], 9, 1.15, true);
@@ -1431,18 +1553,23 @@ function BoomOnlineInner({
         }
       }
 
-      if (payload.phase === 'playing') {
+      if (resolvedPayload.phase === 'playing') {
         winnerTextRef.current = null;
       }
-      syncHudSmart(payload, winnerTextRef.current);
+      syncHudSmart(resolvedPayload, winnerTextRef.current);
     });
   }, [game, me, spawnBurstParticles, syncHudSmart]);
 
-  // Gửi input thời gian thực (0ms one-way socket emit)
+  // Gửi input thời gian thực (0ms one-way socket emit + lưu queue phục vụ Server Reconciliation)
   const emitInput = useCallback(
     (dx: number, dy: number, extra?: { placeBomb?: boolean; special?: boolean }) => {
+      const seq = seqRef.current++;
+      lastMoveEmitAtRef.current = performance.now();
+      const q = pendingInputsRef.current;
+      q.push({ seq, dx, dy, dtAccum: 0 });
+      if (q.length > 60) q.splice(0, q.length - 60);
       const payload: BoomInput = {
-        seq: seqRef.current++,
+        seq,
         dx,
         dy,
         ...(extra?.placeBomb ? { placeBomb: true } : {}),
@@ -1464,8 +1591,31 @@ function BoomOnlineInner({
   );
 
   const triggerBombPress = useCallback(() => {
+    const snap = snapRef.current.curr;
+    const srvMe = snap.players.find((p) => p.id === me);
+    const pr = predRef.current;
+    const grid = gridCacheRef.current.grid;
+    const now = performance.now();
+    if (
+      snap.phase === 'playing' &&
+      srvMe &&
+      srvMe.state === 'alive' &&
+      srvMe.activeBombs + ghostBombsRef.current.length < srvMe.maxBombs
+    ) {
+      const tx = Math.floor(pr.x);
+      const ty = Math.floor(pr.y);
+      const tileFree = tx >= 1 && tx < snap.width - 1 && ty >= 1 && ty < snap.height - 1 && grid[ty * snap.width + tx] === 0;
+      const bombAlreadyThere =
+        snap.bombs.some((b) => !b.lob && Math.floor(b.x) === tx && Math.floor(b.y) === ty) ||
+        ghostBombsRef.current.some((gb) => gb.tx === tx && gb.ty === ty);
+      if (tileFree && !bombAlreadyThere) {
+        ghostBombsRef.current.push({ tx, ty, placedAt: now, range: srvMe.range });
+        lastLocalBombAtRef.current = now;
+        triggerBoomSfx('place', true);
+      }
+    }
     emitInput(moveVecRef.current.dx, moveVecRef.current.dy, { placeBomb: true });
-  }, [emitInput]);
+  }, [emitInput, me]);
 
   const triggerSpecialPress = useCallback(() => {
     emitInput(moveVecRef.current.dx, moveVecRef.current.dy, { special: true });
@@ -1605,6 +1755,7 @@ function BoomOnlineInner({
       if (canvas && ctx) {
         const cfg = renderCfgRef.current;
         const snap = snapRef.current.curr;
+        const activeGrid = snap.grid ?? gridCacheRef.current.grid;
         const prevSnap = snapRef.current.prev;
         const tilePx = cfg.tilePx;
         const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1623,6 +1774,33 @@ function BoomOnlineInner({
           };
         }
 
+        // Phát input nhịp 20Hz khi đang di chuyển liên tục để server ack từng lát cắt chuyển động & tích lũy dt replay
+        const mv = moveVecRef.current;
+        if (snap.phase === 'playing' && (mv.dx !== 0 || mv.dy !== 0) && now - lastMoveEmitAtRef.current >= 48) {
+          const seq = seqRef.current++;
+          lastMoveEmitAtRef.current = now;
+          const q = pendingInputsRef.current;
+          q.push({ seq, dx: mv.dx, dy: mv.dy, dtAccum: 0 });
+          if (q.length > 60) q.splice(0, q.length - 60);
+          void game.act({ type: 'bm_input', input: { seq, dx: mv.dx, dy: mv.dy } });
+        }
+        const tailInp = pendingInputsRef.current.at(-1);
+        if (tailInp && snap.phase === 'playing') {
+          tailInp.dtAccum = Math.min(0.25, tailInp.dtAccum + dt);
+        }
+
+        // Làm tắt dần offset hình ảnh (visual smoothing) không kéo giật vị trí vật lý
+        const vo = visualOffsetRef.current;
+        if (vo.x !== 0 || vo.y !== 0) {
+          const decay = Math.exp(-dt * 16);
+          vo.x *= decay;
+          vo.y *= decay;
+          if (Math.hypot(vo.x, vo.y) < 0.004) {
+            vo.x = 0;
+            vo.y = 0;
+          }
+        }
+
         // Bước dự đoán mượt 60fps cho nhân vật của chính mình khi đang chơi
         const srvMe = snap.players.find((p) => p.id === cfg.me);
         if (
@@ -1630,19 +1808,17 @@ function BoomOnlineInner({
           snap.phase === 'playing' &&
           (srvMe.state === 'alive' || srvMe.state === 'trapped')
         ) {
-          const mv = moveVecRef.current;
           const pr = predRef.current;
           pr.dir = dirFromDelta(mv.dx, mv.dy, pr.dir);
           const spd = getBoomPlayerSpeed(srvMe.speedLvl, srvMe.state);
           const isSolidLocal = (tx: number, ty: number) => {
             if (tx < 0 || tx >= snap.width || ty < 0 || ty >= snap.height) return true;
-            if (snap.grid[ty * snap.width + tx] !== 0) return true;
+            if (activeGrid[ty * snap.width + tx] !== 0) return true;
             for (const b of snap.bombs) {
               if (b.lob) continue;
               const btx = Math.floor(b.x);
               const bty = Math.floor(b.y);
               if (btx === tx && bty === ty) {
-                // Nếu hiện tại đang đứng chồng lên quả bom vừa đặt thì vẫn cho bước thoát ra (khớp server 0.5 + 0.36 = 0.86)
                 const overlapsNow =
                   Math.abs(pr.x - (btx + 0.5)) < 0.86 && Math.abs(pr.y - (bty + 0.5)) < 0.86;
                 if (!overlapsNow) return true;
@@ -1689,7 +1865,7 @@ function BoomOnlineInner({
         // 2. Thùng gỗ phá được (2) & Gạch Tử Thần Vòng Bo (3)
         for (let ty = 0; ty < snap.height; ty++) {
           for (let tx = 0; tx < snap.width; tx++) {
-            const tile = snap.grid[ty * snap.width + tx];
+            const tile = activeGrid[ty * snap.width + tx];
             if (tile === 2) {
               drawWoodenCrate(ctx, tx * tilePx, ty * tilePx, tilePx);
             } else if (tile === 3) {
@@ -1718,7 +1894,7 @@ function BoomOnlineInner({
         // Hệ số nội suy giữa 2 gói 20Hz (`50ms`)
         const alpha = prevSnap ? Math.max(0, Math.min(1.15, (now - snapRef.current.currAt) / 50)) : 1;
 
-        // 6. Bóng nước đang đếm ngược / trượt / bay vọt qua tường
+        // 6. Bóng nước đang đếm ngược / trượt / bay vọt qua tường (+ ghost bomb 0ms cục bộ khi chờ ACK server)
         for (const b of snap.bombs) {
           let bx = b.x;
           let by = b.y;
@@ -1731,6 +1907,40 @@ function BoomOnlineInner({
           }
           const ownerHex = cfg.colorHexById[b.ownerId] ?? '#38BDF8';
           drawWaterBomb(ctx, b, bx, by, ownerHex, tilePx, now);
+        }
+
+        for (let gi = ghostBombsRef.current.length - 1; gi >= 0; gi--) {
+          const gb = ghostBombsRef.current[gi];
+          if (now - gb.placedAt > 450) {
+            ghostBombsRef.current.splice(gi, 1);
+            continue;
+          }
+          if (snap.bombs.some((b) => !b.lob && Math.floor(b.x) === gb.tx && Math.floor(b.y) === gb.ty)) {
+            ghostBombsRef.current.splice(gi, 1);
+            continue;
+          }
+          const myHex = cfg.colorHexById[cfg.me] ?? '#38BDF8';
+          ctx.save();
+          ctx.globalAlpha = 0.86;
+          drawWaterBomb(
+            ctx,
+            {
+              id: -gi - 1,
+              ownerId: cfg.me,
+              x: gb.tx + 0.5,
+              y: gb.ty + 0.5,
+              range: gb.range,
+              ticksLeft: BOOM_BOMB_FUSE_TICKS,
+              vx: 0,
+              vy: 0,
+            },
+            gb.tx + 0.5,
+            gb.ty + 0.5,
+            myHex,
+            tilePx,
+            now,
+          );
+          ctx.restore();
         }
 
         // 7. Nhân vật (sắp xếp theo trục Y để chiều sâu tự nhiên, UFO vẽ trên cùng)
@@ -1747,8 +1957,8 @@ function BoomOnlineInner({
           let renderPlayer = p;
 
           if (p.id === cfg.me && snap.phase === 'playing' && p.state !== 'ufo') {
-            px = predRef.current.x;
-            py = predRef.current.y;
+            px = predRef.current.x + visualOffsetRef.current.x;
+            py = predRef.current.y + visualOffsetRef.current.y;
             renderPlayer = { ...p, dir: predRef.current.dir };
           } else if (prevSnap) {
             const pp = prevSnap.players.find((x) => x.id === p.id && x.state === p.state);
@@ -1839,7 +2049,7 @@ function BoomOnlineInner({
 
     rafId = window.requestAnimationFrame(renderFrame);
     return () => window.cancelAnimationFrame(rafId);
-  }, []);
+  }, [game]);
 
   // Xử lý cảm ứng D-Pad 4 hướng trục chính chuẩn Bomberman (hỗ trợ xoay 90° CSS + trượt corner-slide mượt)
   const snapDpadOffset = useCallback(
@@ -1917,7 +2127,7 @@ function BoomOnlineInner({
                 ]}
               >
                 <T numberOfLines={1} style={styles.killFeedTxt}>
-                  {kf.text}
+                  {kf.text.replace(/!+$/g, '')}
                 </T>
               </View>
             ))}
@@ -1940,7 +2150,7 @@ function BoomOnlineInner({
             style={[
               styles.canvasFrame,
               hud.ringActive && styles.canvasFrameDanger,
-              sticker(3),
+              sticker(2),
               { width: arenaMetrics.canvasW + 4, height: arenaMetrics.canvasH + 4 },
             ]}
             testID="boom-canvas-wrap"
@@ -1964,13 +2174,16 @@ function BoomOnlineInner({
         {/* BANNER ĐẾM NGƯỢC ĐẦU HIỆP & TỔNG KẾT GIỮA HIỆP */}
         {hud.phase === 'countdown' && (
           <View pointerEvents="none" style={styles.centerOverlay}>
-            <View style={[styles.bannerCard, sticker(4)]}>
+            <View style={[styles.bannerCard, sticker(3)]}>
               <T style={styles.bannerSub}>
-                HIỆP {hud.round}/{hud.totalRounds} · {view.mode === 'teams' ? '🔴 ĐỎ vs 🔵 XANH' : 'ĐẤU ĐƠN SINH TỒN'}
+                Hiệp {hud.round}/{hud.totalRounds} · {view.mode === 'teams' ? 'Đội Đỏ vs Đội Xanh' : 'Đấu đơn sinh tồn'}
               </T>
-              <T style={styles.bannerTitle}>💣 SẴN SÀNG ĐẶT BOM!</T>
+              <View style={styles.bannerTitleRow}>
+                <UiIcon name="Bomb" size={18} color={C.gold} strokeWidth={1.75} />
+                <T style={styles.bannerTitle}>Sẵn sàng đặt bom</T>
+              </View>
               <T style={styles.bannerHint}>
-                Phá thùng nhặt đồ · Chạm bóng nước địch để BỤP · Né Vòng Bo lúc 0:30!
+                Phá thùng nhặt đồ · Chạm bóng địch để hạ · Né vòng bo lúc 0:30
               </T>
             </View>
           </View>
@@ -1978,10 +2191,10 @@ function BoomOnlineInner({
 
         {hud.phase === 'round_end' && (
           <View pointerEvents="none" style={styles.centerOverlay}>
-            <View style={[styles.bannerCard, styles.bannerCardWin, sticker(4)]}>
-              <T style={styles.bannerSub}>KẾT THÚC HIỆP {hud.round}/{hud.totalRounds}</T>
+            <View style={[styles.bannerCard, styles.bannerCardWin, sticker(3)]}>
+              <T style={styles.bannerSub}>Kết thúc hiệp {hud.round}/{hud.totalRounds}</T>
               <T style={styles.bannerTitle}>
-                {hud.roundWinnerText ?? `Hiệp ${hud.round} khép lại!`}
+                {(hud.roundWinnerText ?? `Hiệp ${hud.round} khép lại`).replace(/!+$/g, '')}
               </T>
               <View style={styles.miniScoreRow}>
                 {Object.entries(view.names)
@@ -1993,7 +2206,7 @@ function BoomOnlineInner({
                         {pid === me ? 'Bạn' : pname}
                       </T>
                       <T style={styles.miniScorePts}>
-                        {view.scores[pid] ?? 0}đ · 💥{view.kills[pid] ?? 0}
+                        {view.scores[pid] ?? 0}đ · {view.kills[pid] ?? 0} hạ
                       </T>
                     </View>
                   ))}
@@ -2051,25 +2264,25 @@ function BoomOnlineInner({
                 testID="boom-dpad-up"
                 style={[styles.dpadArm, styles.dpadUp, dpadUi.dy < 0 && styles.dpadArmActive]}
               >
-                <UiIcon name="ChevronUp" size={20} color={dpadUi.dy < 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
+                <UiIcon name="ChevronUp" size={20} color={dpadUi.dy < 0 ? '#FFFFFF' : C.darkText} strokeWidth={2.5} />
               </View>
               <View
                 testID="boom-dpad-down"
                 style={[styles.dpadArm, styles.dpadDown, dpadUi.dy > 0 && styles.dpadArmActive]}
               >
-                <UiIcon name="ChevronDown" size={20} color={dpadUi.dy > 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
+                <UiIcon name="ChevronDown" size={20} color={dpadUi.dy > 0 ? '#FFFFFF' : C.darkText} strokeWidth={2.5} />
               </View>
               <View
                 testID="boom-dpad-left"
                 style={[styles.dpadArm, styles.dpadLeft, dpadUi.dx < 0 && styles.dpadArmActive]}
               >
-                <UiIcon name="ChevronLeft" size={20} color={dpadUi.dx < 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
+                <UiIcon name="ChevronLeft" size={20} color={dpadUi.dx < 0 ? '#FFFFFF' : C.darkText} strokeWidth={2.5} />
               </View>
               <View
                 testID="boom-dpad-right"
                 style={[styles.dpadArm, styles.dpadRight, dpadUi.dx > 0 && styles.dpadArmActive]}
               >
-                <UiIcon name="ChevronRight" size={20} color={dpadUi.dx > 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
+                <UiIcon name="ChevronRight" size={20} color={dpadUi.dx > 0 ? '#FFFFFF' : C.darkText} strokeWidth={2.5} />
               </View>
 
               {/* Núm trượt trung tâm phản hồi theo hướng ngón cái */}
@@ -2087,7 +2300,7 @@ function BoomOnlineInner({
               />
             </View>
 
-            {/* BÊN PHẢI: NÚT KỸ NĂNG PHỤ + NÚT ĐẶT / QUĂNG BOM KHỔNG LỒ */}
+            {/* BÊN PHẢI: NÚT KỸ NĂNG PHỤ + NÚT ĐẶT / QUĂNG BOM */}
             <View style={[styles.rightActionZone, compactH && { bottom: 6, right: 6, gap: 6 }]}>
               {/* Nút Kỹ Năng Phụ: Tự chích Kim khi bị nhốt hoặc Quăng Bom qua tường */}
               <Pressable
@@ -2109,22 +2322,24 @@ function BoomOnlineInner({
                   pressed && styles.btnPressed,
                 ]}
               >
-                <EmojiIcon
-                  emoji={hud.myState === 'trapped' || hud.needles > 0 ? '📌' : hud.canGlove ? '🥊' : '⚡'}
-                  size={compactH ? 15 : 17}
+                <UiIcon
+                  name={hud.myState === 'trapped' || hud.needles > 0 ? 'ShieldAlert' : hud.canGlove ? 'Swords' : 'Zap'}
+                  size={compactH ? 14 : 16}
+                  color="#FFFFFF"
+                  strokeWidth={1.75}
                 />
                 <T selectable={false} numberOfLines={1} style={styles.specialBtnTxt}>
                   {hud.myState === 'trapped' && hud.needles > 0
-                    ? `CHÍCH BÓNG! (${hud.needles})`
+                    ? `Chích bóng (${hud.needles})`
                     : hud.needles > 0
-                      ? `KIM CỨU ×${hud.needles}`
+                      ? `Kim cứu ×${hud.needles}`
                       : hud.canGlove
-                        ? 'NÉM QUA TƯỜNG'
-                        : 'KỸ NĂNG'}
+                        ? 'Ném qua tường'
+                        : 'Kỹ năng'}
                 </T>
               </Pressable>
 
-              {/* Nút Chính Khổng Lồ: ĐẶT BOM / QUĂNG BOM / ĐĨA BAY NÉM BOM PHỤC THÙ */}
+              {/* Nút Chính: Đặt bom / Quăng bom / Đĩa bay ném bom phục thù */}
               <Pressable
                 testID="boom-place-btn"
                 // @ts-expect-error phản hồi 0ms ngay khi ngón cái chạm xuống
@@ -2148,32 +2363,34 @@ function BoomOnlineInner({
                   pressed && styles.btnPressed,
                 ]}
               >
-                <EmojiIcon
-                  emoji={
+                <UiIcon
+                  name={
                     hud.myState === 'ufo'
-                      ? '🛸'
+                      ? 'Crosshair'
                       : hud.myState === 'trapped'
                         ? hud.needles > 0
-                          ? '📌'
-                          : '🫧'
+                          ? 'ShieldAlert'
+                          : 'Circle'
                         : hud.standingOnBomb && hud.canGlove
-                          ? '🥊'
-                          : '💣'
+                          ? 'Swords'
+                          : 'Bomb'
                   }
-                  size={compactH ? 24 : 28}
+                  size={compactH ? 22 : 24}
+                  color="#FFFFFF"
+                  strokeWidth={1.75}
                 />
                 <T selectable={false} numberOfLines={1} style={styles.primaryBombTxt}>
                   {hud.myState === 'ufo'
                     ? hud.ufoCooldownSec > 0
-                      ? `HỒI ${hud.ufoCooldownSec}s`
-                      : 'NÉM PHỤC THÙ'
+                      ? `Hồi ${hud.ufoCooldownSec}s`
+                      : 'Ném phục thù'
                     : hud.myState === 'trapped'
                       ? hud.needles > 0
-                        ? 'CHÍCH BÓNG!'
-                        : 'ĐANG BỊ NHỐT'
+                        ? 'Chích bóng'
+                        : 'Đang bị nhốt'
                       : hud.standingOnBomb && hud.canGlove
-                        ? 'QUĂNG BOM!'
-                        : 'ĐẶT BOM'}
+                        ? 'Quăng bom'
+                        : 'Đặt bom'}
                 </T>
                 {hud.myState === 'alive' && (
                   <T selectable={false} style={styles.primaryBombSub}>
@@ -2185,7 +2402,8 @@ function BoomOnlineInner({
           </>
         ) : (
           <View style={styles.spectatorPill}>
-            <T style={styles.spectatorTxt}>👀 Bạn đang xem trận Đặt Bom Tử Chiến</T>
+            <UiIcon name="Eye" size={14} color={C.gold} strokeWidth={1.65} />
+            <T style={styles.spectatorTxt}>Đang xem trận Đặt bom</T>
           </View>
         )}
 
@@ -2193,7 +2411,7 @@ function BoomOnlineInner({
         {desktopWide && (
           <View pointerEvents="none" style={styles.kbHintWrap}>
             <T style={styles.kbHintTxt}>
-              ⌨️ WASD / Mũi tên: Di chuyển · Space / J: Đặt & Quăng Bom · E / Shift: Kỹ năng / Kim Tự Cứu
+              WASD / Mũi tên: Di chuyển · Space / J: Đặt &amp; Quăng bom · E / Shift: Kỹ năng / Kim cứu
             </T>
           </View>
         )}
@@ -2234,20 +2452,33 @@ function TopArcadeHud({
         </View>
 
         <View style={[styles.clockPill, hud.ringActive && styles.clockPillDanger]}>
+          <UiIcon
+            name={hud.ringActive ? 'Flame' : 'Timer'}
+            size={12}
+            color={hud.ringActive ? '#FCA5A5' : '#86EFAC'}
+            strokeWidth={1.75}
+          />
           <T style={[styles.clockTxt, hud.ringActive && styles.clockTxtDanger]}>
-            {hud.ringActive ? `🔥 VÒNG BO SẬP! ${mins}:${secs}` : `⏱ ${mins}:${secs}`}
+            {hud.ringActive ? `Vòng bo ${mins}:${secs}` : `${mins}:${secs}`}
           </T>
         </View>
 
         <View style={styles.alivePill}>
           {mode === 'teams' ? (
-            <T style={styles.aliveTxt}>
-              🔴{hud.redAlive} : 🔵{hud.blueAlive}
-            </T>
+            <View style={styles.teamScoreRow}>
+              <View style={[styles.teamDot, { backgroundColor: '#EF4444' }]} />
+              <T style={styles.aliveTxt}>{hud.redAlive}</T>
+              <T style={[styles.aliveTxt, { color: C.darkMuted }]}>:</T>
+              <View style={[styles.teamDot, { backgroundColor: '#38BDF8' }]} />
+              <T style={styles.aliveTxt}>{hud.blueAlive}</T>
+            </View>
           ) : (
-            <T style={styles.aliveTxt}>
-              💣 {hud.aliveCount}/{hud.totalPlayers}
-            </T>
+            <View style={styles.teamScoreRow}>
+              <UiIcon name="Users" size={11} color={C.darkMuted} strokeWidth={1.65} />
+              <T style={styles.aliveTxt}>
+                {hud.aliveCount}/{hud.totalPlayers}
+              </T>
+            </View>
           )}
         </View>
       </View>
@@ -2257,37 +2488,43 @@ function TopArcadeHud({
         <View style={styles.statsRow}>
           {hud.myState === 'ufo' ? (
             <View style={styles.ufoStateBadge}>
-              <T style={styles.ufoStateTxt}>🛸 ĐĨA BAY PHỤC THÙ</T>
+              <UiIcon name="Crosshair" size={11} color={C.gold} strokeWidth={1.75} />
+              <T style={styles.ufoStateTxt}>Đĩa bay phục thù</T>
             </View>
           ) : (
             <>
               <View style={styles.statChip}>
-                <T style={styles.statChipTxt}>💣×{hud.maxBombs}</T>
+                <UiIcon name="Bomb" size={11} color={C.darkText} strokeWidth={1.65} />
+                <T style={styles.statChipTxt}>×{hud.maxBombs}</T>
               </View>
               <View style={styles.statChip}>
-                <T style={styles.statChipTxt}>💧×{hud.range}</T>
+                <UiIcon name="Flame" size={11} color="#7DD3FC" strokeWidth={1.65} />
+                <T style={styles.statChipTxt}>×{hud.range}</T>
               </View>
               <View style={styles.statChip}>
-                <T style={styles.statChipTxt}>👟×{hud.speedLvl}</T>
+                <UiIcon name="Zap" size={11} color={C.gold} strokeWidth={1.65} />
+                <T style={styles.statChipTxt}>×{hud.speedLvl}</T>
               </View>
               {hud.canKick && (
-                <View style={[styles.statChip, { borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.22)' }]}>
-                  <T style={[styles.statChipTxt, { color: '#6EE7B7' }]}>🥾</T>
+                <View style={[styles.statChip, { borderColor: 'rgba(52, 211, 153, 0.45)', backgroundColor: 'rgba(21, 128, 61, 0.25)' }]}>
+                  <T style={[styles.statChipTxt, { color: '#6EE7B7' }]}>Đá</T>
                 </View>
               )}
               {hud.canGlove && (
-                <View style={[styles.statChip, { borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.22)' }]}>
-                  <T style={[styles.statChipTxt, { color: '#FCA5A5' }]}>🥊</T>
+                <View style={[styles.statChip, { borderColor: 'rgba(248, 113, 113, 0.45)', backgroundColor: 'rgba(185, 28, 28, 0.25)' }]}>
+                  <UiIcon name="Swords" size={11} color="#FCA5A5" strokeWidth={1.65} />
                 </View>
               )}
               {hud.needles > 0 && (
-                <View style={[styles.statChip, { borderColor: '#EC4899', backgroundColor: 'rgba(236,72,153,0.25)' }]}>
-                  <T style={[styles.statChipTxt, { color: '#F9A8D4' }]}>📌×{hud.needles}</T>
+                <View style={[styles.statChip, { borderColor: 'rgba(244, 114, 182, 0.45)', backgroundColor: 'rgba(190, 24, 93, 0.25)' }]}>
+                  <UiIcon name="ShieldAlert" size={11} color="#F9A8D4" strokeWidth={1.65} />
+                  <T style={[styles.statChipTxt, { color: '#F9A8D4' }]}>×{hud.needles}</T>
                 </View>
               )}
               {hud.shieldSec > 0 && (
-                <View style={[styles.statChip, { borderColor: '#FACC15', backgroundColor: 'rgba(250,204,21,0.25)' }]}>
-                  <T style={[styles.statChipTxt, { color: '#FEF08A' }]}>🛡️{hud.shieldSec}s</T>
+                <View style={[styles.statChip, { borderColor: 'rgba(250, 204, 21, 0.45)', backgroundColor: 'rgba(180, 83, 9, 0.28)' }]}>
+                  <UiIcon name="Shield" size={11} color={C.goldSoft} strokeWidth={1.65} />
+                  <T style={[styles.statChipTxt, { color: C.goldSoft }]}>{hud.shieldSec}s</T>
                 </View>
               )}
             </>
@@ -2299,13 +2536,13 @@ function TopArcadeHud({
       <View style={styles.hudTools}>
         {isHost && (
           <Pressable testID="boom-host-end" onPress={onEndMatch} style={styles.toolIconBtn}>
-            <UiIcon name="Trophy" size={15} color="#FACC15" />
+            <UiIcon name="Trophy" size={14} color={C.gold} strokeWidth={1.65} />
           </Pressable>
         )}
         {tools && (
           <>
             <Pressable testID="boom-chat-btn" onPress={tools.openChat} style={styles.toolIconBtn}>
-              <UiIcon name="MessageCircle" size={15} color="#E2E8F0" />
+              <UiIcon name="MessageCircle" size={14} color={C.darkText} strokeWidth={1.65} />
               {tools.unread > 0 && (
                 <View style={styles.unreadDot}>
                   <T style={styles.unreadDotTxt}>{tools.unread > 9 ? '9+' : tools.unread}</T>
@@ -2315,12 +2552,13 @@ function TopArcadeHud({
             <Pressable testID="boom-mute-btn" onPress={tools.toggleMute} style={styles.toolIconBtn}>
               <UiIcon
                 name={tools.muted ? 'VolumeX' : 'Volume2'}
-                size={15}
-                color={tools.muted ? '#FB7185' : '#E2E8F0'}
+                size={14}
+                color={tools.muted ? '#FCA5A5' : C.darkText}
+                strokeWidth={1.65}
               />
             </Pressable>
             <Pressable testID="boom-leave-btn" onPress={tools.leave} style={styles.toolIconBtn}>
-              <UiIcon name="LogOut" size={15} color="#FB7185" />
+              <UiIcon name="LogOut" size={14} color="#FCA5A5" strokeWidth={1.65} />
             </Pressable>
           </>
         )}
@@ -2334,7 +2572,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    backgroundColor: '#07131F',
+    backgroundColor: C.darkBg,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -2342,12 +2580,12 @@ const styles = StyleSheet.create({
   topHud: {
     height: 38,
     marginHorizontal: 6,
-    marginTop: 3,
+    marginTop: 4,
     paddingHorizontal: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.86)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(26, 30, 40, 0.92)',
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.24)',
+    borderColor: C.darkBorder,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -2358,60 +2596,78 @@ const styles = StyleSheet.create({
     height: 32,
     marginTop: 2,
     paddingHorizontal: 6,
-    borderRadius: 11,
+    borderRadius: 8,
   },
   hudLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     flexShrink: 1,
   },
   roundPill: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 7,
+    backgroundColor: C.darkSubtle,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
   },
   roundPillTxt: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#0F172A',
+    fontWeight: '600',
+    color: C.darkText,
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   clockPill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(21, 128, 61, 0.22)',
     borderWidth: 1,
-    borderColor: '#34D399',
+    borderColor: 'rgba(74, 222, 128, 0.40)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
   },
   clockPillDanger: {
-    backgroundColor: 'rgba(225, 29, 72, 0.34)',
-    borderColor: '#FB7185',
+    backgroundColor: 'rgba(185, 28, 28, 0.34)',
+    borderColor: 'rgba(248, 113, 113, 0.65)',
   },
   clockTxt: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#A7F3D0',
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   clockTxtDanger: {
-    color: '#FFE4E6',
+    color: '#FEE2E2',
   },
   alivePill: {
-    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.42)',
-    paddingHorizontal: 7,
+    borderColor: C.darkBorder,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
+  },
+  teamScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  teamDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   aliveTxt: {
     fontSize: 11,
-    fontWeight: '900',
-    color: '#E0F2FE',
+    fontWeight: '600',
+    color: C.darkText,
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
 
   statsRow: {
@@ -2421,31 +2677,38 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   statChip: {
-    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.35)',
+    borderColor: C.darkBorder,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   statChipTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: '600',
+    color: C.darkText,
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   ufoStateBadge: {
-    backgroundColor: 'rgba(147, 51, 234, 0.32)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(180, 83, 9, 0.30)',
     borderWidth: 1,
-    borderColor: '#C084FC',
+    borderColor: 'rgba(245, 158, 11, 0.50)',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 6,
   },
   ufoStateTxt: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#F3E8FF',
+    fontWeight: '600',
+    color: C.goldSoft,
     fontFamily: FONT,
   },
 
@@ -2457,10 +2720,10 @@ const styles = StyleSheet.create({
   toolIconBtn: {
     width: 26,
     height: 26,
-    borderRadius: 8,
-    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+    borderRadius: 7,
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.26)',
+    borderColor: C.darkBorder,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -2472,39 +2735,42 @@ const styles = StyleSheet.create({
     minWidth: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#EF4444',
+    backgroundColor: C.danger,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   unreadDotTxt: {
     fontSize: 8.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
   },
 
   killFeedBox: {
     position: 'absolute',
-    top: 44,
+    top: 46,
     right: 8,
     maxWidth: 235,
-    gap: 3,
+    gap: 4,
     zIndex: 25,
   },
   killFeedRow: {
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 7,
+    backgroundColor: 'rgba(26, 30, 40, 0.88)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     borderLeftWidth: 3,
   },
   kfPop: { borderLeftColor: '#FB7185' },
   kfRescue: { borderLeftColor: '#38BDF8' },
-  kfCrush: { borderLeftColor: '#F59E0B' },
+  kfCrush: { borderLeftColor: C.gold },
   killFeedTxt: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: C.darkText,
     fontFamily: FONT,
   },
 
@@ -2515,16 +2781,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   canvasFrame: {
-    backgroundColor: '#0F172A',
-    borderColor: '#34D399',
-    borderWidth: 2,
-    borderRadius: 13,
+    backgroundColor: C.darkSurface,
+    borderColor: C.darkBorder,
+    borderWidth: 1,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   canvasFrameDanger: {
-    borderColor: '#EF4444',
+    borderColor: C.danger,
   },
 
   centerOverlay: {
@@ -2538,37 +2804,42 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   bannerCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-    borderColor: '#FACC15',
-    borderWidth: 2,
-    borderRadius: 20,
+    backgroundColor: 'rgba(26, 30, 40, 0.94)',
+    borderColor: C.darkBorder,
+    borderWidth: 1,
+    borderRadius: 16,
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     maxWidth: 420,
   },
   bannerCardWin: {
-    borderColor: '#38BDF8',
+    borderColor: 'rgba(56, 189, 248, 0.45)',
   },
   bannerSub: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#FDE047',
-    letterSpacing: 0.5,
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: C.gold,
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  bannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   bannerTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontSize: 17.5,
+    fontWeight: '600',
+    color: C.darkText,
     textAlign: 'center',
     fontFamily: FONT,
   },
   bannerHint: {
     fontSize: 11.5,
-    fontWeight: '700',
-    color: '#BAE6FD',
+    fontWeight: '500',
+    color: C.darkMuted,
     textAlign: 'center',
   },
   miniScoreRow: {
@@ -2579,24 +2850,25 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   miniScoreChip: {
-    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.35)',
-    borderRadius: 10,
+    borderColor: C.darkBorder,
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     alignItems: 'center',
   },
   miniScoreName: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.darkText,
     maxWidth: 76,
   },
   miniScorePts: {
     fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FACC15',
+    fontWeight: '600',
+    color: C.gold,
+    fontVariant: ['tabular-nums'],
   },
 
   // CỤM D-PAD TRÁI
@@ -2605,9 +2877,9 @@ const styles = StyleSheet.create({
     left: 8,
     bottom: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
-    borderWidth: 2,
-    borderColor: 'rgba(56, 189, 248, 0.5)',
+    backgroundColor: 'rgba(17, 20, 28, 0.86)',
+    borderWidth: 1,
+    borderColor: C.darkBorder,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 28,
@@ -2627,27 +2899,27 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: 'rgba(30, 41, 59, 0.92)',
+    backgroundColor: C.darkSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.3)',
+    borderColor: C.darkBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dpadArmActive: {
-    backgroundColor: '#2DD4BF',
-    borderColor: '#99F6E4',
+    backgroundColor: C.jade,
+    borderColor: '#4ADE80',
   },
   dpadUp: { top: 4 },
   dpadDown: { bottom: 4 },
   dpadLeft: { left: 4 },
   dpadRight: { right: 4 },
   dpadPuck: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(56, 189, 248, 0.38)',
-    borderWidth: 1.5,
-    borderColor: '#BAE6FD',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251, 249, 245, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 249, 245, 0.45)',
   },
 
   // CỤM NÚT ĐẶT BOM & KỸ NĂNG PHẢI
@@ -2660,101 +2932,107 @@ const styles = StyleSheet.create({
     zIndex: 28,
   },
   specialBtn: {
-    height: 38,
+    height: 36,
     paddingHorizontal: 10,
-    borderRadius: 14,
-    borderWidth: 2,
+    borderRadius: 10,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 5,
   },
   specialBtnCompact: {
-    height: 34,
+    height: 32,
     paddingHorizontal: 8,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   specialBtnIdle: {
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
-    borderColor: 'rgba(148, 163, 184, 0.4)',
+    backgroundColor: 'rgba(35, 40, 54, 0.90)',
+    borderColor: C.darkBorder,
   },
   specialBtnGloveReady: {
-    backgroundColor: '#B91C1C',
+    backgroundColor: C.danger,
     borderColor: '#FCA5A5',
   },
   specialBtnNeedleReady: {
-    backgroundColor: '#DB2777',
+    backgroundColor: C.lotus,
     borderColor: '#FBCFE8',
   },
   specialBtnTxt: {
-    fontSize: 10.5,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
 
   primaryBombBtn: {
     width: 104,
-    height: 82,
-    borderRadius: 24,
-    borderWidth: 2.5,
+    height: 80,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: 2,
   },
   primaryBombBtnCompact: {
     width: 94,
-    height: 72,
-    borderRadius: 20,
+    height: 70,
+    borderRadius: 16,
   },
   bombBtnNormal: {
     backgroundColor: '#0284C7',
-    borderColor: '#7DD3FC',
+    borderColor: 'rgba(186, 230, 253, 0.65)',
   },
   bombBtnGloveThrow: {
-    backgroundColor: '#EA580C',
-    borderColor: '#FDE047',
+    backgroundColor: C.goldDeep,
+    borderColor: 'rgba(254, 243, 199, 0.65)',
   },
   bombBtnUfoReady: {
-    backgroundColor: '#7E22CE',
-    borderColor: '#E9D5FF',
+    backgroundColor: C.son,
+    borderColor: 'rgba(254, 202, 202, 0.65)',
   },
   bombBtnUfoWait: {
-    backgroundColor: 'rgba(51, 65, 85, 0.88)',
-    borderColor: '#64748B',
+    backgroundColor: 'rgba(35, 40, 54, 0.90)',
+    borderColor: C.darkBorder,
   },
   primaryBombTxt: {
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 11.5,
+    fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   primaryBombSub: {
-    fontSize: 9.5,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '500',
     color: '#E0F2FE',
+    fontVariant: ['tabular-nums'],
   },
   btnPressed: {
-    transform: [{ scale: 0.94 }],
-    opacity: 0.92,
+    transform: [{ scale: 0.96 }],
+    opacity: 0.9,
   },
 
   spectatorPill: {
     position: 'absolute',
     bottom: 8,
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.darkSurface,
     borderWidth: 1,
-    borderColor: C.gold,
-    borderRadius: 999,
+    borderColor: C.darkBorder,
+    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingVertical: 6,
     zIndex: 25,
   },
   spectatorTxt: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: C.gold,
+    fontSize: 12,
+    fontWeight: '500',
+    color: C.darkText,
   },
 
   kbHintWrap: {
@@ -2764,7 +3042,7 @@ const styles = StyleSheet.create({
   },
   kbHintTxt: {
     fontSize: 10.5,
-    fontWeight: '700',
-    color: 'rgba(203, 213, 225, 0.78)',
+    fontWeight: '500',
+    color: C.darkMuted,
   },
 });

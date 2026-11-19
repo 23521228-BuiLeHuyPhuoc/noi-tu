@@ -3,16 +3,24 @@ import { useSecondsLeft } from '../hooks';
 import { C } from '../theme';
 import { T } from '../ui';
 
-/** Thanh thời gian: chuyển đỏ khi còn ≤ 5 giây */
+/** Thanh thời gian gọn nét mảnh 4px: chuyển đỏ khi còn <= 5 giây */
 export function TimerBar({ left, total, testID, lightText }: { left: number; total: number; testID?: string; lightText?: boolean }) {
   const pct = total > 0 ? Math.max(0, Math.min(1, left / total)) : 0;
   const hot = left <= 5;
   return (
     <View style={styles.row}>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: hot ? C.danger : C.jade }]} />
+      <View style={[styles.track, lightText && { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+        <View
+          style={[
+            styles.fill,
+            {
+              width: `${pct * 100}%`,
+              backgroundColor: hot ? C.danger : lightText ? '#FBF9F5' : C.ink,
+            },
+          ]}
+        />
       </View>
-      <T testID={testID} style={[styles.num, lightText && { color: '#F8FAFC' }, hot && { color: C.danger }]}>{left}s</T>
+      <T testID={testID} style={[styles.num, lightText && { color: C.darkText }, hot && { color: C.danger }]}>{left}s</T>
     </View>
   );
 }
@@ -24,8 +32,15 @@ export function CountdownBar({ endsAt, total, clockOffset = 0, testID, lightText
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
-  track: { flex: 1, height: 12, borderRadius: 6, backgroundColor: C.mist, borderWidth: 2, borderColor: C.ink, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
+  track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: C.mist, overflow: 'hidden' },
   fill: { height: '100%', transitionProperty: 'width', transitionDuration: '250ms' } as object,
-  num: { width: 44, textAlign: 'right', fontWeight: '900', fontSize: 20 },
+  num: {
+    minWidth: 36,
+    textAlign: 'right',
+    fontWeight: '600',
+    fontSize: 12.5,
+    color: C.secondary,
+    fontVariant: ['tabular-nums'],
+  },
 });

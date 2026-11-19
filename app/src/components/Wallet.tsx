@@ -11,7 +11,7 @@ import { C, sticker } from '../theme';
 import { Button, T } from '../ui';
 import { Sheet } from './Sheet';
 import { Confetti } from './Fun';
-import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
+import { RubyIcon, UiIcon } from './Icons';
 
 export const fmtVnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 export const fmtRuby = (n: number) => n.toLocaleString('vi-VN');
@@ -37,11 +37,11 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
   };
 
   return (
-    <Sheet title="Nạp Ruby 💎" onClose={onClose}>
+    <Sheet title="Ví Ruby" onClose={onClose}>
       <View style={styles.balanceRow}>
         <T style={styles.balanceLabel}>Số dư khả dụng</T>
         <View style={styles.rubyInline}>
-          <RubyIcon size={22} />
+          <RubyIcon size={20} />
           <T testID="ruby-balance" style={styles.balance}>{fmtRuby(w?.ruby ?? game.user?.ruby ?? 0)}</T>
         </View>
       </View>
@@ -52,7 +52,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
         <>
           <View testID="topup-paused" style={styles.pendingBox}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <UiIcon name="Info" size={16} color="#92400E" />
+              <UiIcon name="Info" size={15} color={C.goldDeep} />
               <T style={styles.pendingTitle}>Nạp Ruby đang tạm ngưng</T>
             </View>
             <T style={styles.pendingItem}>Bạn vẫn nhận Ruby miễn phí qua Điểm danh mỗi ngày.</T>
@@ -60,7 +60,7 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
           {w.pending.length > 0 && (
             <View testID="topup-pending" style={styles.pendingBox}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <UiIcon name="Timer" size={16} color="#92400E" />
+                <UiIcon name="Timer" size={15} color={C.goldDeep} />
                 <T style={styles.pendingTitle}>Đang chờ duyệt (thường trong ngày)</T>
               </View>
               {w.pending.map((r) => (
@@ -79,13 +79,13 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
                   <T style={[styles.histDelta, { color: h.delta >= 0 ? C.jadeDeep : C.danger }]}>
                     {h.delta >= 0 ? '+' : ''}{fmtRuby(h.delta)}
                   </T>
-                  <T style={{ flex: 1 }}>{REASON_TEXT[h.reason] ?? h.reason}{h.reason === 'admin_adjust' && h.ref ? `: ${h.ref}` : ''}</T>
+                  <T style={{ flex: 1, fontSize: 13, color: C.ink }}>{REASON_TEXT[h.reason] ?? h.reason}{h.reason === 'admin_adjust' && h.ref ? `: ${h.ref}` : ''}</T>
                   <T style={styles.muted}>{new Date(h.at).toLocaleDateString('vi-VN')}</T>
                 </View>
               ))}
             </View>
           ) : (
-            <Button testID="ruby-history" small variant="paper" iconNode={<UiIcon name="History" size={16} color={C.ink} />} title="Lịch sử Ruby" onPress={showHistory} />
+            <Button testID="ruby-history" small variant="paper" iconNode={<UiIcon name="History" size={15} color={C.ink} />} title="Lịch sử Ruby" onPress={showHistory} />
           )}
         </>
       )}
@@ -116,17 +116,17 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
   return (
     <View pointerEvents="box-none" style={styles.noticeLayer}>
       {notice.kind === 'update' && <Confetti key={notice.id} />}
-      <Pressable testID="ruby-toast" onPress={() => setNotice(null)} style={[styles.toast, sticker(4), notice.kind === 'rejected' && { backgroundColor: C.ink }]}>
+      <Pressable testID="ruby-toast" onPress={() => setNotice(null)} style={[styles.toast, sticker(2), notice.kind === 'rejected' && { backgroundColor: C.darkSurface, borderColor: C.darkBorder }]}>
         {notice.kind === 'update' ? (
           <>
             <View style={styles.rubyInline}>
               <T style={styles.toastBig}>+{fmtRuby(notice.delta)}</T>
-              <EmojiIcon emoji="💎" size={26} />
+              <RubyIcon size={24} />
             </View>
-            <T style={styles.toastSmall}>{notice.reason === 'topup' ? 'Đã nhận tiền nạp, cảm ơn bạn!' : 'Quản trị vừa cộng Ruby cho bạn'} · Số dư {fmtRuby(notice.ruby)}</T>
+            <T style={styles.toastSmall}>{notice.reason === 'topup' ? 'Đã nhận tiền nạp, cảm ơn bạn' : 'Quản trị vừa cộng Ruby cho bạn'} · Số dư {fmtRuby(notice.ruby)}</T>
           </>
         ) : (
-          <T style={[styles.toastSmall, { color: C.gold }]}>
+          <T style={[styles.toastSmall, { color: C.darkText }]}>
             Chưa thấy khoản chuyển {fmtVnd(notice.amount)}. Nếu bạn đã chuyển, hãy liên hệ quản trị kèm mã nạp nhé.
           </T>
         )}
@@ -136,24 +136,28 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
 }
 
 const styles = StyleSheet.create({
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.mist, padding: 12, borderRadius: 14 },
-  balanceLabel: { color: C.muted, fontWeight: '800' },
+  balanceRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.parchment, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.borderSubtle,
+  },
+  balanceLabel: { color: C.secondary, fontWeight: '500', fontSize: 13.5 },
   rubyInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  balance: { fontSize: 24, fontWeight: '900', color: C.son },
-  h3: { fontSize: 16, fontWeight: '900' },
-  muted: { color: C.muted, fontSize: 13 },
-  pendingBox: { backgroundColor: '#FEF3C7', borderRadius: 14, padding: 12, gap: 4, borderWidth: 1, borderColor: 'rgba(217,119,6,0.25)' },
-  pendingTitle: { fontWeight: '900', color: '#92400E' },
-  pendingItem: { fontSize: 13, color: '#78350F' },
-  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(15,23,42,0.06)' },
-  histDelta: { width: 70, fontWeight: '900' },
-  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '700', overflow: 'hidden' },
-  note: { fontSize: 11.5, color: C.muted, textAlign: 'center' },
+  balance: { fontSize: 22, fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
+  h3: { fontSize: 15, fontWeight: '600', color: C.ink },
+  muted: { color: C.muted, fontSize: 12.5, fontVariant: ['tabular-nums'] },
+  pendingBox: { backgroundColor: C.goldSoft, borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: 'rgba(180,83,9,0.22)' },
+  pendingTitle: { fontWeight: '600', color: C.goldDeep, fontSize: 13.5 },
+  pendingItem: { fontSize: 12.5, color: C.ink, fontVariant: ['tabular-nums'] },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: C.borderSubtle },
+  histDelta: { width: 70, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  error: { color: '#FFFFFF', backgroundColor: C.danger, padding: 8, borderRadius: 10, fontWeight: '500', overflow: 'hidden' },
+  note: { fontSize: 11.5, color: C.muted, textAlign: 'center', fontWeight: '400' },
   noticeLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 95, alignItems: 'center', paddingTop: 70 },
   toast: {
-    backgroundColor: C.paper, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 22,
+    backgroundColor: C.paper, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 22,
+    borderWidth: 1, borderColor: C.borderSubtle,
     alignItems: 'center', gap: 4, maxWidth: 360, marginHorizontal: 16,
   },
-  toastBig: { fontSize: 30, fontWeight: '900', color: C.son },
-  toastSmall: { fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  toastBig: { fontSize: 26, fontWeight: '600', color: C.son, fontVariant: ['tabular-nums'] },
+  toastSmall: { fontSize: 13, fontWeight: '500', textAlign: 'center', color: C.ink, fontVariant: ['tabular-nums'] },
 });
