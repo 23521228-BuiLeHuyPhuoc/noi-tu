@@ -16,7 +16,7 @@ import type { DiceRollView } from '../../../shared/src/dice';
 import { TYPHU_VIEW_LABEL, TYPHU_VIEW_MODES, makeCenterLayout, makeGeo, readViewMode, saveViewMode, type Rect, type TyPhuViewMode } from '../typhuLayout';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, sticker } from '../theme';
 import { Button, T, useFeed } from '../ui';
@@ -236,7 +236,12 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       const dur = Math.round((ANNOUNCE_MS[kind] / speed) * (start > at + 500 ? 0.72 : 1));
       lastAnnEnd.current = start + dur + 60;
       anns.push({ id: seqId(), kind, start, end: start + dur, ...data });
-      later(start - t0, () => play(SOUND[kind]));
+      later(start - t0, () => {
+        play(SOUND[kind]);
+        if (kind === 'bankrupt') playMemePool('broke', { cooldownMs: 2200 });
+        else if (kind === 'loss') playMemePool('lose', { cooldownMs: 2500 });
+        else if (kind === 'reward') playMemePool('win', { cooldownMs: 2500 });
+      });
     };
     // khớp tên dài trước ("An 2" trước "An") và phải theo sau bởi khoảng trắng để tránh trùng tiền tố
     const sortedIds = Object.keys(g.names).sort((a, b) => (g.names[b]?.length ?? 0) - (g.names[a]?.length ?? 0));

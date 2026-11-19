@@ -12,7 +12,7 @@ import type { ActionError, PublicPlayer, RoomState } from '../../../shared/src/t
 import type { Game } from '../useGame';
 import { backdropPalette, C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { useOnChange, useStableWindow } from '../hooks';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -153,7 +153,10 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   });
 
   useOnChange(view.winnerId, (winId) => {
-    if (winId) play(winId === me ? 'win' : 'reveal');
+    if (winId) {
+      play(winId === me ? 'win' : 'reveal');
+      playMemePool(winId === me ? 'win' : 'shock', { cooldownMs: 1200 });
+    }
   });
 
   const calledSet = useMemo(() => new Set(view.called), [view.called]);

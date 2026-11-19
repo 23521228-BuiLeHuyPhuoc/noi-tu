@@ -25,7 +25,7 @@ import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
-import { isMuted, play } from '../sound';
+import { isMuted, play, playMemePool } from '../sound';
 import { useOnChange } from '../hooks';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -416,6 +416,7 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   useOnChange(view.phase, (ph) => {
     setErr(null);
     if (ph === 'bite_reveal') {
+      playMemePool('bite', { cooldownMs: 800 });
       if (view.bittenPlayerId === me) {
         playCrocJumpscareSfx();
       } else {

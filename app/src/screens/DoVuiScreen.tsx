@@ -5,7 +5,8 @@ import type { PublicPlayer, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
-import { useStableWindow } from '../hooks';
+import { useOnChange, useStableWindow } from '../hooks';
+import { playMemePool } from '../sound';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
 import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
@@ -20,6 +21,12 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
   const pal = backdropPalette(activeThemeId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useOnChange(view.phase, (ph) => {
+    if (ph === 'reveal') {
+      playMemePool(view.myAnswer !== null && view.myAnswer === view.correctIndex ? 'correct' : 'wrong');
+    }
+  });
 
   const { width, height } = useStableWindow();
   const wide = width >= 680;
@@ -43,7 +50,12 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
     setErr(null);
     const res = await game.act({ type: 'dv_answer', choice });
     setBusy(false);
-    if (!res.ok) setErr(actionText[res.reason] ?? 'Không gửi được đáp án');
+    if (!res.ok) {
+      playMemePool('wrong', { cooldownMs: 1800 });
+      setErr(actionText[res.reason] ?? 'Không gửi được đáp án');
+    } else {
+      playMemePool('turn_move', { cooldownMs: 2500 });
+    }
   };
 
   const myCorrect = view.phase === 'reveal' && view.myAnswer !== null && view.myAnswer === view.correctIndex;

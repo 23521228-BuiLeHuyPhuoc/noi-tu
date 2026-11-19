@@ -5,13 +5,14 @@ import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { GAME_META } from '../messages';
-import { isMuted, setMuted } from '../sound';
+import { isMuted, setMuted, subscribeAudioSettings } from '../sound';
 import { copyText } from '../web';
 import { C, backdropPalette } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
 import { MapBackdrop } from './MapBackdrop';
+import { AudioSheet } from './AudioSheet';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
 import { TrollFxLayer } from './TrollFx';
@@ -114,12 +115,14 @@ export function Shell({
   const [chatOpen, setChatOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [visualOpen, setVisualOpen] = useState(false);
+  const [audioOpen, setAudioOpen] = useState(false);
   const lastId = game.chat.at(-1)?.id ?? 0;
   const [seenId, setSeenId] = useState(lastId);
   if (chatOpen && seenId !== lastId) setSeenId(lastId);
   const unread = game.chat.filter((m) => m.id > seenId && m.from !== game.me).length;
   const [leaving, setLeaving] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
+  useEffect(() => subscribeAudioSettings(() => setMutedState(isMuted())), []);
   const feed = useFeed();
   const setFeedInset = useFeedInset();
   useEffect(() => () => setFeedInset(16), [setFeedInset]);
@@ -304,6 +307,14 @@ export function Shell({
             </View>
           )}
           <IconButton
+            testID="audio-panel-open"
+            icon="Music"
+            iconNode={<UiIcon name="Music" size={15} color={iconStroke} strokeWidth={1.65} />}
+            label="Nhạc nền & Bảng lầy"
+            style={compactIconBtnStyle}
+            onPress={() => setAudioOpen(true)}
+          />
+          <IconButton
             icon="Volume2"
             iconNode={<UiIcon name={muted ? 'VolumeX' : 'Volume2'} size={15} color={muted ? C.danger : iconStroke} strokeWidth={1.65} />}
             label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
@@ -355,6 +366,7 @@ export function Shell({
         {target && <ThrowSheet game={game} target={target} onClose={() => setTarget(null)} />}
         {chatOpen && <ChatSheet game={game} players={room.players} onClose={() => setChatOpen(false)} />}
         {profileOpen && <ProfileSheet game={game} room={room} onClose={() => setProfileOpen(false)} />}
+        {audioOpen && <AudioSheet onClose={() => setAudioOpen(false)} />}
         {visualOpen && (
           <Sheet title="Giao diện & Chống lag" onClose={() => setVisualOpen(false)}>
             <View style={styles.smoothBox}>

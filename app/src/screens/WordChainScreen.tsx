@@ -10,7 +10,7 @@ import {
 import type { Game } from '../useGame';
 import { actionText, quip } from '../messages';
 import { useOnNew, useSecondsLeft, useStableWindow } from '../hooks';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
@@ -82,6 +82,7 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     if (h.kind === 'word' && h.playerId !== game.me) play('pop');
     if (h.kind === 'eliminated') {
       play(h.playerId === game.me ? 'lose' : 'splat');
+      playMemePool(h.playerId === game.me ? 'lose' : 'eliminated', { cooldownMs: 2000 });
       feed(h.reason === 'left' ? quip.left(h.name) : quip.eliminated(h.playerId === game.me ? 'Bạn' : h.name), 'bad');
       if (h.playerId === game.me) shake();
     }

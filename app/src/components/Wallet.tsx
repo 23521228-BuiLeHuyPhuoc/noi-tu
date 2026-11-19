@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { RubyLedgerRow } from '../../../shared/src/types';
 import type { Game, WalletNotice } from '../useGame';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { C, sticker } from '../theme';
 import { Button, T } from '../ui';
 import { Sheet } from './Sheet';
@@ -117,6 +117,11 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
         if (n.delta <= 0 && !showNegative) return;
       }
       play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose');
+      if (n.kind === 'update') {
+        if (n.reason === 'game_win') playMemePool('win');
+        else if (n.reason === 'game_loss' && n.ruby < 0) playMemePool('broke');
+        else if (n.reason === 'gift_receive') playMemePool('gift');
+      }
       setNotice({ ...n, id: ++seq });
     });
   }, [onWallet]);

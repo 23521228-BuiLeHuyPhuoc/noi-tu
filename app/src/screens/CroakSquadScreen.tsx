@@ -25,7 +25,7 @@ import {
 } from '../../../shared/src/croaksquad';
 import { PLAYER_COLORS, type RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
-import { isMuted } from '../sound';
+import { isMuted, playMemePool } from '../sound';
 import { ViewportContext, useStableWindow } from '../hooks';
 import { C, FONT } from '../theme';
 import { T } from '../ui';
@@ -91,6 +91,7 @@ function playCroakSfx(sfx: CroakSoundFx): void {
       osc.start(now);
       osc.stop(now + 0.16);
     } else if (sfx === 'switch' || sfx === 'key' || sfx === 'checkpoint' || sfx === 'stage_clear') {
+      if (sfx === 'stage_clear') playMemePool('win', { cooldownMs: 2000 });
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.setValueAtTime(660, now + 0.06);
@@ -100,6 +101,7 @@ function playCroakSfx(sfx: CroakSoundFx): void {
       osc.start(now);
       osc.stop(now + 0.26);
     } else if (sfx === 'die') {
+      playMemePool('bite', { cooldownMs: 2500 });
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(300, now);
       osc.frequency.exponentialRampToValueAtTime(95, now + 0.19);

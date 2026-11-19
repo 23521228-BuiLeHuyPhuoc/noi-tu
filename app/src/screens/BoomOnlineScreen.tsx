@@ -29,7 +29,7 @@ import { ViewportContext, useOnChange, useStableWindow } from '../hooks';
 import { Rotator } from '../components/Rotator';
 import { Shell, useShellTools } from '../components/Shell';
 import { UiIcon } from '../components/Icons';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { T } from '../ui';
@@ -151,6 +151,7 @@ function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
       break;
     case 'pop_kill':
       play('ko');
+      playMemePool('bomb', { cooldownMs: 2200 });
       if (isMeRelated) vibrate([30, 40, 55]);
       break;
     case 'rescue':
@@ -179,6 +180,7 @@ function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
       break;
     case 'round_win':
       play('win');
+      playMemePool('win', { cooldownMs: 2000 });
       break;
   }
 }

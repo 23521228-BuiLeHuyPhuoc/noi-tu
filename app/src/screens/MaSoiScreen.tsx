@@ -19,7 +19,7 @@ import type { Game } from '../useGame';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { C, FONT } from '../theme';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
 import { KeyboardLift } from '../components/KeyboardLift';
@@ -187,6 +187,10 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const secLeft = useSecondsLeft(view.phaseEndsAt, game.clockOffset ?? 0, view.phaseSeconds);
   const timerRatio = view.phaseSeconds > 0 ? Math.min(1, secLeft / view.phaseSeconds) : 0;
 
+  useOnChange(view.dead.length, (len) => {
+    if (len > 0) playMemePool('eliminated', { cooldownMs: 2000 });
+  });
+
   // Reset transient selections & auto-channel switch for Wolves between Night and Day
   useOnChange(view.phase, (ph) => {
     setErr(null);
@@ -194,6 +198,17 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     setPickedTwo([]);
     setWitchSave(false);
     setWitchPoison(null);
+    if (NIGHT_PHASES.has(ph)) {
+      playMemePool('shock', { cooldownMs: 2500 });
+    } else if (ph.includes('vote')) {
+      playMemePool('vote', { cooldownMs: 1500 });
+    } else if (ph.includes('defense')) {
+      playMemePool('defense', { cooldownMs: 1500 });
+    } else if (ph === 'hunter_shot') {
+      playMemePool('twist', { cooldownMs: 1500 });
+    } else {
+      playMemePool('chat_hype', { cooldownMs: 2600 });
+    }
     play('pop');
 
     const nightNow = NIGHT_PHASES.has(ph);

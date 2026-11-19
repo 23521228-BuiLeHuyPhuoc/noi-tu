@@ -4,7 +4,7 @@ import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/ty
 import { GAME_LOSS_RUBY, GAME_WIN_RUBY } from '../../../shared/src/ruby';
 import type { Game } from '../useGame';
 import { GAME_META } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { C, backdropPalette, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -35,6 +35,9 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
 
   useEffect(() => {
     play(iWon || !hasWinner ? 'win' : 'lose');
+    if (hasWinner) {
+      playMemePool(iWon ? 'win' : 'lose', { cooldownMs: 800 });
+    }
   }, [iWon, hasWinner]);
 
   const cleanHeadline = r.headline.replace(/!+$/g, '').trim();

@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,8 @@ import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
 import { UiIcon } from './src/components/Icons';
+import { shouldPlayBgm } from './src/audioAssets';
+import { playMemePool, setBgmActive } from './src/sound';
 
 // Tách chunk (code-splitting) cho toàn bộ 15 màn chơi để giảm dung lượng JS khởi động trên di động!
 const WordChainScreen = lazy(() =>
@@ -79,6 +81,23 @@ export default function App() {
 
   const game = useGame();
   const { room } = game;
+
+  const bgmOn = shouldPlayBgm(room);
+  useEffect(() => {
+    setBgmActive(bgmOn);
+  }, [bgmOn]);
+  useEffect(() => () => setBgmActive(false), []);
+
+  const prevRoomPhaseRef = useRef<{ inRoom: boolean; phase: string | null }>({ inRoom: false, phase: null });
+  useEffect(() => {
+    const inRoom = Boolean(room);
+    const phase = room?.phase ?? null;
+    const prev = prevRoomPhaseRef.current;
+    prevRoomPhaseRef.current = { inRoom, phase };
+    if ((!prev.inRoom && inRoom) || (prev.phase === 'lobby' && phase === 'playing')) {
+      playMemePool('welcome', { cooldownMs: 1200 });
+    }
+  }, [room]);
 
   let body;
   if (!room) body = <HomeScreen game={game} />;

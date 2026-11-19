@@ -11,7 +11,7 @@ import { ART } from '../baucuaArt';
 import { portraitOf as portraitFor } from '../avatars';
 import { Portrait } from '../components/Avatar';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
@@ -294,10 +294,12 @@ function Reveal({ dice, myBets, delta, onDone }: {
       setPhase('after');
       if (lost) {
         play('sad');
+        playMemePool('lose', { cooldownMs: 2000 });
         vibrate([60, 80, 60]);
         Animated.timing(sad, { toValue: 1, duration: 400, useNativeDriver: false }).start();
       } else if ((delta ?? 0) > 0) {
         play('win');
+        playMemePool('win', { cooldownMs: 2000 });
         vibrate(80);
       }
     }, FLY_AT);

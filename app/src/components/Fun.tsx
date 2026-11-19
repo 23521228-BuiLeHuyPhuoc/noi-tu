@@ -15,7 +15,7 @@ import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '
 import { ROACH_URI } from '../avatars';
 import { setCharm, setDoodle, setMood, setNick, setWobble } from '../funState';
 import { ViewportContext, useKeyboardInset, useOnNew, useStableWindow } from '../hooks';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { Portrait } from './Avatar';
@@ -485,8 +485,10 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           play('turn');
           feed(`${from} đang hối bạn`, 'bad');
         } else feed(`${from} đang hối ${nameOf(e.to)}`, 'fun');
+        playMemePool('chat_hype', { cooldownMs: 2800 });
       } else if (e.kind === 'emoji') {
         play('pop');
+        playMemePool('chat_hype', { cooldownMs: 2800 });
         if (fromR) add({ kind: 'float', emoji: e.emoji, at: fromR });
         else feed(`${from}: ${e.emoji}`, 'fun');
       } else if (e.kind === 'hit') {
@@ -497,6 +499,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           setMood(e.to, 'dizzy', 3000);
           setWobble(e.to, e.ko || e.move === 'chuong' ? 'spin' : 'shake', e.ko ? 2800 : 1800);
           play(e.ko ? 'ko' : 'punch');
+          playMemePool(e.ko ? 'eliminated' : 'troll', { cooldownMs: 1600 });
           if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
           if (toMe && !e.soft) {
             vibrate(e.ko ? [200, 80, 300] : 150);
@@ -512,10 +515,12 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setDoodle(e.to, e.doodle, DOODLE_MS);
         const what = DOODLE_OPTIONS.find((d) => d.doodle === e.doodle)?.name.toLowerCase().replace('vẽ ', '') ?? 'bậy';
         play('pop');
+        playMemePool('chat_hype', { cooldownMs: 2800 });
         feed(quip.doodle(from, toMe ? 'bạn' : nameOf(e.to), what), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'nick') {
         setNick(e.to, e.nick, NICK_MS);
         play('pop');
+        playMemePool('chat_hype', { cooldownMs: 2800 });
         feed(quip.nick(from, toMe ? 'bạn' : nameOf(e.to), nickText(e.nick)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'honk') {
         setWobble(e.to, 'shake', 1400);
@@ -523,6 +528,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           play(['honk', 'fart', 'boing'][e.variant ?? 0] as 'honk' | 'fart' | 'boing');
           vibrate(120);
         }
+        playMemePool('troll', { cooldownMs: 1600 });
         feed(quip.honk(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'cry') {
         setMood(e.to, 'cry', 6000);

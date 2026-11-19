@@ -12,7 +12,8 @@ import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { KeyboardLift } from '../components/KeyboardLift';
-import { useSecondsLeft, useStableWindow } from '../hooks';
+import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
+import { playMemePool } from '../sound';
 import { UiIcon } from '../components/Icons';
 
 export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
@@ -51,6 +52,9 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
   }, [pulse, panic]);
 
   const aliveSet = useMemo(() => new Set(view.alive), [view.alive]);
+  useOnChange(view.alive.length, (len) => {
+    if (len < view.order.length) playMemePool('bomb', { cooldownMs: 1800 });
+  });
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);
 
   const submitWord = async () => {
@@ -61,8 +65,10 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act({ type: 'bt_submit', word: clean });
     setBusy(false);
     if (!res.ok) {
+      playMemePool('wrong', { cooldownMs: 1600 });
       setErr(actionText[res.reason] ?? 'Từ chưa hợp lệ');
     } else {
+      playMemePool('turn_move', { cooldownMs: 2400 });
       setWord('');
     }
   };

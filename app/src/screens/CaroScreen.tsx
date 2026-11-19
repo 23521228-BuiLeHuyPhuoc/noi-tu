@@ -11,7 +11,7 @@ import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { useOnChange, useStableWindow } from '../hooks';
 import { Button, T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -214,7 +214,10 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   });
 
   useOnChange(view.winnerId, (w) => {
-    if (w) play(w === me ? 'win' : 'lose');
+    if (w) {
+      play(w === me ? 'win' : 'lose');
+      playMemePool(w === me ? 'win' : 'lose', { cooldownMs: 1200 });
+    }
   });
 
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);

@@ -9,9 +9,9 @@ import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { FONT } from '../theme';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { T } from '../ui';
-import { useKeyboardInset, useSecondsLeft, useStableWindow } from '../hooks';
+import { useKeyboardInset, useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { Shell, useShellTools } from '../components/Shell';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
@@ -71,6 +71,49 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 
   const me = game.me ?? '';
   const iAlive = view.alive.includes(me);
+  const prevPhaseRef = useRef(view.phase);
+  const elimAtFinalVoteRef = useRef(view.eliminated.length);
+
+  useEffect(() => {
+    if (view.phase === 'word_reveal' && view.round === 1) {
+      playMemePool('shock', { cooldownMs: 1200 });
+    }
+    // chỉ phát 1 lần khi mới vào ván nếu mở ở vòng 1 word_reveal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useOnChange(view.phase, (ph) => {
+    const prevPh = prevPhaseRef.current;
+    prevPhaseRef.current = ph;
+    if (ph === 'final_vote') {
+      elimAtFinalVoteRef.current = view.eliminated.length;
+    }
+    if (ph === 'word_reveal' && view.round === 1) {
+      playMemePool('shock', { cooldownMs: 1200 });
+    } else if (
+      prevPh === 'final_vote' &&
+      view.eliminated.length === elimAtFinalVoteRef.current &&
+      (ph === 'clue_turn' || ph === 'discussion' || ph === 'word_reveal')
+    ) {
+      playMemePool('forgive');
+    } else if (ph === 'defense') {
+      playMemePool('defense');
+    } else if (ph === 'discussion') {
+      playMemePool('chat_hype', { cooldownMs: 2000 });
+    } else if (ph === 'vote' || ph === 'final_vote') {
+      playMemePool('vote');
+    } else if (ph === 'spy_guess' || ph === 'mrwhite_guess') {
+      playMemePool('twist');
+    } else if (ph === 'reveal_end') {
+      playMemePool('shock');
+    } else if (ph === 'clue_turn' && view.round > 1) {
+      playMemePool('turn_move', { cooldownMs: 2400 });
+    }
+  });
+
+  useOnChange(view.eliminated.length, (len) => {
+    if (len > 0) playMemePool('eliminated');
+  });
   const modalKey = `${view.round}:${view.phase}:${view.mrWhiteId ?? ''}:${(view.defendants ?? []).join(',')}`;
   const curPhaseKey = `${view.phase}:${view.currentSpeakerId ?? ''}:${view.round}`;
   if (phaseKey !== curPhaseKey) {

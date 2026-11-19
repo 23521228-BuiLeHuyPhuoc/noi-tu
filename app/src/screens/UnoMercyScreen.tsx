@@ -29,7 +29,7 @@ import type { ActionError, PublicPlayer, RoomState } from '../../../shared/src/t
 import type { Game } from '../useGame';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
 import { actionText } from '../messages';
-import { play } from '../sound';
+import { play, playMemePool } from '../sound';
 import { C, FONT, sticker } from '../theme';
 import { Button, T, useFeed } from '../ui';
 import { Portrait } from '../components/Avatar';
@@ -429,15 +429,19 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
     switch (view.lastBanner.kind) {
       case 'mercy_ko':
         play(view.lastBanner.targetId === me ? 'ko' : 'boom');
+        playMemePool('eliminated', { cooldownMs: 2000 });
         break;
       case 'stack':
         play(view.drawStack >= 10 ? 'zap' : 'punch');
+        if (view.drawStack >= 4) playMemePool('troll', { cooldownMs: 2200 });
         break;
       case 'swap_7':
         play('whoosh');
+        playMemePool('twist', { cooldownMs: 2400 });
         break;
       case 'rotate_0':
         play('spin');
+        playMemePool('twist', { cooldownMs: 2400 });
         break;
       case 'discard_all':
         play('rocket');
@@ -450,6 +454,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
         break;
       case 'uno_catch':
         play('siren');
+        playMemePool('shock', { cooldownMs: 2200 });
         break;
     }
   });

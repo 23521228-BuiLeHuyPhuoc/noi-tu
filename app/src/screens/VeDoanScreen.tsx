@@ -15,7 +15,8 @@ import type { RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { backdropPalette, C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
-import { useStableWindow } from '../hooks';
+import { useOnChange, useStableWindow } from '../hooks';
+import { playMemePool } from '../sound';
 import { Button, T } from '../ui';
 import { Shell } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
@@ -179,6 +180,20 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const [erasedTracker, setErasedTracker] = useState<{ turn: number; ids: number[] }>({ turn: -1, ids: [] });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useOnChange(view.guessedIds.length, (len) => {
+    if (len > 0) playMemePool('correct');
+  });
+
+  useOnChange(view.phase, (ph) => {
+    if (ph === 'pick_word') {
+      playMemePool('welcome', { cooldownMs: 2800 });
+    } else if (ph === 'drawing') {
+      playMemePool('turn_move', { cooldownMs: 2400 });
+    } else if (ph === 'round_end' && view.guessedIds.length === 0) {
+      playMemePool('wrong');
+    }
+  });
 
   const canvasRef = useRef<ComponentRef<typeof View>>(null);
   const feedScrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
