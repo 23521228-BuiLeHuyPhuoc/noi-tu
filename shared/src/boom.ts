@@ -473,15 +473,19 @@ export function moveBoomPlayerWithSlide(
         snappedX = Math.min(nx, Math.max(candX, wallRight + R + 1e-4));
       }
       if (!overlapsSolid(snappedX, ny, 0, 0)) nx = snappedX;
-      // Trượt góc (Corner-Slide) khi người chơi không ghì hướng dọc ngược lại
-      if (Math.abs(dy) < 0.35 && aheadTx >= 1 && aheadTx < width - 1) {
+      // Trượt góc (Corner-Slide): hỗ trợ cả đi thẳng lẫn nhấn chéo trên D-Pad/bàn phím
+      if (aheadTx >= 1 && aheadTx < width - 1) {
         const curTx = Math.floor(nx);
         const baseTy = Math.floor(ny);
-        for (const candTy of [baseTy, baseTy - 1, baseTy + 1]) {
+        const candidates = [baseTy, baseTy - 1, baseTy + 1].sort(
+          (a, b) => Math.abs(a + 0.5 - ny) - Math.abs(b + 0.5 - ny),
+        );
+        for (const candTy of candidates) {
           if (candTy < 1 || candTy >= height - 1) continue;
           const laneCenterY = candTy + 0.5;
           const diffY = laneCenterY - ny;
-          if (Math.abs(diffY) > 0.01 && Math.abs(diffY) <= 0.46) {
+          const allowSlideY = Math.abs(dy) < 0.35 || Math.sign(diffY) === Math.sign(dy);
+          if (allowSlideY && Math.abs(diffY) > 0.01 && Math.abs(diffY) <= 0.5) {
             if (!isSolidTile(aheadTx, candTy) && !isSolidTile(curTx, candTy)) {
               const nudge = Math.sign(diffY) * Math.min(Math.abs(diffY), stepDist * 0.95);
               if (!overlapsSolid(nx, ny + nudge, 0, Math.sign(diffY))) {
@@ -514,14 +518,18 @@ export function moveBoomPlayerWithSlide(
         snappedY = Math.min(ny, Math.max(candY, wallBottom + R + 1e-4));
       }
       if (!overlapsSolid(nx, snappedY, 0, 0)) ny = snappedY;
-      if (Math.abs(dx) < 0.35 && aheadTy >= 1 && aheadTy < height - 1) {
+      if (aheadTy >= 1 && aheadTy < height - 1) {
         const curTy = Math.floor(ny);
         const baseTx = Math.floor(nx);
-        for (const candTx of [baseTx, baseTx - 1, baseTx + 1]) {
+        const candidates = [baseTx, baseTx - 1, baseTx + 1].sort(
+          (a, b) => Math.abs(a + 0.5 - nx) - Math.abs(b + 0.5 - nx),
+        );
+        for (const candTx of candidates) {
           if (candTx < 1 || candTx >= width - 1) continue;
           const laneCenterX = candTx + 0.5;
           const diffX = laneCenterX - nx;
-          if (Math.abs(diffX) > 0.01 && Math.abs(diffX) <= 0.46) {
+          const allowSlideX = Math.abs(dx) < 0.35 || Math.sign(diffX) === Math.sign(dx);
+          if (allowSlideX && Math.abs(diffX) > 0.01 && Math.abs(diffX) <= 0.5) {
             if (!isSolidTile(candTx, aheadTy) && !isSolidTile(candTx, curTy)) {
               const nudge = Math.sign(diffX) * Math.min(Math.abs(diffX), stepDist * 0.95);
               if (!overlapsSolid(nx + nudge, ny, Math.sign(diffX), 0)) {

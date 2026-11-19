@@ -934,7 +934,7 @@ export function getBotSketch(word: string): VeDoanStroke[] {
   const alias = SKETCH_ALIASES[norm];
   if (alias && BOT_SKETCHES[alias]) return BOT_SKETCHES[alias];
 
-  if (/^(con |chim |cá |hươu )/.test(norm)) {
+  if (/^(con |chim |cá |hươu |bò |gà |vịt |chó |mèo |chuột |côn trùng|bướm|ong |nhện)/.test(norm)) {
     return [
       { color: C.brown, width: 16, points: ellipsePts(520, 610, 185, 130, 20) },
       { color: C.orange, width: 16, points: circlePts(320, 455, 105, 18) },
@@ -943,7 +943,7 @@ export function getBotSketch(word: string): VeDoanStroke[] {
       { color: C.brown, width: 16, points: [[405, 735], [405, 845], [405, 735], [625, 735], [625, 845]] },
     ];
   }
-  if (/^(quả |bánh |phở |cơm |lẩu |cà |bắp |ớt |củ |xúc xích|chai |hộp )/.test(norm)) {
+  if (/^(quả |trái |bánh |phở |bún |mì |cơm |cháo |xôi |lẩu |nem |gỏi |chè |trà |nước |kem |cà |bắp |ớt |củ |rau |thịt |xúc xích|chai |hộp |ly |cốc |món )/.test(norm)) {
     return [
       { color: C.blue, width: 16, points: arcPts(500, 560, 265, 185, 0, Math.PI, 18) },
       { color: C.blue, width: 9, points: ellipsePts(500, 560, 265, 55, 18) },
@@ -952,13 +952,29 @@ export function getBotSketch(word: string): VeDoanStroke[] {
       { color: C.red, width: 9, points: [[460, 345], [440, 265], [475, 205]] },
     ];
   }
-  if (/^(xe |tàu |du thuyền|trực thăng|khinh khí cầu)/.test(norm)) {
+  if (/^(xe |tàu |thuyền |cano|du thuyền|trực thăng|máy bay|khinh khí cầu|tên lửa)/.test(norm)) {
     return [
       { color: C.blue, width: 16, points: rectPts(205, 385, 795, 625) },
       { color: C.teal, width: 9, points: rectPts(585, 425, 755, 525) },
       { color: C.black, width: 16, points: circlePts(335, 655, 75, 16) },
       { color: C.black, width: 16, points: circlePts(665, 655, 75, 16) },
       { color: C.yellow, width: 16, points: [[785, 555], [825, 555]] },
+    ];
+  }
+  if (/^(cây |hoa |lá |rừng |núi |biển |sông |hồ |thác |mây |sao |mặt )/.test(norm)) {
+    return [
+      { color: C.brown, width: 16, points: [[470, 520], [470, 820], [530, 820], [530, 520]] },
+      { color: C.green, width: 16, points: circlePts(500, 390, 175, 18) },
+      { color: C.green, width: 16, points: circlePts(375, 445, 115, 14) },
+      { color: C.green, width: 16, points: circlePts(625, 445, 115, 14) },
+      { color: C.yellow, width: 9, points: circlePts(780, 195, 62, 12) },
+    ];
+  }
+  if (/^(áo |quần |váy |giày |dép |mũ |nón |kính |túi |cặp )/.test(norm)) {
+    return [
+      { color: C.purple, width: 16, points: [[340, 260], [660, 260], [770, 410], [695, 470], [635, 390], [635, 760], [365, 760], [365, 390], [305, 470], [230, 410], [340, 260]] },
+      { color: C.yellow, width: 9, points: arcPts(500, 260, 65, 45, 0, Math.PI, 10) },
+      { color: C.pink, width: 9, points: starPts(500, 490, 55, 25, 5) },
     ];
   }
   return [
@@ -971,28 +987,121 @@ export function getBotSketch(word: string): VeDoanStroke[] {
 }
 
 const EXTRA_VE_DOAN_WORDS: string[] = [
-  'bánh mì', 'phở bò', 'con vịt', 'con gà', 'con trâu', 'con bò',
-  'con heo', 'con voi', 'con hổ', 'con kiến', 'con ong', 'con muỗi',
-  'con nhện', 'con cua', 'con tôm', 'con mực', 'chim cánh cụt', 'chim đại bàng', 'chim cú mèo',
-  'hươu cao cổ', 'cá heo', 'cá vàng', 'quả cam', 'quả nho', 'quả dâu',
-  'quả xoài', 'quả dứa', 'quả chanh', 'cà rốt', 'bắp cải', 'cà chua', 'ớt đỏ', 'nấm rơm', 'củ hành',
-  'bánh chưng', 'bánh bao', 'bánh donut', 'xúc xích', 'cơm tấm', 'lẩu thái',
-  'cây dừa', 'chiếc lá', 'hoa sen', 'hoa hồng', 'cỏ bốn lá', 'ngọn núi',
-  'bãi biển', 'dòng sông', 'cầu treo', 'biển báo', 'cột điện',
-  'lâu đài', 'kim tự tháp', 'tòa nhà cao tầng', 'bệnh viện', 'trường học', 'sân bóng đá', 'xe máy',
-  'xe buýt', 'xe cứu hỏa', 'xe tăng', 'tàu hỏa', 'tàu ngầm', 'khinh khí cầu', 'du thuyền', 'trực thăng',
-  'ti vi', 'tủ lạnh', 'máy giặt', 'quạt máy', 'điều hòa', 'máy ảnh', 'loa kẹo kéo',
-  'tai nghe', 'bàn phím', 'con chuột', 'cục sạc', 'ổ cắm điện', 'bóng đèn', 'đèn pin', 'cây kéo', 'cái búa',
-  'cái cưa', 'cái kìm', 'ổ khóa', 'cái xô', 'cây chổi', 'gương soi', 'bàn chải', 'kem đánh răng',
-  'chiếc gối', 'cái giường', 'cái ghế', 'cái bàn', 'tủ quần áo', 'cửa sổ', 'cửa ra vào', 'cái bát', 'đôi đũa',
-  'cái thìa', 'con dao', 'cái nồi', 'cái ấm trà', 'chai nước', 'hộp sữa', 'áo thun', 'áo dài',
-  'quần jean', 'đôi giày', 'đôi dép', 'cái mũ', 'mũ bảo hiểm', 'găng tay', 'tất chân', 'khăn quàng', 'chiếc nhẫn',
-  'ba lô', 'va li', 'đàn piano', 'cái trống', 'micro', 'quả bóng', 'vợt cầu lông',
-  'ván trượt', 'cung tên', 'cái khiên', 'quả bom', 'nam châm', 'la bàn',
-  'bản đồ', 'quyển sách', 'bút chì', 'cục tẩy', 'thước kẻ', 'cặp sách', 'trái đất', 'sao thổ',
-  'ông già noel', 'chú hề', 'cướp biển', 'siêu nhân', 'người máy', 'phù thủy', 'ma cà rồng',
+  // 1. Động vật, côn trùng & sinh vật biển (90+ từ)
+  'con vịt', 'con gà', 'con gà trống', 'gà con', 'con trâu', 'con bò', 'con bò sữa',
+  'con heo', 'con voi', 'con hổ', 'con sư tử', 'con báo', 'con gấu', 'gấu trúc', 'gấu bắc cực',
+  'con khỉ', 'tinh tinh', 'con ngựa', 'ngựa vằn', 'con lừa', 'con dê', 'con cừu',
+  'con thỏ', 'con sóc', 'con chuột', 'chuột hamster', 'con nhím', 'con dơi', 'con cáo',
+  'chó sói', 'lạc đà', 'chuột túi', 'gấu túi koala', 'hà mã', 'tê giác', 'hươu cao cổ',
+  'con nai', 'tuần lộc', 'kỳ nhông', 'tắc kè hoa', 'con rắn', 'rắn hổ mang', 'kỳ lân',
+  'cá sấu', 'con ếch', 'nòng nọc', 'con rùa', 'ốc sên', 'con kiến', 'con ong', 'bọ rùa',
+  'con muỗi', 'con ruồi', 'con gián', 'châu chấu', 'bọ ngựa', 'chuồn chuồn', 'đom đóm',
+  'bọ cạp', 'con rết', 'con nhện', 'con tằm', 'con ve sầu', 'chim cánh cụt', 'chim đại bàng',
+  'chim cú mèo', 'con công', 'con vẹt', 'chim bồ câu', 'chim sẻ', 'chim gõ kiến',
+  'chim hồng hạc', 'thiên nga', 'con cò', 'đà điểu', 'cá heo', 'cá voi', 'cá mập',
+  'cá vàng', 'cá chép', 'cá ngựa', 'cá đuối', 'cá nóc', 'cá kiếm', 'con cua', 'con tôm',
+  'tôm hùm', 'con mực', 'bạch tuộc', 'sao biển', 'con sứa', 'con sò', 'ngọc trai',
+
+  // 2. Món ăn Việt, quốc tế & đồ uống (95+ từ)
+  'bánh mì', 'bánh mì kẹp', 'phở bò', 'bún bò', 'bún chả', 'bún đậu mắm tôm', 'cơm tấm',
+  'cơm cuộn sushi', 'cơm rang', 'cơm nắm', 'xôi gấc', 'cháo lòng', 'hủ tiếu', 'mì tôm',
+  'mì ý', 'mì cay', 'lẩu thái', 'gỏi cuốn', 'nem rán', 'chả giò', 'bánh xèo', 'bánh khọt',
+  'bánh cuốn', 'bánh bèo', 'bánh hỏi', 'bánh chưng', 'bánh tét', 'bánh bao', 'bánh giò',
+  'bánh gối', 'bánh rán', 'bánh tiêu', 'bánh quẩy', 'bánh flan', 'bánh quy', 'bánh donut',
+  'bánh sừng bò', 'bánh trung thu', 'bánh gạo', 'kẹo mút', 'kẹo dẻo', 'kẹo bông gòn',
+  'sô cô la', 'thạch rau câu', 'xúc xích', 'lạp xưởng', 'khoai tây chiên', 'gà rán',
+  'hamburger', 'sandwich', 'bít tết', 'trứng cút lộn', 'đậu hũ', 'đậu phộng', 'hạt dẻ',
+  'bắp rang bơ', 'mứt gừng', 'hạt hướng dương', 'sinh tố bơ', 'nước mía', 'nước dừa',
+  'nước cam', 'chanh muối', 'trà chanh', 'trà đào', 'trà đá', 'nước ngọt', 'bia hơi',
+  'rượu vang', 'sữa chua', 'kem ly', 'tương ớt', 'nước mắm', 'mật ong',
+
+  // 3. Trái cây & rau củ (65+ từ)
+  'quả cam', 'quả quýt', 'quả bưởi', 'quả chanh', 'quả xoài', 'quả ổi', 'quả cóc',
+  'quả mận', 'quả đào', 'quả lê', 'quả táo', 'quả nho', 'quả dâu', 'việt quất',
+  'quả dứa', 'quả mít', 'quả sầu riêng', 'quả măng cụt', 'quả chôm chôm', 'quả vải',
+  'quả nhãn', 'quả thanh long', 'quả đu đủ', 'quả na', 'quả khế', 'quả bơ', 'quả kiwi',
+  'quả dừa', 'quả lựu', 'quả sung', 'quả hồng', 'quả me', 'cà rốt', 'bắp cải',
+  'cải thảo', 'rau muống', 'súp lơ', 'cà chua', 'cà tím', 'dưa chuột', 'bí đao',
+  'bí ngô', 'khổ qua', 'su hào', 'khoai tây', 'khoai lang', 'bắp ngô', 'ớt đỏ',
+  'củ tỏi', 'củ gừng', 'củ hành', 'củ cải trắng', 'nấm rơm', 'măng tre', 'đậu bắp',
+  'củ lạc',
+
+  // 4. Thiên nhiên, thời tiết & vũ trụ (55+ từ)
+  'bông hoa', 'hoa sen', 'hoa hồng', 'hoa hướng dương', 'hoa cúc', 'hoa mai', 'hoa đào',
+  'hoa tulíp', 'hoa bồ công anh', 'cây dừa', 'cây tre', 'cây chuối', 'cây thông',
+  'cây phong', 'chiếc lá', 'cỏ bốn lá', 'khúc gỗ', 'gốc cây', 'ngọn núi', 'núi lửa',
+  'hang động', 'sa mạc', 'ốc đảo', 'bãi biển', 'hòn đảo', 'đại dương', 'sóng biển',
+  'dòng sông', 'thác nước', 'hồ nước', 'cánh đồng', 'khu rừng', 'cầu vồng', 'đám mây',
+  'giọt mưa', 'tia chớp', 'cơn bão', 'lốc xoáy', 'bông tuyết', 'cục băng', 'bầu trời',
+  'hoàng hôn', 'bình minh', 'trái đất', 'sao thổ', 'mặt trăng', 'vầng trăng', 'dải ngân hà',
+  'hố đen vũ trụ', 'sao băng', 'vệ tinh', 'hành tinh',
+
+  // 5. Phương tiện & giao thông (50+ từ)
+  'xe máy', 'xe đạp', 'xe đạp điện', 'xích lô', 'xe ba gác', 'xe ô tô', 'xe taxi',
+  'xe buýt', 'xe khách', 'xe tải', 'xe ben', 'xe cần cẩu', 'xe lu', 'xe xúc đất',
+  'xe cứu thương', 'xe cứu hỏa', 'xe cảnh sát', 'xe tăng', 'xe đua', 'xe trượt tuyết',
+  'ván trượt', 'patin', 'tàu hỏa', 'tàu điện ngầm', 'tàu cao tốc', 'tàu ngầm',
+  'tàu thủy', 'thuyền buồm', 'ca nô', 'thuyền thúng', 'phà qua sông', 'khinh khí cầu',
+  'trực thăng', 'máy bay phản lực', 'tên lửa', 'tàu vũ trụ', 'đèn giao thông', 'biển báo',
+  'vạch kẻ đường', 'trạm xăng', 'cầu vượt', 'bến xe', 'sân bay', 'đường ray', 'mỏ neo',
+
+  // 6. Gia dụng, đồ bếp & nội thất (65+ từ)
+  'ti vi', 'tủ lạnh', 'máy giặt', 'quạt máy', 'quạt trần', 'điều hòa', 'lò vi sóng',
+  'nồi cơm điện', 'ấm siêu tốc', 'máy xay sinh tố', 'máy sấy tóc', 'bàn là', 'máy hút bụi',
+  'máy ảnh', 'máy quay phim', 'loa kẹo kéo', 'micro', 'đài radio', 'bóng đèn', 'đèn pin',
+  'đèn ngủ', 'đèn chùm', 'nến thơm', 'cục pin', 'cục sạc', 'ổ cắm điện', 'công tắc',
+  'cây kéo', 'cái búa', 'cái cưa', 'cái kìm', 'tua vít', 'cờ lê', 'máy khoan',
+  'ổ khóa', 'cái thang', 'cái xô', 'cây chổi', 'cây lau nhà', 'thùng rác', 'gương soi',
+  'cái lược', 'bàn chải', 'kem đánh răng', 'khăn mặt', 'xà phòng', 'vòi hoa sen', 'bồn tắm',
+  'chiếc gối', 'cái chăn', 'cái đệm', 'cái giường', 'cái ghế', 'ghế sofa', 'cái bàn',
+  'tủ quần áo', 'bàn trang điểm', 'đồng hồ treo tường', 'đồng hồ báo thức', 'rèm cửa',
+  'thảm chùi chân', 'chậu cây', 'bình hoa', 'cái bát', 'đôi đũa', 'cái thìa', 'cái dĩa',
+  'con dao', 'cái thớt', 'cái chảo', 'cái nồi', 'cái ấm trà', 'cái phích nước', 'cái rổ',
+  'chai nước', 'hộp sữa', 'bình giữ nhiệt', 'hộp cơm',
+
+  // 7. Công nghệ, học đường & văn phòng (55+ từ)
+  'máy tính để bàn', 'bàn phím', 'con chuột', 'máy in', 'tai nghe', 'tai nghe bluetooth',
+  'đồng hồ thông minh', 'máy tính bảng', 'máy chơi game', 'tay cầm game', 'kính thực tế ảo',
+  'cục phát wifi', 'usb', 'thẻ nhớ', 'ổ cứng', 'quyển sách', 'quyển vở', 'bút chì',
+  'bút bi', 'bút lông', 'bút dạ quang', 'cục tẩy', 'gọt bút chì', 'hộp bút', 'thước kẻ',
+  'ê ke', 'compa', 'cặp sách', 'ba lô', 'bảng đen', 'phấn viết', 'quả địa cầu',
+  'kính hiển vi', 'kính lúp', 'kính thiên văn', 'ống nghiệm', 'nam châm', 'la bàn',
+  'bản đồ', 'phong bì', 'tem thư', 'con dấu', 'máy tính bỏ túi', 'lịch để bàn',
+
+  // 8. Thời trang, trang sức & làm đẹp (40+ từ)
+  'áo thun', 'áo sơ mi', 'áo dài', 'áo khoác', 'áo len', 'áo mưa', 'váy đầm',
+  'quần jean', 'quần đùi', 'cà vạt', 'nơ cổ', 'thắt lưng', 'đôi giày', 'giày cao gót',
+  'đôi dép', 'dép tông', 'ủng đi mưa', 'đôi tất', 'găng tay', 'khăn quàng cổ',
+  'cái mũ', 'mũ lưỡi trai', 'nón lá', 'mũ bảo hiểm', 'mũ len', 'kính râm',
+  'chiếc nhẫn', 'vòng cổ', 'vòng tay', 'khuyên tai', 'túi xách', 'ví tiền', 'va li',
+  'thỏi son', 'lọ nước hoa', 'sơn móng tay',
+
+  // 9. Công trình, địa danh & đồ vật ngoài trời (40+ từ)
+  'lâu đài', 'kim tự tháp', 'tòa nhà cao tầng', 'chung cư', 'nhà sàn', 'lều cắm trại',
+  'lều tuyết', 'nhà thờ', 'chùa một cột', 'tháp rùa', 'tháp eiffel', 'cối xay gió',
+  'ngọn hải đăng', 'bệnh viện', 'trường học', 'thư viện', 'rạp chiếu phim', 'siêu thị',
+  'nhà hàng', 'quán trà sữa', 'sân vận động', 'bể bơi', 'công viên', 'xích đu',
+  'cầu trượt', 'bập bênh', 'vòng đu quay', 'cổng chào', 'cột điện', 'cầu treo',
+  'hộp thư', 'ghế đá công viên', 'giếng nước', 'bù nhìn rơm',
+
+  // 10. Thể thao, âm nhạc, lễ hội & nhân vật (65+ từ)
+  'quả bóng đá', 'quả bóng rổ', 'bóng chuyền', 'bóng bầu dục', 'bóng bàn', 'quả cầu lông',
+  'vợt cầu lông', 'vợt tennis', 'gậy bóng chày', 'gậy đánh golf', 'ván lướt sóng',
+  'xe trượt ván', 'tạ tay', 'dây nhảy', 'huy chương vàng', 'cúp vô địch', 'ván cờ vua',
+  'quân cờ tướng', 'bộ bài tây', 'xúc xắc', 'con quay', 'cái diều', 'đèn lồng',
+  'pháo hoa', 'cây thông noel', 'người tuyết', 'bánh gừng', 'cây đàn piano', 'cái trống',
+  'đàn bầu', 'đàn vi ô lông', 'kèn saxophone', 'sáo trúc', 'nốt nhạc', 'cung tên',
+  'thanh kiếm', 'cái khiên', 'quả bom', 'cái rìu', 'cây đũa thần', 'thảm bay',
+  'ông già noel', 'chú hề', 'cướp biển', 'siêu nhân', 'người máy', 'người nhện',
+  'phù thủy', 'tiên nữ', 'nàng tiên cá', 'thần đèn', 'ma cà rồng', 'xác ướp',
+  'bộ xương', 'bác sĩ', 'y tá', 'chú công an', 'lính cứu hỏa', 'phi hành gia',
+  'đầu bếp', 'nông dân', 'thợ lặn', 'nhà ảo thuật', 'vua chúa', 'hoàng hậu',
 ];
 
 export const VE_DOAN_WORDS: string[] = Array.from(
-  new Set([...Object.keys(BOT_SKETCHES), ...EXTRA_VE_DOAN_WORDS]),
+  new Set(
+    [...Object.keys(BOT_SKETCHES), ...EXTRA_VE_DOAN_WORDS].map((w) =>
+      w.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim(),
+    ),
+  ),
 );

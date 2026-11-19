@@ -5,12 +5,14 @@
 
 export const LOTO_MIN = 1;
 export const LOTO_MAX = 90;
+export const LOTO_TICKET_ROWS = 6;
+export const LOTO_TICKET_NUMBERS = 30;
 
 export type LotoTicketColor = 'rose' | 'gold' | 'jade' | 'sky' | 'violet';
 
 export const LOTO_TICKET_COLORS: readonly LotoTicketColor[] = ['rose', 'gold', 'jade', 'sky', 'violet'];
 
-/** 3 hàng × 9 cột; ô trống là null, ô có số là 1..90 */
+/** 6 hàng × 9 cột (2 khung 3×9 xếp chồng = 30 số); ô trống là null, ô có số là 1..90 */
 export type LotoGrid = (number | null)[][];
 
 export interface LotoRhyme {
@@ -165,14 +167,7 @@ function safeIndex(rng: () => number, len: number): number {
   return Math.min(len - 1, Math.floor(v * len));
 }
 
-/**
- * Sinh tờ vé Lô Tô truyền thống 3×9 hợp lệ tuyệt đối:
- * - Cột 0: `1..9`, cột 1: `10..19`, ..., cột 7: `70..79`, cột 8: `80..90`.
- * - Mỗi hàng (`0..2`) có đúng **5 số** và **4 ô trống (`null`)**.
- * - Mỗi cột (`0..8`) có **từ 1 đến 3 số**, sắp xếp **tăng dần từ trên xuống dưới**.
- */
-export function generateLotoTicket(rng: () => number): LotoGrid {
-  // 1. Phân phối 15 con số vào 9 cột sao cho mỗi cột có 1..3 số
+function buildLotoBlockLayout(rng: () => number): { colCounts: number[]; colRows: number[][] } {
   const colCounts = [1, 1, 1, 1, 1, 1, 1, 1, 1];
   for (let extra = 0; extra < 6; extra++) {
     const eligible: number[] = [];
@@ -183,7 +178,6 @@ export function generateLotoTicket(rng: () => number): LotoGrid {
     colCounts[pick]++;
   }
 
-  // 2. Xáo thứ tự cột rồi sắp giảm dần theo colCounts để gán hàng theo điều kiện Gale-Ryser (không bao giờ tắc)
   const colOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8];
   for (let i = colOrder.length - 1; i > 0; i--) {
     const j = safeIndex(rng, i + 1);
@@ -222,12 +216,22 @@ export function generateLotoTicket(rng: () => number): LotoGrid {
     colRows[c] = [...chosen];
   }
 
-  // 3. Rút ngẫu nhiên các số thuộc dải của từng cột và xếp tăng dần từ trên xuống
-  const grid: LotoGrid = [
+  return { colCounts, colRows };
+}
+
+/**
+ * Sinh tờ vé Lô Tô Xóm Lầy chuẩn **6×9 (30 số)** gồm 2 bảng 3×9 xếp chồng:
+ * - Cột 0: `1..9`, cột 1: `10..19`, ..., cột 7: `70..79`, cột 8: `80..90`.
+ * - Mỗi hàng (`0..5`) có đúng **5 số** và **4 ô trống (`null`)** -> tổng **30 số độc nhất**.
+ * - Mỗi block 3×9 (`0..2` và `3..5`) có **1..3 số/cột**, toàn bộ 6 hàng trong cột sắp **tăng dần từ trên xuống dưới**.
+ */
+export function generateLotoTicket(rng: () => number): LotoGrid {
+  const blockA = buildLotoBlockLayout(rng);
+  const blockB = buildLotoBlockLayout(rng);
+
+  const grid: LotoGrid = Array.from({ length: LOTO_TICKET_ROWS }, () =>
     Array<number | null>(9).fill(null),
-    Array<number | null>(9).fill(null),
-    Array<number | null>(9).fill(null),
-  ];
+  );
 
   for (let c = 0; c < 9; c++) {
     const min = c === 0 ? 1 : c * 10;
@@ -237,17 +241,17 @@ export function generateLotoTicket(rng: () => number): LotoGrid {
       pool.push(n);
     }
 
-    const count = colCounts[c];
-    for (let i = 0; i < count; i++) {
+    const totalCount = blockA.colCounts[c] + blockB.colCounts[c];
+    for (let i = 0; i < totalCount; i++) {
       const j = i + safeIndex(rng, pool.length - i);
       const tmp = pool[i];
       pool[i] = pool[j];
       pool[j] = tmp;
     }
 
-    const picked = pool.slice(0, count).sort((a, b) => a - b);
-    const rows = colRows[c];
-    for (let i = 0; i < count; i++) {
+    const picked = pool.slice(0, totalCount).sort((a, b) => a - b);
+    const rows = [...blockA.colRows[c], ...blockB.colRows[c].map((r) => r + 3)];
+    for (let i = 0; i < totalCount; i++) {
       grid[rows[i]][c] = picked[i];
     }
   }

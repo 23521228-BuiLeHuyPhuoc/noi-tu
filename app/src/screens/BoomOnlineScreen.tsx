@@ -1258,6 +1258,7 @@ function BoomOnlineInner({
   });
   const seqRef = useRef<number>(1);
   const lastBtnAtRef = useRef<number>(0);
+  const dpadLayoutRef = useRef<{ w: number; h: number }>({ w: 132, h: 132 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bakedFloorRef = useRef<{ key: string; canvas: HTMLCanvasElement | null }>({
@@ -1383,7 +1384,7 @@ function BoomOnlineInner({
         currAt: now,
       };
 
-      // Hòa giải vị trí dự đoán của bản thân với Server
+      // Hòa giải vị trí dự đoán của bản thân với Server (deadzone 0.18 để không giật khựng khi đi mượt)
       const srvMe = payload.players.find((p) => p.id === me);
       if (srvMe) {
         const pr = predRef.current;
@@ -1394,9 +1395,9 @@ function BoomOnlineInner({
           pr.x = srvMe.x;
           pr.y = srvMe.y;
           pr.dir = srvMe.dir;
-        } else {
-          pr.x += (srvMe.x - pr.x) * 0.36;
-          pr.y += (srvMe.y - pr.y) * 0.36;
+        } else if (dist > 0.18) {
+          pr.x += (srvMe.x - pr.x) * 0.24;
+          pr.y += (srvMe.y - pr.y) * 0.24;
         }
       }
 
@@ -1530,14 +1531,20 @@ function BoomOnlineInner({
       keysRef.current = { up: false, down: false, left: false, right: false };
       setMoveVector(0, 0);
     };
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') onBlur();
+    };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibility);
+      setMoveVector(0, 0);
     };
   }, [hud.myState, setMoveVector, triggerBombPress, triggerSpecialPress]);
 
@@ -1635,9 +1642,9 @@ function BoomOnlineInner({
               const btx = Math.floor(b.x);
               const bty = Math.floor(b.y);
               if (btx === tx && bty === ty) {
-                // Nếu hiện tại đang đứng chồng lên quả bom vừa đặt thì vẫn cho bước thoát ra
+                // Nếu hiện tại đang đứng chồng lên quả bom vừa đặt thì vẫn cho bước thoát ra (khớp server 0.5 + 0.36 = 0.86)
                 const overlapsNow =
-                  Math.abs(pr.x - (btx + 0.5)) < 0.84 && Math.abs(pr.y - (bty + 0.5)) < 0.84;
+                  Math.abs(pr.x - (btx + 0.5)) < 0.86 && Math.abs(pr.y - (bty + 0.5)) < 0.86;
                 if (!overlapsNow) return true;
               }
             }
@@ -1834,34 +1841,28 @@ function BoomOnlineInner({
     return () => window.cancelAnimationFrame(rafId);
   }, []);
 
-  // Xử lý cảm ứng D-Pad chuẩn xác trên cả Landscape thực lẫn Portrait xoay ngang CSS
-  const handleDpadPointer = useCallback(
-    (clientX: number, clientY: number, el: HTMLElement) => {
-      const pt = getLocalPoint(clientX, clientY, el, rotated);
-      const ox = pt.x - pt.w * 0.5;
-      const oy = pt.y - pt.h * 0.5;
-      const dist = Math.hypot(ox, oy);
-      if (dist < pt.w * 0.11) {
+  // Xử lý cảm ứng D-Pad 4 hướng trục chính chuẩn Bomberman (hỗ trợ xoay 90° CSS + trượt corner-slide mượt)
+  const snapDpadOffset = useCallback(
+    (ox: number, oy: number) => {
+      if (Math.hypot(ox, oy) < 8) {
         setMoveVector(0, 0);
         return;
       }
-      const angle = Math.atan2(oy, ox);
-      const absCos = Math.abs(Math.cos(angle));
-      const absSin = Math.abs(Math.sin(angle));
-      // Ưu tiên 4 hướng trục thẳng chuẩn Bomberman (góc ±28°), vẫn cho phép đi chéo lượn góc mượt mà!
-      let dx = 0;
-      let dy = 0;
-      if (absCos > 0.88) {
-        dx = ox > 0 ? 1 : -1;
-      } else if (absSin > 0.88) {
-        dy = oy > 0 ? 1 : -1;
+      if (Math.abs(ox) >= Math.abs(oy)) {
+        setMoveVector(ox > 0 ? 1 : -1, 0);
       } else {
-        dx = ox > 0 ? 1 : -1;
-        dy = oy > 0 ? 1 : -1;
+        setMoveVector(0, oy > 0 ? 1 : -1);
       }
-      setMoveVector(dx, dy);
     },
-    [rotated, setMoveVector],
+    [setMoveVector],
+  );
+
+  const handleDpadPointer = useCallback(
+    (clientX: number, clientY: number, el: HTMLElement) => {
+      const pt = getLocalPoint(clientX, clientY, el, rotated);
+      snapDpadOffset(pt.x - pt.w * 0.5, pt.y - pt.h * 0.5);
+    },
+    [rotated, snapDpadOffset],
   );
 
   const fireImmediate = (fn: () => void) => {
@@ -2004,13 +2005,30 @@ function BoomOnlineInner({
         {/* CỤM ĐIỀU KHIỂN CẢM ỨNG HAI BÊN NGÓN CÁI (KHÔNG CHE MÊ CUNG) */}
         {hud.myState !== null ? (
           <>
-            {/* BÊN TRÁI: ARCADE D-PAD 8 HƯỚNG HỖ TRỢ XOAY 90° CHÍNH XÁC */}
+            {/* BÊN TRÁI: ARCADE D-PAD 4 HƯỚNG LIỀN MẠCH KHÔNG XUNG ĐỘT CON-CHA */}
             <View
               testID="boom-dpad"
               style={[
                 styles.dpadOuter,
                 compactH ? styles.dpadOuterCompact : styles.dpadOuterNormal,
               ]}
+              onLayout={({ nativeEvent: { layout } }) => {
+                dpadLayoutRef.current = { w: layout.width, h: layout.height };
+              }}
+              onStartShouldSetResponder={() => Platform.OS !== 'web'}
+              onMoveShouldSetResponder={() => Platform.OS !== 'web'}
+              onResponderGrant={(e) => {
+                const { locationX, locationY } = e.nativeEvent;
+                const { w, h } = dpadLayoutRef.current;
+                snapDpadOffset(locationX - w * 0.5, locationY - h * 0.5);
+              }}
+              onResponderMove={(e) => {
+                const { locationX, locationY } = e.nativeEvent;
+                const { w, h } = dpadLayoutRef.current;
+                snapDpadOffset(locationX - w * 0.5, locationY - h * 0.5);
+              }}
+              onResponderRelease={() => setMoveVector(0, 0)}
+              onResponderTerminate={() => setMoveVector(0, 0)}
               onPointerDown={(e: unknown) => {
                 const pe = e as PointerEvent;
                 pe.preventDefault?.();
@@ -2028,39 +2046,31 @@ function BoomOnlineInner({
               onPointerCancel={() => setMoveVector(0, 0)}
               onLostPointerCapture={() => setMoveVector(0, 0)}
             >
-              {/* 4 cánh chữ thập trực quan */}
-              <Pressable
+              {/* 4 cánh chữ thập nổi bọt về vùng cha boom-dpad (tránh Pressable onPressOut xung đột) */}
+              <View
                 testID="boom-dpad-up"
-                onPressIn={() => setMoveVector(0, -1)}
-                onPressOut={() => setMoveVector(0, 0)}
                 style={[styles.dpadArm, styles.dpadUp, dpadUi.dy < 0 && styles.dpadArmActive]}
               >
                 <UiIcon name="ChevronUp" size={20} color={dpadUi.dy < 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
-              </Pressable>
-              <Pressable
+              </View>
+              <View
                 testID="boom-dpad-down"
-                onPressIn={() => setMoveVector(0, 1)}
-                onPressOut={() => setMoveVector(0, 0)}
                 style={[styles.dpadArm, styles.dpadDown, dpadUi.dy > 0 && styles.dpadArmActive]}
               >
                 <UiIcon name="ChevronDown" size={20} color={dpadUi.dy > 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
-              </Pressable>
-              <Pressable
+              </View>
+              <View
                 testID="boom-dpad-left"
-                onPressIn={() => setMoveVector(-1, 0)}
-                onPressOut={() => setMoveVector(0, 0)}
                 style={[styles.dpadArm, styles.dpadLeft, dpadUi.dx < 0 && styles.dpadArmActive]}
               >
                 <UiIcon name="ChevronLeft" size={20} color={dpadUi.dx < 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
-              </Pressable>
-              <Pressable
+              </View>
+              <View
                 testID="boom-dpad-right"
-                onPressIn={() => setMoveVector(1, 0)}
-                onPressOut={() => setMoveVector(0, 0)}
                 style={[styles.dpadArm, styles.dpadRight, dpadUi.dx > 0 && styles.dpadArmActive]}
               >
                 <UiIcon name="ChevronRight" size={20} color={dpadUi.dx > 0 ? '#042F2E' : '#E2E8F0'} strokeWidth={3} />
-              </Pressable>
+              </View>
 
               {/* Núm trượt trung tâm phản hồi theo hướng ngón cái */}
               <View

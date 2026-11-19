@@ -716,14 +716,17 @@ export function moveAndCollideFrog(
   f.onGround = false;
   let carriedThisStep = false;
 
-  // 0. Bám dính bệ gỗ lơ lửng / thang máy di động (chỉ khi không đang nhảy bứt lên f.vy >= -40)
+  // 0. Bám dính bệ gỗ lơ lửng / thang máy di động (chỉ khi đang rơi/đứng yên f.vy >= 0)
   const startBottom = f.y + CROAK_FROG_H;
-  if (f.vy >= -40) {
+  if (f.vy >= 0) {
     for (const r of solids) {
       if (!r.vxPlatform && !r.vyPlatform) continue;
       if (r.bounceVy !== undefined) continue;
       const horizOverlap = f.x + CROAK_FROG_W > r.x + 2 && f.x < r.x + r.w - 2;
-      const nearTop = startBottom >= r.y - 12 && startBottom <= r.y + 16;
+      const dyPlat = Math.abs((r.vyPlatform ?? 0) * dt);
+      const nearTop =
+        startBottom >= r.y - Math.max(4, dyPlat + 3) &&
+        startBottom <= r.y + Math.max(7, dyPlat + 4);
       if (horizOverlap && nearTop) {
         if (r.vxPlatform) f.x += r.vxPlatform * dt;
         f.y = r.y - CROAK_FROG_H;
@@ -750,6 +753,21 @@ export function moveAndCollideFrog(
         f.x = r.x + r.w;
         f.vx = f.state === 'launched' ? -f.vx * 0.28 : 0;
         boxX.x = f.x;
+      } else {
+        // Fallback khi bệ di động ép ngang vào thân ếch (lún sâu hơn ngưỡng quét)
+        const overlapV = Math.min(boxX.y + boxX.h, r.y + r.h) - Math.max(boxX.y, r.y);
+        if (overlapV > 6) {
+          const pushLeft = f.x + CROAK_FROG_W - r.x;
+          const pushRight = r.x + r.w - f.x;
+          if (pushLeft <= pushRight) {
+            f.x = r.x - CROAK_FROG_W;
+            if (f.vx > 0) f.vx = 0;
+          } else {
+            f.x = r.x + r.w;
+            if (f.vx < 0) f.vx = 0;
+          }
+          boxX.x = f.x;
+        }
       }
     }
 

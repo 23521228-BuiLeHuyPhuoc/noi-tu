@@ -249,6 +249,7 @@ export interface MaSoiLogItem {
   day: number;
   kind: 'dawn' | 'vote' | 'system' | 'hunter';
   text: string;
+  at?: number;
 }
 
 export interface MaSoiView {

@@ -6,6 +6,7 @@ import {
   LOTO_MIN,
   LOTO_RHYMES,
   LOTO_TICKET_COLORS,
+  LOTO_TICKET_NUMBERS,
   checkLotoRow,
   generateLotoTicket,
   type LotoGrid,
@@ -15,7 +16,7 @@ import {
 import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
-const DEFAULT_CALL_INTERVAL_MS = 3200;
+const DEFAULT_CALL_INTERVAL_MS = 1500;
 
 export class LotoGame implements GameEngine {
   private order: string[] = [];
@@ -91,7 +92,7 @@ export class LotoGame implements GameEngine {
     for (const id of this.order) {
       const grid = this.tickets.get(id);
       if (!grid) continue;
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < grid.length; r++) {
         const { hits } = checkLotoRow(grid, r, this.calledSet);
         if (hits >= 4) {
           nextWaiting.push(id);
@@ -152,7 +153,7 @@ export class LotoGame implements GameEngine {
     let bestHits = 0;
     let bestRow = 0;
     let totalHits = 0;
-    for (let r = 0; r < 3; r++) {
+    for (let r = 0; r < grid.length; r++) {
       const { hits } = checkLotoRow(grid, r, this.calledSet);
       totalHits += hits;
       if (hits > bestHits) {
@@ -183,6 +184,7 @@ export class LotoGame implements GameEngine {
 
     const ranking = sorted.map((id) => {
       const prog = this.bestRowProgress(id);
+      const totalNums = this.ticketNumSets.get(id)?.size ?? LOTO_TICKET_NUMBERS;
       if (id === winnerId && winningRow !== null) {
         const rowNums = checkLotoRow(this.tickets.get(id)!, winningRow, this.calledSet).nums;
         return {
@@ -194,7 +196,7 @@ export class LotoGame implements GameEngine {
       return {
         playerId: id,
         name: this.names.get(id) ?? id,
-        detail: `Hàng cao nhất ${prog.bestHits}/5 · Tổng trúng ${prog.totalHits}/15 số`,
+        detail: `Hàng cao nhất ${prog.bestHits}/5 · Tổng trúng ${prog.totalHits}/${totalNums} số`,
       };
     });
 
@@ -223,7 +225,7 @@ export class LotoGame implements GameEngine {
       const grid = this.tickets.get(id);
       const mk = this.marked.get(id);
       if (!grid) continue;
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < grid.length; r++) {
         const full = checkLotoRow(grid, r, this.calledSet);
         if (!full.validKinh) continue;
         const markedHits = mk ? checkLotoRow(grid, r, this.calledSet, mk).hits : full.hits;
@@ -282,7 +284,8 @@ export class LotoGame implements GameEngine {
     }
 
     if (action.type === 'loto_kinh') {
-      if (action.row !== 0 && action.row !== 1 && action.row !== 2) {
+      const grid = this.tickets.get(playerId);
+      if (!grid || !Number.isInteger(action.row) || action.row < 0 || action.row >= grid.length) {
         return { ok: false, reason: 'bad_action' };
       }
 
@@ -290,9 +293,6 @@ export class LotoGame implements GameEngine {
       if (this.called.length < lockUntil) {
         return { ok: false, reason: 'kinh_locked' };
       }
-
-      const grid = this.tickets.get(playerId);
-      if (!grid) return { ok: false, reason: 'bad_action' };
 
       const check = checkLotoRow(grid, action.row, this.calledSet);
       if (!check.validKinh) {
@@ -348,7 +348,7 @@ export class LotoGame implements GameEngine {
     // 1. Hô Kinh ngay lập tức khi có hàng đủ 5/5 số đã gọi (và không bị phạt khóa)
     const lockUntil = this.penaltyUntilCount.get(playerId) ?? 0;
     if (this.called.length >= lockUntil) {
-      for (const r of [0, 1, 2] as const) {
+      for (let r = 0; r < grid.length; r++) {
         if (checkLotoRow(grid, r, this.calledSet).validKinh) {
           return { type: 'loto_kinh', row: r };
         }

@@ -14,15 +14,15 @@ import type { ActionResult, GameAction } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const DEFAULT_SEC: Record<GianDiepPhase, number> = {
-  word_reveal: 5,
-  clue_turn: 24,
-  discussion: 24,
-  vote: 20,
-  defense: 15,
-  final_vote: 12,
-  mrwhite_guess: 15,
-  spy_guess: 15,
-  reveal_end: 7,
+  word_reveal: 10,
+  clue_turn: 40,
+  discussion: 45,
+  vote: 35,
+  defense: 28,
+  final_vote: 22,
+  mrwhite_guess: 25,
+  spy_guess: 25,
+  reveal_end: 12,
 };
 
 const BOT_DEFENSE_LINES = [
@@ -368,7 +368,7 @@ export class GianDiepGame implements GameEngine {
     if (role === 'mrwhite') {
       this.mrWhiteId = chosen;
       this.mrWhiteGuessed = false;
-      this.pushSystem(`🤍 Mr. White ${this.seatTag(chosen)} có 15 giây đoán từ khóa của Dân Thường để lật kèo!`);
+      this.pushSystem(`🤍 Mr. White ${this.seatTag(chosen)} có ${DEFAULT_SEC.mrwhite_guess} giây đoán từ khóa của Dân Thường để lật kèo!`);
       this.enterPhase('mrwhite_guess', () => {
         this.mrWhiteId = null;
         if (!this.checkWin()) {
@@ -385,7 +385,7 @@ export class GianDiepGame implements GameEngine {
     if (role === 'giandiep' && remainingHidden.length === 0) {
       this.mrWhiteId = chosen;
       this.mrWhiteGuessed = false;
-      this.pushSystem(`🕵️ Gián Điệp cuối cùng ${this.seatTag(chosen)} bị lộ! Có 15 giây phản đòn đoán đúng từ Dân Thường để lật kèo!`);
+      this.pushSystem(`🕵️ Gián Điệp cuối cùng ${this.seatTag(chosen)} bị lộ! Có ${DEFAULT_SEC.spy_guess} giây phản đòn đoán đúng từ Dân Thường để lật kèo!`);
       this.enterPhase('spy_guess', () => {
         this.mrWhiteId = null;
         if (!this.checkWin()) {

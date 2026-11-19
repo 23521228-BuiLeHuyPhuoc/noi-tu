@@ -1,8 +1,9 @@
 /**
- * Kiểu dữ liệu & ngân hàng 252 câu hỏi trắc nghiệm thực chiến Đấu Trường Đố Vui (`do_vui`, 1–12 người):
+ * Kiểu dữ liệu & ngân hàng 546 câu hỏi trắc nghiệm thực chiến Đấu Trường Đố Vui (`do_vui`, 1–12 người):
  * Chuẩn trình độ Intern / Fresher / Junior qua 7 chuyên đề (OOP tổng quát, DSA, JS/TS, Node/Backend,
  * React/RN/FE, Git/Mạng/Bảo mật/DevOps & Tiếng Anh Giao Tiếp + IT B1–C1) kèm thời gian linh hoạt theo độ khó.
  */
+import { DO_VUI_EXTRA_QUESTIONS } from './dovui-extra';
 
 export type DoVuiPhase = 'question' | 'reveal';
 
@@ -34,7 +35,7 @@ export const DO_VUI_TOPICS: readonly DoVuiTopicMeta[] = [
     name: 'Tổng Hợp IT & Anh',
     shortName: 'Tổng hợp',
     emoji: '🧠',
-    desc: 'Trộn toàn bộ 252 câu hỏi thực chiến cả 7 chuyên đề CNTT & Tiếng Anh IT (Intern – Junior)',
+    desc: 'Trộn toàn bộ 546 câu hỏi thực chiến cả 7 chuyên đề CNTT & Tiếng Anh IT (Intern – Junior)',
   },
   {
     id: 'oop',
@@ -2784,10 +2785,11 @@ export const DO_VUI_QUESTIONS: DoVuiQuestion[] = [
       'Trong `be committed to / dedicated to / used to`, từ `to` là GIỚI TỪ nên bắt buộc theo sau bởi `V-ing` (`keeping`)!',
     ],
   ]),
+  ...DO_VUI_EXTRA_QUESTIONS,
 ];
 
 /**
- * Trả về danh sách câu hỏi theo chuyên đề (`'all'` hoặc bỏ trống sẽ lấy toàn bộ 252 câu)
+ * Trả về danh sách câu hỏi theo chuyên đề (`'all'` hoặc bỏ trống sẽ lấy toàn bộ 546 câu)
  * và lọc theo độ khó (`'easy' | 'medium' | 'hard'`; nếu `'mixed'` hoặc bỏ trống thì lấy đủ cả 3 mức).
  */
 export function questionsForTopic(

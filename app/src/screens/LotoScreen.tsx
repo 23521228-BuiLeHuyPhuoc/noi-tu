@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   LOTO_RHYMES,
+  LOTO_TICKET_NUMBERS,
+  LOTO_TICKET_ROWS,
   checkLotoRow,
   type LotoTicketColor,
   type LotoView,
@@ -13,15 +15,15 @@ import type { Game } from '../useGame';
 import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { play } from '../sound';
-import { useOnChange } from '../hooks';
-import { Card, T } from '../ui';
-import { Shell, type StripOptions } from '../components/Shell';
-import { CountdownBar } from '../components/TimerBar';
+import { useOnChange, useStableWindow } from '../hooks';
+import { T } from '../ui';
+import { Shell } from '../components/Shell';
+import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
+import { Sheet } from '../components/Sheet';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { Confetti } from '../components/Fun';
 import { EmojiIcon, UiIcon } from '../components/Icons';
-import { MotionSurface } from '../components/MotionPrimitives';
 
 const TICKET_PALETTES: Record<
   LotoTicketColor,
@@ -102,12 +104,43 @@ function errOf(reason: ActionError): string {
   );
 }
 
+const LotoCallBar = memo(function LotoCallBar({
+  nextCallAt,
+  callIntervalMs,
+  clockOffset,
+}: {
+  nextCallAt: number | null;
+  callIntervalMs: number;
+  clockOffset: number;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!nextCallAt) return;
+    const id = setInterval(() => setNowMs(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [nextCallAt]);
+
+  const totalMs = Math.max(500, callIntervalMs);
+  const leftMs = nextCallAt ? Math.max(0, nextCallAt - (nowMs + clockOffset)) : 0;
+  const pct = Math.max(0, Math.min(100, (leftMs / totalMs) * 100));
+
+  return (
+    <View testID="loto-timer" style={styles.callBarRow}>
+      <View style={styles.callBarTrack}>
+        <View style={[styles.callBarFill, { width: `${pct}%` }]} />
+      </View>
+      <T style={styles.callBarSec}>{(leftMs / 1000).toFixed(1)}s</T>
+    </View>
+  );
+});
+
 export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as LotoView;
   const me = game.me ?? '';
   const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
-  const { width } = useWindowDimensions();
+  const { width, height } = useStableWindow();
   const wide = width >= 720;
+  const compactH = height < 720;
 
   const [peekOpen, setPeekOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -147,15 +180,15 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const penaltyLeft = Math.max(0, penaltyUntil - view.called.length);
   const isLocked = penaltyLeft > 0;
 
+  const rowCount = activeGrid.length || LOTO_TICKET_ROWS;
   const rowChecks = useMemo(() => {
-    return [0, 1, 2].map((r) =>
+    return Array.from({ length: rowCount }, (_, r) =>
       checkLotoRow(activeGrid, r, calledSet, view.autoMark ? undefined : markedSet),
     );
-  }, [activeGrid, calledSet, markedSet, view.autoMark]);
+  }, [activeGrid, rowCount, calledSet, markedSet, view.autoMark]);
 
-  const recentBalls = useMemo(() => view.called.slice(-8), [view.called]);
+  const recentBalls = useMemo(() => view.called.slice(-6), [view.called]);
   const currentRhyme = view.currentNum !== null ? LOTO_RHYMES[view.currentNum] : null;
-  const callSec = Math.max(1, Math.round(view.callIntervalMs / 1000));
 
   const act = async (payload: Parameters<Game['act']>[0]) => {
     setBusy(true);
@@ -175,40 +208,21 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
     await act({ type: 'loto_mark', num });
   };
 
-  const handleKinh = async (row: 0 | 1 | 2) => {
+  const handleKinh = async (row: number) => {
     if (busy || !hasMyTicket || view.status !== 'calling') return;
     play('siren');
     await act({ type: 'loto_kinh', row });
   };
 
-  const strip: StripOptions = useMemo(
-    () => ({
-      order: view.order,
-      active: view.winnerId,
-      ring: (p: PublicPlayer) => {
-        if (view.winnerId === p.id) return C.gold;
-        if (waitingSet.has(p.id)) return '#F97316';
-        return TICKET_PALETTES[view.ticketColors[p.id] ?? 'rose']?.frameBorder;
-      },
-      sub: (p: PublicPlayer) => {
-        if (view.winnerId === p.id) return 'KINH RỒI!';
-        if (waitingSet.has(p.id)) return 'ĐỢI (4/5)!';
-        const mLen = view.marked[p.id]?.length ?? 0;
-        return `${mLen}/15 số`;
-      },
-    }),
-    [view.order, view.winnerId, view.ticketColors, view.marked, waitingSet],
-  );
-
   const renderBottom = () => {
     if (view.winnerId) {
       return (
         <View style={styles.footerInline}>
-          <EmojiIcon emoji="🎊" size={18} />
-          <T style={[styles.footerTxt, { color: '#FDE047' }]}>
+          <EmojiIcon emoji="🎊" size={16} />
+          <T numberOfLines={1} style={[styles.footerTxt, { color: '#FDE047' }]}>
             {view.winnerId === me
               ? 'Chúc mừng bạn đã KINH rực rỡ đêm hội chợ!'
-              : `${view.names[view.winnerId] ?? view.winnerId} đã hô KINH thành công hàng ${(view.winningRow ?? 0) + 1}!`}
+              : `${view.names[view.winnerId] ?? view.winnerId} KINH hàng ${(view.winningRow ?? 0) + 1}!`}
           </T>
         </View>
       );
@@ -216,8 +230,8 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
 
     if (!hasMyTicket) {
       return (
-        <T style={[styles.footerTxt, { color: theme.onBg }]}>
-          Bạn đang xem ké tờ vé của {view.names[ticketOwnerId] ?? 'hàng xóm'} — ván sau phát vé riêng nhé!
+        <T numberOfLines={1} style={[styles.footerTxt, { color: theme.onBg }]}>
+          Đang xem ké vé @{view.names[ticketOwnerId] ?? 'hàng xóm'}
         </T>
       );
     }
@@ -225,61 +239,93 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
     const readyRowIdx = rowChecks.findIndex((c) => c.validKinh);
     return (
       <View style={styles.footerInline}>
-        <EmojiIcon emoji={readyRowIdx >= 0 ? '🎉' : '🎫'} size={17} />
-        <T style={[styles.footerTxt, { color: readyRowIdx >= 0 ? '#4ADE80' : theme.onBg }]}>
+        <EmojiIcon emoji={readyRowIdx >= 0 ? '🎉' : '🎫'} size={15} />
+        <T numberOfLines={1} style={[styles.footerTxt, { color: readyRowIdx >= 0 ? '#4ADE80' : theme.onBg }]}>
           {readyRowIdx >= 0
-            ? `HÀNG ${readyRowIdx + 1} ĐÃ ĐỦ 5/5! BẤM NÚT KINH NGAY KẺO TRỄ!`
+            ? `HÀNG ${readyRowIdx + 1} ĐỦ 5/5! BẤM KINH NGAY!`
             : view.autoMark
-              ? 'Chế độ tự chấm đang bật — thấy đủ 5/5 số một hàng là bấm KINH liền tay!'
-              : 'Nghe câu rao, chạm đóng dấu đỏ lên số vừa gọi rồi hô KINH khi đủ 5 số 1 hàng!'}
+              ? 'Tự chấm bật — đủ 5/5 số 1 hàng là bấm KINH!'
+              : 'Chạm chấm số đã kêu — đủ 5/5 hàng bấm KINH!'}
         </T>
       </View>
     );
   };
 
   return (
-    <Shell game={game} room={room} strip={strip} wide={wide} bottom={renderBottom()}>
-      {view.winnerId !== null && <Confetti />}
+    <Shell game={game} room={room} scroll={false} hideStrip wide={wide} bottom={renderBottom()}>
+      <View style={styles.root}>
+        {view.winnerId !== null && <Confetti />}
 
-      {/* SÂN KHẤU RAO SỐ HỘI CHỢ TÂN THỜI */}
-      <MotionSurface>
+        <CompactPlayerStrip
+          room={room}
+          game={game}
+          order={view.order}
+          activeId={view.winnerId}
+          ring={(p: PublicPlayer) => {
+            if (view.winnerId === p.id) return C.gold;
+            if (waitingSet.has(p.id)) return '#F97316';
+            return TICKET_PALETTES[view.ticketColors[p.id] ?? 'rose']?.frameBorder;
+          }}
+          sub={(p: PublicPlayer) => {
+            if (view.winnerId === p.id) return 'KINH!';
+            if (waitingSet.has(p.id)) return 'ĐỢI!';
+            const mLen = view.marked[p.id]?.length ?? 0;
+            return `${mLen}/${LOTO_TICKET_NUMBERS}`;
+          }}
+        />
+
+        {/* SÂN KHẤU RAO SỐ GỌN NHẸ */}
         <LinearGradient
           colors={['#FACC15', '#F97316', '#EC4899']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.callerRim, sticker(4)]}
+          style={[styles.callerRim, sticker(3)]}
         >
           <LinearGradient
             testID="loto-caller"
             colors={['#2E073F', '#6B1143', '#3B0819']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.callerInner}
+            style={[styles.callerInner, compactH && styles.callerInnerCompact]}
           >
-            {/* Thanh Đèn Lồng Hội Chợ */}
+            {/* Thanh Đèn Lồng + Bộ đếm + Nút Soi vé cả xóm */}
             <View style={styles.marqueeBar}>
               <View style={styles.inlineRow}>
-                <EmojiIcon emoji="🏮" size={16} />
-                <T style={styles.marqueeTitle}>ĐOÀN LÔ TÔ XÓM LẦY</T>
-                <EmojiIcon emoji="🎤" size={15} />
+                <EmojiIcon emoji="🏮" size={14} />
+                <T style={styles.marqueeTitle}>LÔ TÔ XÓM LẦY</T>
               </View>
-              <View style={styles.countChip}>
-                <T style={styles.countChipTxt}>
-                  Đã kêu {view.called.length}/90 · Còn {view.remainingCount}
-                </T>
+              <View style={styles.inlineRow}>
+                <View style={styles.countChip}>
+                  <T style={styles.countChipTxt}>
+                    {view.called.length}/90 · Còn {view.remainingCount}
+                  </T>
+                </View>
+                <Pressable
+                  testID="loto-peek-toggle"
+                  onPress={() => {
+                    play('pop');
+                    setPeekOpen(true);
+                  }}
+                  style={[styles.peekPillBtn, view.waitingIds.length > 0 && styles.peekPillBtnHot]}
+                >
+                  <EmojiIcon emoji="👀" size={12} />
+                  <T style={styles.peekPillTxt}>
+                    Soi vé{view.waitingIds.length > 0 ? ` (${view.waitingIds.length})` : ''}
+                  </T>
+                </Pressable>
               </View>
             </View>
 
-            {/* Quả Cầu Lô Tô 3D + Câu Vè Rao Số */}
+            {/* Quả Cầu Lô Tô + Câu Vè */}
             <View style={styles.callerStageRow}>
               <LinearGradient
                 colors={['#FEF08A', '#F59E0B', '#DC2626']}
                 start={{ x: 0.15, y: 0.1 }}
                 end={{ x: 0.85, y: 0.95 }}
-                style={[styles.bingoBallOuter, wide && styles.bingoBallOuterWide]}
+                style={[styles.bingoBallOuter, compactH && styles.bingoBallOuterCompact, wide && styles.bingoBallOuterWide]}
               >
-                <View style={[styles.bingoBallCore, wide && styles.bingoBallCoreWide]}>
-                  <T style={[styles.bingoBallNum, wide && { fontSize: 34 }]}>
+                <View style={[styles.bingoBallCore, compactH && styles.bingoBallCoreCompact, wide && styles.bingoBallCoreWide]}>
+                  <T style={[styles.bingoBallNum, compactH && { fontSize: 22 }, wide && { fontSize: 32 }]}>
                     {view.currentNum !== null ? String(view.currentNum) : '--'}
                   </T>
                 </View>
@@ -288,30 +334,28 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
               <View style={styles.chantBox}>
                 {currentRhyme && (
                   <View style={styles.rhymeTitlePill}>
-                    <EmojiIcon emoji="✨" size={12} />
+                    <EmojiIcon emoji="✨" size={11} />
                     <T numberOfLines={1} style={styles.rhymeTitleTxt}>
                       {currentRhyme.title}
                     </T>
                   </View>
                 )}
-                <T style={styles.chantText}>
+                <T numberOfLines={2} style={[styles.chantText, compactH && { fontSize: 12, lineHeight: 16 }]}>
                   {view.currentChant ??
-                    'Cờ ra con mấy, con mấy gì đây… Bà con trải vé chuẩn bị dò nha!'}
+                    'Cờ ra con mấy… Bà con trải vé chuẩn bị dò nha!'}
                 </T>
               </View>
             </View>
 
             {view.status === 'calling' && (
-              <CountdownBar
-                endsAt={view.nextCallAt}
-                total={callSec}
+              <LotoCallBar
+                nextCallAt={view.nextCallAt}
+                callIntervalMs={view.callIntervalMs}
                 clockOffset={game.clockOffset}
-                lightText
-                testID="loto-timer"
               />
             )}
 
-            {/* Dải 8 Con Số Vừa Kêu Gần Nhất */}
+            {/* Dải 6 Con Số Vừa Kêu + Cảnh Báo 4/5 Sắp Kinh */}
             <View style={styles.recentStrip}>
               <T style={styles.recentLabel}>Vừa ra:</T>
               <View style={styles.recentBallsWrap}>
@@ -335,270 +379,256 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
               </View>
             </View>
 
-            {/* CẢNH BÁO ĐỎ RỰC KHI CÓ NGƯỜI SẮP KINH (4/5) */}
-            {view.waitingIds.length > 0 && (
+            {view.waitingIds.length > 0 ? (
               <LinearGradient
                 colors={['#DC2626', '#EA580C', '#B91C1C']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.waitingAlertBar}
               >
-                <EmojiIcon emoji="🔥" size={16} />
-                <T style={styles.waitingAlertTxt}>
-                  SẮP KINH (ĐỢI!):{' '}
-                  {view.waitingIds.map((id) => `@${view.names[id] ?? id}`).join(', ')} đã trúng 4/5!
+                <EmojiIcon emoji="🔥" size={14} />
+                <T numberOfLines={1} style={styles.waitingAlertTxt}>
+                  SẮP KINH (4/5): {view.waitingIds.map((id) => `@${view.names[id] ?? id}`).join(', ')}
                 </T>
               </LinearGradient>
-            )}
-
-            {view.lastEvent && (
+            ) : view.lastEvent ? (
               <View style={styles.eventBanner}>
-                <EmojiIcon emoji="📢" size={14} />
-                <T style={styles.eventBannerTxt}>{view.lastEvent}</T>
+                <EmojiIcon emoji="📢" size={12} />
+                <T numberOfLines={1} style={styles.eventBannerTxt}>{view.lastEvent}</T>
               </View>
-            )}
+            ) : null}
           </LinearGradient>
         </LinearGradient>
-      </MotionSurface>
 
-      {/* THÔNG BÁO LỖI HOẶC PHẠT KHÓA KINH */}
-      {err && (
-        <View style={[styles.errorBanner, sticker(2)]}>
-          <UiIcon name="AlertTriangle" size={16} color="#FEF08A" />
-          <T style={styles.errorBannerTxt}>{err}</T>
-        </View>
-      )}
+        {/* THÔNG BÁO LỖI HOẶC PHẠT KHÓA KINH */}
+        {err && (
+          <View style={[styles.errorBanner, sticker(2)]}>
+            <UiIcon name="AlertTriangle" size={14} color="#FEF08A" />
+            <T numberOfLines={1} style={styles.errorBannerTxt}>{err}</T>
+          </View>
+        )}
 
-      {isLocked && (
-        <View style={[styles.lockPenaltyBanner, sticker(2)]}>
-          <UiIcon name="Lock" size={15} color="#9A3412" />
-          <T style={styles.lockPenaltyTxt}>
-            Đang bị khóa hô KINH còn {penaltyLeft} lượt gọi số do hô hụt quê độ!
-          </T>
-        </View>
-      )}
-
-      {/* TỜ VÉ LÔ TÔ GIẤY TRUYỀN THỐNG 9 CỘT × 3 HÀNG */}
-      <View
-        testID="loto-ticket"
-        style={[
-          styles.ticketPaper,
-          sticker(4),
-          {
-            backgroundColor: pal.paperBg,
-            borderColor: pal.frameBorder,
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={[...pal.headerGrad]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.ticketHeader}
-        >
-          <View style={styles.inlineRow}>
-            <EmojiIcon emoji="🎟️" size={16} />
-            <T numberOfLines={1} style={styles.ticketHeaderTitle}>
-              {pal.name} · {hasMyTicket ? 'Vé Của Bạn' : `Vé @${view.names[ticketOwnerId] ?? ''}`}
+        {isLocked && (
+          <View style={[styles.lockPenaltyBanner, sticker(2)]}>
+            <UiIcon name="Lock" size={14} color="#9A3412" />
+            <T numberOfLines={1} style={styles.lockPenaltyTxt}>
+              Khóa hô KINH còn {penaltyLeft} lượt gọi do hô hụt!
             </T>
           </View>
-          <View style={styles.modeTag}>
-            <T style={styles.modeTagTxt}>{view.autoMark ? 'Tự chấm' : 'Tự dò'}</T>
-          </View>
-        </LinearGradient>
+        )}
 
-        <View style={styles.ticketRowsWrap}>
-          {activeGrid.map((rowCells, rIdx) => {
-            const isWinRow =
-              view.winnerId === ticketOwnerId && view.winningRow === rIdx;
-            const rInfo = rowChecks[rIdx];
-            const isRowWaiting = rInfo && rInfo.hits === 4;
+        {/* TỜ VÉ LÔ TÔ 9 CỘT × 6 HÀNG (30 SỐ, 2 KHUNG 3×9) */}
+        <View style={styles.ticketStage}>
+          <View
+            testID="loto-ticket"
+            style={[
+              styles.ticketPaper,
+              sticker(3),
+              {
+                backgroundColor: pal.paperBg,
+                borderColor: pal.frameBorder,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[...pal.headerGrad]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.ticketHeader}
+            >
+              <View style={styles.inlineRow}>
+                <EmojiIcon emoji="🎟️" size={14} />
+                <T numberOfLines={1} style={styles.ticketHeaderTitle}>
+                  {pal.name} · {LOTO_TICKET_NUMBERS} số
+                </T>
+              </View>
+              <View style={styles.modeTag}>
+                <T style={styles.modeTagTxt}>{view.autoMark ? 'Tự chấm' : 'Tự dò'}</T>
+              </View>
+            </LinearGradient>
 
-            return (
-              <View
-                key={rIdx}
-                style={[
-                  styles.ticketRow,
-                  isWinRow && styles.ticketRowWin,
-                  isRowWaiting && !isWinRow && styles.ticketRowWait,
-                ]}
-              >
-                {rowCells.map((cell, cIdx) => {
-                  if (cell === null) {
-                    return (
-                      <View
-                        key={`b-${rIdx}-${cIdx}`}
-                        style={[
-                          styles.ticketCell,
-                          wide && styles.ticketCellWide,
-                          {
-                            backgroundColor: pal.blankBg,
-                            borderColor: pal.cellBorder,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.blankOrnament,
-                            { backgroundColor: pal.blankDot },
-                          ]}
-                        />
-                      </View>
-                    );
-                  }
+            <View style={styles.ticketRowsWrap}>
+              {activeGrid.map((rowCells, rIdx) => {
+                const isWinRow =
+                  view.winnerId === ticketOwnerId && view.winningRow === rIdx;
+                const rInfo = rowChecks[rIdx];
+                const isRowWaiting = rInfo && rInfo.hits === 4;
 
-                  const stamped = markedSet.has(cell);
-                  const isJustCalled = view.currentNum === cell;
-
-                  return (
-                    <Pressable
-                      key={`n-${rIdx}-${cIdx}-${cell}`}
-                      testID={`loto-cell-${cell}`}
-                      disabled={!hasMyTicket || view.status !== 'calling'}
-                      onPress={() => handleCellTap(cell)}
-                      style={({ pressed }) => [
-                        styles.ticketCell,
-                        wide && styles.ticketCellWide,
-                        styles.ticketNumCell,
-                        { borderColor: pal.cellBorder },
-                        isJustCalled && !stamped && styles.cellJustCalled,
-                        pressed && hasMyTicket && { transform: [{ scale: 0.93 }] },
+                return (
+                  <View key={rIdx}>
+                    {rIdx === 3 && (
+                      <View style={[styles.blockDivider, { borderColor: pal.frameBorder }]} />
+                    )}
+                    <View
+                      style={[
+                        styles.ticketRow,
+                        isWinRow && styles.ticketRowWin,
+                        isRowWaiting && !isWinRow && styles.ticketRowWait,
                       ]}
                     >
-                      <View
+                      {rowCells.map((cell, cIdx) => {
+                        if (cell === null) {
+                          return (
+                            <View
+                              key={`b-${rIdx}-${cIdx}`}
+                              style={[
+                                styles.ticketCell,
+                                compactH ? styles.ticketCellCompact : wide ? styles.ticketCellWide : null,
+                                {
+                                  backgroundColor: pal.blankBg,
+                                  borderColor: pal.cellBorder,
+                                },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.blankOrnament,
+                                  { backgroundColor: pal.blankDot },
+                                ]}
+                              />
+                            </View>
+                          );
+                        }
+
+                        const stamped = markedSet.has(cell);
+                        const isJustCalled = view.currentNum === cell;
+
+                        return (
+                          <Pressable
+                            key={`n-${rIdx}-${cIdx}-${cell}`}
+                            testID={`loto-cell-${cell}`}
+                            disabled={!hasMyTicket || view.status !== 'calling'}
+                            onPress={() => handleCellTap(cell)}
+                            style={({ pressed }) => [
+                              styles.ticketCell,
+                              compactH ? styles.ticketCellCompact : wide ? styles.ticketCellWide : null,
+                              styles.ticketNumCell,
+                              { borderColor: pal.cellBorder },
+                              isJustCalled && !stamped && styles.cellJustCalled,
+                              pressed && hasMyTicket && { transform: [{ scale: 0.93 }] },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.numSealWrap,
+                                compactH && styles.numSealWrapCompact,
+                                stamped && styles.redLuckySeal,
+                                wide && stamped && styles.redLuckySealWide,
+                              ]}
+                            >
+                              <T
+                                style={[
+                                  styles.cellNumTxt,
+                                  compactH && styles.cellNumTxtCompact,
+                                  wide && styles.cellNumTxtWide,
+                                  { color: stamped ? '#BE123C' : pal.numColor },
+                                ]}
+                              >
+                                {cell}
+                              </T>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* BỘ 6 NÚT HÔ KINH HÀNG 1..6 (2×3 TRÊN MOBILE, 1×6 TRÊN DESKTOP) */}
+        {hasMyTicket && (
+          <View style={[styles.kinhGrid, wide && styles.kinhGridWide]}>
+            {Array.from({ length: rowCount }, (_, rIdx) => {
+              const info = rowChecks[rIdx] ?? { validKinh: false, hits: 0, nums: [] };
+              const ready = info.validKinh && !isLocked;
+              const waitFour = info.hits === 4 && !isLocked;
+
+              return (
+                <Pressable
+                  key={rIdx}
+                  testID={`loto-kinh-${rIdx}`}
+                  disabled={busy || view.status !== 'calling'}
+                  onPress={() => handleKinh(rIdx)}
+                  style={({ pressed }) => [
+                    styles.kinhBtnOuter,
+                    wide ? styles.kinhBtnOuterWide : styles.kinhBtnOuterCompact,
+                    sticker(ready ? 3 : 2),
+                    ready && styles.kinhBtnReadyGlow,
+                    pressed && { transform: [{ translateY: 1 }] },
+                    isLocked && { opacity: 0.68 },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={
+                      isLocked
+                        ? ['#CBD5E1', '#94A3B8', '#64748B']
+                        : ready
+                          ? ['#FEF08A', '#FACC15', '#EA580C']
+                          : waitFour
+                            ? ['#FFEDD5', '#FED7AA', '#FDBA74']
+                            : ['#FFFFFF', '#F8FAFC', '#E2E8F0']
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.kinhBtnInner}
+                  >
+                    <View style={styles.inlineRow}>
+                      {isLocked ? (
+                        <UiIcon name="Lock" size={11} color="#1E293B" />
+                      ) : (
+                        <EmojiIcon emoji={ready ? '🎉' : waitFour ? '🔥' : '🎫'} size={12} />
+                      )}
+                      <T
+                        numberOfLines={1}
                         style={[
-                          styles.numSealWrap,
-                          stamped && styles.redLuckySeal,
-                          wide && stamped && styles.redLuckySealWide,
+                          styles.kinhBtnTitle,
+                          ready && { color: '#451A03' },
                         ]}
                       >
-                        <T
-                          style={[
-                            styles.cellNumTxt,
-                            wide && styles.cellNumTxtWide,
-                            { color: stamped ? '#BE123C' : pal.numColor },
-                          ]}
-                        >
-                          {cell}
-                        </T>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* BỘ 3 NÚT HÔ KINH HÀNG 1 / 2 / 3 */}
-      {hasMyTicket && (
-        <View style={styles.kinhRow}>
-          {([0, 1, 2] as const).map((rIdx) => {
-            const info = rowChecks[rIdx] ?? { validKinh: false, hits: 0, nums: [] };
-            const ready = info.validKinh && !isLocked;
-            const waitFour = info.hits === 4 && !isLocked;
-
-            return (
-              <Pressable
-                key={rIdx}
-                testID={`loto-kinh-${rIdx}`}
-                disabled={busy || view.status !== 'calling'}
-                onPress={() => handleKinh(rIdx)}
-                style={({ pressed }) => [
-                  styles.kinhBtnOuter,
-                  sticker(ready ? 4 : 2),
-                  ready && styles.kinhBtnReadyGlow,
-                  pressed && { transform: [{ translateY: 2 }] },
-                  isLocked && { opacity: 0.68 },
-                ]}
-              >
-                <LinearGradient
-                  colors={
-                    isLocked
-                      ? ['#CBD5E1', '#94A3B8', '#64748B']
-                      : ready
-                        ? ['#FEF08A', '#FACC15', '#EA580C']
-                        : waitFour
-                          ? ['#FFEDD5', '#FED7AA', '#FDBA74']
-                          : ['#FFFFFF', '#F8FAFC', '#E2E8F0']
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={styles.kinhBtnInner}
-                >
-                  <View style={styles.inlineRow}>
-                    {isLocked ? (
-                      <UiIcon name="Lock" size={13} color="#1E293B" />
-                    ) : (
-                      <EmojiIcon emoji={ready ? '🎉' : waitFour ? '🔥' : '🎫'} size={14} />
-                    )}
+                        KINH H{rIdx + 1}
+                      </T>
+                    </View>
                     <T
                       numberOfLines={1}
                       style={[
-                        styles.kinhBtnTitle,
-                        ready && { color: '#451A03' },
+                        styles.kinhBtnSub,
+                        ready && { color: '#7C2D12', fontWeight: '900' },
+                        waitFour && { color: '#C2410C', fontWeight: '900' },
                       ]}
                     >
-                      KINH HÀNG {rIdx + 1}!
+                      {isLocked
+                        ? `Khóa (${penaltyLeft})`
+                        : ready
+                          ? 'ĐỦ 5/5 · HÔ!'
+                          : waitFour
+                            ? '4/5 · ĐỢI!'
+                            : `${info.hits}/5`}
                     </T>
-                  </View>
-                  <T
-                    numberOfLines={1}
-                    style={[
-                      styles.kinhBtnSub,
-                      ready && { color: '#7C2D12', fontWeight: '900' },
-                      waitFour && { color: '#C2410C', fontWeight: '900' },
-                    ]}
-                  >
-                    {isLocked
-                      ? `Khóa (${penaltyLeft} lượt)`
-                      : ready
-                        ? 'ĐỦ 5/5 · HÔ NGAY!'
-                        : waitFour
-                          ? '4/5 · ĐANG ĐỢI!'
-                          : `Đã trúng ${info.hits}/5`}
-                  </T>
-                </LinearGradient>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      {/* BẢNG MỞ RỘNG SOI VÉ HÀNG XÓM */}
-      <Card style={styles.peekCard}>
-        <Pressable
-          testID="loto-peek-toggle"
-          onPress={() => {
-            play('pop');
-            setPeekOpen((v) => !v);
-          }}
-          style={styles.peekHeader}
-        >
-          <View style={styles.inlineRow}>
-            <EmojiIcon emoji="👀" size={17} />
-            <T style={styles.peekTitle}>
-              Soi Tiến Độ Cả Xóm ({view.order.length} tờ vé)
-            </T>
-            {view.waitingIds.length > 0 && (
-              <View style={styles.peekHotBadge}>
-                <T style={styles.peekHotTxt}>{view.waitingIds.length} người ĐỢI!</T>
-              </View>
-            )}
+                  </LinearGradient>
+                </Pressable>
+              );
+            })}
           </View>
-          <UiIcon name={peekOpen ? 'ChevronUp' : 'ChevronDown'} size={18} color={C.ink} />
-        </Pressable>
+        )}
+      </View>
 
-        {peekOpen && (
-          <View style={styles.peekList}>
+      {/* MODAL SOI VÉ CẢ XÓM MỞ QUA SHEET (KHÔNG CHIẾM CHIỀU DỌC MÀN CHÍNH) */}
+      {peekOpen && (
+        <Sheet
+          title={`👀 Soi Tiến Độ Cả Xóm (${view.order.length} tờ)`}
+          onClose={() => setPeekOpen(false)}
+        >
+          <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={styles.peekList}>
             {view.order.map((pid) => {
               const p = playerMap.get(pid);
               const pGrid = view.tickets[pid];
               const pColor = TICKET_PALETTES[view.ticketColors[pid] ?? 'rose'];
               const rows = pGrid
-                ? [0, 1, 2].map((r) => checkLotoRow(pGrid, r, calledSet).hits)
-                : [0, 0, 0];
+                ? pGrid.map((_, r) => checkLotoRow(pGrid, r, calledSet).hits)
+                : Array.from({ length: LOTO_TICKET_ROWS }, () => 0);
 
               return (
                 <View key={pid} style={[styles.peekRow, pid === me && styles.peekRowMe]}>
@@ -608,9 +638,9 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                       { backgroundColor: pColor.frameBorder },
                     ]}
                   />
-                  {p && <Portrait p={p} size={28} frame={p.cosmetics?.frame} />}
+                  {p && <Portrait p={p} size={26} frame={p.cosmetics?.frame} />}
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <NameText fx={p?.cosmetics?.nameFx} style={styles.peekName}>
+                    <NameText fx={p?.cosmetics?.nameFx} numberOfLines={1} style={styles.peekName}>
                       {view.names[pid] ?? pid}
                     </NameText>
                   </View>
@@ -631,7 +661,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                             h === 5 && { color: '#065F46', fontWeight: '900' },
                           ]}
                         >
-                          H{ri + 1}: {h}/5
+                          H{ri + 1}:{h}
                         </T>
                       </View>
                     ))}
@@ -639,138 +669,201 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
                 </View>
               );
             })}
-          </View>
-        )}
-      </Card>
+          </ScrollView>
+        </Sheet>
+      )}
     </Shell>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    minHeight: 0,
+    gap: 5,
+  },
   inlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
   callerRim: {
-    borderRadius: 22,
-    padding: 2.5,
+    borderRadius: 16,
+    padding: 2,
   },
   callerInner: {
-    borderRadius: 20,
-    padding: 12,
-    gap: 9,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 5,
+  },
+  callerInnerCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 4,
   },
   marqueeBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
     gap: 6,
   },
   marqueeTitle: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '900',
     color: '#FDE047',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
   countChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.14)',
     borderWidth: 1,
     borderColor: 'rgba(253,224,71,0.35)',
   },
   countChipTxt: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#FEF9C3',
+  },
+  peekPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  peekPillBtnHot: {
+    backgroundColor: '#EA580C',
+    borderColor: '#FEF08A',
+  },
+  peekPillTxt: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
 
   callerStageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 9,
   },
   bingoBallOuter: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 0 22px rgba(250, 204, 21, 0.72)' } as object)
-      : null),
-  },
-  bingoBallOuterWide: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-  },
-  bingoBallCore: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(180,83,9,0.3)',
-  },
-  bingoBallCoreWide: {
     width: 58,
     height: 58,
     borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  bingoBallOuterCompact: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  bingoBallOuterWide: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  bingoBallCore: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(180,83,9,0.3)',
+  },
+  bingoBallCoreCompact: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  bingoBallCoreWide: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   bingoBallNum: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '900',
     color: '#991B1B',
     fontFamily: FONT,
   },
   chantBox: {
     flex: 1,
-    gap: 4,
+    minWidth: 0,
+    gap: 2,
   },
   rhymeTitlePill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     borderRadius: 999,
     backgroundColor: 'rgba(250,204,21,0.2)',
     borderWidth: 1,
     borderColor: 'rgba(250,204,21,0.45)',
   },
   rhymeTitleTxt: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FEF08A',
   },
   chantText: {
-    fontSize: 13.5,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 17,
     fontWeight: '800',
     fontStyle: 'italic',
     color: '#FDE047',
   },
 
+  callBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  callBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+  },
+  callBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#FACC15',
+  },
+  callBarSec: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FEF08A',
+    minWidth: 28,
+    textAlign: 'right',
+  },
+
   recentStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(15,23,42,0.42)',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
   },
   recentLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#FBCFE8',
   },
@@ -778,20 +871,21 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 5,
+    flexWrap: 'nowrap',
+    overflow: 'hidden',
+    gap: 4,
   },
   recentEmpty: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#CBD5E1',
     fontStyle: 'italic',
   },
   miniBall: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    paddingHorizontal: 5,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 4,
     backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -802,7 +896,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
   },
   miniBallTxt: {
-    fontSize: 12,
+    fontSize: 10.5,
     fontWeight: '900',
     color: '#1E293B',
   },
@@ -813,31 +907,31 @@ const styles = StyleSheet.create({
   waitingAlertBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderWidth: 1.5,
+    gap: 6,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
     borderColor: '#FEF08A',
   },
   waitingAlertTxt: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     color: '#FEF08A',
   },
   eventBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   eventBannerTxt: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#F8FAFC',
   },
@@ -845,75 +939,87 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
     backgroundColor: '#991B1B',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   errorBannerTxt: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#FEF08A',
   },
   lockPenaltyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
     backgroundColor: '#FFEDD5',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderWidth: 1.5,
     borderColor: '#F97316',
   },
   lockPenaltyTxt: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     color: '#9A3412',
   },
 
+  ticketStage: {
+    flex: 1,
+    minHeight: 0,
+    justifyContent: 'center',
+  },
   ticketPaper: {
-    borderRadius: 18,
-    borderWidth: 3,
+    borderRadius: 14,
+    borderWidth: 2.5,
     overflow: 'hidden',
   },
   ticketHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     gap: 6,
   },
   ticketHeaderTitle: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '900',
     color: '#FFFFFF',
     flexShrink: 1,
   },
   modeTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
     borderRadius: 999,
     backgroundColor: 'rgba(15,23,42,0.34)',
   },
   modeTagTxt: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FEF08A',
   },
 
   ticketRowsWrap: {
-    padding: 5,
-    gap: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 5,
+    gap: 2.5,
+  },
+  blockDivider: {
+    borderTopWidth: 1.5,
+    borderStyle: 'dashed',
+    marginVertical: 2,
+    opacity: 0.45,
   },
   ticketRow: {
     flexDirection: 'row',
     gap: 2,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   ticketRowWin: {
     backgroundColor: 'rgba(250, 204, 21, 0.35)',
@@ -925,15 +1031,19 @@ const styles = StyleSheet.create({
   ticketCell: {
     flex: 1,
     minWidth: 0,
-    height: 46,
+    height: 41,
     borderRadius: 6,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  ticketCellCompact: {
+    height: 27,
+    borderRadius: 4,
+  },
   ticketCellWide: {
-    height: 56,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 7,
   },
   ticketNumCell: {
     backgroundColor: '#FFFFFF',
@@ -944,114 +1054,102 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   blankOrnament: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   numSealWrap: {
-    width: 33,
-    height: 33,
-    borderRadius: 16.5,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  numSealWrapCompact: {
+    width: 23,
+    height: 23,
+    borderRadius: 11.5,
+  },
   redLuckySeal: {
     backgroundColor: 'rgba(225, 29, 72, 0.16)',
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#E11D48',
   },
   redLuckySealWide: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2.5,
   },
   cellNumTxt: {
-    fontSize: 16.5,
+    fontSize: 14,
     fontWeight: '900',
     fontFamily: FONT,
     letterSpacing: -0.3,
   },
+  cellNumTxtCompact: {
+    fontSize: 12.5,
+  },
   cellNumTxtWide: {
-    fontSize: 20,
+    fontSize: 18,
   },
 
-  kinhRow: {
+  kinhGrid: {
     flexDirection: 'row',
-    gap: 6,
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  kinhGridWide: {
+    flexWrap: 'nowrap',
   },
   kinhBtnOuter: {
+    borderRadius: 11,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(15,23,42,0.18)',
+  },
+  kinhBtnOuterCompact: {
+    flexBasis: '31.5%',
+    flexGrow: 1,
+  },
+  kinhBtnOuterWide: {
     flex: 1,
     minWidth: 0,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(15,23,42,0.18)',
   },
   kinhBtnReadyGlow: {
     borderColor: '#EA580C',
-    borderWidth: 2.5,
+    borderWidth: 2,
     ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 0 18px rgba(250, 204, 21, 0.85)' } as object)
+      ? ({ boxShadow: '0 0 14px rgba(250, 204, 21, 0.8)' } as object)
       : null),
   },
   kinhBtnInner: {
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    minHeight: 52,
+    gap: 1,
+    minHeight: 34,
   },
   kinhBtnTitle: {
-    fontSize: 12,
+    fontSize: 10.5,
     fontWeight: '900',
     color: C.ink,
   },
   kinhBtnSub: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '800',
     color: '#475569',
   },
 
-  peekCard: {
-    padding: 12,
-    gap: 8,
-  },
-  peekHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  peekTitle: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: C.ink,
-  },
-  peekHotBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    backgroundColor: '#FFEDD5',
-    borderWidth: 1,
-    borderColor: '#F97316',
-  },
-  peekHotTxt: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#C2410C',
-  },
   peekList: {
     gap: 6,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    paddingVertical: 2,
   },
   peekRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
     paddingVertical: 5,
     paddingHorizontal: 7,
     borderRadius: 10,
@@ -1061,24 +1159,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF9C3',
   },
   colorSwatch: {
-    width: 6,
-    height: 26,
+    width: 5,
+    height: 24,
     borderRadius: 3,
   },
   peekName: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
     color: C.ink,
   },
   peekHitsGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    maxWidth: 168,
+    gap: 3,
   },
   rowHitChip: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
     backgroundColor: '#E2E8F0',
   },
   rowHitChipHot: {
@@ -1088,7 +1188,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#A7F3D0',
   },
   rowHitTxt: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '800',
     color: '#334155',
   },
@@ -1097,11 +1197,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 3,
+    gap: 5,
+    paddingVertical: 2,
   },
   footerTxt: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '800',
     textAlign: 'center',
     flexShrink: 1,

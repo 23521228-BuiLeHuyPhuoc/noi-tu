@@ -418,10 +418,11 @@ export class Room {
     return this.engine.disrupt(playerId, ms);
   }
 
-  /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ */
+  /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ / bị khóa theo luật ván */
   addChat(playerId: string, raw: unknown): ChatMsg | null {
     const p = this.find(playerId);
     if (!p) return null;
+    if (this.phase === 'playing' && this.engine?.canRoomChat && !this.engine.canRoomChat(playerId)) return null;
     const input = typeof raw === 'string' ? { text: raw } : raw as Record<string, unknown> | null;
     if (!input || typeof input !== 'object') return null;
     const base = { id: this.chatSeq + 1, from: p.id, name: p.name, at: Date.now() };
@@ -562,11 +563,11 @@ export class Room {
       this.settings = { ...this.settings, giandiepSpies: settings.giandiepSpies };
     }
     if (settings?.veDoanRounds !== undefined) {
-      if (settings.veDoanRounds !== 1 && settings.veDoanRounds !== 2 && settings.veDoanRounds !== 3) return { ok: false, error: 'bad_request' };
+      if (![1, 2, 3, 4, 5, 6].includes(settings.veDoanRounds)) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, veDoanRounds: settings.veDoanRounds };
     }
     if (settings?.doVuiQuestions !== undefined) {
-      if (settings.doVuiQuestions !== 5 && settings.doVuiQuestions !== 10 && settings.doVuiQuestions !== 15) return { ok: false, error: 'bad_request' };
+      if (settings.doVuiQuestions !== 5 && settings.doVuiQuestions !== 10 && settings.doVuiQuestions !== 15 && settings.doVuiQuestions !== 20) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, doVuiQuestions: settings.doVuiQuestions };
     }
     if (settings?.doVuiTopic !== undefined) {

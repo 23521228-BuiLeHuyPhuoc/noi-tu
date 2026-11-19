@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   Platform,
   Pressable,
@@ -22,6 +22,7 @@ import { actionText } from '../messages';
 import { play } from '../sound';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
+import { KeyboardLift } from '../components/KeyboardLift';
 import { Portrait } from '../components/Avatar';
 import { EmojiIcon, GameIcon, UiIcon } from '../components/Icons';
 
@@ -76,6 +77,59 @@ type UnifiedFeedItem =
       stickerId?: string;
     };
 
+const MaSoiChatInputBar = memo(function MaSoiChatInputBar({
+  inputTestID,
+  sendTestID,
+  placeholder,
+  placeholderTextColor,
+  maxLength,
+  wolf = false,
+  day = false,
+  onSend,
+}: {
+  inputTestID: string;
+  sendTestID: string;
+  placeholder: string;
+  placeholderTextColor: string;
+  maxLength: number;
+  wolf?: boolean;
+  day?: boolean;
+  onSend: (clean: string) => Promise<void>;
+}) {
+  const [text, setText] = useState('');
+  const submit = async () => {
+    const clean = text.trim();
+    if (!clean) return;
+    setText('');
+    await onSend(clean);
+  };
+  return (
+    <KeyboardLift>
+      <View style={styles.pinnedInputRow}>
+        <TextInput
+          testID={inputTestID}
+          value={text}
+          onChangeText={setText}
+          onSubmitEditing={() => void submit()}
+          placeholder={placeholder}
+          placeholderTextColor={placeholderTextColor}
+          maxLength={maxLength}
+          returnKeyType="send"
+          blurOnSubmit={false}
+          style={[styles.chatInput, day && !wolf && styles.chatInputDay, wolf && styles.chatInputWolf]}
+        />
+        <Pressable
+          testID={sendTestID}
+          onPress={() => void submit()}
+          style={[styles.sendBtn, wolf && { backgroundColor: '#EF4444' }]}
+        >
+          <UiIcon name="Send" size={15} color={wolf ? '#FFFFFF' : '#0F172A'} />
+        </Pressable>
+      </View>
+    </KeyboardLift>
+  );
+});
+
 export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const view = room.game as MaSoiView;
   const me = game.me ?? '';
@@ -91,12 +145,9 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const [lastFocusSeatId, setLastFocusSeatId] = useState<string | null>(null);
 
   const [commsTab, setCommsTab] = useState<'village' | 'wolf' | 'role'>('village');
-  const [villageInput, setVillageInput] = useState('');
-  const [wolfInput, setWolfInput] = useState('');
   const [suspectMarks, setSuspectMarks] = useState<Record<string, SuspectMark>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [logOrderStamps, setLogOrderStamps] = useState<Record<number, number>>({});
 
   const feedScrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
   const wolfScrollRef = useRef<ComponentRef<typeof ScrollView> | null>(null);
@@ -136,23 +187,6 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const secLeft = useSecondsLeft(view.phaseEndsAt, game.clockOffset ?? 0, view.phaseSeconds);
   const timerRatio = view.phaseSeconds > 0 ? Math.min(1, secLeft / view.phaseSeconds) : 0;
 
-  // Gắn mốc thời gian nhận từng dòng log công khai để gộp chuẩn xác theo thứ tự với Chat Làng
-  const lastLogId = view.publicLog.at(-1)?.id ?? 0;
-  useOnChange(lastLogId, () => {
-    const baseAt = game.chat.at(-1)?.at ?? 1;
-    setLogOrderStamps((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      view.publicLog.forEach((entry, idx) => {
-        if (next[entry.id] === undefined) {
-          next[entry.id] = baseAt + idx + 1;
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  });
-
   // Reset transient selections & auto-channel switch for Wolves between Night and Day
   useOnChange(view.phase, (ph) => {
     setErr(null);
@@ -174,7 +208,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     }
   });
 
-  // Merge publicLog banners chronologically with village chat (100% pure render)
+  // Merge server-stamped publicLog banners chronologically with village chat (rejoin-safe)
   const unifiedVillageFeed = useMemo<UnifiedFeedItem[]>(() => {
     const items: UnifiedFeedItem[] = [];
     for (let i = 0; i < view.publicLog.length; i++) {
@@ -182,7 +216,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       items.push({
         key: `log-${log.id}`,
         kind: 'log',
-        at: logOrderStamps[log.id] ?? i,
+        at: log.at ?? i,
         log,
       });
     }
@@ -199,9 +233,14 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
         stickerId: m.stickerId,
       });
     }
-    items.sort((a, b) => (a.at !== b.at ? a.at - b.at : a.key.localeCompare(b.key)));
+    items.sort((a, b) => {
+      if (a.at !== b.at) return a.at - b.at;
+      if (a.kind === 'log' && b.kind === 'log') return a.log.id - b.log.id;
+      if (a.kind === 'chat' && b.kind === 'chat') return a.id - b.id;
+      return a.kind === 'log' ? -1 : 1;
+    });
     return items;
-  }, [view.publicLog, game.chat, logOrderStamps]);
+  }, [view.publicLog, game.chat]);
 
   // Auto-scroll active chat stream on new messages/events
   useEffect(() => {
@@ -234,25 +273,28 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     return counts;
   }, [view.wolfVotes]);
 
-  const act = async (payload: Parameters<Game['act']>[0], resetSelection = false) => {
-    if (busy) return;
-    setBusy(true);
-    setErr(null);
-    const res = await game.act(payload);
-    setBusy(false);
-    if (!res.ok) {
-      play('error');
-      setErr(actionText[res.reason] ?? 'Không thực hiện được');
-    } else {
-      play('stamp');
-      if (resetSelection) {
-        setSelected(null);
-        setPickedTwo([]);
-        setWitchSave(false);
-        setWitchPoison(null);
+  const act = useCallback(
+    async (payload: Parameters<Game['act']>[0], resetSelection = false) => {
+      if (busy) return;
+      setBusy(true);
+      setErr(null);
+      const res = await game.act(payload);
+      setBusy(false);
+      if (!res.ok) {
+        play('error');
+        setErr(actionText[res.reason] ?? 'Không thực hiện được');
+      } else {
+        play('stamp');
+        if (resetSelection) {
+          setSelected(null);
+          setPickedTwo([]);
+          setWitchSave(false);
+          setWitchPoison(null);
+        }
       }
-    }
-  };
+    },
+    [busy, game],
+  );
 
   const toggleSuspect = (id: string) => {
     if (id === me) return;
@@ -290,8 +332,12 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       return;
     }
 
-    // 3. Night — Wolf Pack: immediate 1-tap target selection / update
+    // 3. Night — Wolf Pack: immediate 1-tap target selection / update (không cắn đồng bọn Sói)
     if (view.phase === 'night_active' && myRole === 'soi') {
+      if (view.wolfPackIds?.includes(id)) {
+        setErr('Không thể chọn đồng bọn Ma Sói làm mồi!');
+        return;
+      }
       void act({ type: 'ms_night', target: id });
       return;
     }
@@ -351,19 +397,23 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const canChatVillage = iAlive && !isNight;
   const canChatWolf = iAlive && myRole === 'soi' && !!view.wolfChat;
 
-  const sendVillageChat = async (textOverride?: string) => {
-    const clean = (textOverride ?? villageInput).trim();
-    if (!clean || !canChatVillage) return;
-    if (!textOverride) setVillageInput('');
-    await game.sendChat(clean);
-  };
+  const sendVillageChat = useCallback(
+    async (text: string) => {
+      const clean = text.trim();
+      if (!clean || !canChatVillage) return;
+      await game.sendChat(clean);
+    },
+    [canChatVillage, game],
+  );
 
-  const sendWolfChat = async (textOverride?: string) => {
-    const clean = (textOverride ?? wolfInput).trim();
-    if (!clean || !canChatWolf) return;
-    if (!textOverride) setWolfInput('');
-    await act({ type: 'ms_wolfChat', text: clean });
-  };
+  const sendWolfChat = useCallback(
+    async (text: string) => {
+      const clean = text.trim();
+      if (!clean || !canChatWolf) return;
+      await act({ type: 'ms_wolfChat', text: clean });
+    },
+    [act, canChatWolf],
+  );
 
   // Context-aware Quick Wolvesville Deduction Chips (auto-inserting #X!)
   const quickDeductionChips = useMemo(() => {
@@ -431,6 +481,11 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     if (view.phase === 'night_witch') {
       if (myRole === 'phuthuy' && iAlive && !view.myNightSubmitted) {
         const vNum = view.witchState?.victimId ? seatNumber.get(view.witchState.victimId) : null;
+        if (!view.witchState?.healLeft) {
+          return view.witchState?.poisonLeft
+            ? '🧪 Hết thuốc cứu — chọn Độc hoặc Bỏ qua'
+            : '🧪 Hết bình phép — bấm Bỏ qua để tiếp tục';
+        }
         return vNum ? `🧪 #${vNum} bị Sói cắn — Cứu hoặc quăng Độc!` : '🧪 Đêm bình yên — dùng Độc hoặc bỏ qua';
       }
       return '🧪 Phù Thủy đang pha chế bình thuốc…';
@@ -634,7 +689,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
             </View>
 
             {/* Contextual 1-Tap Action Pill (Ready / Skip Vote / Skip Shot / Role Peek) */}
-            {view.phase === 'day_discuss' && iAlive ? (
+            {(view.phase === 'day_discuss' || view.phase === 'role_reveal') && iAlive ? (
               <Pressable
                 testID="masoi-ready-btn"
                 disabled={busy || myReady}
@@ -642,7 +697,13 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 style={[styles.headerActBtn, myReady && styles.headerActBtnDone]}
               >
                 <T style={styles.headerActBtnTxt}>
-                  {myReady ? `✓ ${readyCount}/${needReady}` : `Sẵn sàng ${readyCount}/${needReady}`}
+                  {view.phase === 'role_reveal'
+                    ? myReady
+                      ? `✓ Đã xem ${readyCount}/${view.alive.length}`
+                      : '✓ Đã nhớ vai'
+                    : myReady
+                      ? `✓ ${readyCount}/${needReady}`
+                      : `Sẵn sàng ${readyCount}/${needReady}`}
                 </T>
               </Pressable>
             ) : view.phase === 'day_vote' && iAlive ? (
@@ -953,6 +1014,36 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
             {/* TAB 1: UNIFIED VILLAGE CHAT + SYSTEM EVENT BANNERS */}
             {commsTab === 'village' && (
               <View style={styles.chatContentFill}>
+                {/* Ghim tức thì kết quả Tiên Tri / Thám Tử ngay trên luồng chat để không bao giờ bỏ lỡ */}
+                {myRole === 'tientri' && view.seerHistory && view.seerHistory.length > 0 && (() => {
+                  const last = view.seerHistory[view.seerHistory.length - 1];
+                  return (
+                    <View
+                      testID="masoi-intel-banner"
+                      style={[
+                        styles.intelPinBanner,
+                        last.isWolf ? styles.intelPinWolf : styles.intelPinGood,
+                      ]}
+                    >
+                      <T numberOfLines={1} style={styles.intelPinTxt}>
+                        🔮 Đêm {last.day}: #{seatNumber.get(last.targetId)} {view.names[last.targetId]} là{' '}
+                        {last.isWolf ? '🐺 MA SÓI!' : '🧑‍🌾 PHE DÂN!'}
+                      </T>
+                    </View>
+                  );
+                })()}
+                {myRole === 'thamtu' && view.detectiveHistory && view.detectiveHistory.length > 0 && (() => {
+                  const last = view.detectiveHistory[view.detectiveHistory.length - 1];
+                  return (
+                    <View testID="masoi-intel-banner" style={[styles.intelPinBanner, styles.intelPinGood]}>
+                      <T numberOfLines={1} style={styles.intelPinTxt}>
+                        🕵️ Đêm {last.day}: #{seatNumber.get(last.a)} & #{seatNumber.get(last.b)} →{' '}
+                        {last.sameTeam ? 'CÙNG PHE' : 'KHÁC PHE'}
+                      </T>
+                    </View>
+                  );
+                })()}
+
                 <ScrollView
                   ref={feedScrollRef}
                   style={styles.feedScroll}
@@ -1079,26 +1170,15 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                     </View>
                   )
                 ) : (
-                  <View style={styles.pinnedInputRow}>
-                    <TextInput
-                      testID="masoi-village-input"
-                      value={villageInput}
-                      onChangeText={setVillageInput}
-                      onSubmitEditing={() => void sendVillageChat()}
-                      placeholder="Chat suy luận với làng (vd: Nghi #3 là Sói)..."
-                      placeholderTextColor="#94A3B8"
-                      maxLength={200}
-                      returnKeyType="send"
-                      style={[styles.chatInput, !isNight && styles.chatInputDay]}
-                    />
-                    <Pressable
-                      testID="masoi-village-send"
-                      onPress={() => void sendVillageChat()}
-                      style={styles.sendBtn}
-                    >
-                      <UiIcon name="Send" size={15} color="#0F172A" />
-                    </Pressable>
-                  </View>
+                  <MaSoiChatInputBar
+                    inputTestID="masoi-village-input"
+                    sendTestID="masoi-village-send"
+                    placeholder="Chat suy luận với làng (vd: Nghi #3 là Sói)..."
+                    placeholderTextColor="#94A3B8"
+                    maxLength={200}
+                    day={!isNight}
+                    onSend={sendVillageChat}
+                  />
                 )}
               </View>
             )}
@@ -1164,26 +1244,15 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
                 )}
 
                 {iAlive ? (
-                  <View style={styles.pinnedInputRow}>
-                    <TextInput
-                      testID="masoi-wolf-chat-input"
-                      value={wolfInput}
-                      onChangeText={setWolfInput}
-                      onSubmitEditing={() => void sendWolfChat()}
-                      placeholder="Nhắn mật cho đồng bọn Sói..."
-                      placeholderTextColor="#FCA5A5"
-                      maxLength={140}
-                      returnKeyType="send"
-                      style={[styles.chatInput, styles.chatInputWolf]}
-                    />
-                    <Pressable
-                      testID="masoi-wolf-chat-send"
-                      onPress={() => void sendWolfChat()}
-                      style={[styles.sendBtn, { backgroundColor: '#EF4444' }]}
-                    >
-                      <UiIcon name="Send" size={15} color="#FFFFFF" />
-                    </Pressable>
-                  </View>
+                  <MaSoiChatInputBar
+                    inputTestID="masoi-wolf-chat-input"
+                    sendTestID="masoi-wolf-chat-send"
+                    placeholder="Nhắn mật cho đồng bọn Sói..."
+                    placeholderTextColor="#FCA5A5"
+                    maxLength={140}
+                    wolf
+                    onSend={sendWolfChat}
+                  />
                 ) : (
                   <View style={styles.pinnedStatusRow}>
                     <T style={styles.pinnedStatusTxt}>
@@ -1476,9 +1545,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   plotCard: {
-    width: '23.6%',
-    flexGrow: 1,
-    maxWidth: '24.6%',
+    width: '23.4%',
+    flexGrow: 0,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 14,
@@ -2118,6 +2186,24 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '900',
     color: '#C4B5FD',
+  },
+  intelPinBanner: {
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.25)',
+  },
+  intelPinWolf: {
+    backgroundColor: 'rgba(185, 28, 28, 0.88)',
+  },
+  intelPinGood: {
+    backgroundColor: 'rgba(6, 95, 70, 0.88)',
+  },
+  intelPinTxt: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   intelHistoryItem: {
     fontSize: 11.5,

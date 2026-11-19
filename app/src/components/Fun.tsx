@@ -4,7 +4,7 @@ import { Image } from './Image';
  * Lớp hiệu ứng "lầy": đồ bay từ người ném tới người bị ném, bong bóng câu khịa,
  * bị hối thì rung máy + lắc màn hình, pháo giấy khi thắng.
  */
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Dimensions, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   CHAT_MAX, DOODLE_MS, EMOJIS, MAX_HP, NICK_MS,
@@ -1076,147 +1076,227 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
   );
 }
 
-/** Trò chuyện: emoji thả nhanh, câu khịa có sẵn và tin nhắn tự gõ */
-export function ChatSheet({ game, players, onClose }: { game: Game; players: PublicPlayer[]; onClose: () => void }) {
+const FALLBACK_CHAT_AVATAR = { avatar: 0 } as const;
+
+const ChatInputBar = memo(function ChatInputBar({
+  onSend,
+}: {
+  onSend: (text: string) => Promise<boolean>;
+}) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [showStickers, setShowStickers] = useState(false);
-  const [shopOpen, setShopOpen] = useState(false);
-  const feed = useFeed();
-  const ownsPack = !!game.user?.owned?.includes(STICKER_PACK_ID);
-  const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  // màn ngang thấp (Cờ tỷ phú, điện thoại xoay ngang): danh sách tin ngắn lại để ô nhập luôn thấy
-  const shortScreen = useStableWindow().height < 520;
-  const kb = useKeyboardInset() > 0; // đang gõ: ẩn bớt hàng emoji/câu khịa để danh sách và ô nhập vừa phần trên bàn phím
-  const inputFirst = Platform.OS !== 'web' || shortScreen;
-  const me = game.me;
-  const send = async () => {
-    const t = text.trim();
-    if (!t || sending) return;
+
+  const submit = async () => {
+    const clean = text.trim();
+    if (!clean || sending) return;
     setSending(true);
     try {
-      if (await game.sendChat(t)) setText('');
+      if (await onSend(clean)) setText('');
     } finally {
       setSending(false);
     }
   };
-  // ô nhập: màn thấp đặt lên đầu bảng cho luôn thấy, không phải cuộn
-  const inputRow = (
-        <View style={styles.chatInputRow}>
-          <TextInput
-            testID="chat-input"
-            style={styles.chatInput}
-            value={text}
-            onChangeText={setText}
-            placeholder="Nhắn gì đó…"
-            placeholderTextColor={C.muted}
-            maxLength={CHAT_MAX}
-            returnKeyType="send"
-            onSubmitEditing={send}
-            blurOnSubmit={false}
-          />
-          <Button testID="chat-send" title="Gửi" small disabled={sending || !text.trim()} onPress={send} style={{ minWidth: 70 }} />
-        </View>
+
+  return (
+    <View style={styles.chatInputRow}>
+      <TextInput
+        testID="chat-input"
+        style={styles.chatInput}
+        value={text}
+        onChangeText={setText}
+        placeholder="Nhắn gì đó…"
+        placeholderTextColor={C.muted}
+        maxLength={CHAT_MAX}
+        returnKeyType="send"
+        onSubmitEditing={() => void submit()}
+        blurOnSubmit={false}
+      />
+      <Button
+        testID="chat-send"
+        title="Gửi"
+        small
+        disabled={sending || !text.trim()}
+        onPress={() => void submit()}
+        style={{ minWidth: 70 }}
+      />
+    </View>
   );
-  const chatList = (
+});
+
+const ChatMessageList = memo(function ChatMessageList({
+  chat,
+  me,
+  playerMap,
+  compact,
+}: {
+  chat: ChatMsg[];
+  me: string | null;
+  playerMap: Map<string, PublicPlayer>;
+  compact: boolean;
+}) {
+  const listRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    const anim = mountedRef.current;
+    mountedRef.current = true;
+    const t = setTimeout(() => listRef.current?.scrollToEnd({ animated: anim }), 20);
+    return () => clearTimeout(t);
+  }, [chat.length]);
+
+  return (
     <ScrollView
       ref={listRef}
       testID="chat-list"
-      style={[styles.chatList, (kb || shortScreen) && { maxHeight: kb ? 130 : 130 }]}
+      style={[styles.chatList, compact && { maxHeight: 145 }]}
       contentContainerStyle={{ gap: 6, paddingVertical: 4 }}
-      onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+      keyboardShouldPersistTaps="handled"
     >
-      {game.chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
-      {game.chat.map((m) => {
+      {chat.length === 0 && <T style={styles.empty}>Chưa ai nói gì. Mở hàng đi!</T>}
+      {chat.map((m) => {
         const mine = m.from === me;
-        const pl = players.find((p) => p.id === m.from);
+        const pl = playerMap.get(m.from);
         const asset = m.kind === 'sticker' ? stickerOf(m.stickerId) : undefined;
         const bStyle = chatBubbleStyleOf(pl?.cosmetics?.chatBubble);
         const bColor = chatBubbleTextColorOf(pl?.cosmetics?.chatBubble);
         return (
           <View key={m.id} style={[styles.msgRow, mine && { flexDirection: 'row-reverse' }]}>
-            <Portrait p={pl ?? { avatar: 0 }} size={30} border={1.5} frame={pl?.cosmetics?.frame} />
+            {/* Không gắn frame xoay/glow trong danh sách chat popup để tránh overdraw GPU trên mobile */}
+            <Portrait p={pl ?? FALLBACK_CHAT_AVATAR} size={28} border={1.5} />
             <View style={[styles.msg, mine ? styles.msgMine : null, bStyle]}>
               {!mine && <T style={[styles.msgName, bColor ? { color: bColor } : null]}>{m.name}</T>}
-              {m.kind === 'sticker' ? (asset ? <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" /> : <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>Nhãn dán chưa có trên thiết bị này</T>) : <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>{m.text}</T>}
+              {m.kind === 'sticker' ? (
+                asset ? (
+                  <Image source={asset.source} accessibilityLabel={asset.alt} style={styles.messageSticker} resizeMode="contain" />
+                ) : (
+                  <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>
+                    Nhãn dán chưa có trên thiết bị này
+                  </T>
+                )
+              ) : (
+                <T style={[styles.msgText, mine && { color: C.gold }, bColor ? { color: bColor } : null]}>{m.text}</T>
+              )}
             </View>
           </View>
         );
       })}
     </ScrollView>
   );
+});
+
+/** Trò chuyện: ô nhập tách riêng + danh sách memo hóa mượt mà trên mobile */
+export function ChatSheet({ game, players, onClose }: { game: Game; players: PublicPlayer[]; onClose: () => void }) {
+  const [sendingSticker, setSendingSticker] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const feed = useFeed();
+  const ownsPack = !!game.user?.owned?.includes(STICKER_PACK_ID);
+  const shortScreen = useStableWindow().height < 520;
+  const kb = useKeyboardInset() > 0;
+
+  const playerMap = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const handleSendChat = useCallback((msg: string) => game.sendChat(msg), [game]);
+
   if (shopOpen) return <ShopSheet game={game} initialTab="sticker" onClose={() => setShopOpen(false)} />;
   return (
-    <Sheet title="Tám chuyện" onClose={onClose}>
-      {inputFirst && inputRow}
-      {inputFirst && chatList}
-      {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.emojiRow}>
-        {EMOJIS.map((e, i) => (
-          <Button
-            key={e}
-            testID={`emoji-${i}`}
-            title={e}
-            small
-            variant="paper"
-            style={styles.emojiBtn}
-            onPress={() => game.sendFun({ kind: 'emoji', emoji: e })}
-          />
-        ))}
-      </ScrollView>}
-      {!kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.taunts}>
-        {TAUNTS.map((t) => (
-          <Button
-            key={t.id}
-            testID={`taunt-${t.id}`}
-            small
-            variant="paper"
-            title={t.text}
-            onPress={() => {
-              game.sendFun({ kind: 'taunt', taunt: t.id });
-              onClose();
-            }}
-          />
-        ))}
-      </ScrollView>}
-      {!kb && <Button testID="sticker-toggle" title={showStickers ? 'Ẩn nhãn dán' : 'Nhãn dán · 21 (12 bộ Chữ Lầy mua bằng Ruby)'} small variant="paper" onPress={() => setShowStickers((v) => !v)} />}
-      {showStickers && !kb && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>
-        {STICKERS.map((item) => <Pressable key={item.id} testID={`sticker-${item.id}`} accessibilityRole="button" accessibilityLabel={`Gửi nhãn dán ${item.alt}`} disabled={sending} style={[styles.stickerOption, sending && { opacity: 0.5 }]} onPress={async () => {
-          if (sending) return;
-          setSending(true);
-          try { if (await game.sendSticker(item.id)) setShowStickers(false); }
-          finally { setSending(false); }
-        }}><Image source={item.source} accessibilityLabel={item.alt} style={styles.stickerThumb} resizeMode="contain" /></Pressable>)}
-        {CHU_LAY_STICKERS.map((item) => (
-          <Pressable
-            key={item.id}
-            testID={`sticker-${item.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={ownsPack ? `Gửi nhãn dán ${item.alt}` : `${item.alt} (khóa, mua bộ Chữ Lầy trong Cửa hàng)`}
-            disabled={sending}
-            style={[styles.stickerOption, sending && { opacity: 0.5 }]}
-            onPress={async () => {
-              if (!ownsPack) {
-                feed(game.user ? 'Bộ Chữ Lầy đang khóa 🔒 — mua 100 💎 trong Cửa hàng để dùng' : 'Bộ Chữ Lầy cần tài khoản và 100 💎 để mở khóa 🔒', 'info');
-                if (game.user) setShopOpen(true);
-                return;
-              }
-              if (sending) return;
-              setSending(true);
-              try { if (await game.sendSticker(item.id)) setShowStickers(false); }
-              finally { setSending(false); }
-            }}
-          >
-            <Image source={item.source} accessibilityLabel={item.alt} style={[styles.stickerThumb, !ownsPack && { opacity: 0.45 }]} resizeMode="contain" />
-            {!ownsPack && (
-              <View style={styles.stickerLockPill}>
-                <UiIcon name="Lock" size={12} color="#FFFFFF" strokeWidth={2.5} />
-              </View>
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>}
-      {!inputFirst && chatList}
-      {!inputFirst && inputRow}
+    <Sheet
+      title="Tám chuyện"
+      onClose={onClose}
+      scroll={false}
+      stickyBottom={<ChatInputBar onSend={handleSendChat} />}
+    >
+      <ChatMessageList chat={game.chat} me={game.me} playerMap={playerMap} compact={kb || shortScreen} />
+      {!kb && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.emojiRow}>
+          {EMOJIS.map((e, i) => (
+            <Button
+              key={e}
+              testID={`emoji-${i}`}
+              title={e}
+              small
+              variant="paper"
+              style={styles.emojiBtn}
+              onPress={() => game.sendFun({ kind: 'emoji', emoji: e })}
+            />
+          ))}
+        </ScrollView>
+      )}
+      {!kb && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.taunts}>
+          {TAUNTS.map((t) => (
+            <Button
+              key={t.id}
+              testID={`taunt-${t.id}`}
+              small
+              variant="paper"
+              title={t.text}
+              onPress={() => {
+                game.sendFun({ kind: 'taunt', taunt: t.id });
+                onClose();
+              }}
+            />
+          ))}
+        </ScrollView>
+      )}
+      {!kb && (
+        <Button
+          testID="sticker-toggle"
+          title={showStickers ? 'Ẩn nhãn dán' : 'Nhãn dán · 21 (12 bộ Chữ Lầy mua bằng Ruby)'}
+          small
+          variant="paper"
+          onPress={() => setShowStickers((v) => !v)}
+        />
+      )}
+      {showStickers && !kb && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={styles.stickerRow}>
+          {STICKERS.map((item) => (
+            <Pressable
+              key={item.id}
+              testID={`sticker-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Gửi nhãn dán ${item.alt}`}
+              disabled={sendingSticker}
+              style={[styles.stickerOption, sendingSticker && { opacity: 0.5 }]}
+              onPress={async () => {
+                if (sendingSticker) return;
+                setSendingSticker(true);
+                try { if (await game.sendSticker(item.id)) setShowStickers(false); }
+                finally { setSendingSticker(false); }
+              }}
+            >
+              <Image source={item.source} accessibilityLabel={item.alt} style={styles.stickerThumb} resizeMode="contain" />
+            </Pressable>
+          ))}
+          {CHU_LAY_STICKERS.map((item) => (
+            <Pressable
+              key={item.id}
+              testID={`sticker-${item.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={ownsPack ? `Gửi nhãn dán ${item.alt}` : `${item.alt} (khóa, mua bộ Chữ Lầy trong Cửa hàng)`}
+              disabled={sendingSticker}
+              style={[styles.stickerOption, sendingSticker && { opacity: 0.5 }]}
+              onPress={async () => {
+                if (!ownsPack) {
+                  feed(game.user ? 'Bộ Chữ Lầy đang khóa 🔒 — mua 100 💎 trong Cửa hàng để dùng' : 'Bộ Chữ Lầy cần tài khoản và 100 💎 để mở khóa 🔒', 'info');
+                  if (game.user) setShopOpen(true);
+                  return;
+                }
+                if (sendingSticker) return;
+                setSendingSticker(true);
+                try { if (await game.sendSticker(item.id)) setShowStickers(false); }
+                finally { setSendingSticker(false); }
+              }}
+            >
+              <Image source={item.source} accessibilityLabel={item.alt} style={[styles.stickerThumb, !ownsPack && { opacity: 0.45 }]} resizeMode="contain" />
+              {!ownsPack && (
+                <View style={styles.stickerLockPill}>
+                  <UiIcon name="Lock" size={12} color="#FFFFFF" strokeWidth={2.5} />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
     </Sheet>
   );
 }
@@ -1349,7 +1429,7 @@ const styles = StyleSheet.create({
   taunts: { gap: 8, paddingRight: 8 },
   emojiRow: { gap: 6, paddingRight: 8 },
   emojiBtn: { minWidth: 48, paddingHorizontal: 6 },
-  chatList: { maxHeight: 230, minHeight: 90, backgroundColor: C.mist, borderRadius: 14, paddingHorizontal: 8 },
+  chatList: { flexShrink: 1, maxHeight: 240, minHeight: 72, backgroundColor: C.mist, borderRadius: 14, paddingHorizontal: 8 },
   empty: { color: C.muted, textAlign: 'center', paddingVertical: 20 },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   msgAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.ink },

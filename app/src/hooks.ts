@@ -76,35 +76,38 @@ export function useKeyboardLift(ref: React.RefObject<ComponentRef<typeof View> |
     // getBoundingClientRect without providing browser getComputedStyle.
     if (Platform.OS !== 'web') return;
     let inset = 0;
-    const recompute = () => {
-      const el = ref.current as unknown as HTMLElement | null;
-      let next = 0;
-      if (inset > 0 && el?.getBoundingClientRect) {
-        // Lấy độ nhích ĐANG THỰC SỰ áp lên phần tử (đọc từ transform đã vẽ), không dùng giá trị vừa tính:
-        // Android bắn nhiều sự kiện bàn phím liên tiếp trước khi React kịp vẽ lại, cộng dồn sẽ đẩy ô nhập vọt lên quá cao.
-        let applied = 0;
-        const t = window.getComputedStyle(el).transform;
-        if (t && t !== 'none') {
-          const m = t.match(/matrix(3d)?\(([^)]+)\)/);
-          if (m) { const v = m[2].split(',').map(Number); applied = m[1] ? v[13] : v[5]; }
-        }
-        const base = el.getBoundingClientRect().bottom - (Number.isFinite(applied) ? applied : 0);
-        next = Math.max(0, Math.round(base + 10 - (window.innerHeight - inset)));
-      }
+    const update = (next: number) => {
       if (next === liftRef.current) return;
       liftRef.current = next;
       setLift(next);
     };
+    const recompute = () => {
+      if (inset <= 0) {
+        update(0);
+        return;
+      }
+      const el = ref.current as unknown as HTMLElement | null;
+      if (!el?.getBoundingClientRect) {
+        update(0);
+        return;
+      }
+      // Đo trực tiếp từ node anchor bọc ngoài KHÔNG transform để không gây synchronous reflow vòng lặp
+      const base = el.getBoundingClientRect().bottom;
+      const next = Math.max(0, Math.round(base + 10 - (window.innerHeight - inset)));
+      update(next);
+    };
     const off = subscribeKeyboard((v) => { inset = v; recompute(); });
-    // bố cục đổi lúc bàn phím đang mở (từ mới, lỗi hiện ra, nghĩa dài/ngắn) thì tính lại vị trí
-    const ro = typeof ResizeObserver !== 'undefined' && typeof document !== 'undefined' ? new ResizeObserver(() => recompute()) : null;
-    if (ro) {
-      ro.observe(document.body);
-      // khối ô nhập cao thêm (vd. hiện dòng báo lỗi) thì nâng thêm để dòng đó không bị bàn phím che
-      const own = ref.current as unknown as Element | null;
-      if (own && own instanceof Element) ro.observe(own);
-    }
-    return () => { off(); ro?.disconnect(); };
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => { if (inset > 0) recompute(); })
+      : null;
+    const own = ref.current as unknown as Element | null;
+    if (ro && own && own instanceof Element) ro.observe(own);
+    window.addEventListener('orientationchange', recompute);
+    return () => {
+      off();
+      ro?.disconnect();
+      window.removeEventListener('orientationchange', recompute);
+    };
   }, [ref]);
   return lift;
 }

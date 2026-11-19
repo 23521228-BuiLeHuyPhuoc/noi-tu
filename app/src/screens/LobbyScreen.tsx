@@ -438,15 +438,15 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
             <EmojiIcon emoji="🎨" size={18} />
-            <T style={styles.h3}>Số vòng Vẽ & Đoán</T>
+            <T style={styles.h3}>Số vòng Vẽ & Đoán ({room.players.length} người = {Math.min(24, Math.max(2, room.players.length * (room.settings.veDoanRounds ?? 4)))} lượt)</T>
           </View>
           <View style={styles.roundRow}>
-            {[1, 2, 3].map((r) => (
+            {[2, 3, 4, 5].map((r) => (
               <Button
                 key={r}
                 testID={`vd-rounds-${r}`}
                 small
-                variant={(room.settings.veDoanRounds ?? 2) === r ? 'ink' : 'paper'}
+                variant={(room.settings.veDoanRounds ?? 4) === r ? 'ink' : 'paper'}
                 title={`${r} vòng`}
                 disabled={!isHost}
                 style={{ flex: 1 }}
@@ -499,7 +499,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
             })}
           </View>
           <View style={styles.roundRow}>
-            {([5, 10, 15] as const).map((q) => (
+            {([5, 10, 15, 20] as const).map((q) => (
               <Button
                 key={q}
                 testID={`dv-questions-${q}`}

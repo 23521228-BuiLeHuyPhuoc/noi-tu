@@ -65,6 +65,7 @@ export class VeDoanGame implements GameEngine {
   private drawerId = '';
   private wordOptions: string[] = [];
   private secretWord = '';
+  private usedWords = new Set<string>();
   private revealedIdx = new Set<number>();
   private strokes: VeDoanStroke[] = [];
   private botTargetSketch: VeDoanStroke[] = [];
@@ -103,11 +104,16 @@ export class VeDoanGame implements GameEngine {
 
   private pickWordChoices(drawerIsBot: boolean): string[] {
     if (drawerIsBot) {
-      const sketchPool = this.shuffleArray(Object.keys(BOT_SKETCHES));
+      const allBot = Object.keys(BOT_SKETCHES);
+      const freshBot = allBot.filter((w) => !this.usedWords.has(w));
+      const sketchPool = this.shuffleArray(freshBot.length >= 3 ? freshBot : allBot);
       if (sketchPool.length >= 3) return sketchPool.slice(0, 3);
-      const rest = this.shuffleArray(VE_DOAN_WORDS.filter((w) => !(w in BOT_SKETCHES)));
+      const rest = this.shuffleArray(VE_DOAN_WORDS.filter((w) => !(w in BOT_SKETCHES) && !this.usedWords.has(w)));
       return [...sketchPool, ...rest].slice(0, 3);
     }
+    const fresh = VE_DOAN_WORDS.filter((w) => !this.usedWords.has(w));
+    if (fresh.length >= 3) return this.shuffleArray(fresh).slice(0, 3);
+    this.usedWords.clear();
     return this.shuffleArray(VE_DOAN_WORDS).slice(0, 3);
   }
 
@@ -142,9 +148,10 @@ export class VeDoanGame implements GameEngine {
       this.names.set(p.id, p.name);
       this.scores.set(p.id, 0);
     }
-    const rounds = Math.max(1, Math.min(3, this.ctx.settings.veDoanRounds ?? 2));
-    this.totalTurns = Math.min(10, Math.max(2, this.order.length * rounds));
+    const rounds = Math.max(1, Math.min(6, this.ctx.settings.veDoanRounds ?? 4));
+    this.totalTurns = Math.min(24, Math.max(2, this.order.length * rounds));
     this.turnIndex = 0;
+    this.usedWords.clear();
     this.startTurn();
   }
 
@@ -188,6 +195,7 @@ export class VeDoanGame implements GameEngine {
     if (this.finished) return;
     this.clearHints();
     this.secretWord = word;
+    this.usedWords.add(word);
     this.revealedIdx.clear();
     this.strokes = [];
     this.botTargetSketch = getBotSketch(word).map((s) => this.sanitizeStroke(s));

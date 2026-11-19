@@ -520,6 +520,8 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
     tongue: 0,
     spit: 0,
   });
+  const lastThumbPointerAtRef = useRef<number>(0);
+  const thumbLayoutRef = useRef<{ w: number; h: number }>({ w: 184, h: 68 });
 
   // Đồng bộ khi `room.game` thay đổi lớn (vd reset màn, đổi màn, người ra vào)
   useEffect(() => {
@@ -801,11 +803,24 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
         setMoveDir(keysDownRef.current.left ? -1 : 0);
       }
     };
+    const clearKeysAndMove = () => {
+      keysDownRef.current.left = false;
+      keysDownRef.current.right = false;
+      setMoveDir(0);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') clearKeysAndMove();
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearKeysAndMove);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearKeysAndMove);
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearKeysAndMove();
     };
   }, [game, hud.myState, isSpectator, sendInput, setMoveDir]);
 
@@ -1538,12 +1553,36 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
             ]}
             testID="croak-controls"
           >
-            {/* Bàn trượt Thumbpad liên hoàn Trái <-> Phải siêu mượt */}
+            {/* Bàn trượt Thumbpad liên hoàn Trái <-> Phải siêu mượt (chặn synthetic onPress overshoot) */}
             <View
               style={styles.thumbTrack}
+              onLayout={({ nativeEvent: { layout } }) => {
+                thumbLayoutRef.current = { w: layout.width, h: layout.height };
+              }}
+              onStartShouldSetResponder={() => Platform.OS !== 'web'}
+              onMoveShouldSetResponder={() => Platform.OS !== 'web'}
+              onResponderGrant={(e) => {
+                lastThumbPointerAtRef.current = Date.now();
+                const rel = e.nativeEvent.locationX / Math.max(1, thumbLayoutRef.current.w);
+                setMoveDir(rel < 0.45 ? -1 : rel > 0.55 ? 1 : 0);
+              }}
+              onResponderMove={(e) => {
+                lastThumbPointerAtRef.current = Date.now();
+                const rel = e.nativeEvent.locationX / Math.max(1, thumbLayoutRef.current.w);
+                setMoveDir(rel < 0.45 ? -1 : rel > 0.55 ? 1 : 0);
+              }}
+              onResponderRelease={() => {
+                lastThumbPointerAtRef.current = Date.now();
+                setMoveDir(0);
+              }}
+              onResponderTerminate={() => {
+                lastThumbPointerAtRef.current = Date.now();
+                setMoveDir(0);
+              }}
               // @ts-expect-error chặn menu chuột phải trên mobile web
               onContextMenu={(e: Event) => e.preventDefault()}
               onPointerDown={(e: unknown) => {
+                lastThumbPointerAtRef.current = Date.now();
                 const pe = e as PointerEvent;
                 pe.preventDefault?.();
                 const el = pe.currentTarget as HTMLElement;
@@ -1551,19 +1590,30 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
                 updateThumbpadFromPoint(pe.clientX, pe.clientY, el.getBoundingClientRect());
               }}
               onPointerMove={(e: unknown) => {
+                lastThumbPointerAtRef.current = Date.now();
                 const pe = e as PointerEvent;
                 if (pe.buttons === 0 && pe.pressure === 0) return;
                 const el = pe.currentTarget as HTMLElement;
                 updateThumbpadFromPoint(pe.clientX, pe.clientY, el.getBoundingClientRect());
               }}
-              onPointerUp={() => setMoveDir(0)}
-              onPointerCancel={() => setMoveDir(0)}
-              onLostPointerCapture={() => setMoveDir(0)}
+              onPointerUp={() => {
+                lastThumbPointerAtRef.current = Date.now();
+                setMoveDir(0);
+              }}
+              onPointerCancel={() => {
+                lastThumbPointerAtRef.current = Date.now();
+                setMoveDir(0);
+              }}
+              onLostPointerCapture={() => {
+                lastThumbPointerAtRef.current = Date.now();
+                setMoveDir(0);
+              }}
             >
               <Pressable
                 testID="croak-left"
                 onPress={() => {
-                  // Fallback cho kiểm thử click đơn lẻ không giữ pointer
+                  // Fallback chỉ kích hoạt khi KHÔNG phải nhả ngón từ onPointerUp thật (tránh dư trớn +160ms!)
+                  if (Date.now() - lastThumbPointerAtRef.current < 450) return;
                   if (moveDirRef.current === 0) {
                     setMoveDir(-1);
                     setTimeout(() => setMoveDir(0), 160);
@@ -1592,6 +1642,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               <Pressable
                 testID="croak-right"
                 onPress={() => {
+                  if (Date.now() - lastThumbPointerAtRef.current < 450) return;
                   if (moveDirRef.current === 0) {
                     setMoveDir(1);
                     setTimeout(() => setMoveDir(0), 160);

@@ -51,6 +51,8 @@ export interface GameEngine {
   disrupt?(playerId: string, ms: number): number;
   /** người chơi đổi tên giữa ván */
   renamePlayer?(playerId: string, name: string): void;
+  /** kiểm tra xem người chơi có được gửi tin nhắn vào chat chung phòng hay không */
+  canRoomChat?(playerId: string): boolean;
   /**
    * Máy chơi: nước đi tốt nhất lúc này cho người chơi máy `playerId`, hoặc null nếu chưa tới lượt / không cần làm gì.
    * Room tự hẹn giờ (giả vờ suy nghĩ) rồi gọi action() như người thật.

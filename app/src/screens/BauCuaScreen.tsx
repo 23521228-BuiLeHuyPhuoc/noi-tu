@@ -16,6 +16,7 @@ import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
+import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
 import { Sheet } from '../components/Sheet';
 import { compactXu } from '../format';
 import { rectOf, type Rect } from '../components/Fun';
@@ -581,11 +582,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     <Shell
       game={game}
       room={room}
-      strip={{
-        order: rankedIds,
-        rank: (p) => (p.id in g.balances ? rankOf(p.id) : undefined),
-        sub: (p) => (p.id in g.balances ? `${compactXu(g.balances[p.id])} xu${g.debts[p.id] ? ' 💸' : ''}` : undefined),
-      }}
+      scroll={false}
+      hideStrip
       overlay={
         <>
           <View ref={fxRoot} pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 65 }]}>
@@ -609,10 +607,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
                   accessibilityRole="button"
                   accessibilityState={{ selected: chip === v }}
                   onPress={() => setChip(v)}
-                  style={[styles.chip, sticker(chip === v ? 4 : 2), chip === v && styles.chipOn]}
+                  style={[styles.chip, compact && styles.chipCompact, sticker(chip === v ? 4 : 2), chip === v && styles.chipOn]}
                 >
-                  <View style={styles.chipRing}>
-                    <T style={styles.chipText}>{v}</T>
+                  <View style={[styles.chipRing, compact && styles.chipRingCompact]}>
+                    <T style={[styles.chipText, compact && { fontSize: 13 }]}>{v}</T>
                   </View>
                 </Pressable>
               ))}
@@ -672,117 +670,127 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
         )
       }
     >
-      <Card style={[styles.table, compact && { paddingVertical: 8 }]}>
-        <View style={styles.tableHead}>
-          <T testID="bc-round" style={styles.round}>Ván {g.round}/{g.maxRounds}</T>
-          <T testID="bc-step" style={styles.step}>{stepText}</T>
-          {isHost && (
-            <Pressable testID="end-open" onPress={() => setEnding(true)} hitSlop={8}>
-              <T style={styles.endLink}>Tổng kết</T>
-            </Pressable>
-          )}
-        </View>
-        {g.mode === 'jackpot' && (
-          <View style={styles.jackpotBanner} testID="bc-jackpot-banner">
-            <EmojiIcon emoji="🎰" size={16} />
-            <T style={styles.jackpotTxt}>
-              {g.tripleStorm
-                ? `🌪️ BÃO TAM HOA NỔ HŨ (+1x THƯỞNG)!`
-                : g.luckySymbol
-                  ? `Ô Lộc Trời ván này: ${SYMBOL[g.luckySymbol].name.toUpperCase()} nhân ×${g.luckyMult}!`
-                  : 'Chế độ Lộc Trời Nổ Hũ ×2/×3'}
-            </T>
-          </View>
-        )}
-        {g.step === 'betting' && (
-          <View style={styles.timeTrack}>
-            <View style={[styles.timeFill, { width: `${Math.min(100, (left / 20) * 100)}%` }, left <= 5 && { backgroundColor: C.danger }]} />
-          </View>
-        )}
-        {/* đang cược: thu nhỏ/ẩn bát để chiếu 6 ô nằm gọn trong màn hình */}
-        {!(g.step === 'betting' && compact) && (
-          <View style={[styles.plate, compact && { height: 64 }, g.step === 'betting' && styles.plateSmall]}>
-            {g.step === 'result' && g.dice ? (
-              g.dice.map((s, i) => <Face key={`${g.round}-${i}`} s={s} size={compact ? 46 : 58} testID="bc-die" />)
-            ) : (
-              <Bowl shaking={g.step === 'rolling'} size={g.step === 'betting' ? 38 : compact ? 46 : 64} />
+      <View style={styles.root}>
+        <CompactPlayerStrip
+          room={room}
+          game={game}
+          order={rankedIds}
+          rank={(p) => (p.id in g.balances ? rankOf(p.id) : undefined)}
+          sub={(p) => (p.id in g.balances ? `${compactXu(g.balances[p.id])}${g.debts[p.id] ? '💸' : ''}` : undefined)}
+        />
+
+        <Card style={[styles.table, compact && { paddingVertical: 6, paddingHorizontal: 10, gap: 4 }]}>
+          <View style={styles.tableHead}>
+            <T testID="bc-round" style={styles.round}>Ván {g.round}/{g.maxRounds}</T>
+            <T testID="bc-step" numberOfLines={1} style={styles.step}>{stepText}</T>
+            {isHost && (
+              <Pressable testID="end-open" onPress={() => setEnding(true)} hitSlop={8}>
+                <T style={styles.endLink}>Tổng kết</T>
+              </Pressable>
             )}
           </View>
-        )}
-        {g.step === 'result' && myDelta !== undefined && (
-          <T testID="bc-delta" style={[styles.delta, { color: myDelta > 0 ? C.jade : myDelta < 0 ? C.danger : C.muted }]}>
-            {myDelta > 0
-              ? `+${fmt(myDelta)} xu 🤑`
-              : myDelta < 0
-                ? `${fmt(myDelta)} xu 😭`
-                : Object.values(roundBets).some((v) => (v ?? 0) > 0)
-                  ? 'Huề vốn 😌'
-                  : 'Không cược ván này'}
-          </T>
-        )}
-        <View style={styles.infoRow}>
-          {!isSpectator && (
-            <T style={styles.wallet}>
-              <T style={{ fontWeight: '900', color: C.son }}>#{rankOf(me)}/{rankedIds.length}</T> · Ví{' '}
-              <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
-              {staked > 0 ? `, cược ${fmt(staked)}` : ''}
-              {g.debts[me] ? `, nợ ${g.debts[me]}` : ''}
+          {g.mode === 'jackpot' && (
+            <View style={styles.jackpotBanner} testID="bc-jackpot-banner">
+              <EmojiIcon emoji="🎰" size={14} />
+              <T numberOfLines={1} style={styles.jackpotTxt}>
+                {g.tripleStorm
+                  ? `🌪️ BÃO TAM HOA NỔ HŨ (+1x THƯỞNG)!`
+                  : g.luckySymbol
+                    ? `Ô Lộc Trời: ${SYMBOL[g.luckySymbol].name.toUpperCase()} ×${g.luckyMult}!`
+                    : 'Chế độ Lộc Trời Nổ Hũ ×2/×3'}
+              </T>
+            </View>
+          )}
+          {g.step === 'betting' && (
+            <View style={styles.timeTrack}>
+              <View style={[styles.timeFill, { width: `${Math.min(100, (left / 20) * 100)}%` }, left <= 5 && { backgroundColor: C.danger }]} />
+            </View>
+          )}
+          {/* đang cược: thu nhỏ/ẩn bát để chiếu 6 ô nằm gọn trong màn hình */}
+          {!(g.step === 'betting' && compact) && (
+            <View style={[styles.plate, compact && { height: 54 }, g.step === 'betting' && styles.plateSmall]}>
+              {g.step === 'result' && g.dice ? (
+                g.dice.map((s, i) => <Face key={`${g.round}-${i}`} s={s} size={compact ? 42 : 56} testID="bc-die" />)
+              ) : (
+                <Bowl shaking={g.step === 'rolling'} size={g.step === 'betting' ? 36 : compact ? 42 : 60} />
+              )}
+            </View>
+          )}
+          {g.step === 'result' && myDelta !== undefined && (
+            <T testID="bc-delta" style={[styles.delta, compact && { fontSize: 17 }, { color: myDelta > 0 ? C.jade : myDelta < 0 ? C.danger : C.muted }]}>
+              {myDelta > 0
+                ? `+${fmt(myDelta)} xu 🤑`
+                : myDelta < 0
+                  ? `${fmt(myDelta)} xu 😭`
+                  : Object.values(roundBets).some((v) => (v ?? 0) > 0)
+                    ? 'Huề vốn 😌'
+                    : 'Không cược ván này'}
             </T>
           )}
-          <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={[styles.bxhBtn, sticker(2), { flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
-            <EmojiIcon emoji="🏆" size={14} />
-            <T style={styles.bxhText}>BXH</T>
-          </Pressable>
-        </View>
-      </Card>
-
-      <View style={[styles.board, sticker(5)]}>
-        {BAUCUA_SYMBOLS.map((s) => {
-          const stakes = stakesOf(s);
-          return (
-            <Tile
-              key={s}
-              s={s}
-              chip={chip}
-              step={g.step}
-              hits={hits(s)}
-              mine={myBets[s] ?? 0}
-              stakes={stakes}
-              total={stakes.reduce((t, x) => t + x.amount, 0)}
-              glow={wonOn(s)}
-              compact={compact}
-              disabled={isSpectator}
-              luckyMult={g.mode === 'jackpot' && g.luckySymbol === s ? (g.luckyMult ?? 2) : null}
-              freq={freqMap[s]}
-              onPress={() => bet(s)}
-            />
-          );
-        })}
-      </View>
-
-      {g.recent.length > 0 && (
-        <View style={styles.recent}>
-          <T style={styles.recentLabel}>Mấy ván trước</T>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {[...g.recent].reverse().slice(0, 6).map((r, i) => (
-              <View key={i} style={styles.recentItem}>
-                {r.map((s, j) => (
-                  <Image key={j} source={{ uri: ART[s] }} style={{ width: 22, height: 22 }} />
-                ))}
-              </View>
-            ))}
+          <View style={styles.infoRow}>
+            {!isSpectator && (
+              <T numberOfLines={1} style={styles.wallet}>
+                <T style={{ fontWeight: '900', color: C.son }}>#{rankOf(me)}/{rankedIds.length}</T> · Ví{' '}
+                <T style={{ fontWeight: '900' }}>{fmt(balance)} xu</T>
+                {staked > 0 ? `, cược ${fmt(staked)}` : ''}
+                {g.debts[me] ? `, nợ ${g.debts[me]}` : ''}
+              </T>
+            )}
+            <Pressable testID="bc-rank-open" accessibilityRole="button" onPress={() => setBoardOpen(true)} style={[styles.bxhBtn, sticker(2), { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <EmojiIcon emoji="🏆" size={13} />
+              <T style={styles.bxhText}>BXH</T>
+            </Pressable>
           </View>
+        </Card>
+
+        <View style={[styles.board, compact && styles.boardCompact, sticker(4)]}>
+          {BAUCUA_SYMBOLS.map((s) => {
+            const stakes = stakesOf(s);
+            return (
+              <Tile
+                key={s}
+                s={s}
+                chip={chip}
+                step={g.step}
+                hits={hits(s)}
+                mine={myBets[s] ?? 0}
+                stakes={stakes}
+                total={stakes.reduce((t, x) => t + x.amount, 0)}
+                glow={wonOn(s)}
+                compact={compact}
+                disabled={isSpectator}
+                luckyMult={g.mode === 'jackpot' && g.luckySymbol === s ? (g.luckyMult ?? 2) : null}
+                freq={freqMap[s]}
+                onPress={() => bet(s)}
+              />
+            );
+          })}
         </View>
-      )}
+
+        {g.recent.length > 0 && (
+          <View style={styles.recent}>
+            <T style={styles.recentLabel}>Gần đây:</T>
+            <View style={styles.recentRow}>
+              {[...g.recent].reverse().slice(0, 4).map((r, i) => (
+                <View key={i} style={styles.recentItem}>
+                  {r.map((s, j) => (
+                    <Image key={j} source={{ uri: ART[s] }} style={{ width: 18, height: 18 }} />
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
 
       {boardOpen && (
         <Sheet title="🏆 Bảng xếp hạng xu" onClose={() => setBoardOpen(false)}>
           <View testID="bc-leaderboard" style={{ gap: 6 }}>
-                      {rankedIds.map((id, idx) => {
+            {rankedIds.map((id, idx) => {
               const rank = idx + 1;
               const pStaked = Object.values(g.bets[id] ?? {}).reduce((s, v) => s + (v ?? 0), 0);
               const pDelta = g.step === 'result' ? g.lastDeltas?.[id] : undefined;
-                          const pDebt = g.debts[id] ?? 0;
+              const pDebt = g.debts[id] ?? 0;
               return (
                 <View
                   key={id}
@@ -836,17 +844,18 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  table: { gap: 6, alignItems: 'center' },
-  tableHead: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
-  round: { fontWeight: '900', fontSize: 14, color: C.muted },
-  step: { flex: 1, fontWeight: '900', fontSize: 16, textAlign: 'center' },
-  endLink: { color: C.son, fontWeight: '800', textDecorationLine: 'underline', fontSize: 14 },
-  timeTrack: { alignSelf: 'stretch', height: 8, borderRadius: 4, backgroundColor: C.mist, overflow: 'hidden', borderWidth: 1.5, borderColor: C.ink },
+  root: { flex: 1, minHeight: 0, gap: 5, justifyContent: 'space-between' },
+  table: { gap: 4, alignItems: 'center' },
+  tableHead: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch' },
+  round: { fontWeight: '900', fontSize: 13, color: C.muted },
+  step: { flex: 1, fontWeight: '900', fontSize: 15, textAlign: 'center' },
+  endLink: { color: C.son, fontWeight: '800', textDecorationLine: 'underline', fontSize: 13 },
+  timeTrack: { alignSelf: 'stretch', height: 6, borderRadius: 4, backgroundColor: C.mist, overflow: 'hidden', borderWidth: 1.5, borderColor: C.ink },
   timeFill: { height: '100%', backgroundColor: C.jade },
-  plateSmall: { height: 54, minWidth: 140 },
+  plateSmall: { height: 48, minWidth: 130 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', justifyContent: 'space-between' },
-  bxhBtn: { backgroundColor: C.gold, borderRadius: 10, paddingHorizontal: 10, minHeight: 36, justifyContent: 'center' },
-  bxhText: { fontWeight: '900', fontSize: 14 },
+  bxhBtn: { backgroundColor: C.gold, borderRadius: 10, paddingHorizontal: 10, minHeight: 30, justifyContent: 'center' },
+  bxhText: { fontWeight: '900', fontSize: 13 },
   plate: {
     flexDirection: 'row', gap: 10, height: 86, minWidth: 220, alignItems: 'center', justifyContent: 'center',
     backgroundColor: C.mist, borderRadius: 60, paddingHorizontal: 18, borderWidth: 2.5, borderColor: C.ink,
@@ -872,11 +881,12 @@ const styles = StyleSheet.create({
   spectatorNote: { color: C.gold, fontWeight: '800', fontSize: 14, textAlign: 'center', paddingVertical: 8 },
   // chiếu bầu cua: khung đỏ son, 6 ô giấy dó
   board: {
-    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, padding: 8,
-    backgroundColor: '#8E0D14', borderRadius: 18,
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 7, padding: 7,
+    backgroundColor: '#8E0D14', borderRadius: 16,
   },
-  tile: { width: '32%', aspectRatio: 0.82, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
-  tileCompact: { aspectRatio: 1.12 },
+  boardCompact: { rowGap: 5, padding: 5, borderRadius: 14 },
+  tile: { width: '32%', aspectRatio: 0.9, borderRadius: 12, backgroundColor: PAPER, padding: 4, overflow: 'visible' },
+  tileCompact: { aspectRatio: 1.24 },
   tileInner: {
     flex: 1, borderWidth: 1.5, borderColor: C.son, borderRadius: 8, alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 2, overflow: 'hidden',
@@ -905,15 +915,18 @@ const styles = StyleSheet.create({
     position: 'absolute', top: -10, left: -6, backgroundColor: C.jade, color: '#fff', borderWidth: 2, borderColor: C.ink,
     borderRadius: 14, paddingHorizontal: 8, fontWeight: '900', fontSize: 15, overflow: 'hidden',
   },
-  recent: { gap: 6 },
-  recentLabel: { color: C.onSon, fontWeight: '700', fontSize: 13 },
-  recentItem: { flexDirection: 'row', backgroundColor: PAPER, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 8, borderWidth: 1.5, borderColor: C.ink },
-  chips: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
-  chip: { width: 58, height: 58, borderRadius: 29, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  recent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  recentRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 5, overflow: 'hidden' },
+  recentLabel: { color: C.onSon, fontWeight: '700', fontSize: 12 },
+  recentItem: { flexDirection: 'row', backgroundColor: PAPER, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 7, borderWidth: 1.5, borderColor: C.ink },
+  chips: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  chip: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  chipCompact: { width: 46, height: 46, borderRadius: 23 },
   chipRing: {
-    width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderStyle: 'dashed', borderColor: C.son,
+    width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderStyle: 'dashed', borderColor: C.son,
     alignItems: 'center', justifyContent: 'center',
   },
+  chipRingCompact: { width: 34, height: 34, borderRadius: 17 },
   chipOn: { backgroundColor: C.gold, transform: [{ translateY: -4 }] },
   chipText: { fontWeight: '900', fontSize: 15 },
   row: { flexDirection: 'row', gap: 10 },

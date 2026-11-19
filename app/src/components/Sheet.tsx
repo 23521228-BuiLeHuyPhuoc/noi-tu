@@ -12,22 +12,26 @@ export function useSheetOpen(): boolean {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => openCount > 0, () => false);
 }
 
-/** Bảng trượt từ dưới lên chuẩn glassmorphism + bo tròn mềm mại, hỗ trợ `stickyTop` ghim cố định phía trên vùng cuộn */
+/** Bảng trượt từ dưới lên bo tròn mềm mại, hỗ trợ `stickyTop`, `stickyBottom` & `scroll={false}` tránh lồng ScrollView */
 export function Sheet({
   title,
   onClose,
   stickyTop,
+  stickyBottom,
+  scroll = true,
   children,
 }: {
   title: string;
   onClose: () => void;
   stickyTop?: ReactNode;
+  stickyBottom?: ReactNode;
+  scroll?: boolean;
   children: ReactNode;
 }) {
   const kb = useKeyboardInset();
   const { height } = useStableWindow();
   const maxHeight = kb > 0 && Platform.OS === 'web'
-    ? Math.max(220, height - kb - 12) : Math.max(120, Math.round(height * 0.94));
+    ? Math.max(220, height - kb - 10) : Math.max(120, Math.round(height * 0.92));
   const short = height < 520;
   useEffect(() => { bump(1); return () => bump(-1); }, []);
   useEffect(() => {
@@ -54,7 +58,13 @@ export function Sheet({
             { maxHeight },
             short && styles.panelShort,
             kb > 0 && Platform.OS === 'web' && { marginBottom: kb },
-            Platform.OS === 'web' ? ({ animation: 'xl-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1)', boxShadow: '0 -10px 40px rgba(15,23,42,0.35)' } as object) : null,
+            Platform.OS === 'web'
+              ? ({
+                  animation: 'xl-sheet-in 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+                  transition: 'margin-bottom 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+                  boxShadow: '0 -4px 16px rgba(15,23,42,0.18)',
+                } as object)
+              : null,
           ]}
         >
           <View style={styles.grip} />
@@ -77,10 +87,17 @@ export function Sheet({
               <UiIcon name="X" size={18} color={C.ink} strokeWidth={2.5} />
             </Pressable>
           </View>
-          {stickyTop ? <View style={styles.stickyTopWrap}>{stickyTop}</View> : null}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {children}
-          </ScrollView>
+          {stickyTop ? <View style={styles.stickyWrap}>{stickyTop}</View> : null}
+          {scroll ? (
+            <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={styles.bodyFixed}>
+              {children}
+            </View>
+          )}
+          {stickyBottom ? <View style={styles.stickyWrap}>{stickyBottom}</View> : null}
         </View>
       </View>
     </Modal>
@@ -91,13 +108,14 @@ const styles = StyleSheet.create({
   root: { position: (Platform.OS === 'web' ? 'fixed' : 'absolute') as 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 80, justifyContent: 'flex-end' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.56)' },
   panel: {
-    backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomWidth: 0,
-    padding: 18, paddingBottom: 26, gap: 14, width: '100%', maxWidth: 540, alignSelf: 'center', overflow: 'hidden',
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomWidth: 0,
+    padding: 16, paddingBottom: 20, gap: 12, width: '100%', maxWidth: 540, alignSelf: 'center', overflow: 'hidden',
   },
   panelShort: { maxWidth: 680, padding: 12, paddingBottom: 14, gap: 8 },
-  stickyTopWrap: { flexShrink: 0 },
+  stickyWrap: { flexShrink: 0 },
   body: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   bodyContent: { gap: 14 },
+  bodyFixed: { flexShrink: 1, minHeight: 0, gap: 10 },
   grip: { width: 42, height: 4.5, borderRadius: 3, backgroundColor: 'rgba(28,32,36,0.16)', alignSelf: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },

@@ -5,26 +5,24 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Circle as SvgCircle } from 'react-native-svg';
 import type { CaroSymbol, CaroView } from '../../../shared/src/caro';
 import { themeById } from '../../../shared/src/themes';
-import type { ActionError, PublicPlayer, RoomState } from '../../../shared/src/types';
+import type { ActionError, RoomState } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { play } from '../sound';
-import { useOnChange } from '../hooks';
+import { useOnChange, useStableWindow } from '../hooks';
 import { Button, T } from '../ui';
-import { Shell, type StripOptions } from '../components/Shell';
+import { Shell } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
 import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { Confetti } from '../components/Fun';
 import { EmojiIcon, UiIcon, type UiIconName } from '../components/Icons';
-import { MotionSurface } from '../components/MotionPrimitives';
 
 const SYMBOL_META: Record<
   CaroSymbol,
@@ -180,8 +178,9 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   const me = game.me ?? '';
   const isHost = room.hostId === me;
   const theme = themeById(room.settings.roomTheme ?? game.user?.equipped?.roomTheme);
-  const { width } = useWindowDimensions();
+  const { width, height } = useStableWindow();
   const wide = width >= 720;
+  const compact = height < 700 || width < 380;
 
   const isLargeBoard = view.size >= 20;
   const [zoomMode, setZoomMode] = useState<ZoomMode>(() => (view.size >= 20 ? 'comfort' : 'fit'));
@@ -191,6 +190,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     setZoomMode(view.size >= 20 ? 'comfort' : 'fit');
   }
 
+  const [arenaSize, setArenaSize] = useState({ w: 0, h: 0 });
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -236,11 +236,13 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     ? (view.symbols[view.currentPlayerId] ?? null)
     : null;
 
-  // Khung hiển thị bàn cờ: rộng rãi trên Desktop (tới 624px), gọn khít trên Mobile (360-390px)
-  const availBoardPx = Math.max(316, Math.min(wide ? 624 : width - 36, 624));
-  const fitCellPx = Math.max(12, Math.min(wide ? 32 : 25, Math.floor(availBoardPx / view.size)));
-  const comfortCellPx = wide ? 27 : 26;
-  const zoomCellPx = wide ? 38 : 35;
+  // Khung đấu trường đo động qua onLayout để bàn cờ to hết cỡ theo màn hình mà không bao giờ tràn trang ngoài
+  const availW = Math.max(260, (arenaSize.w || (wide ? 624 : width - 24)) - 12);
+  const availH = Math.max(200, (arenaSize.h || (wide ? 500 : height - 210)) - 12);
+  const availSquare = Math.min(availW, availH);
+  const fitCellPx = Math.max(11, Math.min(wide ? 42 : 30, Math.floor((availSquare - 6) / view.size)));
+  const comfortCellPx = wide ? 29 : 26;
+  const zoomCellPx = wide ? 40 : 35;
 
   const cellPx =
     zoomMode === 'zoom'
@@ -248,12 +250,12 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
       : zoomMode === 'comfort'
         ? Math.max(fitCellPx, comfortCellPx)
         : fitCellPx;
-  const emblemPx = Math.max(9, Math.round(cellPx * 0.72));
+  const emblemPx = Math.max(8, Math.round(cellPx * 0.72));
 
   const boardPixelSide = cellPx * view.size + 6;
-  const viewportW = Math.min(boardPixelSide, availBoardPx + 6);
-  const viewportH = Math.min(boardPixelSide, wide ? 370 : 396);
-  const needsScroll = zoomMode !== 'fit' && (boardPixelSide > viewportW + 4 || boardPixelSide > viewportH + 4);
+  const viewportW = Math.min(boardPixelSide, availW);
+  const viewportH = Math.min(boardPixelSide, availH);
+  const needsScroll = boardPixelSide > viewportW + 2 || boardPixelSide > viewportH + 2;
 
   const focusBoardCell = useCallback(
     (targetRow: number, targetCol: number, animated: boolean) => {
@@ -338,68 +340,47 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
       ? 'Thu gọn 1×'
       : 'Zoom 1.5×';
 
-  const strip: StripOptions = useMemo(
-    () => ({
-      order: view.order,
-      active: view.currentPlayerId,
-      ring: (p: PublicPlayer) => {
-        if (view.winnerId === p.id) return C.gold;
-        const sym = view.symbols[p.id];
-        return sym ? SYMBOL_META[sym].color : undefined;
-      },
-      sub: (p: PublicPlayer) => {
-        const sym = view.symbols[p.id];
-        if (!sym) return 'Đang xem';
-        if (view.winnerId === p.id) return `Quân ${sym} · Thắng!`;
-        return view.currentPlayerId === p.id ? `Quân ${sym} · Lượt đi` : `Quân ${sym}`;
-      },
-    }),
-    [view.order, view.currentPlayerId, view.winnerId, view.symbols],
-  );
-
-  const renderBottom = () => {
-    return (
-      <View style={styles.bottomWrap}>
-        <View style={styles.bottomStatusRow}>
-          {view.winnerId ? (
-            <>
-              <EmojiIcon emoji="🏆" size={18} />
-              <T style={[styles.bottomTxt, { color: '#FDE047' }]}>
-                {view.winnerId === me
-                  ? 'Đỉnh cao chiến thuật! Bạn đã nối thành công 5 quân thắng tuyệt đối!'
-                  : `${view.names[view.winnerId] ?? view.winnerId} đã tạo đường 5 quân chiến thắng!`}
-              </T>
-            </>
-          ) : view.isDraw ? (
-            <>
-              <EmojiIcon emoji="🤝" size={18} />
-              <T style={[styles.bottomTxt, { color: '#BAE6FD' }]}>
-                Bàn cờ {view.size}×{view.size} kín đặc bất phân thắng bại — Hòa cờ lịch sử!
-              </T>
-            </>
-          ) : isMyTurn && mySymbol ? (
-            <>
-              <CaroEmblem symbol={mySymbol} size={18} />
-              <T style={[styles.bottomTxt, { color: '#4ADE80' }]}>
-                Tới lượt bạn cầm quân {mySymbol}! Chạm vào ô trống trên bàn {view.size}×{view.size} để đánh.
-              </T>
-            </>
-          ) : mySymbol ? (
-            <>
-              <UiIcon name="Timer" size={16} color="#CBD5E1" />
-              <T style={[styles.bottomTxt, { color: theme.onBg }]}>
-                Đang chờ @{view.names[view.currentPlayerId ?? ''] ?? 'đối thủ'} đi nước tiếp theo…
-              </T>
-            </>
-          ) : (
-            <T style={[styles.bottomTxt, { color: theme.onBg }]}>
-              Đang theo dõi đại chiến Cờ Caro {view.order.length} phe ({view.size}×{view.size}) kịch tính!
+  const renderBottom = () => (
+    <View style={styles.bottomWrap}>
+      <View style={styles.bottomStatusRow}>
+        {view.winnerId ? (
+          <>
+            <EmojiIcon emoji="🏆" size={16} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#FDE047' }]}>
+              {view.winnerId === me
+                ? 'Bạn đã nối đủ 5 quân chiến thắng!'
+                : `${view.names[view.winnerId] ?? view.winnerId} nối 5 quân thắng!`}
             </T>
-          )}
-        </View>
+          </>
+        ) : view.isDraw ? (
+          <>
+            <EmojiIcon emoji="🤝" size={16} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#BAE6FD' }]}>
+              Bàn {view.size}×{view.size} kín đặc — Hòa cờ!
+            </T>
+          </>
+        ) : isMyTurn && mySymbol ? (
+          <>
+            <CaroEmblem symbol={mySymbol} size={15} />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: '#4ADE80' }]}>
+              Lượt bạn ({mySymbol}) — Chạm ô trống để đánh!
+            </T>
+          </>
+        ) : mySymbol ? (
+          <>
+            <UiIcon name="Timer" size={14} color="#CBD5E1" />
+            <T numberOfLines={1} style={[styles.bottomTxt, { color: theme.onBg }]}>
+              Đang chờ @{view.names[view.currentPlayerId ?? ''] ?? 'đối thủ'}…
+            </T>
+          </>
+        ) : (
+          <T numberOfLines={1} style={[styles.bottomTxt, { color: theme.onBg }]}>
+            Đang xem Caro {view.order.length} phe ({view.size}×{view.size})
+          </T>
+        )}
 
         {isHost && !gameEnded && (
-          <View style={styles.hostRow}>
+          <View style={styles.hostInlineBtns}>
             <Button
               testID="caro-end-early"
               small
@@ -408,11 +389,11 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
               iconNode={
                 <UiIcon
                   name="XCircle"
-                  size={14}
+                  size={13}
                   color={confirmEnd ? '#FFFFFF' : C.ink}
                 />
               }
-              title={confirmEnd ? 'Xác nhận kết thúc sớm?' : 'Kết thúc sớm'}
+              title={confirmEnd ? 'Chắc?' : 'Dừng'}
               onPress={handleEarlyEnd}
             />
             {confirmEnd && (
@@ -426,8 +407,8 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
           </View>
         )}
       </View>
-    );
-  };
+    </View>
+  );
 
   const boardRows = useMemo(
     () => Array.from({ length: view.size }, (_, r) => r),
@@ -508,79 +489,98 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   );
 
   return (
-    <Shell game={game} room={room} strip={strip} wide={wide} bottom={renderBottom()}>
-      {view.winnerId !== null && <Confetti />}
+    <Shell game={game} room={room} scroll={false} hideStrip wide={wide} bottom={renderBottom()}>
+      <View style={styles.root}>
+        {view.winnerId !== null && <Confetti />}
 
-      {/* THANH ĐIỀU KHIỂN LƯỢT ĐÁNH, QUY MÔ BÀN CỜ & LUẬT CHẶN 2 ĐẦU */}
-      <MotionSurface>
+        {/* THANH ĐIỀU KHIỂN LƯỢT ĐÁNH GỌN NHẸ — KHÔNG CHIẾM DIỆN TÍCH BÀN CỜ */}
         <LinearGradient
           colors={['#042F2E', '#0F172A', '#1E293B']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.arenaHeader, sticker(4)]}
+          style={[styles.arenaHeader, compact && styles.arenaHeaderCompact, sticker(3)]}
         >
           <View style={styles.headerTopRow}>
             <View style={styles.activeTurnWrap}>
               {activePlayer ? (
                 <Portrait
                   p={activePlayer}
-                  size={34}
+                  size={24}
                   frame={activePlayer.cosmetics?.frame}
                 />
               ) : (
-                <EmojiIcon emoji="⚔️" size={20} />
+                <EmojiIcon emoji="⚔️" size={16} />
               )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <T style={styles.turnMiniLabel}>
-                  {gameEnded ? 'KẾT QUẢ ĐẠI CHIẾN' : 'ĐANG TỚI LƯỢT ĐÁNH'}
-                </T>
-                <View style={styles.inlineRow}>
-                  {activeSymbol && !gameEnded && (
-                    <CaroEmblem symbol={activeSymbol} size={16} />
-                  )}
-                  <NameText
-                    fx={activePlayer?.cosmetics?.nameFx}
-                    style={styles.activePlayerName}
-                  >
-                    {view.winnerId
-                      ? `${view.names[view.winnerId] ?? view.winnerId} chiến thắng!`
-                      : view.isDraw
-                        ? 'Hòa cờ nảy lửa!'
-                        : (view.names[view.currentPlayerId ?? ''] ?? '---')}
-                  </NameText>
-                </View>
-              </View>
+              {activeSymbol && !gameEnded && (
+                <CaroEmblem symbol={activeSymbol} size={14} />
+              )}
+              <NameText
+                fx={activePlayer?.cosmetics?.nameFx}
+                numberOfLines={1}
+                style={styles.activePlayerName}
+              >
+                {view.winnerId
+                  ? `${view.names[view.winnerId] ?? view.winnerId} thắng!`
+                  : view.isDraw
+                    ? 'Hòa cờ!'
+                    : (view.names[view.currentPlayerId ?? ''] ?? '---')}
+              </NameText>
             </View>
 
-            <View style={styles.headerBadgesCol}>
-              <View style={styles.inlineBadges}>
-                <View testID="caro-size-badge" style={styles.sizePill}>
-                  <UiIcon name="LayoutGrid" size={11} color="#5EEAD4" />
-                  <T style={styles.sizePillTxt}>
-                    {view.size}×{view.size} ({view.size * view.size} ô)
-                  </T>
-                </View>
-                <View
-                  style={[
-                    styles.rulePill,
-                    view.blockTwoEnds ? styles.rulePillBlock : styles.rulePillFree,
-                  ]}
-                >
-                  <UiIcon
-                    name={view.blockTwoEnds ? 'Shield' : 'Zap'}
-                    size={11}
-                    color={view.blockTwoEnds ? '#FDE047' : '#67E8F9'}
-                  />
-                  <T style={styles.rulePillTxt}>
-                    {view.blockTwoEnds ? 'Chặn 2 đầu' : 'Tự do'}
-                  </T>
-                </View>
+            <View style={styles.inlineBadges}>
+              <View testID="caro-size-badge" style={styles.sizePill}>
+                <UiIcon name="LayoutGrid" size={10} color="#5EEAD4" />
+                <T style={styles.sizePillTxt}>
+                  {view.size}×{view.size}
+                </T>
               </View>
-              <T style={styles.moveCounterTxt}>
-                Nước #{view.moveCount} · {view.order.length} Phe
-              </T>
+              <View
+                style={[
+                  styles.rulePill,
+                  view.blockTwoEnds ? styles.rulePillBlock : styles.rulePillFree,
+                ]}
+              >
+                <UiIcon
+                  name={view.blockTwoEnds ? 'Shield' : 'Zap'}
+                  size={10}
+                  color={view.blockTwoEnds ? '#FDE047' : '#67E8F9'}
+                />
+                <T style={styles.rulePillTxt}>
+                  {view.blockTwoEnds ? 'Chặn 2' : 'Tự do'}
+                </T>
+              </View>
+              <T style={styles.moveCounterTxt}>#{view.moveCount}</T>
             </View>
           </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.factionBar}>
+            {view.order.map((pid) => {
+              const sym = view.symbols[pid];
+              if (!sym) return null;
+              const m = SYMBOL_META[sym];
+              const pl = playerMap.get(pid);
+              const isTurn = !gameEnded && view.currentPlayerId === pid;
+              return (
+                <View
+                  key={pid}
+                  style={[
+                    styles.factionChip,
+                    {
+                      backgroundColor: m.pillBg,
+                      borderColor: isTurn ? m.pillBorder : 'rgba(255,255,255,0.14)',
+                    },
+                    isTurn && styles.factionChipActive,
+                  ]}
+                >
+                  {pl && <Portrait p={pl} size={18} border={1} />}
+                  <CaroEmblem symbol={sym} size={12} />
+                  <T numberOfLines={1} style={styles.factionNameTxt}>
+                    {view.names[pid] ?? pid}
+                  </T>
+                </View>
+              );
+            })}
+          </ScrollView>
 
           {!gameEnded && (
             <CountdownBar
@@ -591,233 +591,211 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
               testID="caro-timer"
             />
           )}
-
-          {/* Thanh Huy Hiệu Các Phe Tham Chiến (2–4 người) */}
-          <View style={styles.factionBar}>
-            {view.order.map((pid) => {
-              const sym = view.symbols[pid];
-              if (!sym) return null;
-              const m = SYMBOL_META[sym];
-              const isTurn = !gameEnded && view.currentPlayerId === pid;
-              return (
-                <View
-                  key={pid}
-                  style={[
-                    styles.factionChip,
-                    {
-                      backgroundColor: m.pillBg,
-                      borderColor: isTurn ? m.pillBorder : 'rgba(255,255,255,0.12)',
-                    },
-                    isTurn && styles.factionChipActive,
-                  ]}
-                >
-                  <CaroEmblem symbol={sym} size={14} />
-                  <T numberOfLines={1} style={styles.factionNameTxt}>
-                    {view.names[pid] ?? pid}
-                  </T>
-                </View>
-              );
-            })}
-          </View>
         </LinearGradient>
-      </MotionSurface>
 
-      {view.winLine && view.winnerId && (
-        <LinearGradient
-          testID="caro-win-reveal-banner"
-          colors={['#78350F', '#B45309', '#92400E']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.winRevealBanner, sticker(3)]}
-        >
-          <View style={styles.winRevealTop}>
-            <EmojiIcon emoji="🎯" size={20} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <T style={styles.winRevealTitle}>
-                {view.winnerId === me
-                  ? `CHIẾN THẮNG! Bạn nối thành công ${view.winLine.length} quân!`
-                  : `🏆 ${view.names[view.winnerId] ?? view.winnerId} đã nối ${view.winLine.length} quân thẳng hàng!`}
-              </T>
-              <T style={styles.winRevealSub}>
-                Hàng thắng: {view.winLine.map(([r, c]) => `(${r + 1},${c + 1})`).join(' → ')}
-              </T>
+        {view.winLine && view.winnerId && (
+          <LinearGradient
+            testID="caro-win-reveal-banner"
+            colors={['#78350F', '#B45309', '#92400E']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.winRevealBanner, sticker(3)]}
+          >
+            <View style={styles.winRevealTop}>
+              <EmojiIcon emoji="🎯" size={18} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <T numberOfLines={1} style={styles.winRevealTitle}>
+                  {view.winnerId === me
+                    ? `CHIẾN THẮNG! Nối đủ ${view.winLine.length} quân!`
+                    : `🏆 ${view.names[view.winnerId] ?? view.winnerId} nối ${view.winLine.length} quân thắng!`}
+                </T>
+                <T numberOfLines={1} style={styles.winRevealSub}>
+                  {view.winLine.map(([r, c]) => `(${r + 1},${c + 1})`).join('→')}
+                </T>
+              </View>
+              <Button
+                testID="caro-finish-reveal"
+                small
+                variant="gold"
+                disabled={busy}
+                title="Tổng kết"
+                onPress={() => void act({ type: 'caro_finish_reveal' })}
+              />
             </View>
-            <Button
-              testID="caro-finish-reveal"
-              small
-              variant="gold"
-              disabled={busy}
-              title="Tổng kết"
-              onPress={() => void act({ type: 'caro_finish_reveal' })}
-            />
+            {view.revealEndsAt && (
+              <CountdownBar
+                endsAt={view.revealEndsAt}
+                total={5}
+                clockOffset={game.clockOffset}
+                lightText
+              />
+            )}
+          </LinearGradient>
+        )}
+
+        {err && (
+          <View style={[styles.errBanner, sticker(2)]}>
+            <UiIcon name="AlertTriangle" size={14} color="#FEF08A" />
+            <T style={styles.errBannerTxt}>{err}</T>
           </View>
-          {view.revealEndsAt && (
-            <CountdownBar
-              endsAt={view.revealEndsAt}
-              total={5}
-              clockOffset={game.clockOffset}
-              lightText
-            />
-          )}
-        </LinearGradient>
-      )}
+        )}
 
-      {err && (
-        <View style={[styles.errBanner, sticker(2)]}>
-          <UiIcon name="AlertTriangle" size={15} color="#FEF08A" />
-          <T style={styles.errBannerTxt}>{err}</T>
-        </View>
-      )}
-
-      {/* THANH ĐIỀU HƯỚNG PAN / ZOOM & ĐỊNH VỊ TÂM CỜ TRÊN DI ĐỘNG */}
-      <View style={styles.boardToolbar}>
-        <View style={styles.lastMoveInfo}>
-          <UiIcon name="Crosshair" size={14} color={theme.onBg} />
-          <T numberOfLines={1} style={[styles.lastMoveInfoTxt, { color: theme.onBg }]}>
-            {view.lastMove
-              ? `Vừa đánh: (${view.lastMove.row + 1}, ${view.lastMove.col + 1}) · @${view.names[view.lastMove.playerId] ?? ''}`
-              : isLargeBoard
-                ? `Bàn đại chiến ${view.size}×${view.size} (${view.size * view.size} ô) — vuốt để đảo khắp bản đồ`
-                : `Bàn cờ ${view.size}×${view.size} sẵn sàng khai cuộc`}
-          </T>
-        </View>
-
-        <View style={styles.toolbarBtns}>
-          {needsScroll && (
-            <Pressable
-              testID="caro-center-btn"
-              onPress={() => {
-                play('pop');
-                const mid = Math.floor(view.size / 2);
-                focusBoardCell(
-                  view.lastMove ? view.lastMove.row : mid,
-                  view.lastMove ? view.lastMove.col : mid,
-                  true,
-                );
-              }}
-              style={styles.centerBtn}
-            >
-              <UiIcon name="Crosshair" size={13} color="#FDE047" />
-              <T style={styles.centerBtnTxt}>Tâm cờ</T>
-            </Pressable>
-          )}
-
-          <Pressable
-            testID="caro-zoom-toggle"
-            onPress={cycleZoom}
-            style={[styles.zoomToggleBtn, zoomMode === 'zoom' && styles.zoomToggleBtnOn]}
-          >
-            <UiIcon
-              name={zoomMode === 'zoom' ? 'ZoomOut' : 'ZoomIn'}
-              size={13}
-              color={zoomMode === 'zoom' ? '#022C22' : '#E2E8F0'}
-            />
-            <T style={[styles.zoomToggleTxt, zoomMode === 'zoom' && { color: '#022C22' }]}>
-              {zoomBtnLabel}
+        {/* THANH ĐỊNH VỊ TÂM CỜ & ZOOM GỌN TRÊN 1 DÒNG */}
+        <View style={styles.boardToolbar}>
+          <View style={styles.lastMoveInfo}>
+            <UiIcon name="Crosshair" size={13} color={theme.onBg} />
+            <T numberOfLines={1} style={[styles.lastMoveInfoTxt, { color: theme.onBg }]}>
+              {view.lastMove
+                ? `Vừa đánh (${view.lastMove.row + 1},${view.lastMove.col + 1}) · @${view.names[view.lastMove.playerId] ?? ''}`
+                : isLargeBoard
+                  ? `Đại chiến ${view.size}×${view.size} (${view.size * view.size} ô)`
+                  : `Bàn cờ ${view.size}×${view.size} sẵn sàng`}
             </T>
-          </Pressable>
-        </View>
-      </View>
+          </View>
 
-      {/* ĐẤU TRƯỜNG BÀN CỜ CARO CO GIÃN ĐA PHE CYBER JADE */}
-      <View style={[styles.boardArenaWrap, sticker(4)]}>
-        {needsScroll ? (
-          <ScrollView
-            ref={vScrollRef}
-            style={{ maxHeight: viewportH, maxWidth: viewportW }}
-            contentContainerStyle={styles.zoomScrollContent}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator
-          >
+          <View style={styles.toolbarBtns}>
+            {needsScroll && (
+              <Pressable
+                testID="caro-center-btn"
+                onPress={() => {
+                  play('pop');
+                  const mid = Math.floor(view.size / 2);
+                  focusBoardCell(
+                    view.lastMove ? view.lastMove.row : mid,
+                    view.lastMove ? view.lastMove.col : mid,
+                    true,
+                  );
+                }}
+                style={styles.centerBtn}
+              >
+                <UiIcon name="Crosshair" size={12} color="#FDE047" />
+                <T style={styles.centerBtnTxt}>Tâm cờ</T>
+              </Pressable>
+            )}
+
+            <Pressable
+              testID="caro-zoom-toggle"
+              onPress={cycleZoom}
+              style={[styles.zoomToggleBtn, zoomMode === 'zoom' && styles.zoomToggleBtnOn]}
+            >
+              <UiIcon
+                name={zoomMode === 'zoom' ? 'ZoomOut' : 'ZoomIn'}
+                size={12}
+                color={zoomMode === 'zoom' ? '#022C22' : '#E2E8F0'}
+              />
+              <T style={[styles.zoomToggleTxt, zoomMode === 'zoom' && { color: '#022C22' }]}>
+                {zoomBtnLabel}
+              </T>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* ĐẤU TRƯỜNG BÀN CỜ CHIẾM TOÀN BỘ KHÔNG GIAN CÒN LẠI (0 OUTER SCROLL) */}
+        <View
+          style={[styles.boardArenaWrap, sticker(3)]}
+          onLayout={({ nativeEvent: { layout } }) => {
+            const w = Math.floor(layout.width);
+            const h = Math.floor(layout.height);
+            setArenaSize((prev) =>
+              Math.abs(prev.w - w) > 2 || Math.abs(prev.h - h) > 2 ? { w, h } : prev,
+            );
+          }}
+        >
+          {needsScroll ? (
             <ScrollView
-              ref={hScrollRef}
-              horizontal
+              ref={vScrollRef}
+              style={{ maxHeight: viewportH, maxWidth: viewportW }}
               contentContainerStyle={styles.zoomScrollContent}
               nestedScrollEnabled
-              showsHorizontalScrollIndicator
+              showsVerticalScrollIndicator
             >
-              {boardElement}
+              <ScrollView
+                ref={hScrollRef}
+                horizontal
+                contentContainerStyle={styles.zoomScrollContent}
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator
+              >
+                {boardElement}
+              </ScrollView>
             </ScrollView>
-          </ScrollView>
-        ) : (
-          <View style={styles.fitCenterWrap}>{boardElement}</View>
-        )}
+          ) : (
+            <View style={styles.fitCenterWrap}>{boardElement}</View>
+          )}
+        </View>
       </View>
     </Shell>
   );
 }
 
 const styles = StyleSheet.create({
-  inlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  root: {
+    flex: 1,
+    minHeight: 0,
+    gap: 5,
   },
   inlineBadges: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    gap: 4,
+    flexShrink: 0,
   },
   arenaHeader: {
-    borderRadius: 22,
-    padding: 12,
-    gap: 9,
-    borderWidth: 2,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 5,
+    borderWidth: 1.5,
     borderColor: 'rgba(45, 212, 191, 0.36)',
+  },
+  arenaHeaderCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
   },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   activeTurnWrap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 6,
     minWidth: 0,
   },
-  turnMiniLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    color: '#5EEAD4',
-  },
   activePlayerName: {
-    fontSize: 15,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#F8FAFC',
     fontFamily: FONT,
   },
-  headerBadgesCol: {
-    alignItems: 'flex-end',
-    gap: 3,
-  },
   sizePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
     backgroundColor: 'rgba(20, 184, 166, 0.2)',
     borderColor: 'rgba(94, 234, 212, 0.5)',
   },
   sizePillTxt: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '900',
     color: '#99F6E4',
   },
   rulePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -830,77 +808,77 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(103, 232, 249, 0.5)',
   },
   rulePillTxt: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '900',
     color: '#F8FAFC',
   },
   moveCounterTxt: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#94A3B8',
   },
 
   factionBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    alignItems: 'center',
+    gap: 5,
   },
   factionChip: {
-    flexGrow: 1,
-    minWidth: 108,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 10,
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
     borderWidth: 1.5,
+    maxWidth: 120,
   },
   factionChipActive: {
-    transform: [{ translateY: -1 }],
+    borderWidth: 2,
   },
   factionNameTxt: {
-    flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#F8FAFC',
+    flexShrink: 1,
   },
 
   errBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
     backgroundColor: '#991B1B',
-    borderRadius: 12,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   winRevealBanner: {
-    borderRadius: 16,
-    padding: 10,
-    gap: 7,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 5,
     borderWidth: 2,
     borderColor: '#FEF08A',
   },
   winRevealTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   winRevealTitle: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '900',
     color: '#FEF08A',
     fontFamily: FONT,
   },
   winRevealSub: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#FDE68A',
   },
   errBannerTxt: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#FEF08A',
   },
@@ -915,41 +893,41 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     minWidth: 0,
   },
   lastMoveInfoTxt: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '800',
   },
   toolbarBtns: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   centerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: 'rgba(15, 23, 42, 0.82)',
     borderWidth: 1.5,
     borderColor: 'rgba(253, 224, 71, 0.55)',
   },
   centerBtnTxt: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '900',
     color: '#FEF08A',
   },
   zoomToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: 'rgba(15, 23, 42, 0.78)',
     borderWidth: 1.5,
@@ -960,22 +938,22 @@ const styles = StyleSheet.create({
     borderColor: '#99F6E4',
   },
   zoomToggleTxt: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: '900',
     color: '#E2E8F0',
   },
 
   boardArenaWrap: {
-    alignSelf: 'center',
-    maxWidth: '100%',
+    flex: 1,
+    minHeight: 0,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 16,
     backgroundColor: '#0B192C',
     padding: 4,
     borderWidth: 2,
     borderColor: '#14B8A6',
-    ...(Platform.OS === 'web'
-      ? ({ boxShadow: '0 0 24px rgba(20, 184, 166, 0.35)' } as object)
-      : null),
   },
   fitCenterWrap: {
     alignItems: 'center',
@@ -1035,24 +1013,25 @@ const styles = StyleSheet.create({
   },
 
   bottomWrap: {
-    gap: 6,
+    gap: 4,
   },
   bottomStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 6,
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 4,
   },
   bottomTxt: {
-    fontSize: 12.5,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
     fontWeight: '800',
-    textAlign: 'center',
   },
-  hostRow: {
+  hostInlineBtns: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    gap: 5,
+    flexShrink: 0,
   },
 });

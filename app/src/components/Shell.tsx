@@ -130,6 +130,7 @@ export function Shell({
 
   const iconOnly = width < 440 || fullscreen;
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
+  const tightHeight = !scroll && height < 720;
   const inlineStrip = compactLandscape && width >= 700;
   const baseSize = fullscreen || compactLandscape || (wide && width >= 700) ? 50 : height >= 780 ? 58 : height >= 700 ? 52 : 44;
   const stripSize = room.players.length >= 10 ? Math.min(baseSize, 42) : room.players.length >= 7 ? Math.min(baseSize, 46) : baseSize;
@@ -180,7 +181,7 @@ export function Shell({
   const ownedSet = new Set(game.user?.owned ?? []);
 
   const content = (
-    <View style={[styles.content, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen, !scroll && styles.contentNoScroll]}>
+    <View style={[styles.content, !scroll && styles.contentNoScroll, tightHeight && styles.contentTight, compactLandscape && styles.contentLandscape, fullscreen && styles.contentFullscreen]}>
       {children}
     </View>
   );
@@ -224,6 +225,7 @@ export function Shell({
           style={[
             styles.top,
             compactLandscape && styles.topLandscape,
+            tightHeight && styles.topTightVertical,
             iconOnly && styles.topTight,
           ]}
         >
@@ -320,7 +322,7 @@ export function Shell({
         )}
 
         {bottom ? (
-          <View style={[styles.bottom, { borderTopColor: 'rgba(255,255,255,0.12)' }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
+          <View style={[styles.bottom, tightHeight && styles.bottomTight, { borderTopColor: 'rgba(255,255,255,0.12)' }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>
         ) : (
           <View onLayout={() => setFeedInset(12)} />
         )}
@@ -473,9 +475,11 @@ const styles = StyleSheet.create({
   avatarRow: { transform: [{ scale: 0.78 }], marginHorizontal: -7, marginVertical: -9 },
   avatarCompact: { transform: [{ scale: 0.56 }], marginHorizontal: -12, marginVertical: -18 },
   content: { flexGrow: 1, flexShrink: 0, paddingHorizontal: 14, paddingBottom: 12, gap: 12 },
-  contentNoScroll: { flex: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden' },
+  contentNoScroll: { flex: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden', paddingTop: 6, paddingBottom: 6, gap: 6 },
+  contentTight: { paddingHorizontal: 10, paddingTop: 4, paddingBottom: 4, gap: 5 },
   contentLandscape: { paddingBottom: 4, gap: 6 },
   contentFullscreen: { paddingHorizontal: 4, paddingBottom: 4, gap: 4 },
+  topTightVertical: { marginTop: 4, marginBottom: 0, paddingVertical: 4 },
   spectatorBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     marginHorizontal: 12, marginTop: 4, marginBottom: 4, paddingVertical: 6, paddingHorizontal: 10,
@@ -495,6 +499,7 @@ const styles = StyleSheet.create({
   chaosFloatTop: { position: 'absolute', top: 42, left: -10, right: -10, zIndex: 60 },
   chaosFloatText: { fontSize: 13, fontWeight: '900', color: C.gold, textShadowColor: C.ink, textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
   bottom: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 12, gap: 8, borderTopWidth: 1 },
+  bottomTight: { paddingHorizontal: 10, paddingTop: 5, paddingBottom: 7, gap: 5 },
   smoothBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(217,119,6,0.28)', padding: 12 },
   mapItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: C.mist, borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.08)' },
   mapItemOn: { borderColor: C.jade, backgroundColor: '#ECFDF5' },

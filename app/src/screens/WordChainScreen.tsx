@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { toSyllables } from '../../../shared/src/vi';
 import { hasVietMarks } from '../../../shared/src/en';
 import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES } from '../../../shared/src/pos';
@@ -9,12 +9,13 @@ import {
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { actionText, quip } from '../messages';
-import { useOnNew, useSecondsLeft } from '../hooks';
+import { useOnNew, useSecondsLeft, useStableWindow } from '../hooks';
 import { play } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
+import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { TimerBar } from '../components/TimerBar';
 import { useShake } from '../components/Fun';
@@ -159,6 +160,8 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   const toBonus = EN_HINT_EVERY - (myCorrect % EN_HINT_EVERY);
   const fmtSec = (x: number) => `${Number.isInteger(x) ? x : x.toFixed(1).replace('.', ',')}s`;
 
+  const { height, width } = useStableWindow();
+  const compact = height < 700 || width < 380;
   const names = new Map(room.players.map((p) => [p.id, p.name]));
   const current = room.players.find((p) => p.id === g.currentPlayerId);
   const history = [...g.history].reverse();
@@ -250,77 +253,86 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     <Shell
       game={game}
       room={room}
-      strip={{
-        order: g.order,
-        active: g.currentPlayerId,
-        dim: (p) => g.eliminated.includes(p.id),
-        sub: (p) => {
-          const st = g.streaks?.[p.id] ?? 0;
-          return st >= 2 ? `🔥${st} · ${g.words[p.id] ?? 0} từ` : `${g.words[p.id] ?? 0} từ`;
-        },
-      }}
+      scroll={false}
+      hideStrip
       bottom={Platform.OS !== 'web' ? controls : undefined}
       overlay={g.vote && <VoteCard vote={g.vote} game={game} />}
     >
-      <Card style={styles.board}>
-        {(g.difficulty && g.difficulty !== 'normal') || (g.rule && g.rule !== 'free') || (g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 ? (
-          <View style={styles.challengeRow} testID="wordchain-badges">
-            {g.difficulty && g.difficulty !== 'normal' && (
-              <View style={[styles.challengePill, g.difficulty === 'hell' ? styles.pillHell : g.difficulty === 'hard' ? styles.pillHard : styles.pillEasy]}>
-                <EmojiIcon emoji={WORDCHAIN_DIFFICULTIES[g.difficulty].emoji} size={13} />
-                <T style={styles.challengeTxt}>{WORDCHAIN_DIFFICULTIES[g.difficulty].name}</T>
-              </View>
-            )}
-            {g.rule && g.rule !== 'free' && (
-              <View style={[styles.challengePill, g.ruleRelaxed ? styles.pillRelaxed : styles.pillRule]}>
-                <EmojiIcon emoji={WORDCHAIN_RULES[g.rule].emoji} size={13} />
-                <T style={styles.challengeTxt}>
-                  {WORDCHAIN_RULES[g.rule].name}{g.ruleRelaxed ? ' (Tự nới lượt này!)' : ''}
-                </T>
-              </View>
-            )}
-            {(g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 && (
-              <View style={[styles.challengePill, styles.pillStreak]}>
-                <EmojiIcon emoji="🔥" size={13} />
-                <T style={styles.challengeTxt}>Combo x{g.streaks?.[g.currentPlayerId ?? '']}</T>
-              </View>
-            )}
-          </View>
-        ) : null}
-        <T testID="turn-label" style={[styles.turn, myTurn && { color: C.jade }]}>
-          {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
-        </T>
-        <T testID="current-word" style={styles.word} numberOfLines={1} adjustsFontSizeToFit>
-          {isEn ? first : `${first} `}<T style={styles.last}>{last}</T>
-        </T>
-        <Definition definition={g.currentDefinition} current />
-        <T testID="next-count" style={styles.count}>
-          Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
-        </T>
-        {voting ? (
-          <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
-        ) : (
-          <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
-        )}
-        {!voting && (g.turnBonusMs ?? 0) > 0 && (
-          <T testID="turn-bonus" style={styles.bonus}>
-            ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
-          </T>
-        )}
-        {isEn && !isSpectator && !meOut && (
-          <T testID="en-progress" style={styles.progress}>
-            ⏱ Lượt của bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm dần tới 15s)' : ''} · 🆘 còn {myHints} · thêm 1 cứu trợ sau {toBonus} từ nữa
-          </T>
-        )}
-      </Card>
+      <View style={styles.root}>
+        <CompactPlayerStrip
+          room={room}
+          game={game}
+          order={g.order}
+          activeId={g.currentPlayerId}
+          dim={(p) => g.eliminated.includes(p.id)}
+          sub={(p) => {
+            const st = g.streaks?.[p.id] ?? 0;
+            return st >= 2 ? `🔥${st} · ${g.words[p.id] ?? 0}` : `${g.words[p.id] ?? 0} từ`;
+          }}
+        />
 
-      {Platform.OS === 'web' && controls}
+        <Card style={[styles.board, compact && styles.boardCompact]}>
+          {(g.difficulty && g.difficulty !== 'normal') || (g.rule && g.rule !== 'free') || (g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 ? (
+            <View style={styles.challengeRow} testID="wordchain-badges">
+              {g.difficulty && g.difficulty !== 'normal' && (
+                <View style={[styles.challengePill, g.difficulty === 'hell' ? styles.pillHell : g.difficulty === 'hard' ? styles.pillHard : styles.pillEasy]}>
+                  <EmojiIcon emoji={WORDCHAIN_DIFFICULTIES[g.difficulty].emoji} size={13} />
+                  <T style={styles.challengeTxt}>{WORDCHAIN_DIFFICULTIES[g.difficulty].name}</T>
+                </View>
+              )}
+              {g.rule && g.rule !== 'free' && (
+                <View style={[styles.challengePill, g.ruleRelaxed ? styles.pillRelaxed : styles.pillRule]}>
+                  <EmojiIcon emoji={WORDCHAIN_RULES[g.rule].emoji} size={13} />
+                  <T style={styles.challengeTxt}>
+                    {WORDCHAIN_RULES[g.rule].name}{g.ruleRelaxed ? ' (Tự nới lượt này!)' : ''}
+                  </T>
+                </View>
+              )}
+              {(g.streaks?.[g.currentPlayerId ?? ''] ?? 0) >= 2 && (
+                <View style={[styles.challengePill, styles.pillStreak]}>
+                  <EmojiIcon emoji="🔥" size={13} />
+                  <T style={styles.challengeTxt}>Combo x{g.streaks?.[g.currentPlayerId ?? '']}</T>
+                </View>
+              )}
+            </View>
+          ) : null}
+          <T testID="turn-label" style={[styles.turn, compact && { fontSize: 15 }, myTurn && { color: C.jade }]}>
+            {myTurn ? 'Tới lượt bạn!' : current ? `Lượt của ${current.name}` : ''}
+          </T>
+          <T testID="current-word" style={[styles.word, compact && styles.wordCompact]} numberOfLines={1} adjustsFontSizeToFit>
+            {isEn ? first : `${first} `}<T style={[styles.last, compact && styles.wordCompact]}>{last}</T>
+          </T>
+          <Definition definition={g.currentDefinition} current />
+          <T testID="next-count" style={[styles.count, compact && { fontSize: 13 }]}>
+            Còn <T style={{ fontWeight: '900' }}>{g.nextCount}</T> từ có thể nối với “{last}”
+          </T>
+          {voting ? (
+            <T style={styles.paused}>⏸ Đồng hồ tạm dừng trong lúc bỏ phiếu</T>
+          ) : (
+            <TimerBar testID="seconds-left" left={left} total={g.turnSeconds + (g.turnBonusMs ?? 0) / 1000} />
+          )}
+          {!voting && (g.turnBonusMs ?? 0) > 0 && (
+            <T testID="turn-bonus" style={styles.bonus}>
+              ⏸ Được bù +{fmtSec((g.turnBonusMs ?? 0) / 1000)} vì {myTurn ? 'bạn' : current?.name ?? 'người chơi'} bị chọc
+            </T>
+          )}
+          {isEn && !isSpectator && !meOut && (
+            <T testID="en-progress" style={styles.progress}>
+              ⏱ Lượt bạn: {fmtSec(myTurnSec)}{myCorrect < EN_RAMP_WORDS ? ' (giảm tới 15s)' : ''} · 🆘 {myHints} · +{toBonus} từ thêm 🆘
+            </T>
+          )}
+        </Card>
 
-      <Card style={styles.history}>
-        {history.map((h, i) => (
-          <HistoryRow key={g.history.length - i} item={h} isMe={(id) => id === game.me} names={names} />
-        ))}
-      </Card>
+        {Platform.OS === 'web' && controls}
+
+        <Card style={styles.historyWrap}>
+          <ScrollView style={styles.historyScroll} contentContainerStyle={styles.history} keyboardShouldPersistTaps="handled">
+            {history.map((h, i) => (
+              <HistoryRow key={g.history.length - i} item={h} isMe={(id) => id === game.me} names={names} />
+            ))}
+          </ScrollView>
+        </Card>
+      </View>
     </Shell>
   );
 }
@@ -443,26 +455,29 @@ function HistoryRow({ item, isMe }: { item: WordHistoryItem; isMe: (id: string) 
 }
 
 const styles = StyleSheet.create({
-  board: { alignItems: 'center', gap: 8 },
-  turn: { fontSize: 17, fontWeight: '800', color: C.muted, textAlign: 'center' },
-  word: { fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 52, maxWidth: '100%' },
-  last: { color: C.son, fontSize: 44, fontWeight: '900' },
-  count: { color: C.muted, fontSize: 15, textAlign: 'center' },
+  root: { flex: 1, minHeight: 0, gap: 6 },
+  board: { alignItems: 'center', gap: 6, paddingVertical: 10 },
+  boardCompact: { gap: 4, paddingVertical: 8, paddingHorizontal: 10 },
+  turn: { fontSize: 16, fontWeight: '800', color: C.muted, textAlign: 'center' },
+  word: { fontSize: 40, fontWeight: '900', letterSpacing: -1, lineHeight: 48, maxWidth: '100%' },
+  wordCompact: { fontSize: 32, lineHeight: 38 },
+  last: { color: C.son, fontSize: 40, fontWeight: '900' },
+  count: { color: C.muted, fontSize: 14, textAlign: 'center' },
   out: { color: C.onSon, textAlign: 'center', fontWeight: '700', fontSize: 16 },
   inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   inputBox: {
-    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: C.paper, borderRadius: 14, height: 54,
+    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: C.paper, borderRadius: 14, height: 50,
     borderWidth: 2.5, borderColor: C.ink, paddingLeft: 6, overflow: 'hidden',
   },
   prefix: {
     flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: C.son, borderRadius: 10, paddingHorizontal: 10,
-    height: 40, flexShrink: 0,
+    height: 36, flexShrink: 0,
   },
-  prefixText: { color: C.paper, fontSize: 20, fontWeight: '900' },
+  prefixText: { color: C.paper, fontSize: 19, fontWeight: '900' },
   lock: { fontSize: 11, marginTop: -10 },
   input: {
     flex: 1, minWidth: 0, fontFamily: FONT, paddingHorizontal: 10, height: '100%',
-    fontSize: 20, fontWeight: '700', color: C.ink, outlineStyle: 'none',
+    fontSize: 19, fontWeight: '700', color: C.ink, outlineStyle: 'none',
   } as object,
   paused: { color: C.son, fontWeight: '800', fontSize: 14 },
   bonus: { color: C.jade, fontWeight: '800', fontSize: 13, textAlign: 'center' },
@@ -475,7 +490,9 @@ const styles = StyleSheet.create({
   tally: { fontSize: 20, fontWeight: '900', textAlign: 'center' },
   voteNote: { fontSize: 12, color: C.muted, textAlign: 'center' },
   error: { color: C.ink, backgroundColor: C.gold, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, fontWeight: '700', overflow: 'hidden' },
-  history: { gap: 2, paddingVertical: 10 },
+  historyWrap: { flex: 1, minHeight: 56, paddingVertical: 6 },
+  historyScroll: { flex: 1 },
+  history: { gap: 2, paddingVertical: 4 },
   historyEntry: { paddingVertical: 7, gap: 2, minWidth: 0 },
   definition: { gap: 3, minWidth: 0, alignSelf: 'stretch' },
   currentDefinition: { backgroundColor: C.mist, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },

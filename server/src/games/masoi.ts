@@ -52,8 +52,18 @@ export class MaSoiGame implements GameEngine {
   private roleCounts: Partial<Record<MaSoiRole, number>> = {};
   private finished = false;
   private readonly timer = new Timer();
+  private readonly botReadyTimer = new Timer();
 
   constructor(private readonly ctx: EngineContext) {}
+
+  canRoomChat(playerId: string): boolean {
+    if (this.finished) return true;
+    if (!this.alive.has(playerId)) return false;
+    if (this.phase === 'night_cupid' || this.phase === 'night_active' || this.phase === 'night_witch') {
+      return false;
+    }
+    return true;
+  }
 
   private speed(): MaSoiSpeed {
     const s = this.ctx.settings.masoiSpeed;
@@ -67,12 +77,13 @@ export class MaSoiGame implements GameEngine {
   }
 
   private addLog(kind: MaSoiLogItem['kind'], text: string): void {
-    this.publicLog.push({ id: ++this.logSeq, day: this.day, kind, text });
+    this.publicLog.push({ id: ++this.logSeq, day: this.day, kind, text, at: Date.now() });
     if (this.publicLog.length > 60) this.publicLog.shift();
   }
 
   start(players: EnginePlayer[]): void {
     this.order = players.map((p) => p.id);
+    this.readySkip.clear();
     for (const p of players) {
       this.names.set(p.id, p.name);
       this.alive.add(p.id);
@@ -94,6 +105,7 @@ export class MaSoiGame implements GameEngine {
 
   private enterPhase(phase: MaSoiPhase, onTimeout: () => void): void {
     if (this.finished) return;
+    this.botReadyTimer.clear();
     this.phase = phase;
     const ms = this.msFor(phase);
     this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
@@ -112,6 +124,7 @@ export class MaSoiGame implements GameEngine {
 
   private startNight(): void {
     if (this.finished) return;
+    this.readySkip.clear();
     this.guardTarget = null;
     this.wolfVotes.clear();
     this.seerDoneNight = false;
@@ -156,7 +169,11 @@ export class MaSoiGame implements GameEngine {
   private checkActiveNightReady(): void {
     if (this.phase !== 'night_active') return;
     const wolves = this.aliveWithRole('soi').filter((id) => this.isConnectedAlive(id));
-    const wolvesReady = wolves.length === 0 || wolves.every((id) => this.wolfVotes.has(id));
+    const wolfTargets = wolves
+      .map((id) => this.wolfVotes.get(id))
+      .filter((t): t is string => !!t && this.alive.has(t));
+    // Khi có >= 2 Sói cùng thức: chỉ qua đêm sớm khi cả bầy đã vote VÀ đồng thuận cùng 1 mục tiêu!
+    const wolvesReady = wolves.length === 0 || (wolfTargets.length === wolves.length && new Set(wolfTargets).size === 1);
     const seer = this.aliveWithRole('tientri').filter((id) => this.isConnectedAlive(id));
     const seerReady = seer.length === 0 || this.seerDoneNight;
     const guard = this.aliveWithRole('baove').filter((id) => this.isConnectedAlive(id));
@@ -214,6 +231,7 @@ export class MaSoiGame implements GameEngine {
 
   private resolveDawn(): void {
     if (this.finished) return;
+    this.wolfVotes.clear();
     this.guardLastId = this.guardTarget;
     const deaths: { id: string; reason: string }[] = [];
     if (this.nightWolfVictim && !this.witchSaved && this.alive.has(this.nightWolfVictim)) {
@@ -264,7 +282,74 @@ export class MaSoiGame implements GameEngine {
     this.readySkip.clear();
     this.dayVotes.clear();
     this.enterPhase('day_discuss', () => this.startDayVote());
+    const botDelayMs = Math.min(10_000, Math.max(400, Math.floor(this.msFor('day_discuss') * 0.35)));
+    this.botReadyTimer.set(botDelayMs, () => {
+      if (!this.finished && this.phase === 'day_discuss') this.ctx.changed();
+    });
     this.ctx.changed();
+  }
+
+  private checkPhaseAdvance(): void {
+    if (this.finished) return;
+    if (this.phase === 'role_reveal') {
+      const aliveConn = [...this.alive].filter((id) => this.isConnectedAlive(id));
+      if (aliveConn.length > 0 && aliveConn.every((id) => this.readySkip.has(id))) {
+        this.timer.clear();
+        this.startNight();
+      }
+      return;
+    }
+    if (this.phase === 'night_cupid') {
+      const cupids = this.aliveWithRole('cupid').filter((id) => this.isConnectedAlive(id));
+      if (this.cupidDone || cupids.length === 0) {
+        this.timer.clear();
+        this.finishCupidAuto();
+      }
+      return;
+    }
+    if (this.phase === 'night_active') {
+      this.checkActiveNightReady();
+      return;
+    }
+    if (this.phase === 'night_witch') {
+      const witches = this.aliveWithRole('phuthuy').filter((id) => this.isConnectedAlive(id));
+      if (this.witchDoneNight || witches.length === 0) {
+        this.timer.clear();
+        this.resolveDawn();
+      }
+      return;
+    }
+    if (this.phase === 'hunter_shot') {
+      const hid = this.hunterQueue[0];
+      if (!hid || !(this.ctx.isBot?.(hid) || this.ctx.isConnected(hid))) {
+        this.timer.clear();
+        if (hid) {
+          this.hunterFired.add(hid);
+          this.hunterQueue.shift();
+        }
+        if (!this.triggerHunterOrCheckWin()) {
+          if (this.pendingAfterHunter === 'day') this.startDayDiscuss();
+          else { this.day++; this.startNight(); }
+        }
+      }
+      return;
+    }
+    if (this.phase === 'day_discuss') {
+      const aliveConn = [...this.alive].filter((id) => this.isConnectedAlive(id));
+      const readyCount = aliveConn.filter((id) => this.readySkip.has(id)).length;
+      if (aliveConn.length > 0 && readyCount >= Math.max(1, Math.ceil(aliveConn.length / 2))) {
+        this.timer.clear();
+        this.startDayVote();
+      }
+      return;
+    }
+    if (this.phase === 'day_vote') {
+      const aliveConn = [...this.alive].filter((id) => this.isConnectedAlive(id));
+      if (aliveConn.length > 0 && aliveConn.every((id) => this.dayVotes.has(id))) {
+        this.timer.clear();
+        this.resolveDayVote();
+      }
+    }
   }
 
   private startDayVote(): void {
@@ -351,6 +436,7 @@ export class MaSoiGame implements GameEngine {
     if (this.finished) return;
     this.finished = true;
     this.timer.clear();
+    this.botReadyTimer.clear();
     const winSet = new Set(winnerIds);
     const sorted = [...this.order].sort((a, b) => {
       const wa = winSet.has(a) ? 1 : 0;
@@ -434,7 +520,9 @@ export class MaSoiGame implements GameEngine {
 
       if (this.phase === 'night_active') {
         if (role === 'soi') {
-          if (!action.target || !this.alive.has(action.target)) return { ok: false, reason: 'bad_action' };
+          if (!action.target || !this.alive.has(action.target) || this.roles.get(action.target) === 'soi') {
+            return { ok: false, reason: 'bad_action' };
+          }
           this.wolfVotes.set(playerId, action.target);
           this.ctx.changed();
           this.checkActiveNightReady();
@@ -482,7 +570,9 @@ export class MaSoiGame implements GameEngine {
           this.witchSaved = true;
         }
         if (action.poison) {
-          if (!this.poisonLeft || !this.alive.has(action.poison)) return { ok: false, reason: 'bad_action' };
+          if (!this.poisonLeft || !this.alive.has(action.poison) || action.poison === playerId) {
+            return { ok: false, reason: 'bad_action' };
+          }
           this.poisonLeft = false;
           this.witchPoisonTarget = action.poison;
         }
@@ -495,8 +585,18 @@ export class MaSoiGame implements GameEngine {
     }
 
     if (action.type === 'ms_ready') {
-      if (this.phase !== 'day_discuss') return { ok: false, reason: 'bad_action' };
+      if (this.phase !== 'day_discuss' && this.phase !== 'role_reveal') return { ok: false, reason: 'bad_action' };
       this.readySkip.add(playerId);
+      if (this.phase === 'role_reveal') {
+        const aliveConn = [...this.alive].filter((id) => this.isConnectedAlive(id));
+        if (aliveConn.length > 0 && aliveConn.every((id) => this.readySkip.has(id))) {
+          this.timer.clear();
+          this.startNight();
+        } else {
+          this.ctx.changed();
+        }
+        return { ok: true };
+      }
       const aliveConn = [...this.alive].filter((id) => this.isConnectedAlive(id)).length;
       if (this.readySkip.size >= Math.max(1, Math.ceil(aliveConn / 2))) {
         this.timer.clear();
@@ -530,14 +630,20 @@ export class MaSoiGame implements GameEngine {
     if (this.finished || !this.alive.has(playerId)) return;
     const role = this.roles.get(playerId)!;
     this.addLog('system', `🚪 ${this.names.get(playerId)} rời làng (${MASOI_ROLES[role].emoji} ${MASOI_ROLES[role].name}).`);
+    // Người tự rời không thể nổ súng nữa, nhưng nếu người thương còn ở lại là Thợ Săn thì vẫn kích hoạt trả thù!
+    this.hunterFired.add(playerId);
+    this.pendingAfterHunter = this.phase === 'day_discuss' || this.phase === 'day_vote' ? 'night' : 'day';
     this.killPlayer(playerId, 'rời khỏi làng');
-    if (this.checkWin()) return;
-    if (this.phase === 'night_active') this.checkActiveNightReady();
-    else this.ctx.changed();
+    if (this.triggerHunterOrCheckWin()) return;
+    this.checkPhaseAdvance();
+    this.ctx.changed();
   }
 
   onPlayerConnection(_playerId: string, connected: boolean): void {
-    if (this.finished || !connected) return;
+    if (this.finished) return;
+    if (!connected) {
+      this.checkPhaseAdvance();
+    }
     this.ctx.changed();
   }
 
@@ -559,15 +665,21 @@ export class MaSoiGame implements GameEngine {
 
     if (this.phase === 'night_cupid' && role === 'cupid' && !this.cupidDone) {
       const list = [...this.alive];
-      const a = list[0];
-      const b = list[1];
+      if (list.length < 2) return null;
+      const idxA = Math.floor(this.ctx.rng() * list.length) % list.length;
+      const a = list[idxA];
+      const rest = list.filter((x) => x !== a);
+      const b = rest[Math.floor(this.ctx.rng() * rest.length) % rest.length];
       return a && b ? { type: 'ms_night', target: a, target2: b } : null;
     }
 
     if (this.phase === 'night_active') {
+      const myPartner = this.lovers.has(playerId) ? ([...this.lovers].find((x) => x !== playerId) ?? null) : null;
       if (role === 'soi' && !this.wolfVotes.has(playerId)) {
-        const prey = [...this.alive].filter((id) => this.roles.get(id) !== 'soi');
-        const pick = prey[Math.floor(this.ctx.rng() * prey.length) % prey.length];
+        const preyAll = [...this.alive].filter((id) => this.roles.get(id) !== 'soi');
+        const preySafe = myPartner ? preyAll.filter((id) => id !== myPartner) : preyAll;
+        const pool = preySafe.length > 0 ? preySafe : preyAll;
+        const pick = pool[Math.floor(this.ctx.rng() * pool.length) % pool.length];
         return pick ? { type: 'ms_night', target: pick } : null;
       }
       if (role === 'tientri' && !this.seerDoneNight) {
@@ -584,8 +696,19 @@ export class MaSoiGame implements GameEngine {
         return pick ? { type: 'ms_night', target: pick } : null;
       }
       if (role === 'thamtu' && !this.detectiveDoneNight && this.alive.size >= 2) {
-        const list = [...this.alive];
-        return { type: 'ms_night', target: list[0], target2: list[1] };
+        const candidates = [...this.alive].filter((id) => id !== playerId);
+        const pool = candidates.length >= 2 ? candidates : [...this.alive];
+        const pairs: [string, string][] = [];
+        for (let i = 0; i < pool.length; i++) {
+          for (let j = i + 1; j < pool.length; j++) {
+            pairs.push([pool[i], pool[j]]);
+          }
+        }
+        const checkedKeys = new Set(this.detectiveHistory.map((h) => [h.a, h.b].sort().join('|')));
+        const fresh = pairs.filter(([a, b]) => !checkedKeys.has([a, b].sort().join('|')));
+        const choices = fresh.length > 0 ? fresh : pairs;
+        const pick = choices[Math.floor(this.ctx.rng() * choices.length) % choices.length];
+        return pick ? { type: 'ms_night', target: pick[0], target2: pick[1] } : null;
       }
       return null;
     }
@@ -602,22 +725,27 @@ export class MaSoiGame implements GameEngine {
 
     if (this.phase === 'day_discuss' && !this.readySkip.has(playerId)) {
       const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
-      if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= 12_000) {
+      const anyHumanReady = aliveHumans.some((id) => this.readySkip.has(id));
+      const readyThreshold = Math.min(10_000, Math.max(400, Math.floor(this.msFor('day_discuss') * 0.35)));
+      if (aliveHumans.length === 0 || anyHumanReady || Date.now() - this.phaseStartedAt >= readyThreshold) {
         return { type: 'ms_ready' };
       }
       return null;
     }
 
     if (this.phase === 'day_vote' && !this.dayVotes.has(playerId)) {
+      const myPartner = this.lovers.has(playerId) ? ([...this.lovers].find((x) => x !== playerId) ?? null) : null;
       if (role === 'tientri') {
-        const knownWolf = this.seerHistory.find((h) => h.isWolf && this.alive.has(h.targetId));
+        const knownWolf = this.seerHistory.find((h) => h.isWolf && this.alive.has(h.targetId) && h.targetId !== myPartner);
         if (knownWolf) return { type: 'ms_vote', target: knownWolf.targetId };
       }
-      const pool = [...this.alive].filter((id) => {
+      const allValid = [...this.alive].filter((id) => {
         if (id === playerId) return false;
         if (role === 'soi' && this.roles.get(id) === 'soi') return false;
         return true;
       });
+      const nonLover = myPartner ? allValid.filter((id) => id !== myPartner) : allValid;
+      const pool = nonLover.length > 0 ? nonLover : allValid;
       if (pool.length === 0) return { type: 'ms_vote', target: 'skip' };
       const pick = pool[Math.floor(this.ctx.rng() * pool.length) % pool.length];
       return { type: 'ms_vote', target: pick };
@@ -664,7 +792,7 @@ export class MaSoiGame implements GameEngine {
       ...(isLover ? { myPartnerId: partner } : {}),
       ...(isWolf ? {
         wolfPackIds: this.order.filter((id) => this.roles.get(id) === 'soi'),
-        wolfVotes: Object.fromEntries(this.wolfVotes),
+        ...(this.phase === 'night_active' ? { wolfVotes: Object.fromEntries(this.wolfVotes) } : {}),
         wolfChat: [...this.wolfChat],
       } : {}),
       ...(myRole === 'tientri' ? { seerHistory: [...this.seerHistory] } : {}),
@@ -683,5 +811,6 @@ export class MaSoiGame implements GameEngine {
 
   dispose(): void {
     this.timer.clear();
+    this.botReadyTimer.clear();
   }
 }

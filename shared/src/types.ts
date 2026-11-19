@@ -77,10 +77,10 @@ export interface RoomSettings {
   giandiepMrWhite?: boolean;
   /** Ai là gián điệp: số lượng Gián Điệp */
   giandiepSpies?: 1 | 2 | 3;
-  /** Vẽ & Đoán: số vòng vẽ mỗi người */
+  /** Vẽ & Đoán: số vòng vẽ mỗi người (mặc định 4 vòng = 8 lượt với 2 người) */
   veDoanRounds?: number;
   /** Đố vui: số lượng câu hỏi */
-  doVuiQuestions?: 5 | 10 | 15;
+  doVuiQuestions?: 5 | 10 | 15 | 20;
   /** Đố vui: chủ đề CNTT / Tiếng Anh */
   doVuiTopic?: 'all' | 'oop' | 'dsa' | 'js_ts' | 'node_backend' | 'mobile_fe' | 'fullstack_it' | 'english_adv';
   /** Đố vui: độ khó (Intern 16s / Fresher 22s / Junior 30s / Tăng dần) */
@@ -583,7 +583,7 @@ export type GameAction =
   | BoomAction
   | UnoMercyAction
   | { type: 'loto_mark'; num: number }
-  | { type: 'loto_kinh'; row: 0 | 1 | 2 }
+  | { type: 'loto_kinh'; row: number }
   | { type: 'caro_move'; row: number; col: number }
   | { type: 'caro_finish_reveal' }
   | { type: 'cs_input'; input: CroakInput }

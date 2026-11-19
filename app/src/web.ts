@@ -78,10 +78,18 @@ type VirtualKeyboardLike = EventTarget & { overlaysContent: boolean; boundingRec
  * iOS Safari dùng VisualViewport. Chỉ những thành phần cần thấy ô nhập mới tự nâng mình lên.
  */
 export function subscribeKeyboard(cb: (inset: number) => void): () => void {
+  let lastInset = -1;
+  const emit = (raw: number) => {
+    const next = raw > 0 ? Math.round(raw) : 0;
+    if (next !== lastInset) {
+      lastInset = next;
+      cb(next);
+    }
+  };
   if (!isWeb) {
-    const read = () => cb(Keyboard.metrics()?.height ?? 0);
+    const read = () => emit(Keyboard.metrics()?.height ?? 0);
     const show = Keyboard.addListener('keyboardDidShow', read);
-    const hide = Keyboard.addListener('keyboardDidHide', () => cb(0));
+    const hide = Keyboard.addListener('keyboardDidHide', () => emit(0));
     read();
     return () => { show.remove(); hide.remove(); };
   }
@@ -91,17 +99,27 @@ export function subscribeKeyboard(cb: (inset: number) => void): () => void {
   const read = () => {
     let inset = vk?.boundingRect ? vk.boundingRect.height : 0;
     if (vv && vv.scale <= 1.01) inset = Math.max(inset, window.innerHeight - vv.height - vv.offsetTop);
-    cb(inset > 80 ? Math.round(inset) : 0);
+    emit(inset > 80 ? inset : 0);
   };
-  const raf = requestAnimationFrame(read);
-  vk?.addEventListener('geometrychange', read);
-  vv?.addEventListener('resize', read);
-  vv?.addEventListener('scroll', read);
+  let rafId = requestAnimationFrame(() => {
+    rafId = 0;
+    read();
+  });
+  const schedule = () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      read();
+    });
+  };
+  vk?.addEventListener('geometrychange', schedule);
+  vv?.addEventListener('resize', schedule);
+  vv?.addEventListener('scroll', schedule);
   return () => {
-    cancelAnimationFrame(raf);
-    vk?.removeEventListener('geometrychange', read);
-    vv?.removeEventListener('resize', read);
-    vv?.removeEventListener('scroll', read);
+    if (rafId) cancelAnimationFrame(rafId);
+    vk?.removeEventListener('geometrychange', schedule);
+    vv?.removeEventListener('resize', schedule);
+    vv?.removeEventListener('scroll', schedule);
   };
 }
 

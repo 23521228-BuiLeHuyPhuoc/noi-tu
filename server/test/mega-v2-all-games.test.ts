@@ -598,9 +598,9 @@ describe('Game 8 — Bom Chữ Sinh Tử (120 cases)', () => {
 // ============================================================================
 // 9. ĐẤU TRƯỜNG ĐỐ VUI INTERN / FRESHER / JUNIOR & ĐỘ KHÓ THÍCH ỨNG (320 CASES!)
 // ============================================================================
-describe('Game 9 — Đấu Trường Đố Vui Intern/Fresher/Junior & Độ Khó Thích Ứng (320 cases)', () => {
-  it('chủ đề OOP hoàn toàn đa ngôn ngữ (0 câu trói buộc Java/JVM/Spring) & mỗi chuyên đề chia đều 12 easy + 12 medium + 12 hard', () => {
-    expect(DO_VUI_QUESTIONS).toHaveLength(252);
+describe('Game 9 — Đấu Trường Đố Vui Intern/Fresher/Junior & Độ Khó Thích Ứng (546+ câu)', () => {
+  it('chủ đề OOP hoàn toàn đa ngôn ngữ (0 câu trói buộc Java/JVM/Spring) & mỗi chuyên đề chia đều 26 easy + 26 medium + 26 hard', () => {
+    expect(DO_VUI_QUESTIONS).toHaveLength(546);
     expect(secondsForDoVuiLevel('easy')).toBe(16);
     expect(secondsForDoVuiLevel('medium')).toBe(22);
     expect(secondsForDoVuiLevel('hard')).toBe(30);
@@ -608,10 +608,10 @@ describe('Game 9 — Đấu Trường Đố Vui Intern/Fresher/Junior & Độ Kh
 
     for (const tp of DO_VUI_TOPICS.filter((t) => t.id !== 'all')) {
       const qs = DO_VUI_QUESTIONS.filter((q) => q.topic === tp.id);
-      expect(qs).toHaveLength(36);
-      expect(qs.filter((q) => q.difficulty === 'easy')).toHaveLength(12);
-      expect(qs.filter((q) => q.difficulty === 'medium')).toHaveLength(12);
-      expect(qs.filter((q) => q.difficulty === 'hard')).toHaveLength(12);
+      expect(qs).toHaveLength(78);
+      expect(qs.filter((q) => q.difficulty === 'easy')).toHaveLength(26);
+      expect(qs.filter((q) => q.difficulty === 'medium')).toHaveLength(26);
+      expect(qs.filter((q) => q.difficulty === 'hard')).toHaveLength(26);
     }
 
     const oopJavaBound = DO_VUI_QUESTIONS.filter(
@@ -635,7 +635,7 @@ describe('Game 9 — Đấu Trường Đố Vui Intern/Fresher/Junior & Độ Kh
     }
   });
 
-  // Kiểm tra TỪNG CÂU HỎI MỘT trong 252 câu hỏi thực chiến!
+  // Kiểm tra TỪNG CÂU HỎI MỘT trong 546 câu hỏi thực chiến!
   it.each(DO_VUI_QUESTIONS.map((q, idx) => ({ idx: idx + 1, q })))(
     'Câu hỏi Đố Vui #$idx [$q.topic / $q.difficulty]: đủ 4 đáp án phân biệt, súc tích cho mobile & có giải thích rõ ràng',
     ({ q }) => {
@@ -775,26 +775,31 @@ describe('Game 13 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)
     }
   });
 
-  // Kiểm toán 100 tờ vé Lô Tô sinh ngẫu nhiên theo đúng chuẩn Gale-Ryser 3×9!
+  // Kiểm toán 100 tờ vé Lô Tô sinh ngẫu nhiên theo đúng chuẩn 6×9 (30 số, 2 khung 3×9 Gale-Ryser)!
   it.each(Array.from({ length: 100 }, (_, i) => 12000 + i))(
-    'Tờ vé Lô Tô seed=%i đạt chuẩn 100%: 3 hàng × 9 cột, mỗi hàng đúng 5 số, cột đúng đầu số & tăng dần',
+    'Tờ vé Lô Tô seed=%i đạt chuẩn 100%: 6 hàng × 9 cột (30 số), mỗi hàng đúng 5 số, 2 block hợp lệ, cột tăng dần',
     (seed) => {
       const grid = generateLotoTicket(seededRng(seed));
-      expect(grid).toHaveLength(3);
+      expect(grid).toHaveLength(6);
       let totalNums = 0;
       const seen = new Set<number>();
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < 6; r++) {
         expect(grid[r]).toHaveLength(9);
         const rowNums = grid[r].filter((x): x is number => x !== null);
         expect(rowNums).toHaveLength(5);
         totalNums += rowNums.length;
       }
-      expect(totalNums).toBe(15);
+      expect(totalNums).toBe(30);
 
       for (let c = 0; c < 9; c++) {
-        const colVals = [grid[0][c], grid[1][c], grid[2][c]].filter((x): x is number => x !== null);
-        expect(colVals.length).toBeGreaterThanOrEqual(1);
-        expect(colVals.length).toBeLessThanOrEqual(3);
+        const blockA = [grid[0][c], grid[1][c], grid[2][c]].filter((x): x is number => x !== null);
+        const blockB = [grid[3][c], grid[4][c], grid[5][c]].filter((x): x is number => x !== null);
+        expect(blockA.length).toBeGreaterThanOrEqual(1);
+        expect(blockA.length).toBeLessThanOrEqual(3);
+        expect(blockB.length).toBeGreaterThanOrEqual(1);
+        expect(blockB.length).toBeLessThanOrEqual(3);
+
+        const colVals = [...blockA, ...blockB];
         const lo = c === 0 ? 1 : c * 10;
         const hi = c === 8 ? 90 : c * 10 + 9;
         for (let k = 0; k < colVals.length; k++) {
@@ -840,7 +845,7 @@ describe('Game 13 — Lô Tô Hội Chợ 90 Số & Vé 3×9 Chuẩn (160 cases)
           }
           const calledSet = new Set(g.view().called);
           const markedSet = autoMark ? undefined : new Set(g.view().marked[p.id] ?? []);
-          for (const row of [0, 1, 2] as const) {
+          for (let row = 0; row < grid.length; row++) {
             if (checkLotoRow(grid, row, calledSet, markedSet).validKinh) {
               g.action(p.id, { type: 'loto_kinh', row });
             }
