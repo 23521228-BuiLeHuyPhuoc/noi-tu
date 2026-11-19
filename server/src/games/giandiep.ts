@@ -16,10 +16,11 @@ import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from '.
 const DEFAULT_SEC: Record<GianDiepPhase, number> = {
   word_reveal: 10,
   clue_turn: 40,
-  discussion: 45,
+  clue_summary: 10,
+  discussion: 50,
   vote: 35,
   defense: 28,
-  final_vote: 22,
+  final_vote: 25,
   mrwhite_guess: 25,
   spy_guess: 25,
   reveal_end: 12,
@@ -91,8 +92,28 @@ export class GianDiepGame implements GameEngine {
 
   private finished = false;
   private readonly timer = new Timer();
+  private readonly botReadyTimer = new Timer();
 
   constructor(private readonly ctx: EngineContext) {}
+
+  private clearTimers(): void {
+    this.timer.clear();
+    this.botReadyTimer.clear();
+  }
+
+  private aliveConnected(): string[] {
+    return [...this.alive].filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
+  }
+
+  private isChatAllowedPhase(): boolean {
+    return this.phase === 'discussion' || this.phase === 'vote' || this.phase === 'final_vote';
+  }
+
+  canRoomChat(playerId: string): boolean {
+    if (this.finished || this.phase === 'reveal_end') return true;
+    if (!this.alive.has(playerId)) return false;
+    return this.isChatAllowedPhase();
+  }
 
   private msFor(p: GianDiepPhase): number {
     const def = DEFAULT_SEC[p] * 1000;
@@ -111,6 +132,7 @@ export class GianDiepGame implements GameEngine {
       round: this.round,
       kind: 'system',
       text,
+      at: Date.now(),
     });
     if (this.timeline.length > 160) this.timeline.shift();
   }
@@ -156,11 +178,15 @@ export class GianDiepGame implements GameEngine {
       `🕵️ Ván bắt đầu! Chủ đề: «${this.pair.category}» (${danCount} Dân · ${spyCount} Gián Điệp${whiteCount ? ' · 1 Mr. White' : ''}) — Loại hết Gián Điệp để thắng!`,
     );
     this.enterPhase('word_reveal', () => this.startRound());
+    this.botReadyTimer.set(Math.min(2000, Math.floor(this.msFor('word_reveal') / 2)), () => {
+      if (!this.finished && this.phase === 'word_reveal') this.ctx.changed();
+    });
     this.ctx.changed();
   }
 
   private enterPhase(phase: GianDiepPhase, onTimeout: () => void): void {
     if (this.finished) return;
+    this.clearTimers();
     this.phase = phase;
     const ms = this.msFor(phase);
     this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
@@ -185,7 +211,7 @@ export class GianDiepGame implements GameEngine {
     this.defendedIds.clear();
     this.finalVotes.clear();
     this.botChattedRound.clear();
-    this.pushSystem(`🔔 Vòng ${this.round} — Lần lượt từng người mô tả 1 câu về từ khóa.`);
+    this.pushSystem(`🔔 Vòng ${this.round} — Lần lượt từng người khai 1 câu mô tả (tạm khóa chat tới khi khai xong).`);
     this.beginSpeakerTurn();
   }
 
@@ -195,19 +221,21 @@ export class GianDiepGame implements GameEngine {
       this.speakerIdx++;
     }
     if (this.speakerIdx >= this.speakerOrder.length) {
-      this.startDiscussion();
+      this.startClueSummary();
       return;
     }
     const speakerId = this.speakerOrder[this.speakerIdx];
     this.enterPhase('clue_turn', () => {
       const name = this.names.get(speakerId) ?? speakerId;
       const silentText = '🤐 (Im lặng hết giờ)';
+      const now = Date.now();
       this.clues.push({
         id: ++this.clueSeq,
         round: this.round,
         playerId: speakerId,
         name,
         text: silentText,
+        at: now,
       });
       this.timeline.push({
         id: ++this.feedSeq,
@@ -216,9 +244,21 @@ export class GianDiepGame implements GameEngine {
         playerId: speakerId,
         name,
         text: silentText,
+        at: now,
       });
       this.speakerIdx++;
       this.beginSpeakerTurn();
+    });
+    this.ctx.changed();
+  }
+
+  private startClueSummary(): void {
+    if (this.finished) return;
+    this.readySkip.clear();
+    this.pushSystem(`📋 Tổng hợp lời khai Vòng ${this.round} — Đối chiếu toàn bộ gợi ý trước khi thảo luận!`);
+    this.enterPhase('clue_summary', () => this.startDiscussion());
+    this.botReadyTimer.set(Math.min(2500, Math.floor(this.msFor('clue_summary') / 2)), () => {
+      if (!this.finished && this.phase === 'clue_summary') this.ctx.changed();
     });
     this.ctx.changed();
   }
@@ -228,13 +268,16 @@ export class GianDiepGame implements GameEngine {
     this.readySkip.clear();
     this.pushSystem(`💬 Thảo luận Vòng ${this.round} — Đối chiếu lời khai ngay trong khung chat!`);
     this.enterPhase('discussion', () => this.startVote());
+    this.botReadyTimer.set(Math.min(7200, Math.floor(this.msFor('discussion') * 0.6)), () => {
+      if (!this.finished && this.phase === 'discussion') this.ctx.changed();
+    });
     this.ctx.changed();
   }
 
   private startVote(): void {
     if (this.finished) return;
     this.votes.clear();
-    this.pushSystem(`🗳️ Bỏ phiếu Vòng ${this.round} — Chạm vào nghi phạm phía trên để bầu.`);
+    this.pushSystem(`🗳️ Bỏ phiếu Vòng ${this.round} — Bảng chọn nghi phạm đã mở! Hãy chọn người đáng ngờ nhất.`);
     this.enterPhase('vote', () => this.resolveVote());
     this.ctx.changed();
   }
@@ -275,6 +318,9 @@ export class GianDiepGame implements GameEngine {
     const names = top.map((id) => this.seatTag(id)).join(', ');
     this.pushSystem(`⚖️ ${names} bị nghi ngờ cao nhất (${max} phiếu) — bước vào Pha Biện Minh!`);
     this.enterPhase('defense', () => this.startFinalVote());
+    this.botReadyTimer.set(Math.min(4700, Math.floor(this.msFor('defense') * 0.5)), () => {
+      if (!this.finished && this.phase === 'defense') this.ctx.changed();
+    });
     this.ctx.changed();
   }
 
@@ -458,7 +504,7 @@ export class GianDiepGame implements GameEngine {
   private finalizeGame(): void {
     if (this.finished || !this.pendingResult) return;
     this.finished = true;
-    this.timer.clear();
+    this.clearTimers();
     const { winnerIds, headline } = this.pendingResult;
     const winSet = new Set(winnerIds);
     const sorted = [...this.order].sort((a, b) => (winSet.has(b) ? 1 : 0) - (winSet.has(a) ? 1 : 0));
@@ -486,7 +532,75 @@ export class GianDiepGame implements GameEngine {
     const cleanSecret = normPhrase(secret);
     if (!cleanSecret) return false;
     if (cleanText.includes(cleanSecret)) return true;
-    return stripAccents(cleanText).includes(stripAccents(cleanSecret));
+    const strippedText = stripAccents(cleanText);
+    const strippedSecret = stripAccents(cleanSecret);
+    if (strippedText.includes(strippedSecret)) return true;
+    if (cleanSecret.includes(' ')) {
+      const noSpaceSecret = strippedSecret.replace(/\s+/g, '');
+      if (noSpaceSecret.length >= 3 && strippedText.replace(/\s+/g, '').includes(noSpaceSecret)) return true;
+    }
+    return false;
+  }
+
+  private checkPhaseAdvance(): boolean {
+    if (this.finished) return true;
+    if (this.phase === 'word_reveal') {
+      const conn = this.aliveConnected();
+      if (conn.length > 0 && conn.every((id) => this.readySkip.has(id))) {
+        this.clearTimers();
+        this.startRound();
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'clue_summary') {
+      const conn = this.aliveConnected();
+      if (this.readySkip.size >= Math.max(1, Math.ceil(conn.length / 2))) {
+        this.clearTimers();
+        this.startDiscussion();
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'discussion') {
+      const conn = this.aliveConnected();
+      if (this.readySkip.size >= Math.max(1, Math.ceil(conn.length / 2))) {
+        this.clearTimers();
+        this.startVote();
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'vote') {
+      const conn = this.aliveConnected();
+      if (conn.length > 0 && conn.every((id) => this.votes.has(id))) {
+        this.clearTimers();
+        this.resolveVote();
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'defense') {
+      const activeDefs = this.defendants.filter(
+        (id) => this.alive.has(id) && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)),
+      );
+      if (activeDefs.length === 0 || activeDefs.every((id) => this.readySkip.has(id))) {
+        this.clearTimers();
+        this.startFinalVote();
+        return true;
+      }
+      return false;
+    }
+    if (this.phase === 'final_vote') {
+      const connVoters = this.eligibleVerdictVoters().filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
+      if (connVoters.length > 0 && connVoters.every((id) => this.finalVotes.has(id))) {
+        this.clearTimers();
+        this.resolveFinalVote();
+        return true;
+      }
+      return false;
+    }
+    return false;
   }
 
   action(playerId: string, action: GameAction): ActionResult {
@@ -516,7 +630,7 @@ export class GianDiepGame implements GameEngine {
       const guess = action.word.normalize('NFC').replace(/\s+/g, ' ').trim();
       if (!guess) return { ok: false, reason: 'bad_action' };
       this.mrWhiteGuessed = true;
-      this.timer.clear();
+      this.clearTimers();
       const matched =
         normPhrase(guess) === normPhrase(this.danWord) ||
         stripAccents(normPhrase(guess)) === stripAccents(normPhrase(this.danWord));
@@ -539,8 +653,9 @@ export class GianDiepGame implements GameEngine {
 
     if (!this.alive.has(playerId)) return { ok: false, reason: 'bad_action' };
 
-    // Chat thảo luận trực tiếp trong luồng suy luận (chặn lộ từ khóa của chính mình)
+    // Chỉ cho chat trong pha Thảo luận / Vote / Phán quyết; khóa hoàn toàn khi Đang nhận từ hoặc Khai gợi ý
     if (action.type === 'gd_chat') {
+      if (!this.isChatAllowedPhase()) return { ok: false, reason: 'not_your_turn' };
       const text = action.text.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 120);
       if (!text) return { ok: false, reason: 'bad_action' };
       const myWord = this.words.get(playerId);
@@ -552,6 +667,7 @@ export class GianDiepGame implements GameEngine {
         playerId,
         name: this.names.get(playerId) ?? playerId,
         text,
+        at: Date.now(),
       });
       if (this.timeline.length > 160) this.timeline.shift();
       this.ctx.changed();
@@ -565,14 +681,16 @@ export class GianDiepGame implements GameEngine {
       if (!text) return { ok: false, reason: 'bad_action' };
       const myWord = this.words.get(playerId);
       if (this.containsSecretWord(text, myWord)) return { ok: false, reason: 'word_leaked' };
-      this.timer.clear();
+      this.clearTimers();
       const name = this.names.get(playerId) ?? playerId;
+      const now = Date.now();
       this.clues.push({
         id: ++this.clueSeq,
         round: this.round,
         playerId,
         name,
         text,
+        at: now,
       });
       this.timeline.push({
         id: ++this.feedSeq,
@@ -581,6 +699,7 @@ export class GianDiepGame implements GameEngine {
         playerId,
         name,
         text,
+        at: now,
       });
       this.speakerIdx++;
       this.beginSpeakerTurn();
@@ -603,39 +722,22 @@ export class GianDiepGame implements GameEngine {
         playerId,
         name: this.names.get(playerId) ?? playerId,
         text,
+        at: Date.now(),
       });
-      const activeDefs = this.defendants.filter((id) => this.alive.has(id) && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)));
-      if (activeDefs.every((id) => this.defendedIds.has(id) && this.readySkip.has(id))) {
-        this.timer.clear();
-        this.startFinalVote();
-      } else {
-        this.ctx.changed();
-      }
+      if (!this.checkPhaseAdvance()) this.ctx.changed();
       return { ok: true };
     }
 
     if (action.type === 'gd_ready') {
-      if (this.phase === 'discussion') {
+      if (this.phase === 'word_reveal' || this.phase === 'clue_summary' || this.phase === 'discussion') {
         this.readySkip.add(playerId);
-        const aliveConn = [...this.alive].filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id)).length;
-        if (this.readySkip.size >= Math.max(1, Math.ceil(aliveConn / 2))) {
-          this.timer.clear();
-          this.startVote();
-        } else {
-          this.ctx.changed();
-        }
+        if (!this.checkPhaseAdvance()) this.ctx.changed();
         return { ok: true };
       }
       if (this.phase === 'defense' && this.defendants.includes(playerId)) {
         this.readySkip.add(playerId);
         this.defendedIds.add(playerId);
-        const activeDefs = this.defendants.filter((id) => this.alive.has(id) && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)));
-        if (activeDefs.every((id) => this.readySkip.has(id))) {
-          this.timer.clear();
-          this.startFinalVote();
-        } else {
-          this.ctx.changed();
-        }
+        if (!this.checkPhaseAdvance()) this.ctx.changed();
         return { ok: true };
       }
       return { ok: false, reason: 'bad_action' };
@@ -647,13 +749,7 @@ export class GianDiepGame implements GameEngine {
         return { ok: false, reason: 'bad_action' };
       }
       this.votes.set(playerId, action.target);
-      const aliveConn = [...this.alive].filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
-      if (aliveConn.every((id) => this.votes.has(id))) {
-        this.timer.clear();
-        this.resolveVote();
-      } else {
-        this.ctx.changed();
-      }
+      if (!this.checkPhaseAdvance()) this.ctx.changed();
       return { ok: true };
     }
 
@@ -673,13 +769,7 @@ export class GianDiepGame implements GameEngine {
       }
 
       this.finalVotes.set(playerId, action.verdict);
-      const connVoters = voters.filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
-      if (connVoters.every((id) => this.finalVotes.has(id))) {
-        this.timer.clear();
-        this.resolveFinalVote();
-      } else {
-        this.ctx.changed();
-      }
+      if (!this.checkPhaseAdvance()) this.ctx.changed();
       return { ok: true };
     }
 
@@ -694,7 +784,7 @@ export class GianDiepGame implements GameEngine {
       return;
     }
     if ((this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') && this.mrWhiteId === playerId) {
-      this.timer.clear();
+      this.clearTimers();
       this.mrWhiteId = null;
       if (!this.checkWin()) {
         this.round++;
@@ -704,29 +794,39 @@ export class GianDiepGame implements GameEngine {
     }
     if (!this.alive.has(playerId)) return;
     this.alive.delete(playerId);
+    this.votes.delete(playerId);
+    this.finalVotes.delete(playerId);
+    this.readySkip.delete(playerId);
+    this.defendedIds.delete(playerId);
+    for (const [v, t] of [...this.votes]) if (t === playerId) this.votes.delete(v);
+    for (const [v, t] of [...this.finalVotes]) if (t === playerId) this.finalVotes.delete(v);
+
     const role = this.roles.get(playerId)!;
     this.eliminated.push({ id: playerId, role, round: this.round, word: this.words.get(playerId) ?? null });
     if (this.checkWin()) return;
     if (this.phase === 'clue_turn' && this.speakerOrder[this.speakerIdx] === playerId) {
-      this.timer.clear();
+      this.clearTimers();
       this.speakerIdx++;
       this.beginSpeakerTurn();
       return;
     }
-    if (this.phase === 'defense') {
+    if (this.phase === 'defense' || this.phase === 'final_vote') {
       this.defendants = this.defendants.filter((id) => id !== playerId);
       if (this.defendants.length === 0) {
-        this.timer.clear();
+        this.clearTimers();
         this.round++;
         this.startRound();
         return;
       }
     }
+    if (this.checkPhaseAdvance()) return;
     this.ctx.changed();
   }
 
   onPlayerConnection(_playerId: string, connected: boolean): void {
-    if (!this.finished && connected) this.ctx.changed();
+    if (this.finished) return;
+    if (!connected && this.checkPhaseAdvance()) return;
+    if (connected) this.ctx.changed();
   }
 
   renamePlayer(playerId: string, name: string): void {
@@ -743,17 +843,42 @@ export class GianDiepGame implements GameEngine {
     if (!this.alive.has(playerId)) return null;
     const role = this.roles.get(playerId);
 
+    if (this.phase === 'word_reveal') {
+      if (!this.readySkip.has(playerId)) {
+        const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
+        const waitMs = Math.min(1_800, Math.floor(this.msFor('word_reveal') * 0.45));
+        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
+          return { type: 'gd_ready' };
+        }
+      }
+      return null;
+    }
+
     if (this.phase === 'clue_turn' && this.speakerOrder[this.speakerIdx] === playerId) {
       const usedTexts = new Set(this.clues.map((c) => c.text));
-      const pool =
+      const myWord = this.words.get(playerId);
+      const rawPool =
         role === 'mrwhite'
           ? MR_WHITE_GENERIC_CLUES
-          : this.words.get(playerId) === this.pair.wordA
+          : myWord === this.pair.wordA
             ? this.pair.cluesA
             : this.pair.cluesB;
+      const safePool = rawPool.filter((t) => !this.containsSecretWord(t, myWord));
+      const pool = safePool.length ? safePool : ['Khá quen thuộc trong đời sống'];
       const fresh = pool.filter((t) => !usedTexts.has(t));
-      const pick = (fresh.length ? fresh : pool)[Math.floor(this.ctx.rng() * (fresh.length || pool.length))] ?? 'Khá quen thuộc';
+      const pick = (fresh.length ? fresh : pool)[Math.floor(this.ctx.rng() * (fresh.length || pool.length))] ?? 'Khá quen thuộc trong đời sống';
       return { type: 'gd_clue', text: pick };
+    }
+
+    if (this.phase === 'clue_summary') {
+      if (!this.readySkip.has(playerId)) {
+        const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
+        const waitMs = Math.min(2_400, Math.floor(this.msFor('clue_summary') * 0.45));
+        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
+          return { type: 'gd_ready' };
+        }
+      }
+      return null;
     }
 
     if (this.phase === 'discussion') {
@@ -764,7 +889,8 @@ export class GianDiepGame implements GameEngine {
       }
       if (!this.readySkip.has(playerId)) {
         const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
-        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= 7_000) {
+        const waitMs = Math.min(7_000, Math.floor(this.msFor('discussion') * 0.5));
+        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
           return { type: 'gd_ready' };
         }
       }
@@ -789,7 +915,8 @@ export class GianDiepGame implements GameEngine {
       }
       if (!this.readySkip.has(playerId)) {
         const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
-        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= 4_500) {
+        const waitMs = Math.min(4_500, Math.floor(this.msFor('defense') * 0.45));
+        if (aliveHumans.length === 0 || Date.now() - this.phaseStartedAt >= waitMs) {
           return { type: 'gd_ready' };
         }
       }
@@ -856,6 +983,6 @@ export class GianDiepGame implements GameEngine {
   }
 
   dispose(): void {
-    this.timer.clear();
+    this.clearTimers();
   }
 }

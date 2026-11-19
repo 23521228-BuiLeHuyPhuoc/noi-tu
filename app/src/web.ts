@@ -97,8 +97,14 @@ export function subscribeKeyboard(cb: (inset: number) => void): () => void {
   const vv = window.visualViewport;
   if (vk) vk.overlaysContent = true;
   const read = () => {
-    let inset = vk?.boundingRect ? vk.boundingRect.height : 0;
-    if (vv && vv.scale <= 1.01) inset = Math.max(inset, window.innerHeight - vv.height - vv.offsetTop);
+    const appH = document.body?.getBoundingClientRect().height || window.innerHeight;
+    const curVk = (navigator as unknown as { virtualKeyboard?: VirtualKeyboardLike }).virtualKeyboard ?? vk;
+    const curVv = window.visualViewport ?? vv;
+    const vkH = curVk?.boundingRect ? curVk.boundingRect.height : 0;
+    const vvBottom = curVv && curVv.scale <= 1.01 ? curVv.offsetTop + curVv.height : window.innerHeight;
+    const vkOverlap = vkH > 0 ? Math.max(0, appH - (vvBottom - vkH)) : 0;
+    const shrinkH = Math.max(appH - vvBottom, window.innerHeight - vvBottom);
+    const inset = Math.max(vkOverlap, shrinkH);
     emit(inset > 80 ? inset : 0);
   };
   let rafId = requestAnimationFrame(() => {
@@ -112,14 +118,37 @@ export function subscribeKeyboard(cb: (inset: number) => void): () => void {
       read();
     });
   };
+  let t1: ReturnType<typeof setTimeout> | null = null;
+  let t2: ReturnType<typeof setTimeout> | null = null;
+  const clearTimers = () => {
+    if (t1) { clearTimeout(t1); t1 = null; }
+    if (t2) { clearTimeout(t2); t2 = null; }
+  };
+  const onFocusChange = () => {
+    schedule();
+    clearTimers();
+    t1 = setTimeout(schedule, 160);
+    t2 = setTimeout(schedule, 360);
+  };
   vk?.addEventListener('geometrychange', schedule);
   vv?.addEventListener('resize', schedule);
   vv?.addEventListener('scroll', schedule);
+  window.addEventListener('resize', schedule);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('focusin', onFocusChange);
+    document.addEventListener('focusout', onFocusChange);
+  }
   return () => {
     if (rafId) cancelAnimationFrame(rafId);
+    clearTimers();
     vk?.removeEventListener('geometrychange', schedule);
     vv?.removeEventListener('resize', schedule);
     vv?.removeEventListener('scroll', schedule);
+    window.removeEventListener('resize', schedule);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('focusin', onFocusChange);
+      document.removeEventListener('focusout', onFocusChange);
+    }
   };
 }
 

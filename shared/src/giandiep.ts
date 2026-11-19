@@ -7,6 +7,7 @@ export type GianDiepRole = 'dan' | 'giandiep' | 'mrwhite';
 export type GianDiepPhase =
   | 'word_reveal'
   | 'clue_turn'
+  | 'clue_summary'
   | 'discussion'
   | 'vote'
   | 'defense'
@@ -29,6 +30,7 @@ export interface GianDiepClue {
   playerId: string;
   name: string;
   text: string;
+  at?: number;
 }
 
 export type GianDiepFeedKind = 'clue' | 'chat' | 'defense' | 'system';
@@ -40,6 +42,7 @@ export interface GianDiepFeedItem {
   playerId?: string;
   name?: string;
   text: string;
+  at?: number;
 }
 
 export interface GianDiepRevealPlayer {

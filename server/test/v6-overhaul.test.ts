@@ -221,6 +221,10 @@ describe('Phase 49 — Ma Sói V6: sửa triệt để 8 lỗi logic & chat phò
 });
 
 describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ thảo luận', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('thời gian mặc định clue_turn >= 40s, discussion >= 45s, vote >= 35s, mrwhite/spy_guess >= 25s', () => {
     vi.useFakeTimers();
     const { ctx } = makeCtx(seededRng(5001));
@@ -235,6 +239,105 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     const vClue = g.view('p0') as GianDiepView;
     expect(vClue.phase).toBe('clue_turn');
     expect(vClue.phaseSeconds).toBe(40);
+    g.dispose();
+  });
+
+  it('khóa tuyệt đối chat (gd_chat & Room.addChat) khi clue_turn/word_reveal/clue_summary/defense/người bị loại & hỗ trợ nhảy sớm + removePlayer không treo pha', () => {
+    vi.useFakeTimers();
+    const dict = new Dictionary(SMALL_WORDS);
+    const room = new Room('GDCHAT', dict, { rng: () => 0.9999 });
+    const h = room.addPlayer('Host');
+    expect(h.ok).toBe(true);
+    if (!h.ok) return;
+    const p1 = room.addPlayer('Ban1');
+    const p2 = room.addPlayer('Ban2');
+    const p3 = room.addPlayer('Ban3');
+    expect(p1.ok && p2.ok && p3.ok).toBe(true);
+    if (!p1.ok || !p2.ok || !p3.ok) return;
+
+    expect(room.configure(h.playerId, 'giandiep', { giandiepMrWhite: false, giandiepSpies: 1 })).toEqual({ ok: true });
+    expect(room.start(h.playerId)).toEqual({ ok: true });
+
+    const allIds = [h.playerId, p1.playerId, p2.playerId, p3.playerId];
+    // word_reveal: khóa Room.addChat & gd_chat; bấm gd_ready đủ người thì sang clue_turn ngay
+    expect(room.addChat(h.playerId, 'Alo')).toBeNull();
+    expect(room.action(h.playerId, { type: 'gd_chat', text: 'Alo' })).toEqual({ ok: false, reason: 'not_your_turn' });
+    for (const id of allIds) expect(room.action(id, { type: 'gd_ready' })).toEqual({ ok: true });
+
+    const vClue = room.toPublic(h.playerId).game as GianDiepView;
+    expect(vClue.phase).toBe('clue_turn');
+    // Trong clue_turn: cả speaker lẫn người khác đều không được chat tự do
+    for (const id of allIds) {
+      expect(room.addChat(id, 'Chat trong luc khai')).toBeNull();
+      expect(room.action(id, { type: 'gd_chat', text: 'Chat trong luc khai' })).toEqual({
+        ok: false,
+        reason: 'not_your_turn',
+      });
+    }
+
+    // Khai đủ 4 gợi ý -> clue_summary
+    for (let i = 0; i < 4; i++) {
+      const sp = (room.toPublic(h.playerId).game as GianDiepView).currentSpeakerId!;
+      expect(room.action(sp, { type: 'gd_clue', text: `Gợi ý vòng 1 số ${i + 1}` })).toEqual({ ok: true });
+    }
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('clue_summary');
+    expect(room.addChat(h.playerId, 'Khoan chat')).toBeNull();
+
+    // Đa số ready trong clue_summary -> sang discussion & mở khóa chat
+    expect(room.action(h.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    const vDisc = room.toPublic(h.playerId).game as GianDiepView;
+    expect(vDisc.phase).toBe('discussion');
+    expect(vDisc.timeline.some((item) => item.kind === 'clue')).toBe(true);
+    expect(room.addChat(h.playerId, 'Thảo luận nào!')).not.toBeNull();
+
+    // Chống lách lọc từ khóa viết dính không khoảng trắng / không dấu trong gd_chat
+    const danWord = (room.toPublic(p1.playerId).game as GianDiepView).myWord;
+    if (danWord && danWord.includes(' ')) {
+      const compactNoAccent = danWord
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .replace(/\s+/g, '')
+        .toLowerCase();
+      expect(room.action(p1.playerId, { type: 'gd_chat', text: `Chac chan la ${compactNoAccent}` })).toEqual({
+        ok: false,
+        reason: 'word_leaked',
+      });
+    }
+
+    // Chuyển sang vote -> bỏ phiếu thiếu 1 người rồi removePlayer / disconnect để kiểm tra không treo pha
+    expect(room.action(h.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('vote');
+
+    expect(room.action(h.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
+    expect(room.action(p1.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
+    expect(room.action(p2.playerId, { type: 'gd_vote', target: p1.playerId })).toEqual({ ok: true });
+    // p3 rời/mất kết nối khi còn là người cuối chưa vote -> tự chuyển sang defense ngay!
+    room.setConnected(p3.playerId, false);
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('defense');
+    expect(room.addChat(h.playerId, 'Im lang nghe bien minh')).toBeNull();
+
+    room.dispose();
+  });
+
+  it('botReadyTimer tự đánh thức bot ready ở discussion/clue_summary khi có mặt người chơi thật', () => {
+    vi.useFakeTimers();
+    const bots = new Set(['p1', 'p2', 'p3']);
+    const { ctx } = makeCtx(seededRng(5002), { giandiepMrWhite: false, giandiepSpies: 1 }, undefined, bots);
+    const g = new GianDiepGame(ctx);
+    g.start(makePlayers(4));
+
+    // Người thật ready ở word_reveal, chờ botReadyTimer (>2000ms) để bot tự ready theo
+    expect(g.action('p0', { type: 'gd_ready' })).toEqual({ ok: true });
+    vi.advanceTimersByTime(2200);
+    for (const b of bots) {
+      const ba = g.botAction(b);
+      if (ba) expect(g.action(b, ba).ok).toBe(true);
+    }
+    expect(g.view('p0').phase).toBe('clue_turn');
     g.dispose();
   });
 });

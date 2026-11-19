@@ -63,6 +63,12 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     expect(vDan.myWord).not.toBe(vSpy.myWord);
     expect(vWhite.myWord).toBeNull();
 
+    // Khóa chat ở word_reveal và trong khi khai gợi ý (clue_turn)
+    expect(game.action('p2', { type: 'gd_chat', text: 'Nhắn lén lúc nhận từ' })).toEqual({
+      ok: false,
+      reason: 'not_your_turn',
+    });
+
     vi.advanceTimersByTime(2100);
     const vClue = game.view('p2');
     expect(vClue.phase).toBe('clue_turn');
@@ -70,6 +76,10 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
 
     const cur = vClue.currentSpeakerId!;
     const other = vClue.alive.find((id) => id !== cur && id !== 'p1')!;
+    expect(game.action(other, { type: 'gd_chat', text: 'Chat chen ngang' })).toEqual({
+      ok: false,
+      reason: 'not_your_turn',
+    });
     expect(game.action(other, { type: 'gd_clue', text: 'nói chen' })).toEqual({ ok: false, reason: 'not_your_turn' });
 
     const curWord = game.view(cur).myWord;
@@ -84,6 +94,12 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
       const sId = game.view('p0').currentSpeakerId!;
       expect(game.action(sId, { type: 'gd_clue', text: `Gợi ý số ${step + 1}` })).toEqual({ ok: true });
     }
+    // Sau khi khai xong hết -> hiện màn Tổng hợp lời khai (`clue_summary`)
+    expect(game.view('p0').phase).toBe('clue_summary');
+    expect(game.view('p0').clues.filter((c) => c.round === 1)).toHaveLength(6);
+    expect(game.action('p2', { type: 'gd_chat', text: 'Chưa mở chat đâu' })).toEqual({ ok: false, reason: 'not_your_turn' });
+
+    for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
     expect(game.view('p0').phase).toBe('discussion');
 
     // Chat thảo luận hợp nhất + chặn lộ từ khóa trong chat
@@ -114,12 +130,16 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     expect(game.view('p0').round).toBe(2);
     expect(game.view('p0').alive).toHaveLength(6);
 
-    // Chạy vòng 2 -> đưa p1 (Mr. White) lên Biện Minh -> Trục Xuất!
+    // Chạy vòng 2 -> clue_summary -> discussion -> vote -> đưa p1 (Mr. White) lên Biện Minh -> Trục Xuất!
     for (let step = 0; step < 6; step++) {
       const sId = game.view('p0').currentSpeakerId!;
       game.action(sId, { type: 'gd_clue', text: `Vòng 2 số ${step}` });
     }
+    expect(game.view('p0').phase).toBe('clue_summary');
     for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
+    expect(game.view('p0').phase).toBe('discussion');
+    for (const id of ['p0', 'p1', 'p2']) game.action(id, { type: 'gd_ready' });
+    expect(game.view('p0').phase).toBe('vote');
     for (const id of ['p0', 'p2', 'p3', 'p4', 'p5']) game.action(id, { type: 'gd_vote', target: 'p1' });
     game.action('p1', { type: 'gd_vote', target: 'p0' });
 

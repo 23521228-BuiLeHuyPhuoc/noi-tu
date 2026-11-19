@@ -138,6 +138,9 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
       const s = g.view().currentSpeakerId!;
       g.action(s, { type: 'gd_clue', text: `Khẩu hiệu ${i}` });
     }
+    expect(g.view('p0').phase).toBe('clue_summary');
+    for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
+    expect(g.view('p0').phase).toBe('discussion');
     for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
     for (const id of ['p0', 'p1', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p2' });
     g.action('p2', { type: 'gd_vote', target: 'p0' });
@@ -168,6 +171,9 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     for (let i = 0; i < 4; i++) {
       g.action(g.view().currentSpeakerId!, { type: 'gd_clue', text: `Mô tả ${i}` });
     }
+    expect(g.view('p0').phase).toBe('clue_summary');
+    for (const id of ['p0', 'p1']) g.action(id, { type: 'gd_ready' });
+    expect(g.view('p0').phase).toBe('discussion');
     for (const id of ['p0', 'p1']) g.action(id, { type: 'gd_ready' });
     for (const id of ['p1', 'p2', 'p3']) g.action(id, { type: 'gd_vote', target: 'p0' });
     g.action('p0', { type: 'gd_vote', target: 'p1' });

@@ -268,7 +268,7 @@ await C360.shot('04c-masoi-360x640');
 for (const p of [D, M, C360]) await leaveRoom(p);
 
 // ------------------------------------------------------------
-// 5. AI LÀ GIÁN ĐIỆP V6 (STEPPER + CALLOUT + VOTE PANEL + 0 AVATAR-* + ZERO SCROLL)
+// 5. AI LÀ GIÁN ĐIỆP V7 (CHAT-FIRST + KHÓA CHAT LÚC KHAI + RECAP + POPUP HÀO QUANG + KEYBOARD + ZERO SCROLL)
 // ------------------------------------------------------------
 await D.t('create-giandiep').click();
 await D.t('room-code').waitFor({ timeout: 8000 });
@@ -279,45 +279,146 @@ await joinRoomByCode(G4, gdCode, 'Khach4');
 await sleep(250);
 await D.t('start-btn').click();
 
-await M.t('gd-phase-stepper').waitFor({ timeout: 8000 });
-await C360.t('gd-phase-stepper').waitFor({ timeout: 8000 });
-await D.t('gd-phase-stepper').waitFor({ timeout: 8000 });
+await M.t('gd-word-reveal-modal').waitFor({ timeout: 8000 });
+await C360.t('gd-word-reveal-modal').waitFor({ timeout: 8000 });
+await D.t('gd-word-reveal-modal').waitFor({ timeout: 8000 });
 check(await has(M.t('gd-phase-callout'), 3000), 'GianDiep: hiện thẻ Action Callout rõ giai đoạn');
 check((await M.page.locator('[data-testid^="avatar-"]').count()) === 0, 'GianDiep Mobile: không lặp dải avatar-*');
+check((await M.page.locator('[data-testid="gd-secret-word"]').count()) === 1, 'GianDiep: chỉ 1 node gd-secret-word không trùng lặp');
 
-await noOuterScroll(D, 'GianDiep');
-await noOuterScroll(M, 'GianDiep');
-await noOuterScroll(C360, 'GianDiep');
-await D.shot('05-giandiep-desktop');
-await M.shot('05b-giandiep-390x844');
-await C360.shot('05c-giandiep-360x640');
+await noOuterScroll(D, 'GianDiep WordReveal');
+await noOuterScroll(M, 'GianDiep WordReveal');
+await noOuterScroll(C360, 'GianDiep WordReveal');
+await D.shot('05-giandiep-word-desktop');
+await M.shot('05b-giandiep-word-390x844');
+await C360.shot('05c-giandiep-word-360x640');
 
-// Chờ hết word_reveal (10s) sang clue_turn rồi khai gợi ý cho tất cả 4 người chơi tới khi qua discussion -> vote
-for (let step = 0; step < 35; step++) {
-  if ((await M.t('gd-ready-btn').count()) > 0 || (await M.t('gd-vote-panel').count()) > 0) break;
+for (const p of [D, M, C360, G4]) {
+  if ((await p.t('gd-word-ready-btn').count()) > 0) await p.t('gd-word-ready-btn').click().catch(() => {});
+}
+
+// Chờ vào clue_turn, kiểm tra khóa chat với người chưa tới lượt, rồi khai đủ 4 gợi ý
+let checkedLockedDuringClue = false;
+for (let step = 0; step < 30; step++) {
+  if ((await M.t('gd-clue-recap-modal').count()) > 0) break;
   let submitted = false;
   for (const p of [D, M, C360, G4]) {
     if ((await p.t('gd-clue-input').count()) > 0) {
+      if (!checkedLockedDuringClue) {
+        const listener = [D, M, C360, G4].find((x) => x !== p);
+        if (listener && (await listener.t('gd-chat-locked').count()) > 0) {
+          check((await listener.t('gd-chat-input').count()) === 0, 'GianDiep clue_turn: người chưa tới lượt bị khóa ô chat');
+          checkedLockedDuringClue = true;
+        }
+      }
       await p.t('gd-clue-input').fill(`Goi y ${p.nick} v${step}`).catch(() => {});
       await p.t('gd-clue-submit').click().catch(() => {});
       submitted = true;
       await sleep(220);
     }
   }
-  await sleep(submitted ? 180 : 450);
+  await sleep(submitted ? 180 : 350);
 }
-if (await has(M.t('gd-ready-btn'), 5000)) {
-  for (const p of [D, M, C360, G4]) {
-    if ((await p.t('gd-ready-btn').count()) > 0) await p.t('gd-ready-btn').click().catch(() => {});
-  }
-}
-if (await has(M.t('gd-vote-panel'), 6000)) {
-  check((await M.page.locator('[data-testid^="gd-vote-pick-"]').count()) >= 1, 'GianDiep: hiện bảng chọn nghi phạm gd-vote-panel trực quan');
-  await noOuterScroll(M, 'GianDiep Vote');
-  await M.shot('05d-giandiep-vote-390x844');
+check(checkedLockedDuringClue, 'GianDiep clue_turn: xác nhận khóa chat khi chưa tới lượt');
+check(await has(M.t('gd-clue-recap-modal'), 5000), 'GianDiep: tự bật popup Tổng Hợp Lời Khai sau khi khai xong');
+await noOuterScroll(M, 'GianDiep ClueRecap');
+await noOuterScroll(C360, 'GianDiep ClueRecap');
+await M.shot('05d-giandiep-recap-390x844');
+await C360.shot('05d2-giandiep-recap-360x640');
+
+for (const p of [D, M, C360, G4]) {
+  if ((await p.t('gd-recap-ready-btn').count()) > 0) await p.t('gd-recap-ready-btn').click().catch(() => {});
 }
 
-for (const p of [D, M, C360, G4]) await leaveRoom(p);
+// Thảo luận: gửi tin nhắn + kiểm tra không tràn ngang trên 390/360 + giả lập bàn phím co window.innerHeight
+await M.t('gd-chat-input').waitFor({ timeout: 6000 });
+await noOuterScroll(M, 'GianDiep Discussion');
+await noOuterScroll(C360, 'GianDiep Discussion');
+await D.t('gd-chat-input').fill('Nghe câu số 1 hơi nghi nghi nha!').catch(() => {});
+await D.t('gd-chat-send').click().catch(() => {});
+await M.t('gd-chat-input').fill('Mình là Dân Thường xịn đây!').catch(() => {});
+await M.t('gd-chat-send').click().catch(() => {});
+await sleep(250);
+
+await M.t('gd-chat-input').click();
+const kbMetrics = await M.page.evaluate(() => {
+  const bodyH = document.body?.getBoundingClientRect().height || window.innerHeight;
+  const targetH = bodyH - 300;
+  window.__origInnerH = Object.getOwnPropertyDescriptor(window, 'innerHeight') || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'innerHeight');
+  window.__origVv = Object.getOwnPropertyDescriptor(window, 'visualViewport') || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'visualViewport');
+  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => targetH });
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: Object.assign(new EventTarget(), { width: window.innerWidth, height: targetH, offsetTop: 0, scale: 1 }),
+  });
+  window.dispatchEvent(new Event('resize'));
+  window.visualViewport.dispatchEvent(new Event('resize'));
+  return { bodyH, targetH };
+});
+await sleep(450);
+const kbBox = await M.t('gd-chat-input').boundingBox();
+check(
+  !!kbBox && kbBox.y >= 0 && kbBox.y + kbBox.height <= kbMetrics.targetH + 2,
+  `GianDiep Mobile Keyboard (Samsung shrink): ô chat nằm trọn trên bàn phím (${Math.round(kbBox?.y ?? -1)}..${Math.round((kbBox?.y ?? 0) + (kbBox?.height ?? 0))} <= ${Math.round(kbMetrics.targetH)})`,
+);
+await M.shot('05e-giandiep-chat-kb-390x844');
+await M.page.evaluate(() => {
+  if (window.__origInnerH && window.__origInnerH.configurable) {
+    Object.defineProperty(window, 'innerHeight', window.__origInnerH);
+  }
+  if (window.__origVv && window.__origVv.configurable) {
+    Object.defineProperty(window, 'visualViewport', window.__origVv);
+  }
+  delete window.__origInnerH;
+  delete window.__origVv;
+  window.dispatchEvent(new Event('resize'));
+});
+await M.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+await M.t('gd-ready-btn').waitFor({ timeout: 4000 });
+await sleep(200);
+
+// Chuyển Vote -> kiểm tra popup hào quang Vote + thu gọn Xem chat + mở lại
+for (const p of [D, M, C360, G4]) {
+  if ((await p.t('gd-ready-btn').count()) > 0) await p.t('gd-ready-btn').click().catch(() => {});
+}
+check(await has(M.t('gd-vote-modal'), 6000), 'GianDiep: tự bật popup Hào Quang Bỏ Phiếu');
+check((await M.page.locator('[data-testid^="gd-vote-pick-"]').count()) >= 1, 'GianDiep: hiện thẻ nghi phạm gd-vote-pick-* trong popup');
+await noOuterScroll(M, 'GianDiep Vote');
+await M.shot('05f-giandiep-vote-390x844');
+
+await M.t('gd-vote-minimize').click();
+check(await has(M.t('gd-reopen-vote-btn'), 3000), 'GianDiep Vote: nút Mở Lại bảng bỏ phiếu hiện rõ khi thu gọn');
+await M.t('gd-reopen-vote-btn').click();
+await M.t('gd-vote-modal').waitFor({ timeout: 3000 });
+
+// Bầu dồn vào 1 mục tiêu để qua Biện minh -> Phán quyết Cuối (gd-verdict-modal)
+const targetPickId = await D.page.locator('[data-testid^="gd-vote-pick-"]').first().getAttribute('data-testid');
+for (const p of [D, M, C360, G4]) {
+  if (targetPickId && (await p.t(targetPickId).count()) > 0) {
+    await p.t(targetPickId).click().catch(() => {});
+  } else if ((await p.t('gd-skip-vote').count()) > 0) {
+    await p.t('gd-skip-vote').click().catch(() => {});
+  }
+  await sleep(120);
+}
+for (const p of [D, M, C360, G4]) {
+  if (await has(p.t('gd-defense-done'), 2500)) {
+    await p.t('gd-defense-input').fill('Oan qua ca phong oi!').catch(() => {});
+    await p.t('gd-defense-submit').click().catch(() => {});
+    await sleep(150);
+    await p.t('gd-defense-done').click().catch(() => {});
+    break;
+  }
+}
+check(await has(M.t('gd-verdict-modal'), 6000), 'GianDiep: tự bật popup Hào Quang Phán Quyết Cuối');
+await noOuterScroll(M, 'GianDiep Verdict');
+await M.shot('05g-giandiep-verdict-390x844');
+
+for (const p of [D, M, C360, G4]) {
+  const minBtn = p.page.locator('[data-testid$="-minimize"]').first();
+  if ((await minBtn.count()) > 0) await minBtn.click().catch(() => {});
+  await leaveRoom(p);
+}
 
 // ------------------------------------------------------------
 // 6. CỜ CARO V6 (BÀN CỜ TOÀN MÀN HÌNH & ZERO OUTER SCROLL)

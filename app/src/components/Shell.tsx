@@ -1,5 +1,5 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GAME_INFO, type ChatMsg, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
@@ -9,7 +9,7 @@ import { copyText } from '../web';
 import { GAME_META } from '../messages';
 import { C } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
-import { useStableWindow } from '../hooks';
+import { useKeyboardInset, useStableWindow } from '../hooks';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
 import { MapBackdrop } from './MapBackdrop';
 import { Avatar } from './Avatar';
@@ -94,7 +94,7 @@ const RoomFxOverlays = memo(
 
 /** Khung chung cho mọi màn trong phòng: nền Map, HUD kính mờ, hàng avatar 1–12 người, nội dung, vùng nút dưới */
 export function Shell({
-  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false, bare = false,
+  game, room, strip = {}, children, bottom, scroll = true, overlay, wide = false, fullscreen = false, hideStrip = false, hideChat = false, keyboardAware = false, bare = false,
 }: {
   game: Game;
   room: RoomState;
@@ -107,6 +107,8 @@ export function Shell({
   fullscreen?: boolean;
   bare?: boolean;
   hideStrip?: boolean;
+  hideChat?: boolean;
+  keyboardAware?: boolean;
 }) {
   const [target, setTarget] = useState<PublicPlayer | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -122,6 +124,14 @@ export function Shell({
   const setFeedInset = useFeedInset();
   useEffect(() => () => setFeedInset(16), [setFeedInset]);
   const { width, height } = useStableWindow();
+  const rawKbInset = useKeyboardInset();
+  const webKbInset = keyboardAware && Platform.OS === 'web' ? rawKbInset : 0;
+
+  useEffect(() => {
+    if (webKbInset > 0 && typeof window !== 'undefined' && (window.visualViewport?.offsetTop ?? 0) > 0) {
+      window.scrollTo(0, 0);
+    }
+  }, [webKbInset]);
 
   const [smooth, setSmooth] = useSmoothMode();
   const [localTheme, setLocalTheme] = useLocalTheme();
@@ -130,7 +140,7 @@ export function Shell({
 
   const iconOnly = width < 440 || fullscreen;
   const compactLandscape = fullscreen || (wide && width >= 700 && height < 520);
-  const tightHeight = !scroll && height < 720;
+  const tightHeight = (!scroll && height < 720) || webKbInset > 0;
   const inlineStrip = compactLandscape && width >= 700;
   const baseSize = fullscreen || compactLandscape || (wide && width >= 700) ? 50 : height >= 780 ? 58 : height >= 700 ? 52 : 44;
   const stripSize = room.players.length >= 10 ? Math.min(baseSize, 42) : room.players.length >= 7 ? Math.min(baseSize, 46) : baseSize;
@@ -219,7 +229,7 @@ export function Shell({
     }}>
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <MapBackdrop themeId={activeThemeId} smooth={smooth || room.phase === 'playing'} />
-      <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen]}>
+      <View style={[styles.root, wide && styles.rootWide, fullscreen && styles.rootFullscreen, webKbInset > 0 && { paddingBottom: webKbInset }]}>
         {!bare && (<>
         <View
           style={[
@@ -272,14 +282,16 @@ export function Shell({
           )}
           <IconButton testID="room-visual-open" icon="🎨" iconNode={<UiIcon name="Palette" size={iconOnly ? 16 : 19} color={C.violet} />} label="Map phòng & Siêu mượt" style={iconOnly && styles.iconTight} onPress={() => setVisualOpen(true)} />
           <IconButton testID="profile-open" icon="✏️" iconNode={<UiIcon name="Pencil" size={iconOnly ? 16 : 18} color={C.ink} />} label="Sửa tên & ảnh" style={iconOnly && styles.iconTight} onPress={openMyProfile} />
-          <View>
-            <IconButton testID="chat-open" icon="💬" iconNode={<UiIcon name="MessageCircle" size={iconOnly ? 16 : 19} color={C.ink} />} label="Trò chuyện" style={iconOnly && styles.iconTight} onPress={() => setChatOpen(true)} />
-            {unread > 0 && (
-              <View testID="chat-badge" pointerEvents="none" style={styles.badge}>
-                <T style={styles.badgeText}>{unread > 9 ? '9+' : unread}</T>
-              </View>
-            )}
-          </View>
+          {!hideChat && (
+            <View>
+              <IconButton testID="chat-open" icon="💬" iconNode={<UiIcon name="MessageCircle" size={iconOnly ? 16 : 19} color={C.ink} />} label="Trò chuyện" style={iconOnly && styles.iconTight} onPress={() => setChatOpen(true)} />
+              {unread > 0 && (
+                <View testID="chat-badge" pointerEvents="none" style={styles.badge}>
+                  <T style={styles.badgeText}>{unread > 9 ? '9+' : unread}</T>
+                </View>
+              )}
+            </View>
+          )}
           <IconButton
             icon={muted ? '🔇' : '🔊'}
             iconNode={<UiIcon name={muted ? 'VolumeX' : 'Volume2'} size={iconOnly ? 16 : 19} color={muted ? C.danger : C.ink} />}

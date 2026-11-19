@@ -93,7 +93,11 @@ export function useKeyboardLift(ref: React.RefObject<ComponentRef<typeof View> |
       }
       // Đo trực tiếp từ node anchor bọc ngoài KHÔNG transform để không gây synchronous reflow vòng lặp
       const base = el.getBoundingClientRect().bottom;
-      const next = Math.max(0, Math.round(base + 10 - (window.innerHeight - inset)));
+      const appH = document.body?.getBoundingClientRect().height || window.innerHeight;
+      const vv = window.visualViewport;
+      const vvBottom = vv && vv.scale <= 1.01 ? vv.offsetTop + vv.height : window.innerHeight;
+      const visibleBottom = Math.min(window.innerHeight, vvBottom, appH - inset);
+      const next = Math.max(0, Math.round(base + 10 - visibleBottom));
       update(next);
     };
     const off = subscribeKeyboard((v) => { inset = v; recompute(); });

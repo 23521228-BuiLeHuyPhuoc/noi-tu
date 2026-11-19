@@ -62,6 +62,10 @@ for (const mode of ['android', 'ios']) {
   await a.t('room-code').waitFor();
   const code = (await a.t('room-code').textContent()).trim();
   const b = await phone('Bình', mode);
+  if ((await b.t('home-tab-rooms').count()) > 0) {
+    await b.t('home-tab-rooms').click();
+    await b.page.waitForTimeout(200);
+  }
   await b.t('name-input').fill('Bình');
   await b.t('code-input').fill(code);
   await b.t('join-btn').click();
