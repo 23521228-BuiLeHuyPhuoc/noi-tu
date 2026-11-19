@@ -6,7 +6,7 @@ import type { Game } from '../useGame';
 import { C, FONT, backdropPalette, sticker } from '../theme';
 import { actionText } from '../messages';
 import { useOnChange, useStableWindow } from '../hooks';
-import { playMemePool } from '../sound';
+import { play, playMemePool } from '../sound';
 import { T } from '../ui';
 import { Shell } from '../components/Shell';
 import { CompactPlayerStrip } from '../components/CompactPlayerStrip';
@@ -22,9 +22,19 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useOnChange(view.index, () => {
+    if (view.doublePoints) {
+      playMemePool('twist', { cooldownMs: 1800 });
+      play('sparkle');
+    }
+  });
+
   useOnChange(view.phase, (ph) => {
     if (ph === 'reveal') {
-      playMemePool(view.myAnswer !== null && view.myAnswer === view.correctIndex ? 'correct' : 'wrong');
+      const ok = view.myAnswer !== null && view.myAnswer === view.correctIndex;
+      const streak = view.streaks[game.me ?? ''] ?? 0;
+      playMemePool(ok ? (streak >= 2 ? 'win' : 'correct') : 'wrong', { cooldownMs: 900 });
+      play(ok ? 'stamp' : 'error');
     }
   });
 
@@ -51,10 +61,12 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act({ type: 'dv_answer', choice });
     setBusy(false);
     if (!res.ok) {
-      playMemePool('wrong', { cooldownMs: 1800 });
+      playMemePool('wrong', { cooldownMs: 1200 });
+      play('error');
       setErr(actionText[res.reason] ?? 'Không gửi được đáp án');
     } else {
-      playMemePool('turn_move', { cooldownMs: 2500 });
+      playMemePool('turn_move', { cooldownMs: 2200 });
+      play('pop');
     }
   };
 

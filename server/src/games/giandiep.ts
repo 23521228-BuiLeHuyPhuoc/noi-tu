@@ -51,6 +51,25 @@ function normPhrase(s: string): string {
   return s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 
+let livePairBag: number[] = [];
+let lastLivePairIdx = -1;
+
+function drawLivePairIndex(): number {
+  if (livePairBag.length === 0) {
+    livePairBag = Array.from({ length: GIAN_DIEP_WORDS.length }, (_, i) => i);
+    for (let i = livePairBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [livePairBag[i], livePairBag[j]] = [livePairBag[j], livePairBag[i]];
+    }
+    if (livePairBag.length > 1 && livePairBag[0] === lastLivePairIdx) {
+      [livePairBag[0], livePairBag[1]] = [livePairBag[1], livePairBag[0]];
+    }
+  }
+  const idx = livePairBag.shift() ?? 0;
+  lastLivePairIdx = idx;
+  return idx;
+}
+
 export class GianDiepGame implements GameEngine {
   readonly perPlayerView = true;
 
@@ -83,6 +102,7 @@ export class GianDiepGame implements GameEngine {
   private defendants: string[] = [];
   private defendedIds = new Set<string>();
   private finalVotes = new Map<string, string>();
+  private tiePardonUsed = new Set<string>();
   private botChattedRound = new Set<string>();
 
   private mrWhiteId: string | null = null;
@@ -165,12 +185,17 @@ export class GianDiepGame implements GameEngine {
 
   start(players: EnginePlayer[]): void {
     this.order = players.map((p) => p.id);
+    this.tiePardonUsed.clear();
     for (const p of players) {
       this.names.set(p.id, p.name);
       this.alive.add(p.id);
     }
 
-    this.pair = GIAN_DIEP_WORDS[Math.floor(this.ctx.rng() * GIAN_DIEP_WORDS.length) % GIAN_DIEP_WORDS.length];
+    const pairIdx =
+      this.ctx.rng === Math.random
+        ? drawLivePairIndex()
+        : Math.floor(this.ctx.rng() * GIAN_DIEP_WORDS.length) % GIAN_DIEP_WORDS.length;
+    this.pair = GIAN_DIEP_WORDS[pairIdx];
     const flip = this.ctx.rng() < 0.5;
     this.danWord = flip ? this.pair.wordB : this.pair.wordA;
     this.spyWord = flip ? this.pair.wordA : this.pair.wordB;
@@ -432,9 +457,20 @@ export class GianDiepGame implements GameEngine {
         }
         const banishCount = banishVoters.length;
         const forgiveCount = forgiveVoters.length;
-        // Nếu người chơi bỏ phiếu Trục xuất >= Tha bổng (hoặc hết giờ không ai ấn Tha bổng khi đã bị vote cao nhất ở vòng trước)
         if (forgiveCount > banishCount) {
           this.pushSystem(`Tha bổng ${this.seatTag(acc)} (${forgiveCount} tha · ${banishCount} loại)`);
+        } else if (banishCount === forgiveCount) {
+          if (!this.tiePardonUsed.has(acc)) {
+            this.tiePardonUsed.add(acc);
+            this.pushSystem(
+              `Hòa phán quyết (${banishCount} loại · ${forgiveCount} tha) — ${this.seatTag(acc)} được tha bổng (đã dùng quyền hòa 1 lần)`,
+            );
+          } else {
+            this.pushSystem(
+              `Hòa phán quyết lần 2 (${banishCount} loại · ${forgiveCount} tha) — ${this.seatTag(acc)} đã hết quyền hòa, tiến hành trục xuất`,
+            );
+            banished = acc;
+          }
         } else {
           banished = acc;
         }
@@ -1109,6 +1145,7 @@ export class GianDiepGame implements GameEngine {
       votes: Object.fromEntries(this.votes),
       defendants: [...this.defendants],
       finalVotes: Object.fromEntries(this.finalVotes),
+      tiePardonUsed: [...this.tiePardonUsed],
       mrWhiteId: (this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') ? this.mrWhiteId : null,
       targetCharCount: (this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') ? countWordChars(this.danWord) : null,
       roleSummary,

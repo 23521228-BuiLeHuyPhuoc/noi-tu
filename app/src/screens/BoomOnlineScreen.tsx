@@ -142,23 +142,27 @@ function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
       play('boom');
       break;
     case 'pickup':
+      playMemePool('money', { cooldownMs: 2600 });
       play('sparkle');
       if (isMeRelated) vibrate(18);
       break;
     case 'trap':
+      playMemePool('shock', { cooldownMs: 1800 });
       play('inksplash');
       if (isMeRelated) vibrate(45);
       break;
     case 'pop_kill':
+      playMemePool('bomb', { cooldownMs: 1800 });
       play('ko');
-      playMemePool('bomb', { cooldownMs: 2200 });
       if (isMeRelated) vibrate([30, 40, 55]);
       break;
     case 'rescue':
+      playMemePool('forgive', { cooldownMs: 1600 });
       play('sparkle');
       if (isMeRelated) vibrate(30);
       break;
     case 'needle':
+      playMemePool('twist', { cooldownMs: 1600 });
       play('pop');
       if (isMeRelated) vibrate(28);
       break;
@@ -179,8 +183,8 @@ function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
       play('stamp');
       break;
     case 'round_win':
+      playMemePool('win', { cooldownMs: 1800 });
       play('win');
-      playMemePool('win', { cooldownMs: 2000 });
       break;
   }
 }

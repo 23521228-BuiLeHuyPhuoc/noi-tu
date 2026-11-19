@@ -296,10 +296,25 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       const res = await game.act(payload);
       setBusy(false);
       if (!res.ok) {
+        playMemePool('wrong', { cooldownMs: 1200 });
         play('error');
         setErr(actionText[res.reason] ?? 'Không thực hiện được');
       } else {
-        play('stamp');
+        if (payload.type === 'ms_vote') {
+          playMemePool(payload.target === 'skip' ? 'forgive' : 'vote', { cooldownMs: 1600 });
+          play('stamp');
+        } else if (payload.type === 'ms_hunter') {
+          playMemePool(payload.target === 'skip' ? 'forgive' : 'bomb', { cooldownMs: 1200 });
+          play(payload.target === 'skip' ? 'pop' : 'boom');
+        } else if (payload.type === 'ms_night') {
+          playMemePool('twist', { cooldownMs: 2000 });
+          play('stamp');
+        } else if (payload.type === 'ms_wolfChat') {
+          playMemePool('chat_hype', { cooldownMs: 2800 });
+          play('chat');
+        } else {
+          play('pop');
+        }
         if (resetSelection) {
           setSelected(null);
           setPickedTwo([]);

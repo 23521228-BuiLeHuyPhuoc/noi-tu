@@ -215,8 +215,15 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
 
   useOnChange(view.winnerId, (w) => {
     if (w) {
-      play(w === me ? 'win' : 'lose');
       playMemePool(w === me ? 'win' : 'lose', { cooldownMs: 1200 });
+      play(w === me ? 'win' : 'lose');
+    }
+  });
+
+  useOnChange(view.isDraw, (d) => {
+    if (d) {
+      playMemePool('shock', { cooldownMs: 1200 });
+      play('reveal');
     }
   });
 
@@ -301,6 +308,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     const cur = actRef.current;
     if (cur.busy || cur.gameEnded || !cur.isMyTurn) return;
     if (cur.view.board[r * cur.view.size + c] !== null) return;
+    playMemePool('turn_move', { cooldownMs: 2600 });
     play('stamp');
     setBusy(true);
     setErr(null);

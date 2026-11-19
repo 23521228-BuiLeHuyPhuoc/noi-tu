@@ -21,6 +21,7 @@ import {
   SKIN_NAMES, SKIN_PALETTE, characterSvgUri, playerColorOf, randomCharacter,
 } from '../avatars';
 import { shareInvite } from '../web';
+import { playMemePool } from '../sound';
 import { GAME_META, RULES } from '../messages';
 import { RoomManageCard } from '../components/RoomTools';
 import { C, backdropPalette, sticker } from '../theme';
@@ -164,7 +165,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           {room.players.filter((p) => p.bot).map((p) => (
             <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <T style={{ flex: 1, fontWeight: '500', fontSize: 14 }}>{p.name}</T>
-              {isHost && <Button testID={`bot-remove-${p.id}`} small variant="paper" title="Bỏ" onPress={async () => { const e = await game.removeBot(p.id); if (e) feed(e, 'bad'); }} />}
+              {isHost && <Button testID={`bot-remove-${p.id}`} small variant="paper" title="Bỏ" onPress={async () => { const e = await game.removeBot(p.id); if (e) feed(e, 'bad'); else playMemePool('eliminated', { cooldownMs: 2000 }); }} />}
             </View>
           ))}
           {isHost && (
@@ -175,7 +176,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               iconNode={<UiIcon name="Plus" size={15} color={n >= Math.min(room.maxPlayers, info.max) ? C.muted : C.ink} strokeWidth={1.65} />}
               title={n >= Math.min(room.maxPlayers, info.max) ? `Đã đủ tối đa ${Math.min(room.maxPlayers, info.max)} người` : 'Thêm máy chơi cùng'}
               disabled={n >= Math.min(room.maxPlayers, info.max)}
-              onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); }}
+              onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); else playMemePool('welcome', { cooldownMs: 2000 }); }}
             />
           )}
         </Card>

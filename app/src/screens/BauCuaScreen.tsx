@@ -293,14 +293,19 @@ function Reveal({ dice, myBets, delta, onDone }: {
       setTargets(dice.map((s) => (betOn(s) ? rectOf(`sym-${s}`, origin) : null)));
       setPhase('after');
       if (lost) {
+        playMemePool('lose', { cooldownMs: 1600 });
         play('sad');
-        playMemePool('lose', { cooldownMs: 2000 });
         vibrate([60, 80, 60]);
         Animated.timing(sad, { toValue: 1, duration: 400, useNativeDriver: false }).start();
       } else if ((delta ?? 0) > 0) {
+        playMemePool('win', { cooldownMs: 1600 });
         play('win');
-        playMemePool('win', { cooldownMs: 2000 });
         vibrate(80);
+      } else if ((delta ?? 0) < 0) {
+        playMemePool('broke', { cooldownMs: 1600 });
+        play('sad');
+      } else if (anyBet && delta === 0) {
+        playMemePool('twist', { cooldownMs: 1600 });
       }
     }, FLY_AT);
     const t2 = setTimeout(() => Animated.timing(fade, { toValue: 0, duration: 300, useNativeDriver: false }).start(onDone), REVEAL_MS);
@@ -474,7 +479,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 
   useOnChange(g.step, (step) => {
     if (step === 'rolling') play('dice');
-    if (step === 'betting') play('pop');
+    if (step === 'betting') {
+      if (g.tripleStorm) playMemePool('shock', { cooldownMs: 1800 });
+      play('pop');
+    }
     if (step === 'result' && g.dice) {
       setResultBets({ round: g.round, bets: lastBets.current });
       setReveal(g.round);
@@ -524,8 +532,16 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const debtsKey = JSON.stringify(g.debts);
   const prevDebts = useRef(g.debts);
   useEffect(() => {
+    let increased = false;
     for (const [id, n] of Object.entries(g.debts)) {
-      if (n > (prevDebts.current[id] ?? 0)) feed(quip.loan(nameOf(id)), 'fun');
+      if (n > (prevDebts.current[id] ?? 0)) {
+        increased = true;
+        feed(quip.loan(nameOf(id)), 'fun');
+      }
+    }
+    if (increased) {
+      playMemePool('broke', { cooldownMs: 1600 });
+      play('siren');
     }
     prevDebts.current = g.debts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -535,8 +551,21 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     const r = await game.act(a);
     if (!r.ok) {
       setError(actionText[r.reason]);
+      playMemePool('wrong', { cooldownMs: 1200 });
       play('error');
-    } else setError(null);
+    } else {
+      setError(null);
+      if (a.type === 'bc_allin') {
+        playMemePool('money', { cooldownMs: 1500 });
+        play('cash');
+      } else if (a.type === 'bc_double' || a.type === 'bc_rebet') {
+        playMemePool('money', { cooldownMs: 2200 });
+        play('coin');
+      } else if (a.type === 'clearBets') {
+        playMemePool('defense', { cooldownMs: 2200 });
+        play('whoosh');
+      }
+    }
     return r.ok;
   };
 

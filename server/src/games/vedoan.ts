@@ -26,6 +26,44 @@ function normGuess(s: string): string {
   return s.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+function shuffleWithMathRng<T>(items: readonly T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+let liveBotWordBag: string[] = [];
+let liveHumanWordBag: string[] = [];
+
+function drawLiveWords(pool: readonly string[], bagRef: 'bot' | 'human', exclude: Set<string>, count: number): string[] {
+  const bag = bagRef === 'bot' ? liveBotWordBag : liveHumanWordBag;
+  const out: string[] = [];
+  let guard = 0;
+  while (out.length < count && guard++ < pool.length * 2 + 10) {
+    if (bag.length === 0) {
+      const fresh = shuffleWithMathRng(pool);
+      bag.push(...fresh);
+    }
+    const candidate = bag.shift();
+    if (!candidate) continue;
+    if (!exclude.has(candidate) && !out.includes(candidate)) {
+      out.push(candidate);
+    }
+  }
+  if (out.length < count) {
+    for (const w of shuffleWithMathRng(pool)) {
+      if (!out.includes(w)) {
+        out.push(w);
+        if (out.length >= count) break;
+      }
+    }
+  }
+  return out;
+}
+
 export class VeDoanGame implements GameEngine {
   readonly perPlayerView = true;
 
@@ -46,6 +84,7 @@ export class VeDoanGame implements GameEngine {
   private wordOptions: string[] = [];
   private secretWord = '';
   private usedWords = new Set<string>();
+  private offeredWords = new Set<string>();
   private revealedIdx = new Set<number>();
   private strokes: VeDoanStroke[] = [];
   private strokeSeq = 0;
@@ -85,18 +124,38 @@ export class VeDoanGame implements GameEngine {
   }
 
   private pickWordChoices(drawerIsBot: boolean): string[] {
+    const skip = new Set([...this.usedWords, ...this.offeredWords]);
+    const record = (choices: string[]) => {
+      for (const w of choices) this.offeredWords.add(w);
+      return choices;
+    };
+
     if (drawerIsBot) {
       const allBot = Object.keys(BOT_SKETCHES);
-      const freshBot = allBot.filter((w) => !this.usedWords.has(w));
-      const sketchPool = this.shuffleArray(freshBot.length >= 3 ? freshBot : allBot);
-      if (sketchPool.length >= 3) return sketchPool.slice(0, 3);
-      const rest = this.shuffleArray(VE_DOAN_WORDS.filter((w) => !(w in BOT_SKETCHES) && !this.usedWords.has(w)));
-      return [...sketchPool, ...rest].slice(0, 3);
+      if (this.ctx.rng === Math.random) {
+        const picked = drawLiveWords(allBot, 'bot', skip, 3);
+        if (picked.length >= 3) return record(picked);
+      }
+      const freshBot = allBot.filter((w) => !skip.has(w));
+      const fallbackBot = freshBot.length >= 3 ? freshBot : allBot.filter((w) => !this.usedWords.has(w));
+      const sketchPool = this.shuffleArray(fallbackBot.length >= 3 ? fallbackBot : allBot);
+      if (sketchPool.length >= 3) return record(sketchPool.slice(0, 3));
+      const rest = this.shuffleArray(VE_DOAN_WORDS.filter((w) => !(w in BOT_SKETCHES) && !skip.has(w)));
+      return record([...sketchPool, ...rest].slice(0, 3));
     }
-    const fresh = VE_DOAN_WORDS.filter((w) => !this.usedWords.has(w));
-    if (fresh.length >= 3) return this.shuffleArray(fresh).slice(0, 3);
+
+    if (this.ctx.rng === Math.random) {
+      return record(drawLiveWords(VE_DOAN_WORDS, 'human', skip, 3));
+    }
+
+    let fresh = VE_DOAN_WORDS.filter((w) => !skip.has(w));
+    if (fresh.length < 3) {
+      this.offeredWords.clear();
+      fresh = VE_DOAN_WORDS.filter((w) => !this.usedWords.has(w));
+    }
+    if (fresh.length >= 3) return record(this.shuffleArray(fresh).slice(0, 3));
     this.usedWords.clear();
-    return this.shuffleArray(VE_DOAN_WORDS).slice(0, 3);
+    return record(this.shuffleArray(VE_DOAN_WORDS).slice(0, 3));
   }
 
   private botStrokeIntervalMs(): number {
@@ -139,6 +198,7 @@ export class VeDoanGame implements GameEngine {
     this.totalTurns = Math.min(24, Math.max(2, this.order.length * rounds));
     this.turnIndex = 0;
     this.usedWords.clear();
+    this.offeredWords.clear();
     this.startTurn();
   }
 

@@ -237,10 +237,11 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       lastAnnEnd.current = start + dur + 60;
       anns.push({ id: seqId(), kind, start, end: start + dur, ...data });
       later(start - t0, () => {
+        if (kind === 'bankrupt') playMemePool('broke', { cooldownMs: 2000 });
+        else if (kind === 'loss') playMemePool('lose', { cooldownMs: 2200 });
+        else if (kind === 'reward') playMemePool('win', { cooldownMs: 2200 });
+        else if (kind === 'buy' || kind === 'build') playMemePool('money', { cooldownMs: 2200 });
         play(SOUND[kind]);
-        if (kind === 'bankrupt') playMemePool('broke', { cooldownMs: 2200 });
-        else if (kind === 'loss') playMemePool('lose', { cooldownMs: 2500 });
-        else if (kind === 'reward') playMemePool('win', { cooldownMs: 2500 });
       });
     };
     // khớp tên dài trước ("An 2" trước "An") và phải theo sau bởi khoảng trắng để tránh trùng tiền tố
@@ -269,6 +270,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         if (owner === me) announce('buy', t0, {
           title: cell.name, sub: `${nameOf(owner)} · ${fmt(price)}$`, amount: price, portrait: portraitUriOf(owner), color: colorOf(owner), icon: ICON_BY_CELL[i],
         });
+        else playMemePool('money', { cooldownMs: 3200 });
       } else if (owner && houses > (prevHousesRef.current[i] ?? 0)) {
         const station = cell.kind === 'station';
         if (station) adds.push({ k: 'stamp', id: seqId(), at: t0, cell: i, text: '★'.repeat(houses), color: colorOf(owner) });
@@ -276,6 +278,7 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
         if (owner === me) announce('build', t0, {
           title: station ? `Ga lên ${houses} sao` : houses >= TYPHU_MAX_HOUSES ? 'Lên khách sạn' : `Xây nhà cấp ${houses}`, sub: `${nameOf(owner)} · ${cell.name}`, level: station ? undefined : houses, color: colorOf(owner),
         });
+        else playMemePool('money', { cooldownMs: 3200 });
       }
       prevOwnersRef.current[i] = owner ?? '';
       prevHousesRef.current[i] = houses;
@@ -330,18 +333,28 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       } else if (l.kind === 'jail' && l.text.includes('vào tù')) {
         const delay = msUntilArrive();
         adds.push({ k: 'jail', id: seqId(), at: t0 + delay, cell: TYPHU_JAIL });
-        later(delay, () => play('siren'));
+        later(delay, () => {
+          playMemePool('eliminated', { cooldownMs: 1600 });
+          play('siren');
+        });
         feed(l.text, 'bad');
         if (mine) {
           announce('loss', t0 + delay, { title: 'Vào tù', sub: l.text.replace(`${g.names[who] ?? ''} `, ''), portrait: portraitUriOf(who), color: colorOf(who) });
           shake();
         }
+      } else if (l.kind === 'jail' && l.text.includes('ra tù')) {
+        playMemePool('forgive', { cooldownMs: 1800 });
       } else if (l.kind === 'bankrupt') {
         const delay = msUntilArrive();
         adds.push({ k: 'bankrupt', id: seqId(), at: t0 + delay, name: nameOf(who) });
         const creditorMe = !!g.names[me] && l.text.includes(`(chủ nợ: ${g.names[me]})`);
         if (mine || creditorMe) {
           announce('bankrupt', t0 + delay, { title: l.text, portrait: portraitUriOf(who), color: colorOf(who) });
+        } else {
+          later(delay, () => {
+            playMemePool('broke', { cooldownMs: 1800 });
+            play('boom');
+          });
         }
         feed(l.text, 'bad');
       }
@@ -382,7 +395,10 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
       const delay = movement?.kind === 'card' || movement?.kind === 'fly' ? 0 : msUntilArrive();
       const risky = g.card.good === false || (g.card.good === undefined && kindCell?.kind === 'community');
       setCardFx({ id: g.card.id, text: g.card.text, title: risky ? 'Rủi ro' : 'Cơ hội', at: t0 + delay });
-      later(delay, () => play('flip'));
+      later(delay, () => {
+        playMemePool('twist', { cooldownMs: 2200 });
+        play('flip');
+      });
     }
     if (adds.length && !reducedMotion) setFx((old) => [...old.filter((f) => fxEnd(f) > t0), ...adds]);
     setNow(t0);
@@ -403,8 +419,16 @@ function TyPhuBody({ game, room }: { game: Game; room: RoomState }) {
     const r = await game.act(a);
     if (!r.ok) {
       setError(actionText[r.reason]);
+      playMemePool('wrong', { cooldownMs: 1200 });
       play('error');
-    } else setError(null);
+    } else {
+      setError(null);
+      if (a.type === 'sell') playMemePool('broke', { cooldownMs: 1800 });
+      else if (a.type === 'buyout') playMemePool('troll', { cooldownMs: 1400 });
+      else if (a.type === 'useTicket' || a.type === 'payJail') playMemePool('forgive', { cooldownMs: 1800 });
+      else if (a.type === 'stayJail') playMemePool('defense', { cooldownMs: 2200 });
+      else if (a.type === 'skip') playMemePool('forgive', { cooldownMs: 2400 });
+    }
     return r.ok;
   };
 

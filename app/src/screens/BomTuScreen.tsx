@@ -13,7 +13,7 @@ import { Portrait } from '../components/Avatar';
 import { NameText } from '../components/Cosmetics';
 import { KeyboardLift } from '../components/KeyboardLift';
 import { useOnChange, useSecondsLeft, useStableWindow } from '../hooks';
-import { playMemePool } from '../sound';
+import { play, playMemePool } from '../sound';
 import { UiIcon } from '../components/Icons';
 
 export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
@@ -52,8 +52,28 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
   }, [pulse, panic]);
 
   const aliveSet = useMemo(() => new Set(view.alive), [view.alive]);
+  const lastRecent = view.recent[view.recent.length - 1];
+  useOnChange(lastRecent?.id ?? 0, (id) => {
+    if (!id || !lastRecent) return;
+    if (lastRecent.boom) {
+      playMemePool('bomb', { cooldownMs: 1000 });
+      play('boom');
+    } else if (lastRecent.playerId !== me) {
+      playMemePool('turn_move', { cooldownMs: 2400 });
+      play('pop');
+    }
+  });
   useOnChange(view.alive.length, (len) => {
-    if (len < view.order.length) playMemePool('bomb', { cooldownMs: 1800 });
+    if (len < view.order.length) {
+      playMemePool('eliminated', { cooldownMs: 1200 });
+      play('ko');
+    }
+  });
+  useOnChange(panic && isHolder, (isPanic) => {
+    if (isPanic) {
+      playMemePool('shock', { cooldownMs: 3000 });
+      play('siren');
+    }
   });
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);
 
@@ -65,10 +85,12 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act({ type: 'bt_submit', word: clean });
     setBusy(false);
     if (!res.ok) {
-      playMemePool('wrong', { cooldownMs: 1600 });
+      playMemePool('wrong', { cooldownMs: 1000 });
+      play('error');
       setErr(actionText[res.reason] ?? 'Từ chưa hợp lệ');
     } else {
-      playMemePool('turn_move', { cooldownMs: 2400 });
+      playMemePool('turn_move', { cooldownMs: 2000 });
+      play('stamp');
       setWord('');
     }
   };

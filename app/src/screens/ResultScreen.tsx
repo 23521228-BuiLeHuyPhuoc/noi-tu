@@ -34,10 +34,8 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const pal = backdropPalette(activeThemeId);
 
   useEffect(() => {
+    playMemePool(hasWinner ? (iWon ? 'win' : 'lose') : 'shock', { cooldownMs: 800 });
     play(iWon || !hasWinner ? 'win' : 'lose');
-    if (hasWinner) {
-      playMemePool(iWon ? 'win' : 'lose', { cooldownMs: 800 });
-    }
   }, [iWon, hasWinner]);
 
   const cleanHeadline = r.headline.replace(/!+$/g, '').trim();

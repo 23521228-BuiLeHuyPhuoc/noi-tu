@@ -41,12 +41,16 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     vi.useRealTimers();
   });
 
-  it('có ít nhất 150 cặp từ tiếng Việt phân loại rõ ràng', () => {
-    expect(GIAN_DIEP_WORDS.length).toBeGreaterThanOrEqual(150);
+  it('có ít nhất 300 cặp từ tiếng Việt phân loại rõ ràng và không trùng nhau', () => {
+    expect(GIAN_DIEP_WORDS.length).toBeGreaterThanOrEqual(300);
+    const seenWords = new Set<string>();
     for (const pair of GIAN_DIEP_WORDS) {
       expect(pair.wordA).not.toBe(pair.wordB);
       expect(pair.cluesA.length).toBeGreaterThanOrEqual(2);
       expect(pair.cluesB.length).toBeGreaterThanOrEqual(2);
+      const pairKey = [pair.wordA.toLowerCase(), pair.wordB.toLowerCase()].sort().join('|');
+      expect(seenWords.has(pairKey)).toBe(false);
+      seenWords.add(pairKey);
     }
   });
 
@@ -390,5 +394,65 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     }
     expect(gb.view('p0').phase).toBe('final_vote');
     gb.dispose();
+  });
+
+  it('quyền hòa phán quyết cuối 1 lần: hòa lần đầu được tha bổng, hòa lần 2 bị trục xuất', () => {
+    vi.useFakeTimers();
+    const { ctx } = makeCtx(() => 0.9999, { turnMs: 2000, giandiepMrWhite: false, giandiepSpies: 1 });
+    const g = new GianDiepGame(ctx);
+    // 5 người -> 1 Spy (p0) + 4 Dân (p1..p4); cử tri final_vote là 4 người khác bị cáo p2 -> dễ chia 2 loại / 2 tha
+    g.start(makePlayers(5));
+    vi.advanceTimersByTime(2100);
+
+    // Vòng 1: vote p2 lên thớt -> final_vote hòa 2 banish / 2 forgive -> p2 sống & ghi nhận tiePardonUsed
+    for (let i = 0; i < 5; i++) g.action(g.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý vòng 1 #${i}` });
+    for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
+    for (const id of g.view('p0').alive) g.action(id, { type: 'gd_ready' });
+    for (const id of ['p0', 'p1', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p2' });
+    g.action('p2', { type: 'gd_vote', target: 'p0' });
+    vi.advanceTimersByTime(2100);
+    g.action('p2', { type: 'gd_ready' });
+    expect(g.view('p0').phase).toBe('final_vote');
+
+    g.action('p0', { type: 'gd_verdict', verdict: 'banish' });
+    g.action('p1', { type: 'gd_verdict', verdict: 'banish' });
+    g.action('p3', { type: 'gd_verdict', verdict: 'forgive' });
+    g.action('p4', { type: 'gd_verdict', verdict: 'forgive' });
+    vi.advanceTimersByTime(2100);
+
+    const vAfterTie1 = g.view('p0');
+    expect(vAfterTie1.round).toBe(2);
+    expect(vAfterTie1.alive).toHaveLength(5);
+    expect(vAfterTie1.tiePardonUsed).toEqual(['p2']);
+    expect(
+      vAfterTie1.timeline.some(
+        (it) => it.kind === 'system' && it.text.includes('được tha bổng') && it.text.includes('quyền hòa 1 lần'),
+      ),
+    ).toBe(true);
+
+    // Vòng 2: p2 tiếp tục lên thớt -> hòa 2 banish / 2 forgive lần 2 -> hết quyền hòa -> bị trục xuất!
+    for (let i = 0; i < 5; i++) g.action(g.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý vòng 2 #${i}` });
+    for (const id of ['p0', 'p1', 'p2']) g.action(id, { type: 'gd_ready' });
+    for (const id of g.view('p0').alive) g.action(id, { type: 'gd_ready' });
+    for (const id of ['p0', 'p1', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p2' });
+    g.action('p2', { type: 'gd_vote', target: 'p0' });
+    vi.advanceTimersByTime(2100);
+    g.action('p2', { type: 'gd_ready' });
+
+    g.action('p0', { type: 'gd_verdict', verdict: 'banish' });
+    g.action('p1', { type: 'gd_verdict', verdict: 'banish' });
+    g.action('p3', { type: 'gd_verdict', verdict: 'forgive' });
+    g.action('p4', { type: 'gd_verdict', verdict: 'forgive' });
+    vi.advanceTimersByTime(2100);
+
+    const vAfterTie2 = g.view('p0');
+    expect(vAfterTie2.alive).toHaveLength(4);
+    expect(vAfterTie2.eliminated.map((e) => e.id)).toContain('p2');
+    expect(
+      vAfterTie2.timeline.some(
+        (it) => it.kind === 'system' && it.text.includes('hết quyền hòa') && it.text.includes('trục xuất'),
+      ),
+    ).toBe(true);
+    g.dispose();
   });
 });

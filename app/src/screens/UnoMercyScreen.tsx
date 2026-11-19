@@ -428,33 +428,36 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
 
     switch (view.lastBanner.kind) {
       case 'mercy_ko':
-        play(view.lastBanner.targetId === me ? 'ko' : 'boom');
         playMemePool('eliminated', { cooldownMs: 2000 });
+        play(view.lastBanner.targetId === me ? 'ko' : 'boom');
         break;
       case 'stack':
+        playMemePool('troll', { cooldownMs: view.drawStack >= 4 ? 1800 : 2400 });
         play(view.drawStack >= 10 ? 'zap' : 'punch');
-        if (view.drawStack >= 4) playMemePool('troll', { cooldownMs: 2200 });
         break;
       case 'swap_7':
-        play('whoosh');
         playMemePool('twist', { cooldownMs: 2400 });
+        play('whoosh');
         break;
       case 'rotate_0':
-        play('spin');
         playMemePool('twist', { cooldownMs: 2400 });
+        play('spin');
         break;
       case 'discard_all':
+        playMemePool('win', { cooldownMs: 1800 });
         play('rocket');
         break;
       case 'skip_all':
+        playMemePool('troll', { cooldownMs: 2000 });
         play('stamp');
         break;
       case 'roulette':
+        playMemePool('shock', { cooldownMs: 1800 });
         play('dice');
         break;
       case 'uno_catch':
-        play('siren');
         playMemePool('shock', { cooldownMs: 2200 });
+        play('siren');
         break;
     }
   });
@@ -638,24 +641,28 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
 
   const handleDrawPress = useCallback(() => {
     if (!isMyTurn || view.phase !== 'playing' || view.drewThisTurn || busy) return;
+    playMemePool(view.drawStack > 0 || view.roulettePending ? 'lose' : 'turn_move', { cooldownMs: 1800 });
     play('pop');
     void runAction({ type: 'um_draw' });
-  }, [isMyTurn, view.phase, view.drewThisTurn, busy, runAction]);
+  }, [isMyTurn, view.phase, view.drewThisTurn, view.drawStack, view.roulettePending, busy, runAction]);
 
   const handlePassPress = useCallback(() => {
     if (!isMyTurn || !view.drewThisTurn || busy) return;
+    playMemePool('wrong', { cooldownMs: 2200 });
     play('pop');
     void runAction({ type: 'um_pass' });
   }, [isMyTurn, view.drewThisTurn, busy, runAction]);
 
   const handleShoutUnoPress = useCallback(() => {
     if (!showShoutUno || busy) return;
+    playMemePool('win', { cooldownMs: 1400 });
     play('sparkle');
     void runAction({ type: 'um_shout_uno' });
   }, [showShoutUno, busy, runAction]);
 
   const handleCatchUnoPress = useCallback(() => {
     if (!catchTargetId || busy) return;
+    playMemePool('troll', { cooldownMs: 1400 });
     play('siren');
     void runAction({ type: 'um_catch_uno', targetId: catchTargetId });
   }, [catchTargetId, busy, runAction]);

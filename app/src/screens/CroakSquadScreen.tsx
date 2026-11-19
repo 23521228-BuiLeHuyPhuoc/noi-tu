@@ -56,7 +56,16 @@ function getCroakAudioCtx(): AudioContext | null {
 }
 
 function playCroakSfx(sfx: CroakSoundFx): void {
-  if (Platform.OS !== 'web' || isMuted()) return;
+  if (isMuted()) return;
+  if (sfx === 'swallow' || sfx === 'spit') playMemePool('troll', { cooldownMs: 1800 });
+  else if (sfx === 'bounce') playMemePool('turn_move', { cooldownMs: 3000 });
+  else if (sfx === 'switch') playMemePool('twist', { cooldownMs: 2200 });
+  else if (sfx === 'key') playMemePool('money', { cooldownMs: 1800 });
+  else if (sfx === 'checkpoint') playMemePool('correct', { cooldownMs: 2200 });
+  else if (sfx === 'stage_clear') playMemePool('win', { cooldownMs: 1800 });
+  else if (sfx === 'die') playMemePool('bite', { cooldownMs: 2200 });
+
+  if (Platform.OS !== 'web') return;
   try {
     const ctx = getCroakAudioCtx();
     if (!ctx) return;
@@ -91,7 +100,6 @@ function playCroakSfx(sfx: CroakSoundFx): void {
       osc.start(now);
       osc.stop(now + 0.16);
     } else if (sfx === 'switch' || sfx === 'key' || sfx === 'checkpoint' || sfx === 'stage_clear') {
-      if (sfx === 'stage_clear') playMemePool('win', { cooldownMs: 2000 });
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.setValueAtTime(660, now + 0.06);
@@ -101,7 +109,6 @@ function playCroakSfx(sfx: CroakSoundFx): void {
       osc.start(now);
       osc.stop(now + 0.26);
     } else if (sfx === 'die') {
-      playMemePool('bite', { cooldownMs: 2500 });
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(300, now);
       osc.frequency.exponentialRampToValueAtTime(95, now + 0.19);

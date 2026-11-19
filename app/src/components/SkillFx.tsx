@@ -981,6 +981,7 @@ export function SkillLayer({
       const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       if (e.kind === "entrance") {
+        playMemePool("welcome", { cooldownMs: 2200 });
         play("sparkle");
         setShows((xs) => [
           ...xs.slice(-2),
@@ -996,8 +997,8 @@ export function SkillLayer({
       if (e.kind === "gift") {
         const item = shopItem(e.gift);
         const toMe = e.to === game.me;
-        play(e.gift === "gift_rose" ? "sparkle" : "win");
         playMemePool("gift", { cooldownMs: 1200 });
+        play(e.gift === "gift_rose" ? "sparkle" : "win");
         if (toMe) vibrate([60, 40, 120]);
         setShows((xs) => [
           ...xs.slice(-2),
@@ -1190,12 +1191,12 @@ export function SkillLayer({
       ) {
         setMood(e.to, k === "blackhole" || k === "bsod_crash" || k === "ban_hammer" ? "dizzy" : k === "clown_honk" ? "cry" : "shock", 3600);
         setWobble(e.to, k === "blackhole" || k === "rainbow_overload" ? "spin" : "shake", 2400);
-        play(k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement" ? "boom" : k === "paparazzi" || k === "bsod_crash" ? "zap" : "siren");
         if (k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement") {
           playMemePool("shock");
         } else if (k === "clown_honk" || k === "gold_slipper_storm" || k === "coffin_meme") {
           playMemePool("troll");
         }
+        play(k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement" ? "boom" : k === "paparazzi" || k === "bsod_crash" ? "zap" : "siren");
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         const burstEmoji: Record<string, string> = {
           paparazzi: "📸", ghost_scare: "👻", royal_seal: "🏮", meteor: "💥", blackhole: "🌀", dragon_roar: "🐉",

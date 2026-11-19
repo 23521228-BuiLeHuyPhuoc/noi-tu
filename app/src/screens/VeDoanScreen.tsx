@@ -16,7 +16,7 @@ import type { Game } from '../useGame';
 import { backdropPalette, C, FONT, sticker } from '../theme';
 import { actionText } from '../messages';
 import { useOnChange, useStableWindow } from '../hooks';
-import { playMemePool } from '../sound';
+import { play, playMemePool } from '../sound';
 import { Button, T } from '../ui';
 import { Shell } from '../components/Shell';
 import { CountdownBar } from '../components/TimerBar';
@@ -181,17 +181,34 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const lastFeed = view.feed[view.feed.length - 1];
+  useOnChange(lastFeed?.id ?? 0, (id) => {
+    if (!id || !lastFeed || lastFeed.hit) return;
+    if (lastFeed.close) {
+      playMemePool('twist', { cooldownMs: 1200 });
+      play('sparkle');
+    } else if (lastFeed.playerId === me) {
+      playMemePool('wrong', { cooldownMs: 900 });
+      play('error');
+    } else {
+      playMemePool('wrong', { cooldownMs: 2000 });
+    }
+  });
+
   useOnChange(view.guessedIds.length, (len) => {
-    if (len > 0) playMemePool('correct');
+    if (len > 0) {
+      playMemePool('correct', { cooldownMs: 1000 });
+      play('stamp');
+    }
   });
 
   useOnChange(view.phase, (ph) => {
     if (ph === 'pick_word') {
-      playMemePool('welcome', { cooldownMs: 2800 });
+      playMemePool('welcome', { cooldownMs: 2600 });
     } else if (ph === 'drawing') {
-      playMemePool('turn_move', { cooldownMs: 2400 });
-    } else if (ph === 'round_end' && view.guessedIds.length === 0) {
-      playMemePool('wrong');
+      playMemePool('turn_move', { cooldownMs: 2200 });
+    } else if (ph === 'round_end') {
+      playMemePool(view.guessedIds.length === 0 ? 'wrong' : 'win', { cooldownMs: 1400 });
     }
   });
 
@@ -520,7 +537,11 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
       setErr(null);
       const res = await game.act(payload);
       setBusy(false);
-      if (!res.ok) setErr(actionText[res.reason] ?? 'Không thực hiện được');
+      if (!res.ok) {
+        playMemePool('wrong', { cooldownMs: 1100 });
+        play('error');
+        setErr(actionText[res.reason] ?? 'Không thực hiện được');
+      }
       return res.ok;
     },
     [game],
@@ -857,6 +878,8 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                       onPress={() => {
                         erasedInFlightRef.current.set.clear();
                         setErasedTracker({ turn: view.turnIndex, ids: [] });
+                        playMemePool('shock', { cooldownMs: 2400 });
+                        play('whoosh');
                         void act({ type: 'vd_clear' });
                       }}
                       style={styles.toolMiniBtn}

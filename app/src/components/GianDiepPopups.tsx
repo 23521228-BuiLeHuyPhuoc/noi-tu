@@ -885,6 +885,7 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
       .find((m) => m.round === view.round && m.kind === 'defense' && m.playerId === accId)?.text;
     const isSelfProtected = accId === me && view.alive.length > 2;
     const quoteText = latestDef ?? accClue;
+    const usedTiePardon = Boolean(view.tiePardonUsed?.includes(accId));
 
     return (
       <View testID="gd-verdict-modal" style={[styles.liveCard, styles.liveCardElevation]}>
@@ -917,6 +918,11 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
             {allVerdicted
               ? `Cả phòng đã chọn — bấm Xác nhận để sang bước tiếp theo (${sec}s)`
               : `Đổi quyết định tự do tới khi hết giờ (${sec}s)`}
+          </T>
+          <T style={[styles.liveSubtleNote, { color: usedTiePardon ? GD.danger : GD.textSecondary }]}>
+            {usedTiePardon
+              ? 'Đã hết quyền hòa (1/1) — hòa phiếu lần này sẽ bị trục xuất!'
+              : 'Hòa phiếu lần đầu được tha bổng (hiệu lực 1 lần)'}
           </T>
 
           <View style={styles.accusedCompactRow}>

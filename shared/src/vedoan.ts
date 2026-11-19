@@ -1,5 +1,5 @@
 /**
- * Kiểu dữ liệu, 200+ từ khóa & 62 bộ nét vẽ vector đa sắc cho game Vẽ & Đoán (`ve_doan`).
+ * Kiểu dữ liệu, 1.050+ từ khóa & 120 bộ nét vẽ vector đa sắc cho game Vẽ & Đoán (`ve_doan`).
  */
 
 export type VeDoanPhase = 'pick_word' | 'drawing' | 'round_end';
@@ -396,7 +396,7 @@ function wavePts(
 }
 
 /**
- * 62 bộ nét vector đa sắc chuẩn hóa [0..1000, 0..1000] (mỗi hình 4–8 nét, >= 2 màu)
+ * 120 bộ nét vector đa sắc chuẩn hóa [0..1000, 0..1000] (mỗi hình 4–8 nét, >= 2 màu)
  * giúp Bot vẽ từng nét sống động và người chơi nhận diện ngay lập tức.
  */
 export const BOT_SKETCHES: Record<string, VeDoanStroke[]> = {
@@ -911,6 +911,431 @@ export const BOT_SKETCHES: Record<string, VeDoanStroke[]> = {
     { color: C.pink, width: 9, points: [[385, 355], [715, 285]] },
     { color: C.yellow, width: 9, points: starPts(230, 360, 42, 18, 4) },
   ],
+  // +58 bộ nét vẽ mới đa sắc cho Bot (tổng 120 hình)
+  'lâu đài': [
+    { color: C.blue, width: 16, points: rectPts(280, 420, 720, 810) },
+    { color: C.purple, width: 16, points: rectPts(200, 320, 305, 810) },
+    { color: C.purple, width: 16, points: rectPts(695, 320, 800, 810) },
+    { color: C.red, width: 16, points: [[190, 320], [252, 175], [315, 320]] },
+    { color: C.red, width: 16, points: [[685, 320], [748, 175], [810, 320]] },
+    { color: C.red, width: 16, points: [[425, 420], [500, 205], [575, 420]] },
+    { color: C.brown, width: 16, points: [[420, 810], [420, 610], [500, 560], [580, 610], [580, 810]] },
+  ],
+  'cối xay gió': [
+    { color: C.brown, width: 16, points: [[375, 825], [435, 390], [565, 390], [625, 825], [375, 825]] },
+    { color: C.red, width: 16, points: [[420, 390], [500, 270], [580, 390]] },
+    { color: C.orange, width: 9, points: [[500, 435], [260, 225], [295, 195], [500, 435]] },
+    { color: C.orange, width: 9, points: [[500, 435], [740, 225], [770, 260], [500, 435]] },
+    { color: C.orange, width: 9, points: [[500, 435], [260, 645], [295, 680], [500, 435]] },
+    { color: C.orange, width: 9, points: [[500, 435], [740, 645], [705, 680], [500, 435]] },
+    { color: C.yellow, width: 16, points: circlePts(500, 435, 32, 12) },
+  ],
+  'kim tự tháp': [
+    { color: C.yellow, width: 16, points: [[150, 775], [470, 235], [835, 775], [150, 775]] },
+    { color: C.orange, width: 9, points: [[470, 235], [585, 775]] },
+    { color: C.brown, width: 9, points: [[245, 615], [550, 615], [745, 615]] },
+    { color: C.brown, width: 9, points: [[340, 455], [518, 455], [645, 455]] },
+    { color: C.orange, width: 16, points: circlePts(780, 220, 65, 16) },
+  ],
+  'tàu ngầm': [
+    { color: C.yellow, width: 16, points: ellipsePts(500, 560, 315, 130, 24) },
+    { color: C.orange, width: 16, points: [[420, 435], [450, 315], [580, 315], [600, 435]] },
+    { color: C.black, width: 9, points: [[515, 315], [515, 225], [575, 225]] },
+    { color: C.blue, width: 9, points: circlePts(365, 560, 42, 12) },
+    { color: C.blue, width: 9, points: circlePts(500, 560, 42, 12) },
+    { color: C.blue, width: 9, points: circlePts(635, 560, 42, 12) },
+  ],
+  'trực thăng': [
+    { color: C.teal, width: 16, points: ellipsePts(455, 535, 200, 115, 20) },
+    { color: C.teal, width: 16, points: [[645, 515], [845, 495], [845, 535], [645, 550]] },
+    { color: C.black, width: 9, points: [[190, 360], [720, 360]] },
+    { color: C.black, width: 9, points: [[455, 360], [455, 420]] },
+    { color: C.blue, width: 9, points: arcPts(410, 515, 120, 75, Math.PI, Math.PI * 1.75, 12) },
+    { color: C.black, width: 9, points: [[315, 705], [615, 705], [565, 650], [365, 650]] },
+  ],
+  'khinh khí cầu': [
+    { color: C.red, width: 16, points: [[305, 425], [270, 290], [350, 165], [500, 135], [650, 165], [730, 290], [695, 425], [575, 610], [425, 610], [305, 425]] },
+    { color: C.yellow, width: 9, points: [[500, 135], [440, 365], [465, 610]] },
+    { color: C.blue, width: 9, points: [[500, 135], [560, 365], [535, 610]] },
+    { color: C.brown, width: 9, points: [[445, 610], [445, 705]] },
+    { color: C.brown, width: 9, points: [[555, 610], [555, 705]] },
+    { color: C.brown, width: 16, points: rectPts(420, 705, 580, 815) },
+  ],
+  'xe cứu hỏa': [
+    { color: C.red, width: 16, points: [[180, 680], [180, 445], [585, 445], [585, 405], [750, 405], [820, 520], [820, 680], [180, 680]] },
+    { color: C.blue, width: 9, points: rectPts(620, 440, 760, 525) },
+    { color: C.yellow, width: 16, points: [[220, 390], [560, 325], [560, 370], [220, 430]] },
+    { color: C.orange, width: 16, points: circlePts(685, 375, 25, 10) },
+    { color: C.black, width: 16, points: circlePts(320, 705, 72, 16) },
+    { color: C.black, width: 16, points: circlePts(695, 705, 72, 16) },
+  ],
+  'xe cảnh sát': [
+    { color: C.blue, width: 16, points: [[180, 675], [225, 525], [355, 430], [645, 430], [760, 525], [825, 675], [180, 675]] },
+    { color: C.teal, width: 9, points: [[375, 460], [625, 460], [690, 525], [310, 525], [375, 460]] },
+    { color: C.red, width: 16, points: [[450, 415], [500, 365], [500, 415]] },
+    { color: C.blue, width: 16, points: [[500, 415], [500, 365], [550, 415]] },
+    { color: C.black, width: 16, points: circlePts(325, 695, 72, 16) },
+    { color: C.black, width: 16, points: circlePts(680, 695, 72, 16) },
+  ],
+  'xe tải': [
+    { color: C.orange, width: 16, points: rectPts(165, 365, 585, 680) },
+    { color: C.blue, width: 16, points: [[585, 445], [755, 445], [825, 550], [825, 680], [585, 680]] },
+    { color: C.teal, width: 9, points: rectPts(620, 475, 755, 560) },
+    { color: C.black, width: 16, points: circlePts(295, 705, 72, 16) },
+    { color: C.black, width: 16, points: circlePts(705, 705, 72, 16) },
+  ],
+  'xe buýt': [
+    { color: C.yellow, width: 16, points: [[175, 675], [175, 355], [790, 355], [835, 490], [835, 675], [175, 675]] },
+    { color: C.blue, width: 9, points: rectPts(225, 405, 355, 515) },
+    { color: C.blue, width: 9, points: rectPts(395, 405, 525, 515) },
+    { color: C.blue, width: 9, points: rectPts(565, 405, 745, 515) },
+    { color: C.black, width: 16, points: circlePts(320, 700, 72, 16) },
+    { color: C.black, width: 16, points: circlePts(695, 700, 72, 16) },
+  ],
+  'con voi': [
+    { color: C.blue, width: 16, points: ellipsePts(550, 560, 210, 145, 22) },
+    { color: C.blue, width: 16, points: circlePts(315, 475, 110, 18) },
+    { color: C.purple, width: 16, points: ellipsePts(385, 465, 72, 95, 16) },
+    { color: C.blue, width: 16, points: [[225, 510], [160, 625], [205, 685], [250, 645]] },
+    { color: C.blue, width: 16, points: [[425, 695], [425, 815], [475, 815], [635, 815], [635, 695]] },
+    { color: C.black, width: 9, points: [[275, 445], [290, 445]] },
+  ],
+  'con hổ': [
+    { color: C.orange, width: 16, points: circlePts(500, 510, 215, 24) },
+    { color: C.orange, width: 16, points: circlePts(330, 325, 55, 12) },
+    { color: C.orange, width: 16, points: circlePts(670, 325, 55, 12) },
+    { color: C.black, width: 9, points: [[455, 315], [500, 385], [545, 315], [500, 410]] },
+    { color: C.black, width: 9, points: [[315, 490], [385, 510], [685, 490], [615, 510]] },
+    { color: C.black, width: 9, points: [[425, 470], [440, 470], [560, 470], [575, 470]] },
+    { color: C.pink, width: 9, points: [[465, 545], [535, 545], [500, 590], [465, 545]] },
+  ],
+  'con gà': [
+    { color: C.orange, width: 16, points: ellipsePts(510, 595, 180, 145, 22) },
+    { color: C.yellow, width: 16, points: circlePts(365, 395, 95, 18) },
+    { color: C.red, width: 16, points: [[320, 305], [345, 240], [375, 295], [405, 245], [420, 310]] },
+    { color: C.orange, width: 16, points: [[270, 395], [200, 420], [275, 440]] },
+    { color: C.red, width: 16, points: [[685, 540], [785, 455], [760, 555], [815, 535]] },
+    { color: C.brown, width: 9, points: [[460, 740], [460, 825], [560, 740], [560, 825]] },
+  ],
+  'con vịt': [
+    { color: C.yellow, width: 16, points: ellipsePts(525, 610, 195, 130, 22) },
+    { color: C.yellow, width: 16, points: circlePts(365, 395, 95, 18) },
+    { color: C.orange, width: 16, points: [[275, 405], [180, 425], [280, 450]] },
+    { color: C.black, width: 9, points: [[345, 375], [360, 375]] },
+    { color: C.blue, width: 9, points: wavePts(200, 800, 765, 22, 4, 24) },
+  ],
+  'con heo': [
+    { color: C.pink, width: 16, points: circlePts(500, 515, 225, 24) },
+    { color: C.pink, width: 16, points: [[315, 365], [260, 235], [395, 305]] },
+    { color: C.pink, width: 16, points: [[685, 365], [740, 235], [605, 305]] },
+    { color: C.red, width: 9, points: ellipsePts(500, 560, 85, 55, 18) },
+    { color: C.black, width: 16, points: [[465, 560], [475, 560], [525, 560], [535, 560]] },
+    { color: C.black, width: 9, points: [[410, 445], [425, 445], [575, 445], [590, 445]] },
+  ],
+  'con ong': [
+    { color: C.yellow, width: 16, points: ellipsePts(500, 555, 175, 115, 22) },
+    { color: C.black, width: 16, points: [[445, 445], [445, 665]] },
+    { color: C.black, width: 16, points: [[545, 445], [545, 665]] },
+    { color: C.blue, width: 9, points: ellipsePts(445, 385, 75, 105, 16) },
+    { color: C.blue, width: 9, points: ellipsePts(555, 385, 75, 105, 16) },
+    { color: C.black, width: 9, points: [[675, 555], [755, 555]] },
+  ],
+  'con cua': [
+    { color: C.red, width: 16, points: ellipsePts(500, 580, 175, 125, 22) },
+    { color: C.orange, width: 16, points: arcPts(310, 355, 75, 75, 0.4, Math.PI * 1.65, 14) },
+    { color: C.orange, width: 16, points: arcPts(690, 355, 75, 75, -Math.PI * 0.65, Math.PI * 0.6, 14) },
+    { color: C.red, width: 9, points: [[325, 565], [200, 595], [325, 615], [205, 665], [340, 665], [235, 735]] },
+    { color: C.red, width: 9, points: [[675, 565], [800, 595], [675, 615], [795, 665], [660, 665], [765, 735]] },
+    { color: C.black, width: 9, points: [[445, 455], [445, 420], [555, 455], [555, 420]] },
+  ],
+  'con nhện': [
+    { color: C.black, width: 16, points: circlePts(500, 540, 105, 18) },
+    { color: C.black, width: 16, points: circlePts(500, 395, 65, 14) },
+    { color: C.black, width: 9, points: [[400, 495], [220, 415], [160, 515]] },
+    { color: C.black, width: 9, points: [[400, 555], [210, 575], [165, 695]] },
+    { color: C.black, width: 9, points: [[600, 495], [780, 415], [840, 515]] },
+    { color: C.black, width: 9, points: [[600, 555], [790, 575], [835, 695]] },
+    { color: C.red, width: 9, points: [[500, 145], [500, 330]] },
+  ],
+  'cà rốt': [
+    { color: C.orange, width: 16, points: [[375, 360], [625, 360], [500, 845], [375, 360]] },
+    { color: C.green, width: 16, points: [[500, 360], [420, 200], [500, 360], [500, 175], [500, 360], [585, 205]] },
+    { color: C.red, width: 9, points: [[425, 475], [510, 475]] },
+    { color: C.red, width: 9, points: [[460, 610], [545, 610]] },
+  ],
+  'cà chua': [
+    { color: C.red, width: 16, points: ellipsePts(500, 545, 225, 195, 24) },
+    { color: C.green, width: 16, points: [[500, 355], [405, 305], [465, 355], [500, 260], [535, 355], [595, 305], [500, 355]] },
+    { color: C.orange, width: 9, points: arcPts(380, 475, 55, 65, Math.PI, Math.PI * 1.45, 8) },
+    { color: C.green, width: 9, points: [[500, 260], [525, 210]] },
+  ],
+  'quả dứa': [
+    { color: C.yellow, width: 16, points: ellipsePts(500, 600, 175, 215, 24) },
+    { color: C.green, width: 16, points: [[425, 395], [355, 225], [465, 375], [500, 175], [535, 375], [645, 225], [575, 395]] },
+    { color: C.orange, width: 9, points: [[360, 515], [640, 685]] },
+    { color: C.orange, width: 9, points: [[640, 515], [360, 685]] },
+    { color: C.orange, width: 9, points: [[405, 425], [600, 775]] },
+    { color: C.orange, width: 9, points: [[595, 425], [400, 775]] },
+  ],
+  'quả dâu': [
+    { color: C.red, width: 16, points: [[315, 405], [685, 405], [630, 645], [500, 825], [370, 645], [315, 405]] },
+    { color: C.green, width: 16, points: [[365, 395], [435, 330], [500, 385], [565, 330], [635, 395]] },
+    { color: C.green, width: 9, points: [[500, 385], [500, 280]] },
+    { color: C.yellow, width: 9, points: [[415, 515], [430, 515], [555, 515], [570, 515], [490, 635], [505, 635]] },
+  ],
+  'quả nho': [
+    { color: C.green, width: 16, points: [[500, 225], [500, 335], [585, 275]] },
+    { color: C.purple, width: 16, points: circlePts(400, 415, 68, 14) },
+    { color: C.purple, width: 16, points: circlePts(525, 415, 68, 14) },
+    { color: C.purple, width: 16, points: circlePts(635, 415, 68, 14) },
+    { color: C.purple, width: 16, points: circlePts(455, 545, 68, 14) },
+    { color: C.purple, width: 16, points: circlePts(575, 545, 68, 14) },
+    { color: C.purple, width: 16, points: circlePts(515, 675, 68, 14) },
+  ],
+  'cây kem': [
+    { color: C.pink, width: 16, points: arcPts(500, 445, 165, 185, Math.PI, Math.PI * 2, 18) },
+    { color: C.pink, width: 16, points: [[335, 445], [335, 625], [665, 625], [665, 445]] },
+    { color: C.brown, width: 16, points: rectPts(465, 625, 535, 845) },
+    { color: C.yellow, width: 9, points: [[425, 420], [425, 545], [575, 420], [575, 545]] },
+  ],
+  'bánh mì': [
+    { color: C.orange, width: 16, points: ellipsePts(500, 520, 295, 130, 24) },
+    { color: C.brown, width: 9, points: [[345, 455], [400, 535]] },
+    { color: C.brown, width: 9, points: [[465, 440], [525, 525]] },
+    { color: C.brown, width: 9, points: [[595, 455], [650, 535]] },
+  ],
+  'hamburger': [
+    { color: C.orange, width: 16, points: arcPts(500, 445, 225, 155, Math.PI, Math.PI * 2, 18) },
+    { color: C.green, width: 16, points: wavePts(255, 745, 495, 22, 5, 24) },
+    { color: C.brown, width: 16, points: rectPts(265, 535, 735, 615) },
+    { color: C.yellow, width: 9, points: [[315, 535], [495, 605], [675, 535]] },
+    { color: C.orange, width: 16, points: rectPts(275, 635, 725, 725) },
+  ],
+  'bát phở': [
+    { color: C.blue, width: 16, points: arcPts(500, 515, 265, 215, 0, Math.PI, 20) },
+    { color: C.blue, width: 9, points: ellipsePts(500, 515, 265, 55, 20) },
+    { color: C.brown, width: 16, points: rectPts(395, 725, 605, 795) },
+    { color: C.orange, width: 9, points: [[645, 235], [515, 495]] },
+    { color: C.orange, width: 9, points: [[720, 275], [555, 505]] },
+    { color: C.green, width: 9, points: [[395, 435], [375, 355], [405, 285]] },
+  ],
+  'chai nước': [
+    { color: C.red, width: 16, points: rectPts(440, 175, 560, 255) },
+    { color: C.blue, width: 16, points: [[445, 255], [385, 370], [385, 815], [615, 815], [615, 370], [555, 255]] },
+    { color: C.teal, width: 9, points: rectPts(385, 495, 615, 665) },
+    { color: C.teal, width: 9, points: wavePts(395, 595, 580, 16, 2, 16) },
+  ],
+  'cốc nước': [
+    { color: C.blue, width: 16, points: [[335, 275], [665, 275], [615, 795], [385, 795], [335, 275]] },
+    { color: C.teal, width: 9, points: wavePts(360, 640, 480, 18, 2, 18) },
+    { color: C.pink, width: 9, points: [[575, 165], [515, 480]] },
+  ],
+  'ấm trà': [
+    { color: C.teal, width: 16, points: ellipsePts(485, 575, 200, 165, 22) },
+    { color: C.teal, width: 16, points: arcPts(680, 565, 90, 95, -Math.PI * 0.45, Math.PI * 0.45, 12) },
+    { color: C.teal, width: 16, points: [[295, 545], [185, 435], [225, 405], [335, 485]] },
+    { color: C.yellow, width: 16, points: circlePts(485, 385, 35, 12) },
+  ],
+  'cái nồi': [
+    { color: C.black, width: 16, points: rectPts(280, 425, 720, 745) },
+    { color: C.red, width: 16, points: arcPts(500, 425, 220, 90, Math.PI, Math.PI * 2, 18) },
+    { color: C.black, width: 16, points: [[500, 295], [500, 335], [460, 295], [540, 295]] },
+    { color: C.orange, width: 9, points: [[200, 500], [280, 500], [720, 500], [800, 500]] },
+  ],
+  'cái chảo': [
+    { color: C.black, width: 16, points: circlePts(395, 515, 205, 24) },
+    { color: C.black, width: 16, points: circlePts(395, 515, 145, 20) },
+    { color: C.orange, width: 16, points: [[585, 555], [840, 705]] },
+    { color: C.yellow, width: 16, points: circlePts(395, 515, 55, 14) },
+  ],
+  'con dao': [
+    { color: C.blue, width: 16, points: [[200, 620], [565, 265], [645, 345], [525, 490], [200, 620]] },
+    { color: C.brown, width: 16, points: [[200, 620], [115, 710], [175, 770], [275, 675]] },
+    { color: C.teal, width: 9, points: [[280, 580], [555, 305]] },
+    { color: C.red, width: 9, points: [[645, 665], [765, 665]] },
+  ],
+  'cây kéo': [
+    { color: C.blue, width: 16, points: [[275, 345], [765, 665]] },
+    { color: C.blue, width: 16, points: [[275, 665], [765, 345]] },
+    { color: C.red, width: 16, points: circlePts(245, 315, 72, 16) },
+    { color: C.red, width: 16, points: circlePts(245, 695, 72, 16) },
+  ],
+  'cái búa': [
+    { color: C.brown, width: 16, points: rectPts(465, 365, 535, 835) },
+    { color: C.black, width: 16, points: rectPts(285, 225, 700, 365) },
+    { color: C.red, width: 9, points: [[685, 225], [790, 295], [685, 365]] },
+    { color: C.orange, width: 9, points: [[465, 665], [535, 665]] },
+  ],
+  'túi xách': [
+    { color: C.pink, width: 16, points: [[250, 405], [750, 405], [795, 795], [205, 795], [250, 405]] },
+    { color: C.brown, width: 16, points: arcPts(500, 405, 130, 155, Math.PI, Math.PI * 2, 16) },
+    { color: C.yellow, width: 16, points: rectPts(455, 535, 545, 615) },
+    { color: C.purple, width: 9, points: [[235, 520], [765, 520]] },
+  ],
+  'chiếc giày': [
+    { color: C.blue, width: 16, points: [[240, 355], [440, 355], [495, 515], [775, 545], [815, 675], [220, 675], [240, 355]] },
+    { color: C.black, width: 16, points: [[215, 695], [820, 695]] },
+    { color: C.red, width: 9, points: [[475, 445], [535, 445], [505, 495], [565, 495]] },
+    { color: C.yellow, width: 9, points: [[260, 565], [425, 565]] },
+  ],
+  'cái mũ': [
+    { color: C.orange, width: 16, points: arcPts(470, 515, 195, 195, Math.PI, Math.PI * 2, 20) },
+    { color: C.orange, width: 16, points: [[255, 515], [815, 515], [785, 555], [255, 555]] },
+    { color: C.red, width: 16, points: circlePts(470, 305, 32, 10) },
+    { color: C.blue, width: 9, points: [[470, 330], [555, 515]] },
+  ],
+  'chiếc áo': [
+    { color: C.teal, width: 16, points: [[340, 260], [660, 260], [800, 415], [715, 505], [635, 415], [635, 795], [365, 795], [365, 415], [285, 505], [200, 415], [340, 260]] },
+    { color: C.yellow, width: 9, points: arcPts(500, 260, 75, 55, 0, Math.PI, 12) },
+    { color: C.red, width: 9, points: starPts(500, 505, 65, 28, 5) },
+    { color: C.blue, width: 9, points: [[365, 745], [635, 745]] },
+  ],
+  'quyển sách': [
+    { color: C.blue, width: 16, points: [[200, 300], [500, 350], [500, 740], [200, 690], [200, 300]] },
+    { color: C.blue, width: 16, points: [[800, 300], [500, 350], [500, 740], [800, 690], [800, 300]] },
+    { color: C.black, width: 9, points: [[255, 415], [440, 445], [255, 505], [440, 535]] },
+    { color: C.black, width: 9, points: [[560, 445], [745, 415], [560, 535], [745, 505]] },
+  ],
+  'bút chì': [
+    { color: C.yellow, width: 16, points: [[275, 745], [675, 345], [745, 415], [345, 815], [275, 745]] },
+    { color: C.pink, width: 16, points: [[675, 345], [745, 275], [815, 345], [745, 415]] },
+    { color: C.orange, width: 16, points: [[275, 745], [200, 865], [345, 815]] },
+    { color: C.black, width: 16, points: [[200, 865], [240, 835]] },
+  ],
+  'tivi': [
+    { color: C.black, width: 16, points: rectPts(200, 315, 800, 705) },
+    { color: C.blue, width: 9, points: rectPts(245, 360, 755, 655) },
+    { color: C.black, width: 9, points: [[500, 315], [375, 195], [500, 315], [625, 195]] },
+    { color: C.black, width: 16, points: [[420, 705], [420, 780], [580, 780], [580, 705]] },
+  ],
+  'tủ lạnh': [
+    { color: C.teal, width: 16, points: rectPts(320, 175, 680, 835) },
+    { color: C.black, width: 9, points: [[320, 425], [680, 425]] },
+    { color: C.blue, width: 16, points: [[620, 265], [620, 375]] },
+    { color: C.blue, width: 16, points: [[620, 495], [620, 695]] },
+  ],
+  'máy ảnh': [
+    { color: C.black, width: 16, points: rectPts(205, 345, 795, 735) },
+    { color: C.black, width: 16, points: rectPts(395, 255, 605, 345) },
+    { color: C.blue, width: 16, points: circlePts(500, 540, 125, 22) },
+    { color: C.teal, width: 9, points: circlePts(500, 540, 68, 16) },
+    { color: C.yellow, width: 16, points: [[275, 425], [315, 425]] },
+  ],
+  'loa': [
+    { color: C.black, width: 16, points: rectPts(310, 200, 690, 815) },
+    { color: C.blue, width: 16, points: circlePts(500, 345, 65, 16) },
+    { color: C.purple, width: 16, points: circlePts(500, 615, 130, 22) },
+    { color: C.orange, width: 9, points: circlePts(500, 615, 52, 12) },
+  ],
+  'micro': [
+    { color: C.purple, width: 16, points: ellipsePts(500, 355, 95, 130, 20) },
+    { color: C.black, width: 9, points: [[405, 355], [595, 355]] },
+    { color: C.black, width: 16, points: [[465, 485], [535, 485], [515, 760], [485, 760], [465, 485]] },
+    { color: C.pink, width: 9, points: [[500, 760], [470, 845], [565, 865]] },
+  ],
+  'đèn pin': [
+    { color: C.black, width: 16, points: rectPts(200, 445, 535, 575) },
+    { color: C.orange, width: 16, points: [[535, 445], [645, 375], [645, 645], [535, 575]] },
+    { color: C.yellow, width: 9, points: [[670, 435], [840, 325], [675, 510], [875, 510], [670, 585], [840, 695]] },
+    { color: C.red, width: 16, points: [[345, 445], [385, 445]] },
+  ],
+  'cái trống': [
+    { color: C.red, width: 16, points: [[250, 385], [750, 385], [750, 685], [250, 685], [250, 385]] },
+    { color: C.yellow, width: 16, points: ellipsePts(500, 385, 250, 68, 22) },
+    { color: C.yellow, width: 9, points: [[250, 415], [385, 685], [500, 415], [615, 685], [750, 415]] },
+    { color: C.brown, width: 9, points: [[345, 210], [500, 375], [655, 210], [500, 375]] },
+  ],
+  'chiếc nhẫn': [
+    { color: C.yellow, width: 16, points: circlePts(500, 575, 195, 24) },
+    { color: C.yellow, width: 9, points: circlePts(500, 575, 145, 20) },
+    { color: C.teal, width: 16, points: [[420, 305], [500, 210], [580, 305], [500, 385], [420, 305]] },
+    { color: C.orange, width: 9, points: starPts(655, 215, 42, 18, 4) },
+  ],
+  'kim cương': [
+    { color: C.teal, width: 16, points: [[315, 265], [685, 265], [820, 445], [500, 815], [180, 445], [315, 265]] },
+    { color: C.blue, width: 9, points: [[180, 445], [820, 445]] },
+    { color: C.blue, width: 9, points: [[395, 265], [355, 445], [500, 815], [645, 445], [605, 265]] },
+    { color: C.yellow, width: 9, points: starPts(765, 210, 42, 18, 4) },
+  ],
+  'con dấu': [
+    { color: C.brown, width: 16, points: circlePts(500, 295, 95, 18) },
+    { color: C.brown, width: 16, points: [[460, 385], [460, 565], [540, 565], [540, 385]] },
+    { color: C.red, width: 16, points: rectPts(280, 565, 720, 680) },
+    { color: C.red, width: 16, points: [[245, 735], [755, 735]] },
+  ],
+  'lá cờ': [
+    { color: C.brown, width: 16, points: [[250, 195], [250, 855]] },
+    { color: C.red, width: 16, points: rectPts(265, 215, 775, 535) },
+    { color: C.yellow, width: 16, points: starPts(520, 375, 105, 44, 5) },
+    { color: C.brown, width: 16, points: [[205, 855], [315, 855]] },
+  ],
+  'bánh chưng': [
+    { color: C.green, width: 16, points: rectPts(240, 240, 760, 760) },
+    { color: C.orange, width: 9, points: [[500, 240], [500, 760]] },
+    { color: C.orange, width: 9, points: [[240, 500], [760, 500]] },
+    { color: C.orange, width: 9, points: [[375, 240], [375, 760], [625, 240], [625, 760]] },
+  ],
+  'hoa sen': [
+    { color: C.pink, width: 16, points: [[500, 225], [420, 455], [500, 625], [580, 455], [500, 225]] },
+    { color: C.pink, width: 16, points: [[305, 345], [345, 555], [500, 625], [220, 505], [305, 345]] },
+    { color: C.pink, width: 16, points: [[695, 345], [655, 555], [500, 625], [780, 505], [695, 345]] },
+    { color: C.green, width: 16, points: arcPts(500, 635, 285, 95, 0, Math.PI, 18) },
+    { color: C.blue, width: 9, points: wavePts(200, 800, 785, 18, 3, 18) },
+  ],
+  'pháo hoa': [
+    { color: C.red, width: 9, points: [[500, 385], [500, 165], [500, 385], [705, 255], [500, 385], [725, 455]] },
+    { color: C.yellow, width: 9, points: [[500, 385], [295, 255], [500, 385], [275, 455], [500, 385], [360, 575]] },
+    { color: C.purple, width: 9, points: [[500, 385], [640, 575], [500, 385], [500, 605]] },
+    { color: C.orange, width: 9, points: [[500, 560], [500, 825]] },
+    { color: C.teal, width: 9, points: starPts(270, 690, 48, 20, 4) },
+  ],
+  'sóng biển': [
+    { color: C.blue, width: 16, points: [[160, 665], [290, 345], [495, 290], [600, 395], [505, 465], [640, 595], [840, 665]] },
+    { color: C.teal, width: 9, points: wavePts(160, 840, 745, 28, 3, 24) },
+    { color: C.yellow, width: 16, points: circlePts(745, 240, 68, 16) },
+    { color: C.blue, width: 9, points: arcPts(545, 370, 75, 60, Math.PI * 0.2, Math.PI * 1.4, 10) },
+  ],
+  'khủng long': [
+    { color: C.green, width: 16, points: [[220, 685], [375, 575], [475, 325], [625, 255], [725, 315], [645, 395], [560, 405], [545, 655], [220, 685]] },
+    { color: C.orange, width: 9, points: [[445, 340], [385, 365], [425, 435], [355, 485], [395, 545]] },
+    { color: C.green, width: 16, points: [[435, 665], [435, 815], [535, 665], [535, 815]] },
+    { color: C.black, width: 9, points: [[620, 295], [635, 295]] },
+  ],
+  'kỳ lân': [
+    { color: C.pink, width: 16, points: circlePts(445, 455, 155, 22) },
+    { color: C.yellow, width: 16, points: [[420, 305], [450, 135], [495, 305]] },
+    { color: C.purple, width: 16, points: [[340, 355], [285, 265], [375, 315]] },
+    { color: C.teal, width: 9, points: [[575, 395], [675, 445], [585, 515], [695, 565]] },
+    { color: C.black, width: 9, points: [[400, 445], [420, 445]] },
+  ],
+  'nàng tiên cá': [
+    { color: C.pink, width: 16, points: circlePts(500, 275, 85, 18) },
+    { color: C.red, width: 9, points: [[425, 230], [375, 385], [575, 230], [625, 385]] },
+    { color: C.teal, width: 16, points: [[445, 520], [555, 520], [525, 725], [415, 835], [500, 775], [585, 835], [525, 725]] },
+    { color: C.purple, width: 16, points: [[445, 365], [445, 520], [555, 520], [555, 365]] },
+  ],
+  'người máy': [
+    { color: C.blue, width: 16, points: rectPts(355, 225, 645, 435) },
+    { color: C.black, width: 9, points: [[500, 145], [500, 225], [495, 145], [510, 145]] },
+    { color: C.yellow, width: 16, points: circlePts(435, 315, 32, 10) },
+    { color: C.yellow, width: 16, points: circlePts(565, 315, 32, 10) },
+    { color: C.teal, width: 16, points: rectPts(320, 455, 680, 735) },
+    { color: C.red, width: 9, points: [[220, 485], [320, 485], [680, 485], [780, 485]] },
+  ],
+  'phi hành gia': [
+    { color: C.blue, width: 16, points: circlePts(500, 325, 140, 22) },
+    { color: C.teal, width: 16, points: rectPts(405, 255, 595, 385) },
+    { color: C.blue, width: 16, points: rectPts(365, 475, 635, 715) },
+    { color: C.orange, width: 9, points: rectPts(435, 535, 565, 625) },
+    { color: C.blue, width: 16, points: [[425, 715], [425, 845], [575, 715], [575, 845]] },
+  ],
+  'ông già noel': [
+    { color: C.red, width: 16, points: [[340, 360], [500, 165], [660, 360], [340, 360]] },
+    { color: C.pink, width: 16, points: circlePts(500, 485, 155, 22) },
+    { color: C.orange, width: 16, points: [[355, 505], [385, 695], [500, 775], [615, 695], [645, 505]] },
+    { color: C.black, width: 9, points: [[440, 445], [455, 445], [545, 445], [560, 445]] },
+    { color: C.red, width: 16, points: circlePts(500, 505, 32, 10) },
+  ],
 };
 
 const SKETCH_ALIASES: Record<string, string> = {
@@ -931,7 +1356,7 @@ const SKETCH_ALIASES: Record<string, string> = {
 
 /**
  * Lấy bộ nét vẽ của Bot cho từ khóa bất kỳ:
- * - Khớp trực tiếp hoặc qua alias trong 62 hình `BOT_SKETCHES`.
+ * - Khớp trực tiếp hoặc qua alias trong 120 hình `BOT_SKETCHES`.
  * - Nếu từ ngoài danh sách sketch, sinh hình đa sắc 5 nét theo nhóm ngữ nghĩa (động vật, đồ ăn, xe cộ, thiên nhiên, đồ vật).
  */
 export function getBotSketch(word: string): VeDoanStroke[] {
@@ -1102,6 +1527,79 @@ const EXTRA_VE_DOAN_WORDS: string[] = [
   'phù thủy', 'tiên nữ', 'nàng tiên cá', 'thần đèn', 'ma cà rồng', 'xác ướp',
   'bộ xương', 'bác sĩ', 'y tá', 'chú công an', 'lính cứu hỏa', 'phi hành gia',
   'đầu bếp', 'nông dân', 'thợ lặn', 'nhà ảo thuật', 'vua chúa', 'hoàng hậu',
+
+  // 11. Kho mở rộng V8 (+430 từ khóa đa dạng, dễ vẽ, ít trùng lặp giữa các ván)
+  'gấu nâu', 'hổ trắng', 'báo đốm', 'báo đen', 'linh cẩu', 'chồn hương', 'chó đốm', 'chó pug', 'chó shiba',
+  'mèo mướp', 'thỏ trắng', 'cừu non', 'dê núi', 'ngựa gỗ', 'ngựa một sừng', 'lợn rừng', 'trâu nước',
+  'bò tót', 'tê tê', 'thú mỏ vịt', 'hải ly', 'rái cá', 'cá sấu con', 'rắn lục', 'trăn gấm',
+  'rùa biển', 'ếch xanh', 'cóc vàng', 'bọ hung', 'bọ cánh cứng', 'kiến lửa', 'ong vò vẽ', 'ong thợ',
+  'bướm đêm', 'sâu róm', 'kén bướm', 'ốc bươu', 'sò huyết', 'trai ngọc', 'tôm tít', 'cua hoàng đế',
+  'cá hồi', 'cá thu', 'cá trích', 'cá lóc', 'cá trê', 'cá rô phi', 'lươn đồng', 'cá bống',
+  'chim bói cá', 'chim sáo', 'chim họa mi', 'chim chích chòe', 'chim hải âu', 'bồ nông', 'kền kền', 'chim ưng',
+  'công xòe đuôi', 'vẹt đuôi dài', 'sếu đầu đỏ', 'vịt trời', 'ngan xám', 'ngỗng trắng', 'chim khướu',
+
+  'bún mắm', 'bún mọc', 'bún thang', 'bún riêu', 'miến lươn', 'miến xào', 'mì quảng', 'cao lầu',
+  'phở cuốn', 'phở xào', 'cơm cháy', 'cơm gà hội an', 'cơm niêu', 'xôi xéo', 'xôi đậu đen', 'xôi khúc',
+  'bánh tẻ', 'bánh nậm', 'bánh lọc', 'bánh ít', 'bánh cam', 'bánh cống', 'bánh da lợn', 'bánh bò',
+  'bánh chuối nướng', 'bánh khoai mì', 'bánh đúc', 'bánh đa', 'bánh pía', 'bánh tráng', 'bánh tráng trộn',
+  'bánh tráng nướng', 'bò né', 'bò kho', 'cà ri gà', 'gà nướng', 'vịt quay', 'heo sữa quay', 'chả lụa',
+  'nem chua', 'dồi sụn', 'trứng ốp la', 'trứng bắc thảo', 'chả trứng', 'canh chua', 'thịt kho tàu', 'cá kho tộ',
+  'tôm rim', 'mực nhồi thịt', 'hàu nướng mỡ hành', 'ốc hương', 'nghêu hấp sả', 'càng cua rang me', 'gỏi ngó sen',
+  'nộm đu đủ', 'dưa món', 'củ kiệu', 'cà pháo', 'kim chi', 'kimbap', 'ramen', 'udon', 'takoyaki',
+  'dimsum', 'sủi cảo', 'há cảo', 'hoành thánh', 'bánh bao kim sa', 'bánh crepe', 'waffle', 'pancake',
+  'tiramisu', 'pudding', 'mochi', 'chân gà sả tắc', 'khô gà lá chanh', 'cá viên chiên', 'bắp xào bơ',
+  'chè bưởi', 'chè đậu đen', 'chè khúc bạch', 'chè trôi nước', 'sương sáo', 'trà vải', 'trà đào', 'matcha đá xay',
+  'sữa đậu nành', 'sữa bắp', 'sữa tươi trân châu', 'coca cola', 'nước dừa tươi', 'nước ép táo', 'nước ép ổi',
+
+  'quả sấu', 'quả mơ', 'quả nhót', 'quả thị', 'quả hồng xiêm', 'quả vú sữa', 'quả roi', 'quả bòn bon',
+  'quả mâm xôi', 'quả phúc bồn tử', 'quả anh đào', 'quả việt quất', 'quả dưa lưới', 'quả dưa gang', 'quả dưa hấu vàng',
+  'quả dừa xiêm', 'quả cau', 'quả gấc', 'củ sắn', 'củ từ', 'củ khoai môn', 'củ dền', 'củ đậu',
+  'rau dền', 'rau mồng tơi', 'rau ngót', 'rau cải xanh', 'rau xà lách', 'rau cần tây', 'hành tây', 'hành lá',
+  'húng quế', 'ngò rí', 'lá lốt', 'tía tô', 'sả cây', 'ớt chuông', 'ớt hiểm', 'đậu cô ve', 'đậu đũa', 'đậu xanh',
+
+  'bàn ăn', 'ghế xoay', 'ghế bành', 'tủ giày', 'giá sách', 'kệ tivi', 'bàn học', 'đèn bàn',
+  'đèn lồng giấy', 'đèn dầu', 'lò nướng', 'lò sưởi', 'bếp từ', 'bếp ga', 'máy hút mùi', 'máy rửa bát',
+  'máy pha cà phê', 'máy ép trái cây', 'máy làm bánh mì', 'máy lọc nước', 'bình đun nước', 'chảo chống dính',
+  'nồi áp suất', 'nồi chiên không dầu', 'nồi lẩu điện', 'vá múc canh', 'sạn xào', 'kẹp gắp đá', 'dụng cụ khui bia',
+  'rổ nhựa', 'thau giặt đồ', 'giỏ đựng đồ', 'móc phơi áo', 'kẹp phơi đồ', 'bàn ủi hơi nước', 'cầu là',
+  'gối ôm', 'chăn bông', 'màn ngủ', 'chiếu trúc', 'thảm trải sàn', 'rèm cửa sổ', 'chốt cửa', 'chuông cửa',
+  'tay nắm cửa', 'gạch bông', 'ngói đỏ', 'ống khói', 'ban công', 'sân thượng', 'hàng rào gỗ', 'cổng sắt',
+
+  'tai nghe chụp tai', 'chuột không dây', 'lót chuột', 'màn hình cong', 'webcam', 'card đồ họa', 'quạt tản nhiệt',
+  'loa bluetooth', 'máy chiếu', 'bảng vẽ điện tử', 'bút cảm ứng', 'cáp sạc nhanh', 'ổ điện thông minh',
+  'cảm biến khói', 'khóa vân tay', 'camera hành trình', 'flycam', 'tay cầm chơi game', 'ghế gaming',
+  'đĩa cd', 'băng cassette', 'đầu đĩa than', 'máy chơi điện tử cầm tay', 'máy in ảnh', 'máy đếm tiền',
+
+  'áo dài cách tân', 'áo bà ba', 'áo tứ thân', 'áo cử nhân', 'áo blu trắng', 'áo giáp sắt', 'áo choàng',
+  'váy công chúa', 'váy đuôi cá', 'quần yếm', 'quần âu', 'quần thể thao', 'nơ bướm', 'cài tóc tai thỏ',
+  'bờm tóc', 'dây buộc tóc', 'kính bơi', 'kính lặn', 'kính bảo hộ', 'kính thiên thần', 'mặt nạ phòng độc',
+  'mặt nạ halloween', 'mũ cao bồi', 'mũ đầu bếp', 'mũ cối', 'mũ phi công', 'mũ phù thủy', 'vương miện hoa hậu',
+  'găng tay boxing', 'găng tay len', 'tất giáng sinh', 'dép tổ ong', 'dép lào', 'giày patin', 'giày ba lê',
+
+  'xe điện cân bằng', 'xe scooter', 'xe ô tô mui trần', 'xe bán tải', 'xe bồn', 'xe trộn bê tông', 'xe rác',
+  'xe cứu hộ', 'xe bọc thép', 'xe ngựa', 'xe kéo tay', 'xích lô máy', 'tàu điện', 'tàu cánh ngầm',
+  'du thuyền', 'ca nô lướt sóng', 'thuyền kayak', 'bè tre', 'phao cứu sinh', 'phao vịt vàng', 'vịnh hạ long',
+  'hòn trống mái', 'cầu vàng đà nẵng', 'dinh độc lập', 'chợ bến thành', 'lăng bác', 'văn miếu',
+  'vạn lý trường thành', 'đấu trường la mã', 'tượng nữ thần tự do', 'nhà hát con sò', 'tháp nghiêng pisa',
+
+  'quả cầu tuyết', 'lồng đèn trung thu', 'đèn ông sao', 'bánh trôi nước', 'mâm ngũ quả', 'cây mai vàng',
+  'cành đào nở hoa', 'bao lì xì đỏ', 'trống múa lân', 'đầu lân sư rồng', 'mặt nạ chú tễu', 'nón quai thao',
+  'đàn nhị', 'đàn tranh', 'cồng chiêng', 'kèn trumpet', 'trống cơm', 'khèn mèo', 'thanh la',
+  'cờ vua quân mã', 'quân xe cờ tướng', 'bàn cờ vây', 'bàn bi a', 'quả bowling', 'gậy đánh bi a',
+  'huy chương đồng', 'đai vô địch', 'băng rôn cổ vũ', 'kèn vuvuzela', 'loa phóng thanh', 'còi trọng tài',
+  'bộ sơ cứu', 'ống nghe bác sĩ', 'nhiệt kế', 'ống tiêm', 'chai cồn sát khuẩn', 'cuộn băng gạc', 'nạng gỗ',
+  'xe lăn', 'máy đo huyết áp', 'viên thuốc con nhộng', 'hộp khẩu trang', 'bông tăm', 'nhíp nhổ lông',
+
+  'con dấu đỏ', 'kẹp giấy', 'dập ghim', 'băng keo hai mặt', 'băng keo trong', 'giấy note vàng', 'tệp tài liệu',
+  'cặp táp', 'va li kéo', 'thẻ căn cước', 'hộ chiếu', 'vé máy bay', 'tem bưu chính', 'hộp thư bưu điện',
+  'đồng hồ cát', 'đồng hồ quả lắc', 'chuông báo cháy', 'bình chữa cháy', 'bảng chỉ đường', 'cọc tiêu giao thông',
+  'trạm thu phí', 'cây xăng', 'cột thu lôi', 'tuabin gió', 'pin năng lượng mặt trời', 'trạm vũ trụ',
+  'tàu con thoi', 'kính viễn vọng', 'thiên thạch', 'ngân hà', 'nhật thực', 'nguyệt thực', 'cực quang',
+
+  'rồng châu á', 'phượng hoàng lửa', 'kỳ lân có cánh', 'bạch mã', 'chó ba đầu', 'người tuyết olaf',
+  'người khổng lồ', 'người lùn', 'thủy thủ', 'cao bồi miền tây', 'ninja nhật bản', 'samurai',
+  'chiến binh la mã', 'hiệp sĩ trung cổ', 'công chúa', 'hoàng tử', 'thám tử lừng danh', 'nhà khoa học',
+  'phi công máy bay', 'tiếp viên hàng không', 'tổng thống', 'ca sĩ thần tượng', 'diễn viên xiếc', 'chú hề tung hứng',
 ];
 
 export const VE_DOAN_WORDS: string[] = Array.from(

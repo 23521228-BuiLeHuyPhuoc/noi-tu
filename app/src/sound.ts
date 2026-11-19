@@ -1,5 +1,6 @@
 import { Asset } from 'expo-asset';
 import {
+  ALL_MEME_IDS,
   BGM_ASSETS,
   BGM_PLAYLIST,
   MEME_ASSETS,
@@ -53,7 +54,7 @@ const SFX_MEME_MAP: Partial<Record<Sfx, { pool: MemePoolKey; cooldownMs: number 
 const KEY = 'xomlay.muted';
 const KEY_BGM = 'xomlay.bgm';
 const KEY_MEME = 'xomlay.meme';
-const KEY_BGM_VOL = 'xomlay.bgmVol';
+const KEY_BGM_VOL = 'xomlay.bgmVol.v2';
 
 function readBool(k: string, fallback: boolean): boolean {
   try {
@@ -105,7 +106,7 @@ let ctx: AudioContext | null = null;
 let muted = readBool(KEY, false);
 let bgmEnabled = readBool(KEY_BGM, true);
 let memeEnabled = readBool(KEY_MEME, true);
-let bgmVolume = readNum(KEY_BGM_VOL, 0.26);
+let bgmVolume = readNum(KEY_BGM_VOL, 0.8);
 let manualBgmOverride: BgmId | null = null;
 let bgmActive = false;
 let currentPlaylistBgmId: BgmId | null = null;
@@ -117,8 +118,10 @@ let bgmEl: HTMLAudioElement | null = null;
 let memeEl: HTMLAudioElement | null = null;
 let memeDuckTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMemePlayedAt = 0;
-let fartCount = 0;
+let globalMemeBag: MemeId[] = [];
+let lastGlobalMeme: MemeId | null = null;
 const poolBags: Partial<Record<MemePoolKey, MemeId[]>> = {};
+const playedThisSession = new Set<MemeId>();
 const recentMemes: MemeId[] = [];
 const listeners = new Set<() => void>();
 let gestureRetryInstalled = false;
@@ -198,8 +201,13 @@ export function setManualBgmOverride(id: BgmId | null): void {
   notify();
 }
 
+export function isBgmActive(): boolean {
+  return bgmActive;
+}
+
 export function getCurrentBgmId(): BgmId | null {
-  return manualBgmOverride ?? (bgmActive ? currentPlaylistBgmId : null);
+  if (!bgmActive) return null;
+  return manualBgmOverride ?? currentPlaylistBgmId;
 }
 
 function resolveAssetUri(mod: unknown): string | null {
@@ -293,7 +301,6 @@ export function setBgmActive(active: boolean): void {
 
 export function nextBgmTrack(): void {
   manualBgmOverride = null;
-  bgmActive = true;
   drawNextPlaylistBgm();
   syncBgmPlayback();
   notify();
@@ -331,7 +338,7 @@ export function playMeme(id: MemeId, opts?: { force?: boolean; cooldownMs?: numb
 
   try {
     const el = new Audio(uri);
-    el.volume = 0.92;
+    el.volume = 1.0;
     memeEl = el;
     bgmDuckCount = 1;
     applyBgmVolume();
@@ -350,26 +357,64 @@ export function playMeme(id: MemeId, opts?: { force?: boolean; cooldownMs?: numb
   }
 }
 
+function recordMemeHistory(id: MemeId): void {
+  if (playedThisSession.size >= ALL_MEME_IDS.length) {
+    playedThisSession.clear();
+  }
+  playedThisSession.add(id);
+  recentMemes.push(id);
+  if (recentMemes.length > 8) recentMemes.shift();
+}
+
+export function playRandomMeme(opts?: { force?: boolean; cooldownMs?: number }): void {
+  if (muted || !memeEnabled) return;
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+  const cooldown = opts?.cooldownMs ?? 1350;
+  if (!opts?.force && Date.now() - lastMemePlayedAt < cooldown) return;
+
+  if (globalMemeBag.length === 0) {
+    globalMemeBag = shuffleCopy(ALL_MEME_IDS, lastGlobalMeme);
+  }
+  const pick = globalMemeBag.shift() ?? ALL_MEME_IDS[0];
+  if (!pick) return;
+  lastGlobalMeme = pick;
+  recordMemeHistory(pick);
+  playMeme(pick, { ...opts, force: true });
+}
+
 export function playMemePool(pool: MemePoolKey, opts?: { cooldownMs?: number }): void {
+  if (muted || !memeEnabled) return;
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+  const cooldown = opts?.cooldownMs ?? 1350;
+  if (Date.now() - lastMemePlayedAt < cooldown) return;
+
   const list = MEME_POOLS[pool];
   if (!list || list.length === 0) return;
+
+  if (playedThisSession.size >= ALL_MEME_IDS.length) {
+    playedThisSession.clear();
+  }
+
   let bag = poolBags[pool];
   if (!bag || bag.length === 0) {
     bag = shuffleCopy(list, recentMemes[recentMemes.length - 1]);
     poolBags[pool] = bag;
   }
-  const idx = bag.findIndex((id) => !recentMemes.includes(id));
-  const pick = idx >= 0 ? bag.splice(idx, 1)[0] : bag.shift()!;
-  recentMemes.push(pick);
-  if (recentMemes.length > 5) recentMemes.shift();
-  playMeme(pick, opts);
+
+  let idx = bag.findIndex((id) => !playedThisSession.has(id) && !recentMemes.includes(id));
+  if (idx < 0) idx = bag.findIndex((id) => !recentMemes.includes(id));
+  if (idx < 0) idx = 0;
+
+  const pick = bag.splice(idx, 1)[0] ?? list[0];
+  if (!pick) return;
+  recordMemeHistory(pick);
+  playMeme(pick, { ...opts, force: true });
 }
 
 function triggerSfxMeme(sfx: Sfx): void {
   if (muted || !memeEnabled) return;
   if (sfx === 'fart') {
-    if (fartCount++ % 2 === 0) playMeme('vn_fartmic', { cooldownMs: 1400 });
-    else playMemePool('troll', { cooldownMs: 1400 });
+    playMemePool('troll', { cooldownMs: 1400 });
     return;
   }
   const mapped = SFX_MEME_MAP[sfx];

@@ -114,6 +114,9 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
   useOnChange(view.eliminated.length, (len) => {
     if (len > 0) playMemePool('eliminated');
   });
+  useOnChange(view.clues.length, (len) => {
+    if (len > 0) playMemePool('chat_hype', { cooldownMs: 3000 });
+  });
   const modalKey = `${view.round}:${view.phase}:${view.mrWhiteId ?? ''}:${(view.defendants ?? []).join(',')}`;
   const curPhaseKey = `${view.phase}:${view.currentSpeakerId ?? ''}:${view.round}`;
   if (phaseKey !== curPhaseKey) {
@@ -159,7 +162,29 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
     setErr(null);
     const res = await game.act(payload);
     setBusy(false);
-    if (!res.ok) setErr(actionText[res.reason] ?? 'Thao tác không hợp lệ');
+    if (!res.ok) {
+      playMemePool('wrong', { cooldownMs: 1200 });
+      play('error');
+      setErr(actionText[res.reason] ?? 'Thao tác không hợp lệ');
+    } else if (payload.type === 'gd_clue') {
+      playMemePool('turn_move', { cooldownMs: 2400 });
+      play('stamp');
+    } else if (payload.type === 'gd_defense') {
+      playMemePool('defense', { cooldownMs: 1600 });
+      play('pop');
+    } else if (payload.type === 'gd_vote') {
+      playMemePool('vote', { cooldownMs: 1800 });
+      play('pop');
+    } else if (payload.type === 'gd_verdict') {
+      playMemePool(payload.verdict === 'forgive' ? 'forgive' : 'vote', { cooldownMs: 1400 });
+      play('stamp');
+    } else if (payload.type === 'gd_guess') {
+      playMemePool('twist', { cooldownMs: 1200 });
+      play('reveal');
+    } else if (payload.type === 'gd_chat') {
+      playMemePool('chat_hype', { cooldownMs: 3200 });
+      play('chat');
+    }
     return res.ok;
   };
 

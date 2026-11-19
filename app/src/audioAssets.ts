@@ -41,7 +41,16 @@ export type MemeId =
   | 'linda_toalet'
   | 'linda_cuutui'
   | 'linda_chanhnha'
-  // Cô Ba Vàng Ngọc (16)
+  | 'linda_xinchao_mn'
+  | 'linda_uongnuocmia'
+  | 'linda_cuutoibacon'
+  | 'linda_ecaijztroi'
+  | 'linda_meoicuucon'
+  | 'linda_moimocra'
+  | 'linda_buoitoivuive'
+  | 'linda_toasang'
+  | 'linda_xuongnuiquay'
+  // Cô Ba Vàng Ngọc (26)
   | 'coba_giangho'
   | 'coba_thoithoi'
   | 'coba_quatbatieu'
@@ -58,7 +67,17 @@ export type MemeId =
   | 'coba_mayimtaotha'
   | 'coba_khovang'
   | 'coba_thathu'
-  // Cô Minh Hiếu (15)
+  | 'coba_choitangoc'
+  | 'coba_dunglaigia'
+  | 'coba_nhinquancanh'
+  | 'coba_xinloianh'
+  | 'coba_tamgietubi'
+  | 'coba_giadinhtannat'
+  | 'coba_dungdongkich'
+  | 'coba_dunggionmat'
+  | 'coba_dinhphen'
+  | 'coba_aotuongsucmanh'
+  // Cô Minh Hiếu (25)
   | 'minhhieu_tinhlai'
   | 'minhhieu_duongquyen'
   | 'minhhieu_tiendohay'
@@ -74,7 +93,17 @@ export type MemeId =
   | 'minhhieu_chotdon'
   | 'minhhieu_conquyxao'
   | 'minhhieu_laytienche'
-  // Cô Phương Hằng (14)
+  | 'minhhieu_soqua'
+  | 'minhhieu_cuutoi'
+  | 'minhhieu_tienchicho'
+  | 'minhhieu_tiendomat'
+  | 'minhhieu_nganruoido'
+  | 'minhhieu_1000do'
+  | 'minhhieu_tientuoi'
+  | 'minhhieu_khongaimua'
+  | 'minhhieu_cadonhuquy'
+  | 'minhhieu_rotmuocmat'
+  // Cô Phương Hằng (29)
   | 'phuonghang_ngongang'
   | 'phuonghang_trongcuoc'
   | 'phuonghang_dungdien'
@@ -89,7 +118,22 @@ export type MemeId =
   | 'phuonghang_dosup'
   | 'phuonghang_kimcuong'
   | 'phuonghang_lamchu'
-  // Chị Phiến (15)
+  | 'phuonghang_50tuoi'
+  | 'phuonghang_thayvay'
+  | 'phuonghang_nguyhiem'
+  | 'phuonghang_khonhon'
+  | 'phuonghang_suthat'
+  | 'phuonghang_tinhhinh'
+  | 'phuonghang_tienphuongtien'
+  | 'phuonghang_tubitritue'
+  | 'phuonghang_quantutrathu'
+  | 'phuonghang_voquytday'
+  | 'phuonghang_chuabaogiobochay'
+  | 'phuonghang_thanhcong'
+  | 'phuonghang_aidungaisai'
+  | 'phuonghang_lammoico'
+  | 'phuonghang_anhhung'
+  // Chị Phiến (25)
   | 'chiphien_aiepmay'
   | 'chiphien_maydien'
   | 'chiphien_xinloi'
@@ -105,6 +149,16 @@ export type MemeId =
   | 'chiphien_vonghiem'
   | 'chiphien_xinhdep'
   | 'chiphien_metlamroi'
+  | 'chiphien_taisancuachi'
+  | 'chiphien_kemay'
+  | 'chiphien_dequahe'
+  | 'chiphien_capdoimanh'
+  | 'chiphien_chitoitiec'
+  | 'chiphien_nhinchidi'
+  | 'chiphien_nhinmaylaidi'
+  | 'chiphien_odaumaxai'
+  | 'chiphien_khongthamlam'
+  | 'chiphien_xuitaotai'
   // Hỗ trợ Game cốt lõi (10)
   | 'batan_noroi'
   | 'tienbip_cainit'
@@ -157,7 +211,16 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   linda_toalet: require('../assets/audio/memes/linda_toalet.mp3'),
   linda_cuutui: require('../assets/audio/memes/linda_cuutui.mp3'),
   linda_chanhnha: require('../assets/audio/memes/linda_chanhnha.mp3'),
-  // Cô Ba Vàng Ngọc (16)
+  linda_xinchao_mn: require('../assets/audio/memes/linda_xinchao_mn.mp3'),
+  linda_uongnuocmia: require('../assets/audio/memes/linda_uongnuocmia.mp3'),
+  linda_cuutoibacon: require('../assets/audio/memes/linda_cuutoibacon.mp3'),
+  linda_ecaijztroi: require('../assets/audio/memes/linda_ecaijztroi.mp3'),
+  linda_meoicuucon: require('../assets/audio/memes/linda_meoicuucon.mp3'),
+  linda_moimocra: require('../assets/audio/memes/linda_moimocra.mp3'),
+  linda_buoitoivuive: require('../assets/audio/memes/linda_buoitoivuive.mp3'),
+  linda_toasang: require('../assets/audio/memes/linda_toasang.mp3'),
+  linda_xuongnuiquay: require('../assets/audio/memes/linda_xuongnuiquay.mp3'),
+  // Cô Ba Vàng Ngọc (26)
   coba_giangho: require('../assets/audio/memes/coba_giangho.mp3'),
   coba_thoithoi: require('../assets/audio/memes/coba_thoithoi.mp3'),
   coba_quatbatieu: require('../assets/audio/memes/coba_quatbatieu.mp3'),
@@ -174,7 +237,17 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   coba_mayimtaotha: require('../assets/audio/memes/coba_mayimtaotha.mp3'),
   coba_khovang: require('../assets/audio/memes/coba_khovang.mp3'),
   coba_thathu: require('../assets/audio/memes/coba_thathu.mp3'),
-  // Cô Minh Hiếu (15)
+  coba_choitangoc: require('../assets/audio/memes/coba_choitangoc.mp3'),
+  coba_dunglaigia: require('../assets/audio/memes/coba_dunglaigia.mp3'),
+  coba_nhinquancanh: require('../assets/audio/memes/coba_nhinquancanh.mp3'),
+  coba_xinloianh: require('../assets/audio/memes/coba_xinloianh.mp3'),
+  coba_tamgietubi: require('../assets/audio/memes/coba_tamgietubi.mp3'),
+  coba_giadinhtannat: require('../assets/audio/memes/coba_giadinhtannat.mp3'),
+  coba_dungdongkich: require('../assets/audio/memes/coba_dungdongkich.mp3'),
+  coba_dunggionmat: require('../assets/audio/memes/coba_dunggionmat.mp3'),
+  coba_dinhphen: require('../assets/audio/memes/coba_dinhphen.mp3'),
+  coba_aotuongsucmanh: require('../assets/audio/memes/coba_aotuongsucmanh.mp3'),
+  // Cô Minh Hiếu (25)
   minhhieu_tinhlai: require('../assets/audio/memes/minhhieu_tinhlai.mp3'),
   minhhieu_duongquyen: require('../assets/audio/memes/minhhieu_duongquyen.mp3'),
   minhhieu_tiendohay: require('../assets/audio/memes/minhhieu_tiendohay.mp3'),
@@ -190,7 +263,17 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   minhhieu_chotdon: require('../assets/audio/memes/minhhieu_chotdon.mp3'),
   minhhieu_conquyxao: require('../assets/audio/memes/minhhieu_conquyxao.mp3'),
   minhhieu_laytienche: require('../assets/audio/memes/minhhieu_laytienche.mp3'),
-  // Cô Phương Hằng (14)
+  minhhieu_soqua: require('../assets/audio/memes/minhhieu_soqua.mp3'),
+  minhhieu_cuutoi: require('../assets/audio/memes/minhhieu_cuutoi.mp3'),
+  minhhieu_tienchicho: require('../assets/audio/memes/minhhieu_tienchicho.mp3'),
+  minhhieu_tiendomat: require('../assets/audio/memes/minhhieu_tiendomat.mp3'),
+  minhhieu_nganruoido: require('../assets/audio/memes/minhhieu_nganruoido.mp3'),
+  minhhieu_1000do: require('../assets/audio/memes/minhhieu_1000do.mp3'),
+  minhhieu_tientuoi: require('../assets/audio/memes/minhhieu_tientuoi.mp3'),
+  minhhieu_khongaimua: require('../assets/audio/memes/minhhieu_khongaimua.mp3'),
+  minhhieu_cadonhuquy: require('../assets/audio/memes/minhhieu_cadonhuquy.mp3'),
+  minhhieu_rotmuocmat: require('../assets/audio/memes/minhhieu_rotmuocmat.mp3'),
+  // Cô Phương Hằng (29)
   phuonghang_ngongang: require('../assets/audio/memes/phuonghang_ngongang.mp3'),
   phuonghang_trongcuoc: require('../assets/audio/memes/phuonghang_trongcuoc.mp3'),
   phuonghang_dungdien: require('../assets/audio/memes/phuonghang_dungdien.mp3'),
@@ -205,7 +288,22 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   phuonghang_dosup: require('../assets/audio/memes/phuonghang_dosup.mp3'),
   phuonghang_kimcuong: require('../assets/audio/memes/phuonghang_kimcuong.mp3'),
   phuonghang_lamchu: require('../assets/audio/memes/phuonghang_lamchu.mp3'),
-  // Chị Phiến (15)
+  phuonghang_50tuoi: require('../assets/audio/memes/phuonghang_50tuoi.mp3'),
+  phuonghang_thayvay: require('../assets/audio/memes/phuonghang_thayvay.mp3'),
+  phuonghang_nguyhiem: require('../assets/audio/memes/phuonghang_nguyhiem.mp3'),
+  phuonghang_khonhon: require('../assets/audio/memes/phuonghang_khonhon.mp3'),
+  phuonghang_suthat: require('../assets/audio/memes/phuonghang_suthat.mp3'),
+  phuonghang_tinhhinh: require('../assets/audio/memes/phuonghang_tinhhinh.mp3'),
+  phuonghang_tienphuongtien: require('../assets/audio/memes/phuonghang_tienphuongtien.mp3'),
+  phuonghang_tubitritue: require('../assets/audio/memes/phuonghang_tubitritue.mp3'),
+  phuonghang_quantutrathu: require('../assets/audio/memes/phuonghang_quantutrathu.mp3'),
+  phuonghang_voquytday: require('../assets/audio/memes/phuonghang_voquytday.mp3'),
+  phuonghang_chuabaogiobochay: require('../assets/audio/memes/phuonghang_chuabaogiobochay.mp3'),
+  phuonghang_thanhcong: require('../assets/audio/memes/phuonghang_thanhcong.mp3'),
+  phuonghang_aidungaisai: require('../assets/audio/memes/phuonghang_aidungaisai.mp3'),
+  phuonghang_lammoico: require('../assets/audio/memes/phuonghang_lammoico.mp3'),
+  phuonghang_anhhung: require('../assets/audio/memes/phuonghang_anhhung.mp3'),
+  // Chị Phiến (25)
   chiphien_aiepmay: require('../assets/audio/memes/chiphien_aiepmay.mp3'),
   chiphien_maydien: require('../assets/audio/memes/chiphien_maydien.mp3'),
   chiphien_xinloi: require('../assets/audio/memes/chiphien_xinloi.mp3'),
@@ -221,6 +319,16 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   chiphien_vonghiem: require('../assets/audio/memes/chiphien_vonghiem.mp3'),
   chiphien_xinhdep: require('../assets/audio/memes/chiphien_xinhdep.mp3'),
   chiphien_metlamroi: require('../assets/audio/memes/chiphien_metlamroi.mp3'),
+  chiphien_taisancuachi: require('../assets/audio/memes/chiphien_taisancuachi.mp3'),
+  chiphien_kemay: require('../assets/audio/memes/chiphien_kemay.mp3'),
+  chiphien_dequahe: require('../assets/audio/memes/chiphien_dequahe.mp3'),
+  chiphien_capdoimanh: require('../assets/audio/memes/chiphien_capdoimanh.mp3'),
+  chiphien_chitoitiec: require('../assets/audio/memes/chiphien_chitoitiec.mp3'),
+  chiphien_nhinchidi: require('../assets/audio/memes/chiphien_nhinchidi.mp3'),
+  chiphien_nhinmaylaidi: require('../assets/audio/memes/chiphien_nhinmaylaidi.mp3'),
+  chiphien_odaumaxai: require('../assets/audio/memes/chiphien_odaumaxai.mp3'),
+  chiphien_khongthamlam: require('../assets/audio/memes/chiphien_khongthamlam.mp3'),
+  chiphien_xuitaotai: require('../assets/audio/memes/chiphien_xuitaotai.mp3'),
   // Hỗ trợ Game cốt lõi (10)
   batan_noroi: require('../assets/audio/memes/batan_noroi.mp3'),
   tienbip_cainit: require('../assets/audio/memes/tienbip_cainit.mp3'),
@@ -321,8 +429,17 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'linda_toalet', persona: 'linda', label: 'Mới đi toa lét ra', quote: 'Linda mới đi toa lét ra!', context: 'Tấu hài lúc vào bàn / chat' },
   { id: 'linda_cuutui', persona: 'linda', label: 'Trời đất ơi cứu tui!', quote: 'Trời đất ơi cứu tui!', context: 'Bị dí bom / cạn Ruby / bị đớp' },
   { id: 'linda_chanhnha', persona: 'linda', label: 'Cho em chanh nha chị', quote: 'Cho em chanh nha chị!', context: 'Chọc quê / rôm rả bàn chơi' },
+  { id: 'linda_xinchao_mn', persona: 'linda', label: 'Xin chào mọi người', quote: 'Xin chào mọi người!', context: 'Chào bàn khi vào phòng' },
+  { id: 'linda_uongnuocmia', persona: 'linda', label: 'Đang uống nước mía nè', quote: 'Em tôi hả đang uống nước mía cho mọi người coi!', context: 'Thảnh thơi hóng chuyện trên bàn' },
+  { id: 'linda_cuutoibacon', persona: 'linda', label: 'Chết tôi sớm rồi bà con ơi', quote: 'Chết tôi là sớm rồi bà con ơi!', context: 'Nổ bom / bị cá sấu cắn / thua đau' },
+  { id: 'linda_ecaijztroi', persona: 'linda', label: 'Ê cái gì vậy trời?', quote: 'Ê cái gì vậy trời? Trời ơi!', context: 'Sốc bất ngờ / đoán trật / dính đòn' },
+  { id: 'linda_meoicuucon', persona: 'linda', label: 'Mẹ ơi cứu con!', quote: 'Mẹ ơi cứu con hả!', context: 'Hoảng loạn khi dính bom / cắn' },
+  { id: 'linda_moimocra', persona: 'linda', label: 'Bữa nay chị moi ra hết', quote: 'Bữa nay chết với chị, bữa nay chị moi ra hết!', context: 'Vạch mặt gián điệp / lật kèo vote' },
+  { id: 'linda_buoitoivuive', persona: 'linda', label: 'Chúc mọi người buổi tối vui vẻ', quote: 'Không quên chúc mọi người buổi tối vui vẻ!', context: 'Chào bàn / mở màn rôm rả' },
+  { id: 'linda_toasang', persona: 'linda', label: 'Đi tới đâu là tỏa sáng tới đó', quote: 'Đi tới đâu là tỏa sáng tới đó!', context: 'Vào ván / đoán đúng / thắng giòn' },
+  { id: 'linda_xuongnuiquay', persona: 'linda', label: 'Tao xuống núi quậy hả?', quote: 'Tu mà cho tu lâu, tao xuống núi quậy hả?', context: 'Tới lượt / cà khịa đối thủ' },
 
-  // Cô Ba Vàng Ngọc (16)
+  // Cô Ba Vàng Ngọc (26)
   { id: 'coba_giangho', persona: 'coba', label: 'Dòng họ tao giang hồ không!', quote: 'Mày biết dòng họ tao là giang hồ không?', context: 'Bỏ phiếu / hù dọa đối thủ' },
   { id: 'coba_thoithoi', persona: 'coba', label: 'Ôi trời ơi thôi thôi!', quote: 'Ôi trời ơi thôi thôi!', context: 'Hoảng hốt né đòn / thua / cá sấu đớp' },
   { id: 'coba_quatbatieu', persona: 'coba', label: 'Quạt ba tiêu Cô Ba!', quote: 'Quạt ba tiêu nè con!', context: 'Tung chiêu troll / thổi bay đối thủ' },
@@ -339,8 +456,18 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'coba_mayimtaotha', persona: 'coba', label: 'Mày im thì tao tha!', quote: 'Mày im thì tao tha, tao im tao không nói tới mày được!', context: 'Phán quyết tha bổng / lật kèo' },
   { id: 'coba_khovang', persona: 'coba', label: 'Mẹ mới cho cái kho vàng', quote: 'Nhờ cái tâm thánh thiện mà mẹ mới cho cái kho vàng!', context: 'Thắng jackpot / đoán trúng / nhận tiền' },
   { id: 'coba_thathu', persona: 'coba', label: 'Ta sẵn sàng tha thứ cho con', quote: 'Ta sẵn sàng tha thứ cho con nếu con biết rồi!', context: 'Chọn tha bổng / xoay chiều thế trận' },
+  { id: 'coba_choitangoc', persona: 'coba', label: 'Chơi phải chơi cho tận gốc', quote: 'Chơi phải chơi cho tận gốc tận cùng!', context: 'Vào ván / tung chiêu hết mình' },
+  { id: 'coba_dunglaigia', persona: 'coba', label: 'Dừng lại! Đó là tên giả đó', quote: 'Dừng lại! Đó là tên giả đó!', context: 'Bắt gián điệp / lật mặt sói / vote' },
+  { id: 'coba_nhinquancanh', persona: 'coba', label: 'Mày nhìn hoàn cảnh của mày đi', quote: 'Cho mày nhìn cái cảnh của mày đi!', context: 'Cà khịa đối thủ đang thê thảm' },
+  { id: 'coba_xinloianh', persona: 'coba', label: 'Em xin lỗi anh tha thứ cho em', quote: 'Bây giờ em xin lỗi em lạy anh, tha thứ cho em!', context: 'Thanh minh / xin tha bổng phút chót' },
+  { id: 'coba_tamgietubi', persona: 'coba', label: 'Tâm từ bi bỏ qua cho con', quote: 'Lấy tâm từ bi mà bỏ qua cho lần này!', context: 'Tha bổng khi vote hòa / xử nhẹ' },
+  { id: 'coba_giadinhtannat', persona: 'coba', label: 'Tha thứ cho con, tan nát hết rồi', quote: 'Mẹ hãy tha thứ cho con, gia cảnh đã tan nát hết rồi!', context: 'Than thở cháy túi / thua đau / thanh minh' },
+  { id: 'coba_dungdongkich', persona: 'coba', label: 'Đừng có đóng kịch nữa!', quote: 'Đừng có đóng kịch nữa chị ơi!', context: 'Tố diễn sâu / vote nghi phạm' },
+  { id: 'coba_dunggionmat', persona: 'coba', label: 'Vô tù ngồi nè, đừng giỡn mặt!', quote: 'Này vô tù ngồi nè, chứ mày đừng có giỡn mặt!', context: 'Vào tù / bị loại / cảnh cáo cực gắt' },
+  { id: 'coba_dinhphen', persona: 'coba', label: 'Coi lại cái mặt, dính phèn kìa', quote: 'Coi lại cái mặt của mình đi, dính phèn rồi đó!', context: 'Đoán sai / chọc quê đồng đội' },
+  { id: 'coba_aotuongsucmanh', persona: 'coba', label: 'Ảo tưởng sức mạnh!', quote: 'Nói gì hả? Ảo tưởng sức mạnh vừa thôi!', context: 'Đoán hụt / nổ quá đà bị dập' },
 
-  // Cô Minh Hiếu (15)
+  // Cô Minh Hiếu (25)
   { id: 'minhhieu_tinhlai', persona: 'minhhieu', label: 'Tự nhiên cái tui tỉnh lại liền luôn', quote: 'Trời đất ơi tự nhiên cái tui tỉnh lại liền luôn!', context: 'Đoán trúng bất ngờ / lật kèo sống lại' },
   { id: 'minhhieu_duongquyen', persona: 'minhhieu', label: 'Cầm tiền đô đi đường quyền', quote: 'Có tiền đô này nè, cầm tiền đô đi đường quyền với mày!', context: 'Ra đòn / tung chiêu phản công' },
   { id: 'minhhieu_tiendohay', persona: 'minhhieu', label: 'Có tiền đi đường quyền mạnh ghê', quote: 'Bữa nay có tiền đi đường quyền mạnh ghê luôn!', context: 'Ăn lớn / vừa ra nước đi hay' },
@@ -355,9 +482,19 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'minhhieu_muonkhoc', persona: 'minhhieu', label: 'Đó muốn khóc vậy đó', quote: 'Đó, muốn khóc vậy đó!', context: 'Mất trắng Ruby / bị loại' },
   { id: 'minhhieu_chotdon', persona: 'minhhieu', label: 'Chốt đơn chốt đơn chốt đơn!', quote: 'Chốt đơn! Chốt đơn! Chốt đơn! Chốt đơn!', context: 'Chốt lượt / vote / đoán đúng từ khóa' },
   { id: 'minhhieu_conquyxao', persona: 'minhhieu', label: 'Xạo! Mấy con quỷ xạo', quote: 'Xạo! Mấy cái con quỷ xạo!', context: 'Bóc phốt / chê đáp án sai' },
-  { id: 'minhhieu_laytienche', persona: 'minhhieu', label: 'Lấy tiền che lại liền!', quote: 'Thì em lấy tiền che lại liền!', context: 'Né đòn / đỡ phạt bằng Ruby / tha bổng' },
+  { id: 'minhhieu_laytienche', persona: 'minhhieu', label: 'Lấy tiền che lại liền!', quote: 'Thì em lấy tiền che lại liền!', context: 'Né đòn / đỡ phạt bằng Ruby / lật kèo' },
+  { id: 'minhhieu_soqua', persona: 'minhhieu', label: 'Thôi trời ơi tôi sợ lắm!', quote: 'Sợ quá trời ơi thôi tôi sợ lắm rồi!', context: 'Hoảng hồn / dí bom / cá sấu cắn' },
+  { id: 'minhhieu_cuutoi', persona: 'minhhieu', label: 'Trời ơi cứu tôi chết tôi!', quote: 'Trời ơi cứu tôi, cứu tôi, chết tôi trời ơi!', context: 'Dính bom / bị cắn / bị loại khỏi ván' },
+  { id: 'minhhieu_tienchicho', persona: 'minhhieu', label: 'Tiền này của chị kia cho nữa đó', quote: 'Còn cái tiền này là của cái chị kia nữa đó!', context: 'Nhận thưởng / tặng quà Ruby' },
+  { id: 'minhhieu_tiendomat', persona: 'minhhieu', label: 'Tiền đô gửi về nó mát gì đâu', quote: 'Tiền đô mà tao nói gửi về nó mát gì đâu á!', context: 'Thu tiền thuê / thắng Ruby rủng rỉnh' },
+  { id: 'minhhieu_nganruoido', persona: 'minhhieu', label: 'Tiền mới ngàn rưỡi đô nè', quote: 'Gửi về tiền mới ngàn rưỡi đô nè thấy chưa!', context: 'Nhận Ruby / ăn kèo lớn' },
+  { id: 'minhhieu_1000do', persona: 'minhhieu', label: 'Một ngàn đô chưa xài nữa!', quote: 'Cho họ một ngàn đô nè, đổi ra chưa xài nữa!', context: 'Phát thưởng / tặng quà / rủng rỉnh' },
+  { id: 'minhhieu_tientuoi', persona: 'minhhieu', label: 'Tiền tươi không nè!', quote: 'Tiền tươi không nè, tiền đô của người ta gửi về nè!', context: 'Thanh toán Ruby tươi rói' },
+  { id: 'minhhieu_khongaimua', persona: 'minhhieu', label: 'Chốt đơn mà không thấy ai mua', quote: 'Chốt đơn chốt đơn mà em không thấy ai mua hết trơn!', context: 'Thua ván / ế hàng / cháy túi' },
+  { id: 'minhhieu_cadonhuquy', persona: 'minhhieu', label: 'Ca dở như quỷ, cầm mic không ra', quote: 'Ca dở như quỷ mà cầm micro ca hoài!', context: 'Chê đáp án sai / chọc quê trên chat' },
+  { id: 'minhhieu_rotmuocmat', persona: 'minhhieu', label: 'Nói mà rớt nước mắt muốn khóc', quote: 'Ngồi nói mà rớt nước mắt muốn khóc luôn vậy đó!', context: 'Thua thảm / cạn túi / bị loại' },
 
-  // Cô Phương Hằng (14)
+  // Cô Phương Hằng (29)
   { id: 'phuonghang_ngongang', persona: 'phuonghang', label: 'Ngỡ ngàng ngơ ngác bật ngửa', quote: 'Quá bất ngờ, ngỡ ngàng, ngơ ngác và bật ngửa!', context: 'Lật kèo bất ngờ / mở kết quả sốc' },
   { id: 'phuonghang_trongcuoc', persona: 'phuonghang', label: 'Người trong cuộc hiểu người trong kẹt', quote: 'Chỉ có người trong cuộc mới hiểu người trong kẹt thôi quý vị à!', context: 'Biện minh / thảo luận nội bộ' },
   { id: 'phuonghang_dungdien', persona: 'phuonghang', label: 'Thần điêu đại bịp đừng diễn nữa', quote: 'Thần điêu đại bịp! Thôi đừng có diễn nữa mấy má mấy cha ơi!', context: 'Tố cáo khi bỏ phiếu' },
@@ -372,8 +509,23 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'phuonghang_dosup', persona: 'phuonghang', label: 'Cho nó đổ sụp luôn!', quote: 'Nó muốn sụp thì em cho nó đổ sụp luôn!', context: 'Bom nổ / hạ gục đối thủ' },
   { id: 'phuonghang_kimcuong', persona: 'phuonghang', label: 'Im lặng là vàng, nói ra là kim cương', quote: 'Người ta nói im lặng là vàng, còn tôi nói ra tôi mới là kim cương!', context: 'Chốt đáp án / thắng / nhận Ruby' },
   { id: 'phuonghang_lamchu', persona: 'phuonghang', label: 'Làm chủ cuộc sống, làm chủ cuộc chơi', quote: 'Làm chủ mình, làm chủ cuộc sống, làm chủ cuộc chơi!', context: 'Vào ván / tung chiêu làm chủ bàn' },
+  { id: 'phuonghang_50tuoi', persona: 'phuonghang', label: '50 tuổi mà được như tôi không?', quote: 'Có ai 50 tuổi mà được như tôi không quý vị!', context: 'Gáy thắng / khịa nhẹ bàn chơi' },
+  { id: 'phuonghang_thayvay', persona: 'phuonghang', label: 'Thấy vậy mà không phải vậy!', quote: 'Thấy vậy mà không phải vậy đâu nha quý vị!', context: 'Lật kèo / thanh minh / tình huống bất ngờ' },
+  { id: 'phuonghang_nguyhiem', persona: 'phuonghang', label: 'Nơi không an toàn là nơi nguy hiểm!', quote: 'Những nơi không an toàn là những nơi rất là nguy hiểm!', context: 'Cảnh báo bom / cá sấu / vào đêm' },
+  { id: 'phuonghang_khonhon', persona: 'phuonghang', label: 'Đừng nghĩ mình khôn hơn người khác', quote: 'Đừng bao giờ nghĩ rằng mình khôn hơn người khác!', context: 'Chặt đẹp / chọc quê / hóng chat' },
+  { id: 'phuonghang_suthat', persona: 'phuonghang', label: 'Sự thật bao giờ cũng là sự thật', quote: 'Chị nói sự thật bao giờ cũng là sự thật thôi!', context: 'Đoán trúng / khẳng định chắc nịch' },
+  { id: 'phuonghang_tinhhinh', persona: 'phuonghang', label: 'Tình hình bây giờ rất là tình hình', quote: 'Tình hình bây giờ rất là tình hình luôn quý vị!', context: 'Bầu không khí căng thẳng / hóng biến' },
+  { id: 'phuonghang_tienphuongtien', persona: 'phuonghang', label: 'Tiền chỉ là phương tiện thôi mà', quote: 'Tiền nó chỉ là phương tiện thôi mà quý vị!', context: 'Giao dịch Ruby / tiêu tiền không tiếc' },
+  { id: 'phuonghang_tubitritue', persona: 'phuonghang', label: 'Có từ bi thì phải có trí tuệ', quote: 'Có từ bi thì phải có trí tuệ nha quý vị!', context: 'Tha bổng sáng suốt / tung nước đi hay' },
+  { id: 'phuonghang_quantutrathu', persona: 'phuonghang', label: 'Quân tử trả thù 10 năm chưa muộn', quote: 'Quân tử trả thù 10 năm chưa muộn đâu nha!', context: 'Ghi thù lật kèo / chọc đối thủ' },
+  { id: 'phuonghang_voquytday', persona: 'phuonghang', label: 'Vỏ quýt dày có móng tay nhọn!', quote: 'Đi đêm có ngày gặp ma, vỏ quýt dày có móng tay nhọn!', context: 'Bắt quả tang / lật kèo / xử tử' },
+  { id: 'phuonghang_chuabaogiobochay', persona: 'phuonghang', label: 'Cuộc chơi chưa bao giờ bỏ chạy!', quote: 'Cuộc chơi này tôi chưa bao giờ bỏ chạy!', context: 'Chốt lượt / phản biện không lùi bước' },
+  { id: 'phuonghang_thanhcong', persona: 'phuonghang', label: 'Thành công thì tôi hưởng thụ!', quote: 'Cuộc sống tôi thành công thì tôi hưởng thụ!', context: 'Thắng lớn / thu Ruby' },
+  { id: 'phuonghang_aidungaisai', persona: 'phuonghang', label: 'Không thể kết luận ai đúng ai sai', quote: 'Chúng ta không thể kết luận ai đúng ai sai!', context: 'Tranh luận / vote cân não / đoán hụt' },
+  { id: 'phuonghang_lammoico', persona: 'phuonghang', label: 'Chỉ có làm thì mới có ăn!', quote: 'Chỉ có làm thì mới có ăn nha quý vị!', context: 'Đoán đúng / cày điểm tới lượt' },
+  { id: 'phuonghang_anhhung', persona: 'phuonghang', label: 'Anh hùng núp là bị lôi ra hết!', quote: 'Anh hùng hảo hán núp vô là bị lôi ra hết!', context: 'Chỉ điểm gián điệp / lộ phe đêm' },
 
-  // Chị Phiến (15)
+  // Chị Phiến (25)
   { id: 'chiphien_aiepmay', persona: 'chiphien', label: 'Ai ép mày, mệt thì nghỉ!', quote: 'Ai ép mày! Mệt thì nghỉ, chứ làm hoài chi!', context: 'Thua ván / hết Ruby / bị loại' },
   { id: 'chiphien_maydien', persona: 'chiphien', label: 'Mày điên rồi không để ai ngủ', quote: 'Mày điên rồi! Biết mấy giờ chưa không để cho ai ngủ hết trơn!', context: 'Sốc / hối nhanh trong chat' },
   { id: 'chiphien_xinloi', persona: 'chiphien', label: 'Xin lỗi gì mà xin lỗi?!', quote: 'Xin lỗi nha! Xin lỗi gì mà xin lỗi?!', context: 'Phản đòn / troll khi bị vote oan' },
@@ -387,8 +539,18 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'chiphien_miengdat', persona: 'chiphien', label: 'Mua cho em miếng đất là tin liền', quote: 'Anh mua cho em miếng đất nha là chị tin liền!', context: 'Tặng quà / mua đất trong game' },
   { id: 'chiphien_villa', persona: 'chiphien', label: 'Mua căn villa dụ chị được liền', quote: 'Muốn dụ chị dễ lắm, mua căn villa là dụ chị được liền rồi!', context: 'Nhận quà khủng / nâng cấp' },
   { id: 'chiphien_vonghiem', persona: 'chiphien', label: 'Phương trình vô nghiệm', quote: 'Chúng tôi chính là một phương trình vô nghiệm!', context: 'Bó tay / thua ván / đáp án trật' },
-  { id: 'chiphien_xinhdep', persona: 'chiphien', label: 'Không có mày chị vẫn xinh vẫn đẹp', quote: 'Ở đất ơi nè, không có mày chị vẫn xinh vẫn đẹp!', context: 'Tự tin lật kèo / không sợ cô lập' },
+  { id: 'chiphien_xinhdep', persona: 'chiphien', label: 'Không có mày chị vẫn xinh vẫn đẹp', quote: 'Ở đất ơi nè, không có mày chị vẫn xinh vẫn đẹp!', context: 'Tự tin lật kèo / đi tiếp không ngại' },
   { id: 'chiphien_metlamroi', persona: 'chiphien', label: 'Một cái thôi chị mệt lắm rồi', quote: 'Trời đất ơi một cái thôi là chị đã mệt lắm rồi em yêu ơi!', context: 'Dính bom / bị cắn / ăn đòn nặng' },
+  { id: 'chiphien_taisancuachi', persona: 'chiphien', label: 'Tài sản của ảnh dành cho chị hết', quote: 'Tài sản của ảnh là dành cho chị hết đó nha!', context: 'Ăn tiền thuê / nhận quà Ruby' },
+  { id: 'chiphien_kemay', persona: 'chiphien', label: 'Kệ mày chứ, chị không quan tâm', quote: 'Kệ mày chứ, chị Phiến không có quan tâm đâu cưng!', context: 'Cà khịa / phản biện bơ đẹp' },
+  { id: 'chiphien_dequahe', persona: 'chiphien', label: 'Dễ quá he!', quote: 'Trời ơi dễ quá he!', context: 'Đoán đúng cái rẹt / đi nước quá mượt' },
+  { id: 'chiphien_capdoimanh', persona: 'chiphien', label: 'Cặp đôi mạnh nhất thế giới!', quote: 'Cặp đôi là mạnh nhất thế giới luôn đó nha!', context: 'Thắng đồng đội / đoán ăn ý' },
+  { id: 'chiphien_chitoitiec', persona: 'chiphien', label: 'Chị tới tiệc rồi đây!', quote: 'Ôi tới tiệc rồi đây mấy cưng ơi!', context: 'Vào ván / góp vui phòng chờ' },
+  { id: 'chiphien_nhinchidi', persona: 'chiphien', label: 'Giờ mày nhìn chị đi!', quote: 'Giờ mày nhìn chị đi, chị đẹp mà!', context: 'Chốt lượt tự tin / khịa nhẹ' },
+  { id: 'chiphien_nhinmaylaidi', persona: 'chiphien', label: 'Mày nhìn lại mày đi!', quote: 'Mày nhìn lại mày đi cưng!', context: 'Cà khịa đáp án sai / chọc quê' },
+  { id: 'chiphien_odaumaxai', persona: 'chiphien', label: 'Ở đâu ra mà xài hết bà nội ơi!', quote: 'Ở đâu ra mà cho xài hết bà nội ơi!', context: 'Hết hồn tiền bay nhanh / cháy túi' },
+  { id: 'chiphien_khongthamlam', persona: 'chiphien', label: 'Chị không phải người tham lam!', quote: 'Chị không phải là một con đàn bà tham lam đâu nha!', context: 'Thanh minh / tha bổng rộng lượng' },
+  { id: 'chiphien_xuitaotai', persona: 'chiphien', label: 'Đừng đổ lỗi cho xui là tại tôi!', quote: 'Đừng đổ lỗi cho xui là tại tôi nha!', context: 'Đoán sai / thua xui / thanh minh' },
 
   // Hỗ trợ Game cốt lõi (10)
   { id: 'batan_noroi', persona: 'game_fx', label: 'Bà Tân: Chạy đi các cháu ơi nổ rồi!', quote: 'Chạy đi các cháu ơi nổ rồi!', context: 'Đặt bom nổ / Bom Chữ' },
@@ -448,102 +610,150 @@ export const ACTION_POOL_META: readonly { key: MemePoolKey; label: string; desc:
 
 export const MEME_POOLS: Record<MemePoolKey, readonly MemeId[]> = {
   welcome: [
-    'linda_chao', 'linda_trolai', 'linda_chicho', 'linda_emquaday', 'linda_toalet',
-    'coba_muonchoi', 'coba_buoccungchan', 'minhhieu_khoe', 'phuonghang_lamchu', 'chiphien_hoahau',
+    'linda_chao', 'linda_xinchao_mn', 'linda_trolai', 'linda_buoitoivuive', 'linda_emquaday',
+    'linda_toasang', 'coba_muonchoi', 'coba_buoccungchan', 'coba_choitangoc', 'coba_dethuong',
+    'minhhieu_khoe', 'phuonghang_lamchu', 'chiphien_hoahau', 'chiphien_chitoitiec',
   ],
   turn_move: [
-    'linda_chicho', 'linda_emquaday', 'linda_zo', 'minhhieu_duongquyen', 'minhhieu_tiendohay',
-    'minhhieu_chotdon', 'phuonghang_dunglacham', 'phuonghang_lamchu', 'coba_totote', 'coba_muonchoi',
-    'coba_buoccungchan', 'chiphien_hoahau',
+    'linda_chicho', 'linda_emquaday', 'linda_zo', 'linda_xuongnuiquay',
+    'minhhieu_duongquyen', 'minhhieu_tiendohay', 'minhhieu_chotdon', 'minhhieu_lubu',
+    'phuonghang_lamchu', 'phuonghang_dunglacham', 'phuonghang_chuabaogiobochay', 'phuonghang_lammoico',
+    'phuonghang_tubitritue', 'coba_totote', 'coba_choitangoc', 'coba_quatbatieu',
+    'coba_muonchoi', 'chiphien_nhinchidi', 'chiphien_xinhdep', 'chiphien_dequahe',
   ],
   correct: [
-    'minhhieu_tinhlai', 'minhhieu_chotdon', 'linda_dangcap', 'linda_ngonquaha', 'linda_zo',
-    'coba_futani', 'coba_khovang', 'coba_dethuong', 'phuonghang_chanly', 'phuonghang_kimcuong',
-    'chiphien_bonghong', 'chiphien_xinhdep',
+    'minhhieu_tinhlai', 'minhhieu_chotdon', 'minhhieu_tiendohay',
+    'linda_dangcap', 'linda_ngonquaha', 'linda_zo', 'linda_toasang',
+    'coba_futani', 'coba_dethuong', 'coba_khovang',
+    'phuonghang_chanly', 'phuonghang_suthat', 'phuonghang_kimcuong', 'phuonghang_lammoico',
+    'phuonghang_tubitritue', 'chiphien_bonghong', 'chiphien_dequahe', 'chiphien_xinhdep',
+    'chiphien_capdoimanh', 'chiphien_khongvon',
   ],
   wrong: [
-    'linda_que', 'linda_jzma', 'linda_airanh', 'linda_botkhung', 'linda_oijztroi',
-    'coba_batphelon', 'coba_thoithoi', 'minhhieu_hoihan', 'minhhieu_conquyxao',
-    'phuonghang_tuongvay', 'phuonghang_haoquang', 'chiphien_loilam', 'chiphien_kholam', 'chiphien_vonghiem',
+    'linda_que', 'linda_jzma', 'linda_airanh', 'linda_botkhung', 'linda_oijztroi', 'linda_ecaijztroi',
+    'coba_batphelon', 'coba_dinhphen', 'coba_aotuongsucmanh', 'coba_thoithoi', 'coba_nhinquancanh',
+    'minhhieu_hoihan', 'minhhieu_conquyxao', 'minhhieu_cadonhuquy',
+    'phuonghang_aidungaisai', 'phuonghang_haoquang', 'phuonghang_khonhon',
+    'chiphien_loilam', 'chiphien_kholam', 'chiphien_vonghiem', 'chiphien_xuitaotai',
   ],
   win: [
-    'linda_dangcap', 'linda_zo', 'linda_ngonqua', 'linda_ngonquaha',
-    'coba_khovang', 'coba_dethuong', 'coba_totote',
-    'minhhieu_matphoiphoi', 'minhhieu_tiendohay',
-    'phuonghang_motminhtao', 'phuonghang_kimcuong',
-    'chiphien_khongvon', 'chiphien_bonghong',
+    'linda_dangcap', 'linda_zo', 'linda_ngonqua', 'linda_ngonquaha', 'linda_toasang', 'linda_cuoi',
+    'coba_khovang', 'coba_totote', 'coba_futani', 'coba_dethuong',
+    'minhhieu_matphoiphoi', 'minhhieu_tiendohay', 'minhhieu_tiendomat',
+    'phuonghang_motminhtao', 'phuonghang_thanhcong', 'phuonghang_kimcuong', 'phuonghang_50tuoi',
+    'chiphien_khongvon', 'chiphien_bonghong', 'chiphien_capdoimanh', 'chiphien_xinhdep', 'chiphien_dequahe',
   ],
   lose: [
-    'linda_que', 'linda_10lay', 'linda_oijztroi', 'linda_jzma',
-    'coba_thoithoi', 'coba_luocmay', 'minhhieu_hoihan', 'minhhieu_muonkhoc',
-    'phuonghang_divang', 'phuonghang_haoquang',
-    'chiphien_aiepmay', 'chiphien_vonghiem', 'chiphien_loilam',
+    'linda_que', 'linda_oijztroi', 'linda_jzma', 'linda_cuutoibacon', 'linda_meoicuucon',
+    'coba_thoithoi', 'coba_giadinhtannat',
+    'minhhieu_hoihan', 'minhhieu_muonkhoc', 'minhhieu_rotmuocmat', 'minhhieu_khongaimua',
+    'phuonghang_divang', 'phuonghang_haoquang', 'phuonghang_quantutrathu',
+    'chiphien_aiepmay', 'chiphien_loilam', 'chiphien_vonghiem', 'chiphien_xuitaotai', 'tienbip_cainit',
   ],
   money: [
-    'minhhieu_tiendo_quat', 'minhhieu_10trieu', 'minhhieu_lubu', 'minhhieu_canvang',
-    'minhhieu_matphoiphoi', 'minhhieu_laytienche', 'coba_futani', 'coba_phenguoigiau',
-    'coba_khovang', 'phuonghang_kimcuong', 'chiphien_khongvon', 'chiphien_30ty', 'linda_ngonqua',
+    'minhhieu_tiendo_quat', 'minhhieu_matphoiphoi', 'minhhieu_tiendomat', 'minhhieu_nganruoido',
+    'minhhieu_1000do', 'minhhieu_tientuoi', 'minhhieu_10trieu', 'minhhieu_tienchicho',
+    'minhhieu_lubu', 'minhhieu_canvang', 'minhhieu_laytienche',
+    'coba_futani', 'coba_phenguoigiau', 'coba_khovang',
+    'phuonghang_kimcuong', 'phuonghang_tienphuongtien', 'phuonghang_thanhcong',
+    'chiphien_khongvon', 'chiphien_30ty', 'chiphien_villa', 'chiphien_taisancuachi', 'chiphien_odaumaxai',
+    'linda_ngonqua',
   ],
   broke: [
-    'tienbip_cainit', 'vn_hettien', 'minhhieu_muonkhoc', 'minhhieu_canvang',
-    'chiphien_30ty', 'chiphien_aiepmay', 'coba_phenguoigiau', 'coba_luocmay',
-    'linda_cuutui', 'phuonghang_luadao',
+    'tienbip_cainit', 'vn_hettien', 'sena_donate',
+    'minhhieu_muonkhoc', 'minhhieu_rotmuocmat', 'minhhieu_canvang', 'minhhieu_hoihan', 'minhhieu_khongaimua',
+    'chiphien_30ty', 'chiphien_aiepmay', 'chiphien_odaumaxai',
+    'coba_giadinhtannat', 'linda_cuutui', 'phuonghang_luadao',
   ],
   gift: [
-    'linda_thatim', 'linda_ngonqua', 'coba_futani', 'coba_dethuong',
-    'minhhieu_maccuoi', 'minhhieu_10trieu', 'phuonghang_kimcuong',
-    'chiphien_miengdat', 'chiphien_villa', 'sena_donate',
+    'linda_thatim', 'linda_ngonqua', 'linda_ngonquaha',
+    'coba_futani', 'coba_dethuong', 'coba_khovang',
+    'minhhieu_maccuoi', 'minhhieu_tienchicho', 'minhhieu_10trieu', 'minhhieu_1000do', 'minhhieu_khoe',
+    'phuonghang_kimcuong',
+    'chiphien_miengdat', 'chiphien_villa', 'chiphien_taisancuachi', 'sena_donate',
   ],
   troll: [
-    'linda_level', 'linda_botkhung', 'linda_cuoi', 'linda_maccuoi',
-    'linda_chuyencuatao', 'linda_chanhnha', 'linda_airanh', 'linda_duathoi',
-    'coba_quatbatieu', 'coba_totote', 'minhhieu_duongquyen', 'minhhieu_conquyxao',
-    'phuonghang_dunglacham', 'phuonghang_nhieuchuyen', 'chiphien_xinhdep', 'chiphien_xinloi', 'vn_fartmic',
+    'linda_level', 'linda_botkhung', 'linda_cuoi', 'linda_maccuoi', 'linda_chuyencuatao',
+    'linda_chanhnha', 'linda_airanh', 'linda_duathoi', 'linda_xuongnuiquay', 'linda_moimocra',
+    'coba_quatbatieu', 'coba_totote', 'coba_luocmay', 'coba_dunggionmat', 'coba_dinhphen',
+    'coba_aotuongsucmanh', 'coba_nhinquancanh',
+    'minhhieu_duongquyen', 'minhhieu_conquyxao', 'minhhieu_cadonhuquy',
+    'phuonghang_dunglacham', 'phuonghang_khonhon', 'phuonghang_50tuoi', 'phuonghang_quantutrathu',
+    'phuonghang_tuongvay', 'chiphien_kemay', 'chiphien_nhinmaylaidi', 'chiphien_nhinchidi',
+    'chiphien_xinloi', 'vn_fartmic',
   ],
   vote: [
-    'vn_toicongchuyen', 'linda_hongnho', 'linda_chuyencuatao',
-    'coba_giangho', 'coba_batphelon', 'coba_ngaychon',
+    'vn_toicongchuyen', 'vn_amongus', 'linda_chuyencuatao', 'linda_botkhung', 'linda_moimocra',
+    'coba_giangho', 'coba_batphelon', 'coba_ngaychon', 'coba_dungdongkich', 'coba_dunglaigia',
     'minhhieu_conquyxao', 'minhhieu_chotdon',
-    'phuonghang_dungdien', 'phuonghang_trongcuoc', 'chiphien_kholam',
+    'phuonghang_dungdien', 'phuonghang_anhhung', 'phuonghang_luadao', 'phuonghang_aidungaisai',
+    'phuonghang_voquytday', 'chiphien_kholam', 'chiphien_xinloi',
   ],
   defense: [
     'linda_hongnho', 'linda_10lay', 'linda_thaloi', 'linda_duathoi',
-    'chiphien_xinloi', 'coba_mayimtaotha', 'phuonghang_trongcuoc', 'phuonghang_nhieuchuyen', 'minhhieu_laytienche',
+    'coba_xinloianh', 'coba_giadinhtannat', 'coba_mayimtaotha',
+    'minhhieu_soqua', 'minhhieu_laytienche',
+    'phuonghang_trongcuoc', 'phuonghang_thayvay', 'phuonghang_suthat',
+    'phuonghang_chuabaogiobochay', 'phuonghang_aidungaisai',
+    'chiphien_xinloi', 'chiphien_khongthamlam', 'chiphien_xuitaotai', 'chiphien_kemay',
   ],
   forgive: [
-    'coba_thathu', 'coba_mayimtaotha', 'coba_buoccungchan',
-    'linda_thaloi', 'linda_duathoi', 'minhhieu_laytienche', 'chiphien_xinhdep', 'phuonghang_tuongvay',
+    'coba_thathu', 'coba_mayimtaotha', 'coba_tamgietubi', 'coba_buoccungchan', 'coba_xinloianh',
+    'linda_thaloi', 'linda_duathoi', 'linda_10lay',
+    'phuonghang_tubitritue', 'phuonghang_trongcuoc', 'chiphien_khongthamlam',
   ],
   eliminated: [
-    'vn_vinhbietcu', 'linda_que', 'linda_achetchi', 'coba_votungoi', 'coba_ngaychon',
-    'minhhieu_muonkhoc', 'phuonghang_dosup', 'phuonghang_divang', 'chiphien_dingu', 'chiphien_aiepmay',
+    'vn_vinhbietcu', 'linda_que', 'linda_achetchi', 'linda_banoi',
+    'coba_votungoi', 'coba_ngaychon', 'coba_luocmay', 'coba_dunggionmat',
+    'minhhieu_muonkhoc', 'minhhieu_rotmuocmat', 'minhhieu_cuutoi',
+    'phuonghang_dosup', 'phuonghang_divang', 'phuonghang_voquytday',
+    'chiphien_dingu', 'chiphien_aiepmay', 'chiphien_metlamroi',
   ],
   twist: [
-    'vn_batngochua', 'vn_vineboom', 'minhhieu_tinhlai', 'minhhieu_laytienche',
-    'linda_omc', 'linda_caigizay', 'coba_mayimtaotha', 'coba_thathu',
-    'phuonghang_ngongang', 'phuonghang_tuongvay', 'chiphien_xinhdep',
+    'vn_batngochua', 'vn_vineboom', 'minhhieu_tinhlai', 'minhhieu_laytienche', 'minhhieu_duongquyen',
+    'linda_omc', 'linda_caigizay', 'linda_emquaday', 'linda_moimocra',
+    'coba_mayimtaotha', 'coba_thathu', 'coba_dunglaigia', 'coba_dungdongkich',
+    'phuonghang_ngongang', 'phuonghang_tuongvay', 'phuonghang_thayvay',
+    'phuonghang_voquytday', 'phuonghang_quantutrathu',
   ],
   bomb: [
-    'batan_noroi', 'vn_vineboom', 'linda_cuutui', 'linda_banoi', 'linda_achetchi',
-    'coba_thoithoi', 'coba_ngaychon', 'minhhieu_hoihan', 'phuonghang_dosup', 'chiphien_metlamroi',
+    'batan_noroi', 'vn_vineboom',
+    'linda_cuutui', 'linda_cuutoibacon', 'linda_meoicuucon', 'linda_banoi', 'linda_achetchi', 'linda_oijztroi',
+    'coba_thoithoi', 'coba_ngaychon',
+    'minhhieu_cuutoi', 'minhhieu_soqua', 'minhhieu_hoihan',
+    'phuonghang_dosup', 'phuonghang_nguyhiem', 'chiphien_metlamroi',
   ],
   bite: [
-    'linda_cuutui', 'linda_achetchi', 'linda_banoi', 'coba_thoithoi',
-    'coba_luocmay', 'minhhieu_lubu', 'phuonghang_dunglacham', 'chiphien_metlamroi',
+    'linda_cuutui', 'linda_cuutoibacon', 'linda_meoicuucon', 'linda_achetchi',
+    'linda_banoi', 'linda_jzma', 'linda_ecaijztroi',
+    'coba_thoithoi', 'coba_votungoi',
+    'minhhieu_cuutoi', 'minhhieu_soqua', 'minhhieu_muonkhoc',
+    'phuonghang_nguyhiem', 'chiphien_metlamroi',
   ],
   shock: [
-    'vn_amongus', 'vn_vineboom', 'linda_banoi', 'linda_omc', 'linda_caigizay',
-    'linda_jzma', 'linda_oijztroi', 'coba_batphelon', 'minhhieu_tinhlai',
-    'phuonghang_ngongang', 'phuonghang_divang', 'phuonghang_luadao', 'chiphien_maydien',
+    'vn_amongus', 'vn_vineboom',
+    'linda_banoi', 'linda_omc', 'linda_caigizay', 'linda_jzma', 'linda_ecaijztroi', 'linda_oijztroi',
+    'coba_batphelon', 'coba_dunggionmat', 'coba_dunglaigia',
+    'minhhieu_tinhlai', 'minhhieu_soqua',
+    'phuonghang_ngongang', 'phuonghang_tinhhinh', 'phuonghang_nguyhiem', 'phuonghang_thayvay',
+    'phuonghang_tuongvay', 'phuonghang_anhhung', 'phuonghang_divang', 'phuonghang_luadao', 'phuonghang_dosup',
+    'chiphien_maydien', 'chiphien_vonghiem', 'chiphien_odaumaxai',
   ],
   chat_hype: [
-    'linda_chicho', 'linda_maccuoi', 'linda_cuoi', 'linda_toalet', 'linda_chanhnha', 'linda_level',
-    'minhhieu_maccuoi', 'minhhieu_lubu', 'phuonghang_nhieuchuyen', 'phuonghang_trongcuoc',
-    'chiphien_maydien', 'chiphien_dingu', 'coba_giangho', 'coba_buoccungchan', 'coba_phenguoigiau',
+    'linda_chicho', 'linda_maccuoi', 'linda_cuoi', 'linda_uongnuocmia', 'linda_toalet',
+    'linda_chanhnha', 'linda_level', 'linda_airanh', 'linda_buoitoivuive',
+    'minhhieu_maccuoi', 'minhhieu_lubu', 'minhhieu_tiendo_quat', 'minhhieu_cadonhuquy',
+    'phuonghang_nhieuchuyen', 'phuonghang_trongcuoc', 'phuonghang_haoquang',
+    'phuonghang_tinhhinh', 'phuonghang_khonhon', 'phuonghang_50tuoi',
+    'chiphien_maydien', 'chiphien_nhinmaylaidi', 'chiphien_kemay', 'chiphien_chitoitiec',
+    'coba_giangho', 'coba_buoccungchan', 'coba_phenguoigiau', 'coba_dinhphen',
   ],
 };
 
-/** Xác định phòng hiện tại có bật nhạc nền xoay vòng 6 bài hay không. */
+/** Toàn bộ 153 ID meme hợp lệ để phát xoay vòng ngẫu nhiên toàn cục không lặp. */
+export const ALL_MEME_IDS: readonly MemeId[] = MEME_LIST.map((m) => m.id);
+
+/** Nhạc nền xoay vòng 6 bài chỉ phát khi đang ở phòng chờ (lobby), tắt khi vào ván chơi. */
 export function shouldPlayBgm(room: RoomState | null): boolean {
-  return Boolean(room);
+  return room?.phase === 'lobby';
 }

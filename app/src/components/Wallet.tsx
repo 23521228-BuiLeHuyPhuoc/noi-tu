@@ -116,12 +116,13 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
         const showNegative = n.delta < 0 && (n.reason === 'game_loss' || n.reason === 'admin_adjust');
         if (n.delta <= 0 && !showNegative) return;
       }
-      play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose');
       if (n.kind === 'update') {
         if (n.reason === 'game_win') playMemePool('win');
         else if (n.reason === 'game_loss' && n.ruby < 0) playMemePool('broke');
         else if (n.reason === 'gift_receive') playMemePool('gift');
+        else if (n.reason === 'checkin') playMemePool('money');
       }
+      play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose');
       setNotice({ ...n, id: ++seq });
     });
   }, [onWallet]);

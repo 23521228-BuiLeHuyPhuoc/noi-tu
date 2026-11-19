@@ -405,13 +405,15 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
     const prev = prevPressedRef.current;
     prevPressedRef.current = pressedCount;
     if (!isBite && pressedCount > prev) {
+      const remaining = view.teeth.length - pressedCount;
+      if (remaining > 0 && remaining <= 4) playMemePool('shock', { cooldownMs: 2200 });
       play('pop');
       Animated.sequence([
         Animated.timing(jawAnim, { toValue: 0.14, duration: 65, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.spring(jawAnim, { toValue: 0, friction: 6, tension: 140, useNativeDriver: USE_NATIVE_DRIVER }),
       ]).start();
     }
-  }, [pressedCount, isBite, jawAnim]);
+  }, [pressedCount, isBite, jawAnim, view.teeth.length]);
 
   useOnChange(view.phase, (ph) => {
     setErr(null);

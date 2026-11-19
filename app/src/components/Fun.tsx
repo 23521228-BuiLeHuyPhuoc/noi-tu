@@ -420,6 +420,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
 
   // tin nhắn mới: bong bóng dưới avatar người gửi
   useOnNew(chat, (m) => {
+    if (m.kind === 'sticker') playMemePool('chat_hype', { cooldownMs: 2000 });
     if (m.from !== game.me) play('chat');
     const at = rectOf(`avatar-${m.from}`, origin(), rotatedRef.current);
     const bubbleFx = playersRef.current.find((p) => p.id === m.from)?.cosmetics?.chatBubble;
@@ -454,6 +455,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const hit = () => {
           setMood(e.to, nice ? 'smug' : 'shock', 2200);
           if (!nice) setWobble(e.to, 'shake', 1400);
+          playMemePool(nice ? 'gift' : 'troll', { cooldownMs: 1400 });
           play(nice ? 'coin' : 'splat');
           if (toR) add({ kind: 'splat', emoji, at: toR });
           if (toMe) {
@@ -473,22 +475,23 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         }
       } else if (e.kind === 'taunt') {
         const text = TAUNTS.find((t) => t.id === e.taunt)?.text ?? '';
+        playMemePool('troll', { cooldownMs: 1400 });
         play('pop');
         if (fromR) say({ from: e.from, name: from === 'bạn' ? 'Bạn' : from, text, at: fromR, chat: false });
         else feed(`${from}: ${text}`, 'fun');
       } else if (e.kind === 'poke' && !e.poke) {
         setMood(e.to, 'angry', 2500);
         setWobble(e.to, 'shake', 1800);
+        playMemePool('chat_hype', { cooldownMs: 2800 });
         if (toMe) {
           vibrate(400);
           shake();
           play('turn');
           feed(`${from} đang hối bạn`, 'bad');
         } else feed(`${from} đang hối ${nameOf(e.to)}`, 'fun');
-        playMemePool('chat_hype', { cooldownMs: 2800 });
       } else if (e.kind === 'emoji') {
-        play('pop');
         playMemePool('chat_hype', { cooldownMs: 2800 });
+        play('pop');
         if (fromR) add({ kind: 'float', emoji: e.emoji, at: fromR });
         else feed(`${from}: ${e.emoji}`, 'fun');
       } else if (e.kind === 'hit') {
@@ -498,8 +501,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const land = () => {
           setMood(e.to, 'dizzy', 3000);
           setWobble(e.to, e.ko || e.move === 'chuong' ? 'spin' : 'shake', e.ko ? 2800 : 1800);
-          play(e.ko ? 'ko' : 'punch');
           playMemePool(e.ko ? 'eliminated' : 'troll', { cooldownMs: 1600 });
+          play(e.ko ? 'ko' : 'punch');
           if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
           if (toMe && !e.soft) {
             vibrate(e.ko ? [200, 80, 300] : 150);
@@ -514,21 +517,21 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
       } else if (e.kind === 'doodle') {
         setDoodle(e.to, e.doodle, DOODLE_MS);
         const what = DOODLE_OPTIONS.find((d) => d.doodle === e.doodle)?.name.toLowerCase().replace('vẽ ', '') ?? 'bậy';
-        play('pop');
         playMemePool('chat_hype', { cooldownMs: 2800 });
+        play('pop');
         feed(quip.doodle(from, toMe ? 'bạn' : nameOf(e.to), what), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'nick') {
         setNick(e.to, e.nick, NICK_MS);
-        play('pop');
         playMemePool('chat_hype', { cooldownMs: 2800 });
+        play('pop');
         feed(quip.nick(from, toMe ? 'bạn' : nameOf(e.to), nickText(e.nick)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'honk') {
         setWobble(e.to, 'shake', 1400);
+        playMemePool('troll', { cooldownMs: 1600 });
         if (toMe) {
           play(['honk', 'fart', 'boing'][e.variant ?? 0] as 'honk' | 'fart' | 'boing');
           vibrate(120);
         }
-        playMemePool('troll', { cooldownMs: 1600 });
         feed(quip.honk(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'cry') {
         setMood(e.to, 'cry', 6000);
@@ -547,6 +550,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setWobble(e.to, 'spin', 3600);
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '🌀', at: toR });
+        playMemePool('troll', { cooldownMs: 1600 });
         play('spin');
         if (toMe) {
           vibrate([120, 60, 180, 60, 140]);
@@ -558,6 +562,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setWobble(e.to, 'shake', 2800);
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '🌋', at: toR });
+        playMemePool('bomb', { cooldownMs: 1600 });
         play('quake');
         if (toMe) {
           vibrate([180, 50, 220, 50, 180]);
