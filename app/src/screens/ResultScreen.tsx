@@ -17,6 +17,7 @@ const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
   'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
+  'family_feud', 'who_is_it',
 ];
 
 export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {

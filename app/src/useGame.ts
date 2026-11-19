@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, ChaosAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
-  LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TopupRequest,
+  LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TeamId, TopupRequest,
   WalletError, WalletInfo,
 } from '../../shared/src/types';
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
@@ -54,6 +54,8 @@ export interface Game {
   /** chủ phòng thêm / bỏ máy chơi cùng (phòng chờ) */
   addBot(): Promise<string | null>;
   removeBot(id: string): Promise<string | null>;
+  pickTeam(team: TeamId | null): Promise<string | null>;
+  shuffleTeams(): Promise<string | null>;
   start(): Promise<string | null>;
   act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
@@ -525,6 +527,14 @@ export function useGame(): Game {
     (id: string) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:removeBot', { id })),
     [simple],
   );
+  const pickTeam = useCallback(
+    (team: TeamId | null) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:pickTeam', { team })),
+    [simple],
+  );
+  const shuffleTeams = useCallback(
+    () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:shuffleTeams')),
+    [simple],
+  );
   const start = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')), [simple]);
   const restart = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')), [simple]);
   const act = useCallback(
@@ -712,6 +722,8 @@ export function useGame(): Game {
       customize,
       addBot,
       removeBot,
+      pickTeam,
+      shuffleTeams,
       start,
       restart,
       act,
@@ -757,6 +769,8 @@ export function useGame(): Game {
       customize,
       addBot,
       removeBot,
+      pickTeam,
+      shuffleTeams,
       start,
       restart,
       act,

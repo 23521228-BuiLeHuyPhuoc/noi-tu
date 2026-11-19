@@ -28,6 +28,8 @@ import { UnoMercyGame } from './games/unomercy';
 import { LotoGame } from './games/loto';
 import { CaroGame } from './games/caro';
 import { CroakSquadGame } from './games/croaksquad';
+import { FamilyFeudGame } from './games/familyfeud';
+import { WhoIsItGame } from './games/whoisit';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
 import type { BoomTickPayload } from '../../shared/src/boom';
 
@@ -63,6 +65,8 @@ interface Player {
   characterCustom?: boolean;
   /** người chơi máy (chủ phòng thêm vào) */
   bot?: boolean;
+  /** đội người chơi chọn ở phòng chờ */
+  team?: 'red' | 'blue';
   removeTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -86,6 +90,7 @@ const BOT_THINK_MS: Record<GameType, [number, number]> = {
   ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
   loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
   ca_sau: [450, 950], boom_online: [999999, 999999], uno_mercy: [620, 1250],
+  family_feud: [2800, 4800], who_is_it: [3000, 5200],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -457,6 +462,41 @@ export class Room {
     this.changed();
   }
 
+  /** Người chơi tự chọn đội Đỏ/Xanh trong phòng chờ (ai bấm sớm vào trước). */
+  pickTeam(playerId: string, team: unknown): Result {
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    const p = this.find(playerId);
+    if (!p) return { ok: false, error: 'not_in_room' };
+    if (team === null) {
+      p.team = undefined;
+      this.changed();
+      return { ok: true };
+    }
+    if (team !== 'red' && team !== 'blue') return { ok: false, error: 'bad_request' };
+    const cap = Math.ceil(Math.max(2, this.players.length) / 2);
+    const taken = this.players.filter((x) => x.id !== playerId && x.team === team).length;
+    if (taken >= cap) return { ok: false, error: 'team_full' };
+    p.team = team;
+    this.changed();
+    return { ok: true };
+  }
+
+  /** Chủ phòng trộn ngẫu nhiên 2 đội Đỏ/Xanh trong phòng chờ. */
+  shuffleTeams(byId: string): Result {
+    if (byId !== this.hostId) return { ok: false, error: 'not_host' };
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    const shuffled = [...this.players];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    shuffled.forEach((p, idx) => {
+      p.team = idx % 2 === 0 ? 'red' : 'blue';
+    });
+    this.changed();
+    return { ok: true };
+  }
+
   /** Chủ phòng đổi phòng thành công khai / riêng tư (được cả lúc đang chơi). */
   setPublic(byId: string, value: unknown): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
@@ -610,6 +650,14 @@ export class Room {
       if (settings.croakStage !== 0 && settings.croakStage !== 1 && settings.croakStage !== 2) return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, croakStage: settings.croakStage };
     }
+    if (settings?.familyFeudRounds !== undefined) {
+      if (settings.familyFeudRounds !== 3 && settings.familyFeudRounds !== 5) return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, familyFeudRounds: settings.familyFeudRounds };
+    }
+    if (settings?.whoIsItDifficulty !== undefined) {
+      if (settings.whoIsItDifficulty !== 'auto' && settings.whoIsItDifficulty !== 'large') return { ok: false, error: 'bad_request' };
+      this.settings = { ...this.settings, whoIsItDifficulty: settings.whoIsItDifficulty };
+    }
     if (settings?.roomTheme !== undefined) {
       if (typeof settings.roomTheme !== 'string' || !ROOM_THEMES.some((t) => t.id === settings.roomTheme)) {
         return { ok: false, error: 'bad_request' };
@@ -638,7 +686,7 @@ export class Room {
     this.participants = order.map((p) => p.id);
     this.engine = this.createEngine();
     this.phase = 'playing';
-    this.engine.start(order.map((p) => ({ id: p.id, name: p.name })));
+    this.engine.start(order.map((p) => ({ id: p.id, name: p.name, ...(p.team ? { team: p.team } : {}) })));
     this.changed();
     return { ok: true };
   }
@@ -685,6 +733,7 @@ export class Room {
       ...(p.cosmetics ? { cosmetics: p.cosmetics } : {}),
       ...(p.vipTier ? { vipTier: p.vipTier } : {}),
       ...(p.bot ? { bot: true } : {}),
+      ...(p.team ? { team: p.team } : {}),
     }));
     const serverNow = Date.now();
     const cache = new Map<string, RoomState>();
@@ -774,6 +823,10 @@ export class Room {
         return new CaroGame(ctx);
       case 'croaksquad':
         return new CroakSquadGame(ctx);
+      case 'family_feud':
+        return new FamilyFeudGame(ctx);
+      case 'who_is_it':
+        return new WhoIsItGame(ctx);
       default:
         return new WordChainGame(ctx, 'vi');
     }

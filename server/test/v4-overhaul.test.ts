@@ -110,7 +110,7 @@ function makeHarness(
 // 1. DANH MỤC 15 GAME THỨ TỰ CŨ -> MỚI & AVATAR LẦY LỘI / MEME
 // ============================================================================
 describe('Phase 27 & 28 — Danh mục 15 Game (Cũ → Mới) & Avatar Lầy Lội', () => {
-  it('chứa chính xác 15 game theo thứ tự ra mắt từ cũ tới mới, đã xóa tinh_mat và den_do', () => {
+  it('chứa chính xác 17 game theo thứ tự ra mắt từ cũ tới mới, đã xóa tinh_mat và den_do', () => {
     const keys = Object.keys(GAME_INFO) as GameType[];
     expect(keys).toEqual([
       'wordchain',
@@ -128,11 +128,15 @@ describe('Phase 27 & 28 — Danh mục 15 Game (Cũ → Mới) & Avatar Lầy L�
       'ca_sau',
       'boom_online',
       'uno_mercy',
+      'family_feud',
+      'who_is_it',
     ]);
     expect('tinh_mat' in GAME_INFO).toBe(false);
     expect('den_do' in GAME_INFO).toBe(false);
     expect(GAME_INFO.boom_online).toEqual({ name: 'Đặt bom tử chiến', min: 2, max: 12 });
     expect(GAME_INFO.uno_mercy).toEqual({ name: 'UNO Tàn nhẫn', min: 2, max: 12 });
+    expect(GAME_INFO.family_feud).toEqual({ name: 'Khảo sát Xóm Lầy', min: 2, max: 12 });
+    expect(GAME_INFO.who_is_it).toEqual({ name: 'Đoán Ai Đây?', min: 2, max: 12 });
   });
 
   it('bộ 36 preset avatar mặc định chứa đầy đủ biểu cảm lầy lội & đạo cụ meme', () => {

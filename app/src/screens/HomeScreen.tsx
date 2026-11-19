@@ -38,6 +38,8 @@ const GAMES: GameType[] = [
   'ca_sau',
   'boom_online',
   'uno_mercy',
+  'family_feud',
+  'who_is_it',
 ];
 
 type HomeFragment = 'games' | 'rooms' | 'shop' | 'profile';
@@ -51,17 +53,18 @@ const FRAGMENTS: { id: HomeFragment; label: string; icon: UiIconName }[] = [
 
 type Category = 'all' | 'party' | 'hidden' | 'coop' | 'word' | 'classic';
 const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[] }[] = [
-  { id: 'all', label: 'Tất cả (15)', icon: 'LayoutGrid' },
-  { id: 'party', label: 'Nhóm đông', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui', 'ca_sau', 'boom_online', 'uno_mercy'] },
-  { id: 'hidden', label: 'Ẩn vai', icon: 'Eye', games: ['masoi', 'giandiep'] },
+  { id: 'all', label: 'Tất cả (17)', icon: 'LayoutGrid' },
+  { id: 'party', label: 'Nhóm đông', icon: 'PartyPopper', games: ['ve_doan', 'bom_tu', 'do_vui', 'ca_sau', 'boom_online', 'uno_mercy', 'family_feud', 'who_is_it'] },
+  { id: 'hidden', label: 'Ẩn vai', icon: 'Eye', games: ['masoi', 'giandiep', 'who_is_it'] },
   { id: 'coop', label: 'Phối hợp & Cờ', icon: 'Swords', games: ['caro', 'croaksquad', 'boom_online'] },
   { id: 'classic', label: 'Bàn hội chợ', icon: 'Dices', games: ['baucua', 'typhu', 'loto', 'uno_mercy'] },
-  { id: 'word', label: 'Từ vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
+  { id: 'word', label: 'Từ vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en', 'family_feud'] },
 ];
 
 const GAME_TAG: Partial<Record<GameType, string>> = {
-  boom_online: 'Mới',
-  uno_mercy: 'Mới',
+  family_feud: 'Mới',
+  who_is_it: 'Mới',
+  uno_mercy: 'Hot',
   croaksquad: 'Co-op',
   ca_sau: '3D',
 };

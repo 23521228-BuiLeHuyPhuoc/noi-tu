@@ -7,6 +7,7 @@ import type { ThrowImpulse } from '../../../shared/src/dice';
 export interface EnginePlayer {
   id: string;
   name: string;
+  team?: 'red' | 'blue';
 }
 
 /** Những gì Room cung cấp cho một ván chơi */

@@ -209,6 +209,18 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
       ack(room.removeBot(session.playerId, p?.id));
     });
+    socket.on('room:pickTeam', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.pickTeam(session.playerId, p?.team ?? null));
+    });
+    socket.on('room:shuffleTeams', (ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.shuffleTeams(session.playerId));
+    });
 
     socket.on('player:customize', (p, ack) => {
       if (typeof ack !== 'function') return;

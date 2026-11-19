@@ -12,6 +12,7 @@ export const errorText: Record<ErrorCode, string> = {
   too_few_players: 'Chưa đủ người để chơi game này.',
   color_taken: 'Màu này đã có người trong phòng chọn rồi.',
   kicked: 'Bạn đã bị chủ phòng mời ra khỏi phòng này.',
+  team_full: 'Đội này đã đủ người — hãy chọn đội còn lại nhé.',
   bad_request: 'Có lỗi xảy ra, thử lại nhé.',
 };
 
@@ -106,6 +107,8 @@ export const GAME_META: Record<GameType, { emoji: string; tagline: string; playe
   ca_sau: { emoji: '🐊', tagline: 'Đầu Cá Sấu Chúa 3D há hàm răng trắng hếu — chạm trúng Răng Đau là sập hàm PHẬP!', players: '2–12 người' },
   boom_online: { emoji: '💣', tagline: 'Boom Online Sinh Tồn Vòng Bo: nhốt bóng nước, đá bom, ném bom & Đĩa Bay phục thù!', players: '2–12 người' },
   uno_mercy: { emoji: '🃏', tagline: 'UNO Show ’Em No Mercy: chồng +2/+4/+6/+10 không đáy, Số 7 cướp bài & 25 lá CHÁY BÀI!', players: '2–12 người' },
+  family_feud: { emoji: '🎤', tagline: 'Khảo sát 260+ câu siêu lầy lội & 18+ nhẹ: đấu đội Đỏ vs Xanh đoán sát nghĩa!', players: '2–12 người' },
+  who_is_it: { emoji: '🕵️‍♀️', tagline: 'Who Is It HopKids chia 2 đội (chọn đội sớm): 24–54 nhân vật càng đông càng căng, hỏi đặc điểm tìm thẻ mật!', players: '2–12 người' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -186,6 +189,16 @@ export const RULES: Record<GameType, string[]> = {
     'Game đi cảnh giải đố xoay ngang 60FPS (2–6 người chơi, hỗ trợ thêm cả AI Đồng Đội Máy thông minh!).',
     'Phóng lưỡi nuốt đồng đội vào bụng rồi ngắm đường cong quỹ đạo để bắn bạn qua vực sâu hoặc lên vách cao!',
     'Phối hợp dẫm công tắc mở cầu, nhặt chìa khóa mở cổng đá và đưa cả đội chạm Đài Sen Vàng để phá đảo 3 màn!',
+  ],
+  family_feud: [
+    'Chia 2 đội Đỏ và Xanh đối kháng 3 hoặc 5 vòng (vòng áp chót x2 điểm, vòng cuối x3 điểm lật kèo cực gắt).',
+    'Mỗi câu gồm 6 đáp án khảo sát bá đạo — hệ thống tự nhận diện tiếng Việt sát nghĩa, không dấu, teen-code và từ đồng nghĩa.',
+    'Trả lời trật 3 gậy X sẽ mất quyền kiểm soát bảng sang cho đội kia CƯỚP SẠCH toàn bộ quỹ điểm vòng đó!',
+  ],
+  who_is_it: [
+    'Chia 2 đội Đỏ/Xanh (chọn đội ngay ở phòng chờ), số nhân vật tự tăng từ 24 lên 54 thẻ theo số người chơi.',
+    'Mỗi đội chọn bí mật 1 nhân vật để giấu; lần lượt đặt câu hỏi đặc điểm (tự chấm chuẩn) hoặc câu hỏi tự do (Có/Không).',
+    'Chạm thẻ để úp/mở trên bảng đội mình (nhấn giữ để phóng to), hoặc Chốt Đoán với tối đa 2 mạng sai!',
   ],
 };
 

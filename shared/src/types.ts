@@ -11,6 +11,8 @@ import type { UnoMercyAction, UnoMercyView } from './unomercy';
 import type { LotoView } from './loto';
 import type { CaroSizeMode, CaroView } from './caro';
 import type { CroakInput, CroakSquadView, CroakTickPayload } from './croaksquad';
+import type { FamilyFeudAction, FamilyFeudView } from './familyfeud-types';
+import type { WhoIsItAction, WhoIsItDifficulty, WhoIsItView } from './whoisit';
 import type { WordChainDifficulty, WordChainRule } from './pos';
 import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
@@ -35,7 +37,9 @@ export type GameType =
   | 'croaksquad'
   | 'ca_sau'
   | 'boom_online'
-  | 'uno_mercy';
+  | 'uno_mercy'
+  | 'family_feud'
+  | 'who_is_it';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
@@ -54,6 +58,8 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
   ca_sau: { name: 'Khám răng cá sấu', min: 2, max: 12 },
   boom_online: { name: 'Đặt bom tử chiến', min: 2, max: 12 },
   uno_mercy: { name: 'UNO Tàn nhẫn', min: 2, max: 12 },
+  family_feud: { name: 'Khảo sát Xóm Lầy', min: 2, max: 12 },
+  who_is_it: { name: 'Đoán Ai Đây?', min: 2, max: 12 },
 };
 
 export interface RoomSettings {
@@ -101,6 +107,10 @@ export interface RoomSettings {
   caroRevealMs?: number;
   /** Đầm lầy quái chiêu: màn xuất phát (0..2) */
   croakStage?: 0 | 1 | 2;
+  /** Khảo sát Xóm Lầy: số vòng chơi (3 hoặc 5) */
+  familyFeudRounds?: 3 | 5;
+  /** Đoán Ai Đây?: chế độ số nhân vật theo số người hoặc Bảng lớn */
+  whoIsItDifficulty?: WhoIsItDifficulty;
   /** @deprecated tương thích ngược */
   ludoPieces?: 2 | 4;
 }
@@ -280,7 +290,11 @@ export interface PublicPlayer {
   account?: boolean;
   /** người chơi máy */
   bot?: boolean;
+  /** đội người chơi đã tự chọn ở phòng chờ (game chia đội) */
+  team?: TeamId;
 }
+
+export type TeamId = 'red' | 'blue';
 
 export interface RankEntry {
   playerId: string;
@@ -353,7 +367,9 @@ export type GameView =
   | UnoMercyView
   | LotoView
   | CaroView
-  | CroakSquadView;
+  | CroakSquadView
+  | FamilyFeudView
+  | WhoIsItView;
 
 // ================= Nối từ =================
 
@@ -589,6 +605,8 @@ export type GameAction =
   | { type: 'caro_finish_reveal' }
   | { type: 'cs_input'; input: CroakInput }
   | { type: 'cs_reset_stage' }
+  | FamilyFeudAction
+  | WhoIsItAction
   | { type: 'end' };
 
 export type ActionError =
@@ -861,6 +879,7 @@ export type ErrorCode =
   | 'color_taken'
   /** đã bị chủ phòng mời ra: không vào lại được phòng đó */
   | 'kicked'
+  | 'team_full'
   | 'bad_request';
 
 export type Ack<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
@@ -881,6 +900,10 @@ export interface ClientToServerEvents {
   /** chủ phòng thêm / bỏ người chơi máy (ở phòng chờ) */
   'room:addBot': (ack: (r: Ack<{ playerId: string }>) => void) => void;
   'room:removeBot': (p: { id: string }, ack: (r: Ack) => void) => void;
+  /** người chơi tự chọn đội Đỏ/Xanh ở phòng chờ (ai bấm sớm vào trước) */
+  'room:pickTeam': (p: { team: TeamId | null }, ack: (r: Ack) => void) => void;
+  /** chủ phòng trộn ngẫu nhiên lại 2 đội Đỏ/Xanh */
+  'room:shuffleTeams': (ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   /** gửi input vật lý thời gian thực một chiều (không chờ ACK để giảm nửa độ trễ mạng) */

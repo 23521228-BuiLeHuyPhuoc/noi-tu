@@ -6,12 +6,14 @@ import {
 } from '../../../shared/src/avatars';
 import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, GAME_INFO, PLAYER_COLORS,
-  type CharacterConfig, type CharacterLook, type GameType, type RoomState,
+  type CharacterConfig, type CharacterLook, type GameType, type RoomState, type TeamId,
 } from '../../../shared/src/types';
 import { ROOM_THEMES } from '../../../shared/src/themes';
 import { DO_VUI_DIFFICULTIES, DO_VUI_TOPICS, type DoVuiDifficulty } from '../../../shared/src/dovui';
 import { caroSizeForPlayers } from '../../../shared/src/caro';
 import { CA_SAU_ROUND_OPTIONS } from '../../../shared/src/casau';
+import { FAMILY_FEUD_ROUND_OPTIONS } from '../../../shared/src/familyfeud-types';
+import { whoIsItBoardSize } from '../../../shared/src/whoisit';
 import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES, type WordChainDifficulty, type WordChainRule } from '../../../shared/src/pos';
 import { CROAK_STAGES } from '../../../shared/src/croaksquad';
 import type { Game } from '../useGame';
@@ -33,6 +35,7 @@ const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
   'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
+  'family_feud', 'who_is_it',
 ];
 
 const PRESET_ORDER: number[] = [
@@ -116,6 +119,16 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         ? 'Chơi một mình'
         : `Bắt đầu ${info.name}`;
 
+  const isTeamGame =
+    room.gameType === 'family_feud' ||
+    room.gameType === 'who_is_it' ||
+    (room.gameType === 'boom_online' && room.settings.boomMode === 'teams');
+  const teamCap = Math.ceil(Math.max(2, n) / 2);
+  const redTeam = room.players.filter((p) => p.team === 'red');
+  const blueTeam = room.players.filter((p) => p.team === 'blue');
+  const unassignedTeam = room.players.filter((p) => !p.team);
+  const myTeam: TeamId | null = mePlayer?.team ?? null;
+
   return (
     <Shell
       game={game}
@@ -178,6 +191,75 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               disabled={n >= Math.min(room.maxPlayers, info.max)}
               onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); else playMemePool('welcome', { cooldownMs: 2000 }); }}
             />
+          )}
+        </Card>
+      )}
+
+      {isTeamGame && (
+        <Card style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <View style={styles.headIconRow}>
+              <UiIcon name="Users" size={16} color={C.ink} strokeWidth={1.65} />
+              <T style={styles.h3}>Chọn Đội (Ai bấm sớm vào trước)</T>
+            </View>
+            {isHost && n >= 2 && (
+              <Button
+                testID="shuffle-teams-btn"
+                small
+                variant="paper"
+                title="🎲 Trộn đội"
+                onPress={async () => {
+                  const e = await game.shuffleTeams();
+                  if (e) feed(e, 'bad');
+                  else playMemePool('turn_move', { cooldownMs: 1200 });
+                }}
+              />
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {([
+              { id: 'red' as const, label: 'ĐỘI ĐỎ', list: redTeam, bg: '#FEF2F2', border: '#DC2626', accent: '#B91C1C' },
+              { id: 'blue' as const, label: 'ĐỘI XANH', list: blueTeam, bg: '#EFF6FF', border: '#2563EB', accent: '#1D4ED8' },
+            ]).map((tm) => {
+              const joined = myTeam === tm.id;
+              const full = !joined && tm.list.length >= teamCap;
+              return (
+                <View key={tm.id} style={{ flex: 1, backgroundColor: tm.bg, borderColor: tm.border, borderWidth: 1.5, borderRadius: 12, padding: 8, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <T style={{ fontSize: 12, fontWeight: '800', color: tm.accent }}>{tm.label}</T>
+                    <T style={{ fontSize: 11.5, fontWeight: '800', color: tm.accent }}>{tm.list.length}/{teamCap}</T>
+                  </View>
+                  <View style={{ gap: 3, minHeight: 28 }}>
+                    {tm.list.length === 0 ? (
+                      <T style={{ fontSize: 11.5, color: C.muted, fontStyle: 'italic' }}>Chưa có ai…</T>
+                    ) : (
+                      tm.list.map((p) => (
+                        <T key={p.id} numberOfLines={1} style={{ fontSize: 12.5, fontWeight: p.id === game.me ? '800' : '600', color: C.ink }}>
+                          {p.id === game.me ? '★ ' : '• '}{p.name}
+                        </T>
+                      ))
+                    )}
+                  </View>
+                  <Button
+                    testID={`pick-team-${tm.id}`}
+                    small
+                    variant={joined ? 'ink' : 'paper'}
+                    disabled={full}
+                    title={joined ? '✓ Đang ở đội (Rời)' : full ? 'Đã đủ chỗ' : `Vào ${tm.label}`}
+                    onPress={async () => {
+                      const e = await game.pickTeam(joined ? null : tm.id);
+                      if (e) feed(e, 'bad');
+                      else playMemePool('turn_move', { cooldownMs: 1200 });
+                    }}
+                  />
+                </View>
+              );
+            })}
+          </View>
+          {unassignedTeam.length > 0 && (
+            <T style={{ fontSize: 11.5, color: C.secondary }}>
+              Chưa chọn đội ({unassignedTeam.map((p) => p.name).join(', ')}) — sẽ tự chia đều vào 2 đội khi bắt đầu!
+            </T>
           )}
         </Card>
       )}
@@ -543,6 +625,60 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                   disabled={!isHost}
                   style={{ flex: 1 }}
                   onPress={() => game.configure({ settings: { lotoAutoMark: opt.auto } })}
+                />
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'family_feud' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji={GAME_META.family_feud.emoji} size={18} />
+            <T style={styles.h3}>Số vòng Khảo sát Xóm Lầy</T>
+          </View>
+          <View style={styles.roundRow}>
+            {FAMILY_FEUD_ROUND_OPTIONS.map((r) => (
+              <Button
+                key={r}
+                testID={`ff-rounds-${r}`}
+                small
+                variant={(room.settings.familyFeudRounds ?? 3) === r ? 'ink' : 'paper'}
+                title={`${r} vòng`}
+                disabled={!isHost}
+                style={{ flex: 1 }}
+                onPress={() => game.configure({ settings: { familyFeudRounds: r } })}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
+
+      {room.gameType === 'who_is_it' && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji={GAME_META.who_is_it.emoji} size={18} />
+            <T style={styles.h3}>
+              Số nhân vật ({whoIsItBoardSize(Math.max(2, n), room.settings.whoIsItDifficulty ?? 'auto')} thẻ)
+            </T>
+          </View>
+          <View style={styles.roundRow}>
+            {[
+              { mode: 'auto' as const, label: 'Tự động theo người' },
+              { mode: 'large' as const, label: 'Bảng lớn (+1 bậc)' },
+            ].map((opt) => {
+              const active = (room.settings.whoIsItDifficulty ?? 'auto') === opt.mode;
+              return (
+                <Button
+                  key={opt.mode}
+                  testID={`wi-mode-${opt.mode}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={opt.label}
+                  disabled={!isHost}
+                  style={{ flex: 1 }}
+                  onPress={() => game.configure({ settings: { whoIsItDifficulty: opt.mode } })}
                 />
               );
             })}
