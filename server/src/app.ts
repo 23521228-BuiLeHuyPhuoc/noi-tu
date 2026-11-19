@@ -3,6 +3,7 @@ import { attachAvatarRoute, cloudinaryUploader, PhotoService, type AvatarUploade
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { GAME_INFO, type ClientToServerEvents, type GameType, type ServerToClientEvents } from '../../shared/src/types';
+import { GAME_LOSS_RUBY, GAME_WIN_RUBY } from '../../shared/src/ruby';
 import type { Dictionary } from './dictionary';
 import { RoomManager, type RoomManagerOptions } from './roomManager';
 import { attachSocketHandlers, broadcastRoom } from './socket';
@@ -108,11 +109,12 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
 
   // giữ tắt perMessageDeflate mặc định để giảm trễ từng gói tin & tiết kiệm ~1MB zlib buffer mỗi socket trên Render 512MB
   const io: GameServer['io'] = new Server(http, { cors: { origin: '*' } });
+  const events = new WalletEvents();
   const manager: RoomManager = new RoomManager(dict, {
     ...opts,
     room: {
       ...opts.room,
-      // cộng thành tích cho người chơi có tài khoản (hỗ trợ cả thắng đơn và thắng theo phe)
+      // cộng thành tích và thưởng/trừ Ruby (+2000 thắng / -2000 thua, được phép âm) cho người chơi có tài khoản
       onFinish: ({ gameType, participants, winnerId, winnerIds }) => {
         const ids = participants.filter((id) => id.startsWith(ACCOUNT_PREFIX)).map((id) => id.slice(ACCOUNT_PREFIX.length));
         const rawWinners = winnerIds && winnerIds.length > 0 ? winnerIds : winnerId ? [winnerId] : [];
@@ -120,6 +122,20 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         if (ids.length) {
           leaderCache.clear();
           store.recordGame(ids, gameType, winners.length <= 1 ? (winners[0] ?? null) : winners).catch(logErr('recordGame'));
+          if (participants.length >= 2 && rawWinners.length > 0) {
+            const winSet = new Set(winners);
+            for (const userId of ids) {
+              const won = winSet.has(userId);
+              const delta = won ? GAME_WIN_RUBY : -GAME_LOSS_RUBY;
+              const reason = won ? 'game_win' : 'game_loss';
+              wallet
+                .creditRuby(userId, delta, reason, gameType, undefined, won ? undefined : { allowNegative: true })
+                .then((balance) => {
+                  if (balance !== null) events.update(userId, { ruby: balance, delta, reason });
+                })
+                .catch(logErr(reason));
+            }
+          }
         }
       },
       // từ được cả phòng duyệt: dùng được ngay và lưu vào CSDL
@@ -143,7 +159,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
     onRoomChange: (room) => broadcastRoom(io, room),
   });
   const now = opts.now ?? Date.now;
-  attachSocketHandlers(io, manager, auth, photos, { wallet, store, events: new WalletEvents(), now, quota: new FunQuota(now, opts.freePokes) });
+  attachSocketHandlers(io, manager, auth, photos, { wallet, store, events, now, quota: new FunQuota(now, opts.freePokes) });
 
   return {
     http,

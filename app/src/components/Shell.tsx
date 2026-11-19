@@ -4,6 +4,7 @@ import { GAME_INFO, type ChatMsg, type PublicPlayer, type RoomState } from '../.
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
+import { GAME_META } from '../messages';
 import { isMuted, setMuted } from '../sound';
 import { copyText } from '../web';
 import { C, backdropPalette } from '../theme';
@@ -19,7 +20,7 @@ import { PokeLayer } from './PokeFx';
 import { PokeSideLayer } from './PokeSideFx';
 import { Sheet } from './Sheet';
 import { ProfileSheet } from './Account';
-import { RubyIcon, UiIcon } from './Icons';
+import { EmojiIcon, RubyIcon, UiIcon } from './Icons';
 
 export interface StripOptions {
   sub?: (p: PublicPlayer) => string | undefined;
@@ -266,6 +267,7 @@ export function Shell({
           </Pressable>
 
           <View style={[styles.gameNameWrap, compactLandscape && styles.gameNameLandscape]}>
+            <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={18} />
             <T numberOfLines={1} style={[styles.gameName, { color: pal.text }]}>
               {GAME_INFO[room.gameType].name}
             </T>

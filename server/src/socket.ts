@@ -5,6 +5,7 @@ import { ACCOUNT_PREFIX, cleanName, type Room } from './room';
 import { cleanFun, isDisruptive, isHardFx, isScreenTroll, isTrollFx, pauseMsOf, pickChaosPoke, pickPokeSide, RateLimiter, trollExtras, WindowLimiter } from './fun';
 import { isAdmin } from './admin';
 import { pokeItem } from '../../shared/src/pokes';
+import { giftRubyForReceiver } from '../../shared/src/ruby';
 import type { Auth } from './auth';
 import { PhotoService } from './avatar';
 import { attachWalletHandlers } from './wallet';
@@ -348,9 +349,17 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       io.to(room.code).emit('fun:event', {
         ...f, ...extra, ...(soft ? { soft: true } : {}), ...(pausedMs ? { pausedMs } : {}), ...(side ? { side } : {}), id: ++funSeq, from,
       });
-      // người nhận quà có tài khoản được cộng điểm quà (không nhận Ruby)
+      // người nhận quà có tài khoản được cộng điểm quà và hưởng 70% Ruby từ món quà
       if (f.kind === 'gift' && price !== undefined && f.to.startsWith(ACCOUNT_PREFIX)) {
-        walletCtx?.store.addGiftPoints(f.to.slice(ACCOUNT_PREFIX.length), price).catch((e) => console.error('giftPoints', e));
+        const recipientId = f.to.slice(ACCOUNT_PREFIX.length);
+        walletCtx?.store.addGiftPoints(recipientId, price).catch((e) => console.error('giftPoints', e));
+        const giftRuby = giftRubyForReceiver(price);
+        if (giftRuby > 0 && walletCtx) {
+          const recBalance = await walletCtx.wallet.creditRuby(recipientId, giftRuby, 'gift_receive', f.gift, user?.username);
+          if (recBalance !== null) {
+            walletCtx.events.update(recipientId, { ruby: recBalance, delta: giftRuby, reason: 'gift_receive' });
+          }
+        }
       }
       reply({ ok: true });
     };

@@ -17,7 +17,15 @@ export const fmtVnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 export const fmtRuby = (n: number) => n.toLocaleString('vi-VN');
 
 const REASON_TEXT: Record<string, string> = {
-  topup: 'Nạp Ruby', admin_adjust: 'Quản trị điều chỉnh', shop: 'Mua ở cửa hàng', skill: 'Dùng kỹ năng chọc', gift: 'Tặng quà', checkin: 'Điểm danh',
+  topup: 'Nạp Ruby',
+  admin_adjust: 'Quản trị điều chỉnh',
+  shop: 'Mua ở cửa hàng',
+  skill: 'Dùng kỹ năng chọc',
+  gift: 'Tặng quà',
+  gift_receive: 'Nhận quà (70%)',
+  checkin: 'Điểm danh',
+  game_win: 'Thắng ván chơi',
+  game_loss: 'Thua ván chơi',
 };
 
 export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void }) {
@@ -36,13 +44,15 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
     else setError(r.error);
   };
 
+  const curBalance = w?.ruby ?? game.user?.ruby ?? 0;
+
   return (
     <Sheet title="Ví Ruby" onClose={onClose}>
       <View style={styles.balanceRow}>
         <T style={styles.balanceLabel}>Số dư khả dụng</T>
         <View style={styles.rubyInline}>
           <RubyIcon size={20} />
-          <T testID="ruby-balance" style={styles.balance}>{fmtRuby(w?.ruby ?? game.user?.ruby ?? 0)}</T>
+          <T testID="ruby-balance" style={[styles.balance, curBalance < 0 && { color: C.danger }]}>{fmtRuby(curBalance)}</T>
         </View>
       </View>
 
@@ -90,20 +100,23 @@ export function WalletSheet({ game, onClose }: { game: Game; onClose: () => void
         </>
       )}
       {error && w && <T style={styles.error}>{error}</T>}
-      <T style={styles.note}>Ruby chỉ dùng mua đồ vui trong game, không đổi ra tiền hay xu Bầu cua / Cờ tỷ phú.</T>
+      <T style={styles.note}>Thắng ván +2.000 Ruby, thua ván -2.000 Ruby (có thể âm), nhận quà hưởng 70% Ruby; không đổi ra xu Bầu cua / Cờ tỷ phú.</T>
     </Sheet>
   );
 }
 
-/** Thông báo "+N Ruby" kèm pháo giấy, hoặc báo bị từ chối — hiện ở mọi màn */
+/** Thông báo "+N / -N Ruby" kèm pháo giấy khi được cộng, hoặc báo bị từ chối — hiện ở mọi màn */
 export function WalletNoticeLayer({ game }: { game: Game }) {
   const [notice, setNotice] = useState<(WalletNotice & { id: number }) | null>(null);
   const { onWallet } = game;
   useEffect(() => {
     let seq = 0;
     return onWallet((n) => {
-      if (n.kind === 'update' && n.delta <= 0) return;
-      play(n.kind === 'update' ? 'win' : 'lose');
+      if (n.kind === 'update') {
+        const showNegative = n.delta < 0 && (n.reason === 'game_loss' || n.reason === 'admin_adjust');
+        if (n.delta <= 0 && !showNegative) return;
+      }
+      play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose');
       setNotice({ ...n, id: ++seq });
     });
   }, [onWallet]);
@@ -113,17 +126,44 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
     return () => clearTimeout(t);
   }, [notice]);
   if (!notice) return null;
+  const isGain = notice.kind === 'update' && notice.delta > 0;
+  const isLoss = notice.kind === 'update' && notice.delta < 0;
+  const updateReasonText =
+    notice.kind === 'update'
+      ? notice.reason === 'topup'
+        ? 'Đã nhận tiền nạp, cảm ơn bạn'
+        : notice.reason === 'game_win'
+          ? 'Thắng ván chơi · Thưởng kim cương'
+          : notice.reason === 'game_loss'
+            ? 'Thua ván chơi · Trừ kim cương'
+            : notice.reason === 'gift_receive'
+              ? 'Nhận 70% kim cương từ quà tặng'
+              : notice.reason === 'checkin'
+                ? 'Điểm danh hằng ngày'
+                : 'Quản trị vừa điều chỉnh Ruby cho bạn'
+      : '';
   return (
     <View pointerEvents="box-none" style={styles.noticeLayer}>
-      {notice.kind === 'update' && <Confetti key={notice.id} />}
-      <Pressable testID="ruby-toast" onPress={() => setNotice(null)} style={[styles.toast, sticker(2), notice.kind === 'rejected' && { backgroundColor: C.darkSurface, borderColor: C.darkBorder }]}>
+      {isGain && <Confetti key={notice.id} />}
+      <Pressable
+        testID="ruby-toast"
+        onPress={() => setNotice(null)}
+        style={[
+          styles.toast,
+          sticker(2),
+          notice.kind === 'rejected' && { backgroundColor: C.darkSurface, borderColor: C.darkBorder },
+          isLoss && { backgroundColor: C.dangerSoft, borderColor: 'rgba(185, 28, 28, 0.35)' },
+        ]}
+      >
         {notice.kind === 'update' ? (
           <>
             <View style={styles.rubyInline}>
-              <T style={styles.toastBig}>+{fmtRuby(notice.delta)}</T>
+              <T style={[styles.toastBig, isLoss && { color: C.danger }]}>
+                {notice.delta >= 0 ? '+' : ''}{fmtRuby(notice.delta)}
+              </T>
               <RubyIcon size={24} />
             </View>
-            <T style={styles.toastSmall}>{notice.reason === 'topup' ? 'Đã nhận tiền nạp, cảm ơn bạn' : 'Quản trị vừa cộng Ruby cho bạn'} · Số dư {fmtRuby(notice.ruby)}</T>
+            <T style={styles.toastSmall}>{updateReasonText} · Số dư {fmtRuby(notice.ruby)}</T>
           </>
         ) : (
           <T style={[styles.toastSmall, { color: C.darkText }]}>

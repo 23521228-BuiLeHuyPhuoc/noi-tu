@@ -576,6 +576,7 @@ export type GameAction =
   | { type: 'vd_stroke'; stroke: VeDoanStroke }
   | { type: 'vd_undo' }
   | { type: 'vd_clear' }
+  | { type: 'vd_erase_stroke'; strokeIds: number[] }
   | { type: 'vd_guess'; text: string }
   | { type: 'bt_submit'; word: string }
   | { type: 'dv_answer'; choice: 0 | 1 | 2 | 3 }

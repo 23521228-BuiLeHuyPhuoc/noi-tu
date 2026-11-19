@@ -324,7 +324,7 @@ describe('Điểm danh hằng ngày', () => {
 });
 
 describe('Quà tặng trong phòng', () => {
-  it('người tặng trả Ruby, người nhận được điểm quà (không nhận Ruby), cả phòng thấy sự kiện', async () => {
+  it('người tặng trả Ruby, người nhận được điểm quà + hưởng 70% Ruby, cả phòng thấy sự kiện', async () => {
     const an = await account('anvui');
     const bi = await account('binh');
     const boss = await account('boss');
@@ -332,18 +332,20 @@ describe('Quà tặng trong phòng', () => {
     await fund(boss, 'anvui', 250);
     expect(await an.emitWithAck('fun:send', { kind: 'gift', to: bi.pid, gift: 'gift_car' })).toEqual({ ok: true });
     expect(await balance(an)).toBe(50);
-    expect(await balance(bi)).toBe(0);
+    expect(await balance(bi)).toBe(140);
     await wait(50);
     expect(bi.funs.find((e) => e.kind === 'gift')).toMatchObject({ kind: 'gift', gift: 'gift_car', from: an.pid, to: bi.pid });
     expect(an.funs.some((e) => e.kind === 'gift')).toBe(true);
-    expect(await bi.emitWithAck('shop:get')).toMatchObject({ ok: true, giftPoints: 200 });
+    expect(await bi.emitWithAck('shop:get')).toMatchObject({ ok: true, giftPoints: 200, ruby: 140 });
+    const h = await bi.emitWithAck('wallet:history');
+    expect(h.ok && h.rows[0]).toMatchObject({ delta: 140, balance: 140, reason: 'gift_receive' });
     expect(await an.emitWithAck('shop:get')).toMatchObject({ ok: true, giftPoints: 0 });
     // thiếu Ruby: need_ruby, không phát, không cộng điểm
     const before = bi.funs.length;
     expect(await an.emitWithAck('fun:send', { kind: 'gift', to: bi.pid, gift: 'gift_castle' })).toEqual({ ok: false, reason: 'need_ruby' });
     await wait(30);
     expect(bi.funs.length).toBe(before);
-    expect(await bi.emitWithAck('shop:get')).toMatchObject({ giftPoints: 200 });
+    expect(await bi.emitWithAck('shop:get')).toMatchObject({ giftPoints: 200, ruby: 140 });
     // quà không có trong danh mục
     expect(await an.emitWithAck('fun:send', { kind: 'gift', to: bi.pid, gift: 'gift_xxx' as never })).toEqual({ ok: false });
   });

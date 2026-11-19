@@ -26,31 +26,13 @@ import { RoomManageCard } from '../components/RoomTools';
 import { C, backdropPalette, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Shell } from '../components/Shell';
-import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji, type UiIconName } from '../components/Icons';
+import { EmojiIcon, RubyIcon, UiIcon, splitEdgeEmoji } from '../components/Icons';
 
 const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
   'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
 ];
-
-const GAME_ICON: Record<GameType, UiIconName> = {
-  wordchain: 'BookOpen',
-  wordchain_en: 'Globe',
-  baucua: 'Dices',
-  typhu: 'Diamond',
-  masoi: 'Moon',
-  giandiep: 'Fingerprint',
-  ve_doan: 'Brush',
-  bom_tu: 'Flame',
-  do_vui: 'HelpCircle',
-  loto: 'Layers',
-  caro: 'Crosshair',
-  croaksquad: 'Zap',
-  ca_sau: 'Triangle',
-  boom_online: 'Bomb',
-  uno_mercy: 'Swords',
-};
 
 const PRESET_ORDER: number[] = [
   26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
@@ -199,97 +181,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <T style={[styles.section, { color: pal.text }]}>{isHost ? 'Chọn game (15 trò chơi)' : 'Game của phòng'}</T>
-      {isHost ? (
-        <View style={styles.games}>
-          {GAMES.map((g) => {
-            const on = g === room.gameType;
-            return (
-              <Pressable
-                key={g}
-                testID={`pick-${g}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                onPress={() => game.configure({ gameType: g })}
-                style={[styles.pick, sticker(on ? 2 : 1), on && styles.pickOn]}
-              >
-                <View style={[styles.pickIconBox, on && styles.pickIconBoxOn]}>
-                  <UiIcon name={GAME_ICON[g]} size={18} color={on ? C.onSon : C.ink} strokeWidth={1.65} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <T numberOfLines={1} style={[styles.pickName, on && styles.pickNameOn]}>{GAME_INFO[g].name}</T>
-                  <T style={[styles.pickPlayers, on && styles.pickPlayersOn]}>{GAME_META[g].players}</T>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
-        <Card style={styles.chosen}>
-          <View style={styles.pickIconBox}>
-            <UiIcon name={GAME_ICON[room.gameType]} size={20} color={C.ink} strokeWidth={1.65} />
-          </View>
-          <T style={styles.chosenName}>{info.name}</T>
-        </Card>
-      )}
-
-      {/* Map & Chủ đề màu phòng */}
-      {isHost && (
-        <Card style={{ gap: 8 }}>
-          <View style={styles.headIconRow}>
-            <UiIcon name="Map" size={16} color={C.secondary} strokeWidth={1.65} />
-            <T style={styles.h3}>Chủ đề bàn chơi</T>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8 }}>
-            {ROOM_THEMES.map((t) => {
-              const unlocked = t.price === 0 || ownedSet.has(t.id);
-              const selected = activeThemeId === t.id;
-              const isDefault = t.id === 'son_mac_dinh';
-              return (
-                <Pressable
-                  key={t.id}
-                  testID={`lobby-map-${t.id}`}
-                  disabled={!unlocked}
-                  onPress={async () => {
-                    const e = await game.configure({ settings: { roomTheme: t.id } });
-                    if (e) feed(e, 'bad');
-                  }}
-                  style={[
-                    styles.mapChip,
-                    {
-                      backgroundColor: isDefault ? C.mist : t.bg,
-                      borderColor: selected ? (isDefault ? C.ink : t.accent) : (isDefault ? C.borderSubtle : 'rgba(255,255,255,0.22)'),
-                    },
-                    selected && { borderWidth: 2 },
-                    !unlocked && { opacity: 0.45 },
-                  ]}
-                >
-                  <View
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: isDefault ? C.son : t.accent,
-                    }}
-                  />
-                  <T style={{ fontSize: 12, fontWeight: selected ? '600' : '500', color: isDefault ? C.ink : C.darkText }}>{t.name}</T>
-                  {!unlocked && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                      <RubyIcon size={11} />
-                      <T style={{ fontSize: 11, fontWeight: '600', color: C.gold, fontVariant: ['tabular-nums'] }}>{t.price}</T>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </Card>
-      )}
-
       {(room.gameType === 'wordchain' || room.gameType === 'wordchain_en') && (
         <Card style={{ gap: 10 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="BookOpen" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={18} />
             <T style={styles.h3}>Độ khó thời gian & Luật từ loại</T>
           </View>
           <View style={styles.roundRow}>
@@ -333,7 +228,10 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
 
       {room.gameType === 'baucua' && (
         <Card style={{ gap: 10 }}>
-          <T style={styles.h3}>Chế độ Bầu Cua & Số ván</T>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji={GAME_META.baucua.emoji} size={18} />
+            <T style={styles.h3}>Chế độ Bầu Cua & Số ván</T>
+          </View>
           <View style={styles.roundRow}>
             {(['classic', 'jackpot'] as const).map((m) => {
               const active = (room.settings.baucuaMode ?? 'classic') === m;
@@ -374,7 +272,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'typhu' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Diamond" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.typhu.emoji} size={18} />
             <T style={styles.h3}>Chế độ Cờ tỷ phú</T>
           </View>
           <View style={styles.roundRow}>
@@ -400,7 +298,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'masoi' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Moon" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.masoi.emoji} size={18} />
             <T style={styles.h3}>Bộ vai trò & Nhịp độ Ma sói</T>
           </View>
           <View style={styles.roundRow}>
@@ -447,7 +345,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'giandiep' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Fingerprint" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.giandiep.emoji} size={18} />
             <T style={styles.h3}>Tùy chọn Ai là gián điệp</T>
           </View>
           <View style={styles.roundRow}>
@@ -478,7 +376,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 've_doan' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Brush" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.ve_doan.emoji} size={18} />
             <T style={styles.h3}>Số vòng Vẽ & Đoán ({room.players.length} người = {Math.min(24, Math.max(2, room.players.length * (room.settings.veDoanRounds ?? 4)))} lượt)</T>
           </View>
           <View style={styles.roundRow}>
@@ -501,7 +399,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'do_vui' && (
         <Card style={{ gap: 10 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="HelpCircle" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.do_vui.emoji} size={18} />
             <T style={styles.h3}>Chuyên đề, Độ khó & Số câu</T>
           </View>
           <View style={styles.roundRow}>
@@ -559,7 +457,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'ca_sau' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Triangle" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.ca_sau.emoji} size={18} />
             <T style={styles.h3}>Số hiệp Khám răng cá sấu</T>
           </View>
           <View style={styles.roundRow}>
@@ -582,7 +480,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'boom_online' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Bomb" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.boom_online.emoji} size={18} />
             <T style={styles.h3}>Chế độ Đặt bom tử chiến</T>
           </View>
           <View style={styles.roundRow}>
@@ -625,7 +523,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'loto' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Layers" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.loto.emoji} size={18} />
             <T style={styles.h3}>Kiểu dò vé Lô tô</T>
           </View>
           <View style={styles.roundRow}>
@@ -654,7 +552,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'caro' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Crosshair" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.caro.emoji} size={18} />
             <T style={styles.h3}>
               Bàn Cờ caro ({Math.min(4, Math.max(2, n))} phe ·{' '}
               {caroSizeForPlayers(Math.min(4, Math.max(2, n)), room.settings.caroSizeMode ?? 'auto')}×
@@ -707,7 +605,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
       {room.gameType === 'croaksquad' && (
         <Card style={{ gap: 8 }}>
           <View style={styles.headIconRow}>
-            <UiIcon name="Zap" size={16} color={C.secondary} strokeWidth={1.65} />
+            <EmojiIcon emoji={GAME_META.croaksquad.emoji} size={18} />
             <T style={styles.h3}>Màn xuất phát Đầm lầy quái chiêu</T>
           </View>
           <View style={styles.roundRow}>
@@ -728,6 +626,93 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               );
             })}
           </View>
+        </Card>
+      )}
+
+      <T style={[styles.section, { color: pal.text }]}>{isHost ? 'Chọn game (15 trò chơi)' : 'Game của phòng'}</T>
+      {isHost ? (
+        <View style={styles.games}>
+          {GAMES.map((g) => {
+            const on = g === room.gameType;
+            return (
+              <Pressable
+                key={g}
+                testID={`pick-${g}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                onPress={() => game.configure({ gameType: g })}
+                style={[styles.pick, sticker(on ? 2 : 1), on && styles.pickOn]}
+              >
+                <View style={[styles.pickIconBox, on && styles.pickIconBoxOn]}>
+                  <EmojiIcon emoji={GAME_META[g].emoji} size={24} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T numberOfLines={1} style={[styles.pickName, on && styles.pickNameOn]}>{GAME_INFO[g].name}</T>
+                  <T style={[styles.pickPlayers, on && styles.pickPlayersOn]}>{GAME_META[g].players}</T>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : (
+        <Card style={styles.chosen}>
+          <View style={styles.pickIconBox}>
+            <EmojiIcon emoji={GAME_META[room.gameType].emoji} size={26} />
+          </View>
+          <T style={styles.chosenName}>{info.name}</T>
+        </Card>
+      )}
+
+      {/* Map & Chủ đề màu phòng */}
+      {isHost && (
+        <Card style={{ gap: 8 }}>
+          <View style={styles.headIconRow}>
+            <UiIcon name="Map" size={16} color={C.secondary} strokeWidth={1.65} />
+            <T style={styles.h3}>Chủ đề bàn chơi</T>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8 }}>
+            {ROOM_THEMES.map((t) => {
+              const unlocked = t.price === 0 || ownedSet.has(t.id);
+              const selected = activeThemeId === t.id;
+              const isDefault = t.id === 'son_mac_dinh';
+              return (
+                <Pressable
+                  key={t.id}
+                  testID={`lobby-map-${t.id}`}
+                  disabled={!unlocked}
+                  onPress={async () => {
+                    const e = await game.configure({ settings: { roomTheme: t.id } });
+                    if (e) feed(e, 'bad');
+                  }}
+                  style={[
+                    styles.mapChip,
+                    {
+                      backgroundColor: isDefault ? C.mist : t.bg,
+                      borderColor: selected ? (isDefault ? C.ink : t.accent) : (isDefault ? C.borderSubtle : 'rgba(255,255,255,0.22)'),
+                    },
+                    selected && { borderWidth: 2 },
+                    !unlocked && { opacity: 0.45 },
+                  ]}
+                >
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: isDefault ? C.son : t.accent,
+                    }}
+                  />
+                  <T style={{ fontSize: 12, fontWeight: selected ? '600' : '500', color: isDefault ? C.ink : C.darkText }}>{t.name}</T>
+                  {!unlocked && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                      <RubyIcon size={11} />
+                      <T style={{ fontSize: 11, fontWeight: '600', color: C.gold, fontVariant: ['tabular-nums'] }}>{t.price}</T>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </Card>
       )}
 

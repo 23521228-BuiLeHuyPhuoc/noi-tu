@@ -33,7 +33,7 @@ export interface GianDiepClue {
   at?: number;
 }
 
-export type GianDiepFeedKind = 'clue' | 'chat' | 'defense' | 'system';
+export type GianDiepFeedKind = 'clue' | 'chat' | 'defense' | 'system' | 'elimination';
 
 export interface GianDiepFeedItem {
   id: number;
@@ -41,6 +41,7 @@ export interface GianDiepFeedItem {
   kind: GianDiepFeedKind;
   playerId?: string;
   name?: string;
+  role?: GianDiepRole;
   text: string;
   at?: number;
 }
@@ -76,15 +77,300 @@ export interface GianDiepView {
   /** Phiếu Phán Quyết cuối cùng: 'banish' | 'forgive' (nếu 1 bị cáo) hoặc id bị cáo / 'skip' (nếu nhiều bị cáo đồng phiếu) */
   finalVotes: Record<string, string>;
   mrWhiteId: string | null;
+  /** Tổng số ký tự chữ/số của từ khóa phe Dân (chỉ gửi trong pha đoán từ, không tiết lộ số tiếng) */
+  targetCharCount?: number | null;
   /** Cơ cấu vai diễn toàn ván & số người phe Dân / phe Ẩn danh còn sống */
   roleSummary?: { dan: number; giandiep: number; mrwhite: number };
   aliveCounts?: { dan: number; hidden: number };
   /** Mở toàn bộ vai trò & từ khóa của từng người ở cuối ván (`reveal_end`) để cả phòng đối chiếu */
   revealedAll: GianDiepRevealPlayer[] | null;
+  winnerIds?: string[] | null;
   wordPairReveal: { wordA: string; wordB: string; winnerHeadline: string } | null;
   /** Chỉ gửi riêng cho đúng viewerId */
   myRole: GianDiepRole | null;
   myWord: string | null;
+}
+
+/** Đếm số ký tự chữ cái / chữ số của từ khóa (bỏ khoảng trắng và dấu câu, không tiết lộ số tiếng). */
+export function countWordChars(word: string): number {
+  return Array.from(word.normalize('NFC').replace(/[^\p{L}\p{N}]/gu, '')).length;
+}
+
+function stripVnAccents(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+function normClean(s: string): string {
+  return stripVnAccents(s)
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normNoHyphen(s: string): string {
+  return stripVnAccents(s)
+    .replace(/[-–—]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function applySynonyms(s: string): string {
+  return s
+    .replace(/\bxe hoi\b/g, 'o to')
+    .replace(/\bbalo\b/g, 'ba lo')
+    .replace(/\bvali\b/g, 'va li')
+    .replace(/\bcafe\b/g, 'ca phe')
+    .replace(/\btv\b/g, 'tivi')
+    .replace(/\bnon\b/g, 'mu')
+    .replace(/\bmuong\b/g, 'thia')
+    .replace(/\bmy\b/g, 'mi')
+    .replace(/\b(cay |cai )?du che mua\b/g, 'o che mua')
+    .replace(/\b(cay |cai )du\b/g, 'o che mua')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const STRICT_MULTI_PREFIXES: readonly string[][] = [
+  ['trinh', 'duyet'],
+  ['xep', 'hinh'],
+  ['ung', 'dung'],
+  ['chup', 'anh'],
+  ['danh', 'bai'],
+  ['cay', 'dan'],
+  ['nha', 'ga'],
+  ['pho', 'co'],
+];
+
+const STRICT_SINGLE_PREFIXES = new Set([
+  'con', 'cai', 'chiec', 'qua', 'trai', 'chim', 'quan', 'tiem',
+  'truong', 'nui', 'le', 'mang', 'di', 'dan', 'quay',
+]);
+
+const GUESS_EXTRA_PREFIXES = new Set([
+  'mot', 'xe', 'cay', 'mon', 'to', 'ly', 'coc', 'chen', 'bat', 'dia',
+  'doi', 'bo', 'nghe', 'tro', 'choi', 'game', 'loai', 'chu', 'cu',
+  'bong', 'doa', 'goi', 'tui', 'hop', 'chai', 'lon', 'phim',
+]);
+
+const TRAILING_QUALIFIERS = [
+  'thong minh',
+  'deo tay',
+  'danh rang',
+  'chai dau',
+  'quet nha',
+  'khong day',
+  'che mua',
+  'ha noi',
+  'hue',
+  'mtp',
+  'soi',
+  'to nu',
+  'xanh',
+];
+
+const GENERIC_STOPWORDS = new Set([
+  'con', 'cai', 'chiec', 'qua', 'trai', 'chim', 'quan', 'tiem', 'truong',
+  'nui', 'pho', 'co', 'le', 'mang', 'o', 'di', 'dan', 'quay', 'phong',
+  'may', 'banh', 'nuoc', 'bai', 'xe', 'bui', 'bu',
+  'the', 'nguoi', 'thit', 'bo', 'ga', 'ca', 'anh', 'video', 'hinh', 'do',
+  'mon', 'tieng', 'nha', 'san', 'hat', 'choi', 'cay', 'la', 'hoa',
+  'an', 'uong', 'lam', 'xem', 'chay', 'bay', 'soi', 'lau', 'com',
+  'bun', 'tra', 'kem', 'mu', 'kinh', 'giay', 'ao', 'tui',
+  'tinh', 'thong', 'minh', 'khong', 'day', 'tu',
+  'dong', 'tien', 'mat', 'tay', 'chan', 'dau', 'toc',
+]);
+
+function stripLeadingPrefixes(tokens: string[], allowEmpty: boolean, includeExtra: boolean): string[] {
+  const cur = [...tokens];
+  const canStrip = (n: number) => (allowEmpty ? cur.length >= n : cur.length > n);
+  let changed = true;
+  while (changed && cur.length > 0) {
+    changed = false;
+    for (const mp of STRICT_MULTI_PREFIXES) {
+      if (canStrip(mp.length) && mp.every((w, i) => cur[i] === w)) {
+        cur.splice(0, mp.length);
+        changed = true;
+        break;
+      }
+    }
+    if (changed) continue;
+    const head = cur[0];
+    if (STRICT_SINGLE_PREFIXES.has(head) && canStrip(1)) {
+      cur.shift();
+      changed = true;
+      continue;
+    }
+    // Strip 'phong' except for 'Phòng khách' where remaining tokens === ['khach']
+    if (head === 'phong' && canStrip(1)) {
+      const rest = cur.slice(1);
+      if (!(rest.length === 1 && rest[0] === 'khach')) {
+        cur.shift();
+        changed = true;
+        continue;
+      }
+    }
+    // Strip 'o' specifically when followed by 'khach ...' (e.g. 'Ở khách sạn' -> 'khach san')
+    if (head === 'o' && cur.length >= 3 && cur[1] === 'khach') {
+      cur.shift();
+      changed = true;
+      continue;
+    }
+    if (includeExtra && canStrip(1)) {
+      if (cur.length >= 2 && cur[0] === 'tro' && cur[1] === 'choi' && (allowEmpty ? cur.length >= 2 : cur.length > 2)) {
+        cur.splice(0, 2);
+        changed = true;
+        continue;
+      }
+      if (GUESS_EXTRA_PREFIXES.has(head)) {
+        cur.shift();
+        changed = true;
+      }
+    }
+  }
+  return cur;
+}
+
+function isContiguousSubseq(needle: string[], haystack: string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  for (let i = 0; i <= haystack.length - needle.length; i++) {
+    let ok = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+function matchSingleTarget(guess: string, target: string, otherWord?: string): boolean {
+  const gClean = normClean(guess);
+  const tClean = normClean(target);
+  if (!gClean || !tClean) return false;
+
+  const gSyn = applySynonyms(normNoHyphen(guess));
+  const tSyn = applySynonyms(normNoHyphen(target));
+  if (!gSyn || !tSyn) return false;
+
+  if (gClean === tClean || gSyn === tSyn) return true;
+
+  const oClean = otherWord ? normClean(otherWord) : '';
+  const oSyn = otherWord ? applySynonyms(normNoHyphen(otherWord)) : '';
+  if (oClean && (gClean === oClean || gSyn === oSyn)) return false;
+
+  const gTokens = gSyn.split(' ').filter(Boolean);
+  const tTokens = tSyn.split(' ').filter(Boolean);
+  const oTokens = oSyn ? oSyn.split(' ').filter(Boolean) : [];
+
+  const gCore = stripLeadingPrefixes(gTokens, true, true);
+  if (gCore.length === 0) return false;
+
+  const tCore = stripLeadingPrefixes(tTokens, false, false);
+  const oCore = oTokens.length > 0 ? stripLeadingPrefixes(oTokens, false, false) : [];
+
+  // Special case for 'Ô che mưa': accept 'o', 'cay o', 'cai o', 'du', 'cay du', 'cai du', 'o che mua'
+  if (tCore.join(' ') === 'o che mua') {
+    const allowedUmbrella = new Set(['o', 'cay o', 'cai o', 'du', 'cay du', 'cai du', 'o che mua']);
+    const gRawNoHyphen = normNoHyphen(guess);
+    if (allowedUmbrella.has(gRawNoHyphen) || allowedUmbrella.has(gSyn)) return true;
+  }
+
+  if (oCore.length > 0 && gCore.join(' ') === oCore.join(' ')) return false;
+
+  if (gCore.join(' ') === tCore.join(' ')) return true;
+  if (gCore.join('') === tCore.join('') && (tCore.length >= 2 || tCore.join('').length >= 3)) return true;
+
+  // Trailing-qualifier base (e.g. 'Điện thoại thông minh' -> 'dien thoai', 'Đồng hồ đeo tay' -> 'dong ho')
+  const tJoined = tCore.join(' ');
+  let tBase: string[] = [];
+  for (const q of TRAILING_QUALIFIERS) {
+    if (tJoined.endsWith(` ${q}`)) {
+      const candidate = tJoined.slice(0, -(q.length + 1)).split(' ').filter(Boolean);
+      if (candidate.length >= 1) {
+        tBase = candidate;
+        break;
+      }
+    }
+  }
+  if (
+    tBase.length > 0 &&
+    tBase.join('').length >= 2 &&
+    !tBase.every((t) => GENERIC_STOPWORDS.has(t)) &&
+    !(oTokens.length > 0 && tBase.every((t) => oTokens.includes(t)))
+  ) {
+    if (gCore.join(' ') === tBase.join(' ') || (tBase.length >= 2 && gCore.join('') === tBase.join(''))) {
+      return true;
+    }
+  }
+
+  // Multi-token prefix keyword match (e.g. 'sư tử' vs 'Con sư tử', 'ổ cứng' vs 'Ổ cứng di động')
+  if (
+    gCore.length >= 2 &&
+    gCore.length <= tCore.length &&
+    gCore.length >= Math.ceil(tCore.length * 0.5) &&
+    tCore.slice(0, gCore.length).every((w, i) => gCore[i] === w) &&
+    gCore.some((t) => !oTokens.includes(t) && !GENERIC_STOPWORDS.has(t))
+  ) {
+    return true;
+  }
+
+  // Multi-token distinctive contiguous sub-phrase (e.g. 'bít tết' for 'Bò bít tết' vs 'Bò né')
+  if (
+    gCore.length >= 2 &&
+    gCore.length >= Math.ceil(tCore.length * 0.6) &&
+    isContiguousSubseq(gCore, tCore) &&
+    gCore.every((t) => !oTokens.includes(t)) &&
+    gCore.some((t) => !GENERIC_STOPWORDS.has(t)) &&
+    !TRAILING_QUALIFIERS.includes(gCore.join(' '))
+  ) {
+    return true;
+  }
+
+  // Superset match: user typed 1-2 extra descriptive words around target core (e.g. 'con sư tử châu phi', 'bánh mì thịt')
+  const oDistinctive = new Set(oCore.filter((t) => !tCore.includes(t) && !GENERIC_STOPWORDS.has(t)));
+  if (
+    gCore.length > tCore.length &&
+    gCore.length <= tCore.length + 2 &&
+    isContiguousSubseq(tCore, gCore) &&
+    (tCore.length >= 2 || !GENERIC_STOPWORDS.has(tCore[0])) &&
+    !gCore.some((t) => oDistinctive.has(t))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * So khớp từ khóa Gián Điệp / Mr. White đoán theo từ khóa cốt lõi:
+ * - Chấp nhận biến thể bỏ tiền tố loại từ (vd: "sư tử" khớp "Con sư tử", "đại bàng" khớp "Chim đại bàng")
+ * - Từ chối từ chung chung / chỉ tiền tố loại từ (vd: "con", "chim", "bánh") hoặc khớp nhầm sang từ phe còn lại.
+ */
+export function matchGianDiepGuess(guess: string, target: string, otherWord?: string): boolean {
+  const variants = [target];
+  if (target.includes('/')) {
+    const slashIdx = target.indexOf('/');
+    const before = target.slice(0, slashIdx).trim();
+    const afterPart = target.slice(slashIdx + 1).trim();
+    const prefixTokens = before.split(/\s+/);
+    if (before) variants.push(before);
+    if (afterPart) {
+      if (prefixTokens.length > 1) {
+        variants.push(`${prefixTokens.slice(0, -1).join(' ')} ${afterPart}`);
+      } else {
+        variants.push(afterPart);
+      }
+    }
+  }
+  return variants.some((v) => matchSingleTarget(guess, v, otherWord));
 }
 
 export const GIAN_DIEP_ROLE_META: Record<GianDiepRole, { name: string; emoji: string; color: string; desc: string }> = {

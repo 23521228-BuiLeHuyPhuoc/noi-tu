@@ -3,6 +3,8 @@ import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type Gest
 import {
   buildVeDoanShapePoints,
   computeFloodFillPath,
+  findHitStrokeIndex,
+  sprayStrokeToPath,
   VE_DOAN_COLORS,
   VE_DOAN_WIDTHS,
   type VeDoanStroke,
@@ -23,7 +25,8 @@ import { UiIcon, type UiIconName } from '../components/Icons';
 
 const TOOL_META: { id: VeDoanTool; label: string; icon?: UiIconName }[] = [
   { id: 'pen', label: 'Bút', icon: 'Pencil' },
-  { id: 'fill', label: 'Đổ màu', icon: 'Palette' },
+  { id: 'spray', label: 'Xịt' },
+  { id: 'fill', label: 'Tô', icon: 'Palette' },
   { id: 'eraser', label: 'Tẩy', icon: 'Eraser' },
   { id: 'line', label: 'Thẳng' },
   { id: 'rect', label: 'Vuông' },
@@ -33,6 +36,17 @@ const TOOL_META: { id: VeDoanTool; label: string; icon?: UiIconName }[] = [
 function ToolGlyph({ tool, icon, active }: { tool: VeDoanTool; icon?: UiIconName; active: boolean }) {
   const color = active ? C.ink : C.secondary;
   if (icon) return <UiIcon name={icon} size={13} color={color} />;
+  if (tool === 'spray') {
+    return (
+      <View style={{ width: 13, height: 13, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: 1.5, marginBottom: 1, marginLeft: 3 }}>
+          <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: color }} />
+          <View style={{ width: 2.5, height: 2.5, borderRadius: 1.5, backgroundColor: color }} />
+        </View>
+        <View style={{ width: 7, height: 6.5, borderRadius: 2, borderWidth: 1.4, borderColor: color }} />
+      </View>
+    );
+  }
   if (tool === 'line') {
     return (
       <View
@@ -56,6 +70,10 @@ function strokeMarkup(s: VeDoanStroke, all: VeDoanStroke[], idx: number): string
   const tool = s.tool ?? 'pen';
   if (tool === 'fill') {
     const d = s.fillPath ?? (s.points[0] ? computeFloodFillPath(all.slice(0, idx), s.points[0][0], s.points[0][1]) : '');
+    return d ? `<path d="${d}" fill="${s.color}"/>` : '';
+  }
+  if (tool === 'spray') {
+    const d = sprayStrokeToPath(s);
     return d ? `<path d="${d}" fill="${s.color}"/>` : '';
   }
   const strokeColor = tool === 'eraser' ? '#FFFFFF' : s.color;
@@ -154,9 +172,11 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const compact = height < 720 || width < 380;
 
   const [tool, setTool] = useState<VeDoanTool>('pen');
+  const [eraserMode, setEraserMode] = useState<'pixel' | 'object'>('pixel');
   const [color, setColor] = useState<string>(VE_DOAN_COLORS[0]);
   const [brush, setBrush] = useState<number>(VE_DOAN_WIDTHS[1]);
   const [draft, setDraft] = useState<VeDoanStroke | null>(null);
+  const [erasedTracker, setErasedTracker] = useState<{ turn: number; ids: number[] }>({ turn: -1, ids: [] });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -166,8 +186,20 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const originRef = useRef<{ px: number; py: number } | null>(null);
   const draftPtsRef = useRef<[number, number][]>([]);
   const shapeStartRef = useRef<[number, number] | null>(null);
+  const spraySeedRef = useRef(0);
+  const sprayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const erasedInFlightRef = useRef<{ turn: number; set: Set<number> }>({ turn: -1, set: new Set() });
   const drawingRef = useRef(false);
   const draftRafRef = useRef<number | null>(null);
+
+  const stopSprayTimer = () => {
+    if (sprayTimerRef.current !== null) {
+      clearInterval(sprayTimerRef.current);
+      sprayTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopSprayTimer(), []);
 
   useEffect(() => {
     const t = setTimeout(() => feedScrollRef.current?.scrollToEnd({ animated: true }), 50);
@@ -177,22 +209,76 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const effectiveWidth = tool === 'eraser' ? (brush === 4 ? 12 : brush === 9 ? 22 : 34) : brush;
   const effectiveColor = tool === 'eraser' ? '#FFFFFF' : color;
 
-  const flushDraftFrame = (curTool: VeDoanTool, c: string, w: number) => {
+  const flushDraftFrame = (curTool: VeDoanTool, c: string, w: number, spraySeed?: number) => {
+    const nextDraft: VeDoanStroke = {
+      tool: curTool,
+      color: c,
+      width: w,
+      points: [...draftPtsRef.current],
+      ...(curTool === 'spray' && spraySeed !== undefined ? { seed: spraySeed } : {}),
+    };
     if (draftRafRef.current !== null || typeof requestAnimationFrame === 'undefined') {
       if (typeof requestAnimationFrame === 'undefined') {
-        setDraft({ tool: curTool, color: c, width: w, points: [...draftPtsRef.current] });
+        setDraft(nextDraft);
       }
       return;
     }
     draftRafRef.current = requestAnimationFrame(() => {
       draftRafRef.current = null;
       if (drawingRef.current) {
-        setDraft({ tool: curTool, color: c, width: w, points: [...draftPtsRef.current] });
+        setDraft({
+          tool: curTool,
+          color: c,
+          width: w,
+          points: [...draftPtsRef.current],
+          ...(curTool === 'spray' && spraySeed !== undefined ? { seed: spraySeed } : {}),
+        });
       }
     });
   };
 
   const canDraw = isDrawer && view.phase === 'drawing';
+
+  const eraseObjectAt = (pt: [number, number]) => {
+    if (erasedInFlightRef.current.turn !== view.turnIndex) {
+      erasedInFlightRef.current = { turn: view.turnIndex, set: new Set() };
+    }
+    const present = new Set(view.strokes.map((s) => s.id).filter((n): n is number => n !== undefined));
+    for (const id of [...erasedInFlightRef.current.set]) {
+      if (!present.has(id)) erasedInFlightRef.current.set.delete(id);
+    }
+    const candidates = view.strokes.filter(
+      (s) => s.id === undefined || !erasedInFlightRef.current.set.has(s.id),
+    );
+    const hitRadius = brush === 4 ? 14 : brush === 9 ? 20 : 28;
+    const hitIdx = findHitStrokeIndex(candidates, pt[0], pt[1], hitRadius);
+    if (hitIdx < 0) return;
+    const hit = candidates[hitIdx];
+    if (hit.id === undefined) return;
+    const hitId = hit.id;
+    erasedInFlightRef.current.set.add(hitId);
+    setErasedTracker((prev) => {
+      const base = prev.turn === view.turnIndex ? prev.ids : [];
+      return { turn: view.turnIndex, ids: base.includes(hitId) ? base : [...base, hitId] };
+    });
+    void game.act({ type: 'vd_erase_stroke', strokeIds: [hitId] });
+  };
+
+  const startSprayLoop = (seed: number, w: number, col: string) => {
+    stopSprayTimer();
+    sprayTimerRef.current = setInterval(() => {
+      if (!drawingRef.current) {
+        stopSprayTimer();
+        return;
+      }
+      const cur = draftPtsRef.current;
+      const tail = cur[cur.length - 1];
+      if (tail && cur.length < 150) {
+        draftPtsRef.current = [...cur, tail];
+        flushDraftFrame('spray', col, w, seed);
+      }
+    }, 75);
+  };
 
   const webNorm = (e: WebPointerEvt): [number, number] => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -214,6 +300,20 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     } catch {
       // bỏ qua
     }
+    if (tool === 'eraser' && eraserMode === 'object') {
+      shapeStartRef.current = null;
+      eraseObjectAt(pt);
+      return;
+    }
+    if (tool === 'spray') {
+      shapeStartRef.current = null;
+      const seed = Math.floor(Math.random() * 1_000_000);
+      spraySeedRef.current = seed;
+      draftPtsRef.current = [pt];
+      setDraft({ tool: 'spray', color: effectiveColor, width: effectiveWidth, points: [pt], seed });
+      startSprayLoop(seed, effectiveWidth, effectiveColor);
+      return;
+    }
     if (tool === 'line' || tool === 'rect' || tool === 'circle') {
       shapeStartRef.current = pt;
       const pts = buildVeDoanShapePoints(tool, pt, pt);
@@ -229,6 +329,10 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const onWebMove = (e: WebPointerEvt) => {
     if (!canDraw || !drawingRef.current || tool === 'fill') return;
     const pt = webNorm(e);
+    if (tool === 'eraser' && eraserMode === 'object') {
+      eraseObjectAt(pt);
+      return;
+    }
     if ((tool === 'line' || tool === 'rect' || tool === 'circle') && shapeStartRef.current) {
       draftPtsRef.current = buildVeDoanShapePoints(tool, shapeStartRef.current, pt);
       flushDraftFrame(tool, effectiveColor, effectiveWidth);
@@ -239,12 +343,13 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     if (!last || Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 8) {
       if (pts.length < 150) {
         draftPtsRef.current = [...pts, pt];
-        flushDraftFrame(tool, effectiveColor, effectiveWidth);
+        flushDraftFrame(tool, effectiveColor, effectiveWidth, tool === 'spray' ? spraySeedRef.current : undefined);
       }
     }
   };
 
   const onWebUp = () => {
+    stopSprayTimer();
     if (!drawingRef.current) return;
     drawingRef.current = false;
     shapeStartRef.current = null;
@@ -255,10 +360,16 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
     const pts = draftPtsRef.current;
     draftPtsRef.current = [];
     setDraft(null);
-    if (canDraw && tool !== 'fill' && pts.length > 0) {
+    if (canDraw && tool !== 'fill' && !(tool === 'eraser' && eraserMode === 'object') && pts.length > 0) {
       void game.act({
         type: 'vd_stroke',
-        stroke: { ...(tool !== 'pen' ? { tool } : {}), color: effectiveColor, width: effectiveWidth, points: pts },
+        stroke: {
+          ...(tool !== 'pen' ? { tool } : {}),
+          ...(tool === 'spray' ? { seed: spraySeedRef.current } : {}),
+          color: effectiveColor,
+          width: effectiveWidth,
+          points: pts,
+        },
       });
     }
   };
@@ -291,6 +402,21 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
       void game.act({ type: 'vd_stroke', stroke: { tool: 'fill', color, width: brush, points: [pt] } });
       return;
     }
+    drawingRef.current = true;
+    if (tool === 'eraser' && eraserMode === 'object') {
+      shapeStartRef.current = null;
+      eraseObjectAt(pt);
+      return;
+    }
+    if (tool === 'spray') {
+      shapeStartRef.current = null;
+      const seed = Math.floor(Math.random() * 1_000_000);
+      spraySeedRef.current = seed;
+      draftPtsRef.current = [pt];
+      setDraft({ tool: 'spray', color: effectiveColor, width: effectiveWidth, points: [pt], seed });
+      startSprayLoop(seed, effectiveWidth, effectiveColor);
+      return;
+    }
     if (tool === 'line' || tool === 'rect' || tool === 'circle') {
       shapeStartRef.current = pt;
       const pts = buildVeDoanShapePoints(tool, pt, pt);
@@ -306,6 +432,10 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
   const onDrawMove = (evt: GestureResponderEvent) => {
     if (!canDraw || Platform.OS === 'web' || tool === 'fill') return;
     const pt = toNorm(evt);
+    if (tool === 'eraser' && eraserMode === 'object') {
+      eraseObjectAt(pt);
+      return;
+    }
     if ((tool === 'line' || tool === 'rect' || tool === 'circle') && shapeStartRef.current) {
       const next = buildVeDoanShapePoints(tool, shapeStartRef.current, pt);
       draftPtsRef.current = next;
@@ -318,29 +448,54 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
       if (pts.length < 150) {
         const next = [...pts, pt];
         draftPtsRef.current = next;
-        setDraft({ tool, color: effectiveColor, width: effectiveWidth, points: next });
+        setDraft({
+          tool,
+          color: effectiveColor,
+          width: effectiveWidth,
+          points: next,
+          ...(tool === 'spray' ? { seed: spraySeedRef.current } : {}),
+        });
       }
     }
   };
 
   const onDrawEnd = () => {
     if (Platform.OS === 'web') return;
+    stopSprayTimer();
+    drawingRef.current = false;
     originRef.current = null;
     shapeStartRef.current = null;
     const pts = draftPtsRef.current;
     draftPtsRef.current = [];
     setDraft(null);
-    if (canDraw && tool !== 'fill' && pts.length > 0) {
+    if (canDraw && tool !== 'fill' && !(tool === 'eraser' && eraserMode === 'object') && pts.length > 0) {
       void game.act({
         type: 'vd_stroke',
-        stroke: { ...(tool !== 'pen' ? { tool } : {}), color: effectiveColor, width: effectiveWidth, points: pts },
+        stroke: {
+          ...(tool !== 'pen' ? { tool } : {}),
+          ...(tool === 'spray' ? { seed: spraySeedRef.current } : {}),
+          color: effectiveColor,
+          width: effectiveWidth,
+          points: pts,
+        },
       });
     }
   };
 
+  const activeErasedIds = useMemo(() => {
+    if (erasedTracker.turn !== view.turnIndex || erasedTracker.ids.length === 0) return new Set<number>();
+    const present = new Set(view.strokes.map((s) => s.id).filter((n): n is number => n !== undefined));
+    return new Set(erasedTracker.ids.filter((id) => present.has(id)));
+  }, [erasedTracker, view.turnIndex, view.strokes]);
+
+  const visibleStrokes = useMemo(
+    () => (activeErasedIds.size > 0 ? view.strokes.filter((s) => s.id === undefined || !activeErasedIds.has(s.id)) : view.strokes),
+    [view.strokes, activeErasedIds],
+  );
+
   const allStrokes = useMemo(
-    () => (draft ? [...view.strokes, draft] : view.strokes),
-    [view.strokes, draft],
+    () => (draft ? [...visibleStrokes, draft] : visibleStrokes),
+    [visibleStrokes, draft],
   );
   const svgUri = useMemo(() => (Platform.OS === 'web' ? '' : strokesToSvgUri(allStrokes)), [allStrokes]);
 
@@ -364,6 +519,12 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const guessedSet = useMemo(() => new Set(view.guessedIds), [view.guessedIds]);
   const guessResetKey = `${view.turnIndex}|${view.drawerId}`;
+  const maskedParts =
+    view.maskedWords && view.maskedWords.length > 0
+      ? view.maskedWords
+      : view.maskedWord
+        ? view.maskedWord.split(/\s{2,}/).filter(Boolean)
+        : [];
 
   const renderBottom = () => {
     if (view.phase === 'pick_word') {
@@ -451,9 +612,22 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
               {view.secretWord ? (
                 <T testID="vd-word-display" numberOfLines={1} style={styles.wordSecret}>{view.secretWord.toUpperCase()}</T>
               ) : (
-                <T testID="vd-word-display" numberOfLines={1} style={styles.wordMasked}>
-                  {view.maskedWord || 'Chuẩn bị...'} ({view.wordLength})
-                </T>
+                <View testID="vd-word-display" style={styles.maskedWrap}>
+                  {maskedParts.length > 0 ? (
+                    <View style={styles.maskedWordsRow}>
+                      {maskedParts.map((part, idx) => (
+                        <T key={idx} style={styles.wordMaskedPart}>{part}</T>
+                      ))}
+                    </View>
+                  ) : (
+                    <T style={styles.wordMaskedPart}>Chuẩn bị...</T>
+                  )}
+                  {maskedParts.length > 0 && (
+                    <T style={styles.wordCountBadge}>
+                      ({maskedParts.length} tiếng · {view.wordLength} chữ)
+                    </T>
+                  )}
+                </View>
               )}
             </View>
             <View style={styles.drawerPill}>
@@ -498,6 +672,10 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                       const d = s.fillPath ?? (s.points[0] ? computeFloodFillPath(allStrokes.slice(0, idx), s.points[0][0], s.points[0][1]) : '');
                       return d ? <path key={idx} d={d} fill={s.color} /> : null;
                     }
+                    if (stTool === 'spray') {
+                      const d = sprayStrokeToPath(s);
+                      return d ? <path key={idx} d={d} fill={s.color} /> : null;
+                    }
                     const stColor = stTool === 'eraser' ? '#FFFFFF' : s.color;
                     return s.points.length === 1 ? (
                       <circle key={idx} cx={s.points[0][0]} cy={s.points[0][1]} r={Math.max(4, s.width * 0.7)} fill={stColor} />
@@ -525,7 +703,9 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                     {canDraw
                       ? tool === 'fill'
                         ? 'Chạm vào vùng bất kỳ để đổ màu'
-                        : 'Chạm và kéo để vẽ tại đây'
+                        : tool === 'spray'
+                          ? 'Chạm và kéo để xịt sơn'
+                          : 'Chạm và kéo để vẽ tại đây'
                       : 'Bảng vẽ đang trống…'}
                   </T>
                 </View>
@@ -555,7 +735,7 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
               )}
             </View>
 
-            {/* Thanh Công Cụ Vẽ 2 Hàng Siêu Gọn Chạm Dễ Trên Mobile */}
+            {/* Thanh Công Cụ Vẽ Gọn Chạm Dễ Trên Mobile + Chế Độ Tẩy Nét/Vùng Sơn */}
             {canDraw && (
               <View style={styles.tools}>
                 <View style={styles.toolPickerRow}>
@@ -565,7 +745,13 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                       <Pressable
                         key={tm.id}
                         testID={`vd-tool-${tm.id}`}
-                        onPress={() => setTool(tm.id)}
+                        onPress={() => {
+                          if (tm.id === 'eraser' && tool === 'eraser') {
+                            setEraserMode((m) => (m === 'pixel' ? 'object' : 'pixel'));
+                          } else {
+                            setTool(tm.id);
+                          }
+                        }}
                         style={[styles.toolChip, active && styles.toolChipActive]}
                       >
                         <ToolGlyph tool={tm.id} icon={tm.icon} active={active} />
@@ -574,6 +760,33 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                     );
                   })}
                 </View>
+
+                {tool === 'eraser' && (
+                  <View style={styles.eraserModeRow}>
+                    <Pressable
+                      testID="vd-eraser-mode-pixel"
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: eraserMode === 'pixel' }}
+                      onPress={() => setEraserMode('pixel')}
+                      style={[styles.eraserModeChip, eraserMode === 'pixel' && styles.eraserModeChipActive]}
+                    >
+                      <T style={[styles.eraserModeTxt, eraserMode === 'pixel' && styles.eraserModeTxtActive]}>
+                        Tẩy thường
+                      </T>
+                    </Pressable>
+                    <Pressable
+                      testID="vd-eraser-mode-object"
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: eraserMode === 'object' }}
+                      onPress={() => setEraserMode('object')}
+                      style={[styles.eraserModeChip, eraserMode === 'object' && styles.eraserModeChipActive]}
+                    >
+                      <T style={[styles.eraserModeTxt, eraserMode === 'object' && styles.eraserModeTxtActive]}>
+                        Tẩy nét / vùng sơn
+                      </T>
+                    </Pressable>
+                  </View>
+                )}
 
                 <View style={styles.paletteActionBar}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.paletteScroll}>
@@ -612,10 +825,28 @@ export function VeDoanScreen({ game, room }: { game: Game; room: RoomState }) {
                         </Pressable>
                       );
                     })}
-                    <Pressable testID="vd-undo" onPress={() => act({ type: 'vd_undo' })} style={styles.toolMiniBtn} accessibilityLabel="Hoàn tác">
+                    <Pressable
+                      testID="vd-undo"
+                      onPress={() => {
+                        erasedInFlightRef.current.set.clear();
+                        setErasedTracker({ turn: view.turnIndex, ids: [] });
+                        void act({ type: 'vd_undo' });
+                      }}
+                      style={styles.toolMiniBtn}
+                      accessibilityLabel="Hoàn tác"
+                    >
                       <UiIcon name="Undo2" size={15} color={C.ink} />
                     </Pressable>
-                    <Pressable testID="vd-clear" onPress={() => act({ type: 'vd_clear' })} style={styles.toolMiniBtn} accessibilityLabel="Xóa hết">
+                    <Pressable
+                      testID="vd-clear"
+                      onPress={() => {
+                        erasedInFlightRef.current.set.clear();
+                        setErasedTracker({ turn: view.turnIndex, ids: [] });
+                        void act({ type: 'vd_clear' });
+                      }}
+                      style={styles.toolMiniBtn}
+                      accessibilityLabel="Xóa hết"
+                    >
                       <UiIcon name="Trash2" size={15} color={C.danger} />
                     </Pressable>
                   </View>
@@ -662,7 +893,24 @@ const styles = StyleSheet.create({
     paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', minWidth: 0,
   },
   wordSecret: { color: '#FDE68A', fontSize: 14.5, fontWeight: '600', letterSpacing: 1 },
-  wordMasked: { color: C.paper, fontSize: 13.5, fontWeight: '600', letterSpacing: 1.2 },
+  maskedWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+    rowGap: 2,
+  },
+  maskedWordsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 12,
+    rowGap: 2,
+  },
+  wordMaskedPart: { color: C.paper, fontSize: 13.5, fontWeight: '600', letterSpacing: 1.2, fontVariant: ['tabular-nums'] },
+  wordCountBadge: { color: 'rgba(253, 251, 247, 0.72)', fontSize: 11, fontWeight: '500', fontVariant: ['tabular-nums'] },
   drawerPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 114,
     backgroundColor: C.goldSoft, paddingHorizontal: 8, paddingVertical: 3,
@@ -696,15 +944,33 @@ const styles = StyleSheet.create({
   pickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   tools: { gap: 5, flexShrink: 0 },
-  toolPickerRow: { flexDirection: 'row', gap: 4, justifyContent: 'space-between' },
+  toolPickerRow: { flexDirection: 'row', gap: 3, justifyContent: 'space-between' },
   toolChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingHorizontal: 5, paddingVertical: 5, borderRadius: 9,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3,
+    paddingHorizontal: 3, paddingVertical: 5, borderRadius: 9,
     backgroundColor: C.parchment, borderWidth: 1, borderColor: C.borderSubtle,
   },
   toolChipActive: { backgroundColor: C.goldSoft, borderColor: C.ink },
-  toolLabel: { fontSize: 10.5, fontWeight: '500', color: C.secondary },
+  toolLabel: { fontSize: 10, fontWeight: '500', color: C.secondary },
   toolLabelActive: { color: C.ink, fontWeight: '600' },
+  eraserModeRow: { flexDirection: 'row', gap: 6 },
+  eraserModeChip: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: C.mist,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eraserModeChipActive: {
+    backgroundColor: C.ink,
+    borderColor: C.ink,
+  },
+  eraserModeTxt: { fontSize: 11, fontWeight: '500', color: C.secondary },
+  eraserModeTxtActive: { color: C.onSon, fontWeight: '600' },
 
   paletteActionBar: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   paletteScroll: { gap: 5, alignItems: 'center', paddingVertical: 2 },

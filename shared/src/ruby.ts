@@ -40,3 +40,14 @@ export function normalizeTopupCode(text: string): string | null {
   const flat = String(text ?? '').toUpperCase().replace(/[\s\-._]/g, '');
   return TOPUP_CODE_RE.exec(flat)?.[0] ?? null;
 }
+
+/** Kim cương thưởng khi thắng / trừ khi thua mỗi ván (có thể trừ âm số dư) */
+export const GAME_WIN_RUBY = 2000;
+export const GAME_LOSS_RUBY = 2000;
+/** Tỉ lệ kim cương người nhận quà được hưởng (70% giá trị món quà) */
+export const GIFT_RECEIVER_SHARE = 0.7;
+
+export function giftRubyForReceiver(price: number): number {
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  return Math.max(0, Math.floor(price * GIFT_RECEIVER_SHARE));
+}

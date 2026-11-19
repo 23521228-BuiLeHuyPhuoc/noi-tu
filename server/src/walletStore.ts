@@ -10,7 +10,7 @@ import { newTopupCode } from '../../shared/src/ruby';
 import type { RubyLedgerRow, TopupRequest } from '../../shared/src/types';
 import type { UserRecord } from './store';
 
-export type RubyReason = 'topup' | 'admin_adjust' | 'shop' | 'skill' | 'gift' | 'checkin';
+export type RubyReason = 'topup' | 'admin_adjust' | 'shop' | 'skill' | 'gift' | 'gift_receive' | 'checkin' | 'game_win' | 'game_loss';
 type Status = TopupRequest['status'];
 
 export interface WalletStore {
@@ -26,8 +26,8 @@ export interface WalletStore {
   addApproved(userId: string, username: string, code: string, amount: number, by: string, ruby: number, opts?: { at?: Date; nonce?: string }): Promise<TopupRequest | 'duplicate'>;
   /** đặt mốc đã nhận khuyến mãi lần đầu; true nếu lần này là lần đầu */
   markFirstTopup(userId: string): Promise<boolean>;
-  /** cộng/trừ Ruby nguyên tử; trả số dư mới, null nếu không có tài khoản hoặc không đủ Ruby */
-  creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string): Promise<number | null>;
+  /** cộng/trừ Ruby nguyên tử; trả số dư mới, null nếu không có tài khoản hoặc không đủ Ruby (trừ khi allowNegative=true) */
+  creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string, opts?: { allowNegative?: boolean }): Promise<number | null>;
   balance(userId: string): Promise<number>;
   firstTopupDone(userId: string): Promise<boolean>;
   history(userId: string, limit: number): Promise<RubyLedgerRow[]>;
@@ -120,11 +120,11 @@ export class MemoryWalletStore implements WalletStore {
     u.firstTopupAt = new Date();
     return true;
   }
-  async creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string) {
+  async creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string, opts?: { allowNegative?: boolean }) {
     const u = this.users.get(userId);
     if (!u) return null;
     const next = (u.ruby ?? 0) + delta;
-    if (next < 0) return null;
+    if (delta < 0 && next < 0 && !opts?.allowNegative) return null;
     u.ruby = next;
     this.ledger.push({ userId, delta, balance: next, reason, ...(ref ? { ref } : {}), ...(by ? { by } : {}), at: Date.now() + this.order++ / 1000 });
     return next;
@@ -306,11 +306,11 @@ export class MongoWalletStore implements WalletStore {
     if (!_id) return false;
     return (await this.users.updateOne({ _id, firstTopupAt: { $exists: false } }, { $set: { firstTopupAt: new Date() } })).modifiedCount === 1;
   }
-  async creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string) {
+  async creditRuby(userId: string, delta: number, reason: RubyReason, ref?: string, by?: string, opts?: { allowNegative?: boolean }) {
     const _id = oid(userId);
     if (!_id) return null;
     const d = await this.users.findOneAndUpdate(
-      { _id, ...(delta < 0 ? { ruby: { $gte: -delta } } : {}) },
+      { _id, ...(delta < 0 && !opts?.allowNegative ? { ruby: { $gte: -delta } } : {}) },
       { $inc: { ruby: delta } },
       { returnDocument: 'after', projection: { ruby: 1 } },
     );

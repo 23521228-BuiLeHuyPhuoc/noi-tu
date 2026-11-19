@@ -486,7 +486,7 @@ export function ProfileSheet({ game, room, initialName, onClose }: {
         <View testID="profile-wallet" style={styles.rubyRow}>
           <View style={styles.rubyPill}>
             <RubyIcon size={17} />
-            <T style={styles.rubyText}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+            <T style={[styles.rubyText, (user.ruby ?? 0) < 0 && { color: C.danger }]}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           </View>
           {user.admin && <Button testID="admin-open" small variant="ink" iconNode={<UiIcon name="Settings2" size={14} color={C.onSon} />} title="Quản trị" onPress={() => setSub('admin')} />}
           <Button testID="shop-open-profile" small variant="paper" iconNode={<UiIcon name="ShoppingBag" size={14} color={C.ink} />} title="Cửa hàng" onPress={() => setSub('shop')} />
@@ -564,7 +564,7 @@ export function ProfileCard({ user, onEdit, onWallet, onAdmin, onShop }: { user:
         <View style={styles.rubyRow}>
           <View style={styles.rubyPill}>
             <RubyIcon size={17} />
-            <T testID="home-ruby" style={styles.rubyText}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+            <T testID="home-ruby" style={[styles.rubyText, (user.ruby ?? 0) < 0 && { color: C.danger }]}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           </View>
           {user.admin && onAdmin && <Button testID="admin-open-home" small variant="ink" iconNode={<UiIcon name="Settings2" size={14} color={C.onSon} />} title="Quản trị" onPress={onAdmin} />}
           {onShop && <Button testID="shop-open" small variant="paper" iconNode={<UiIcon name="ShoppingBag" size={14} color={C.ink} />} title="Cửa hàng" onPress={onShop} />}

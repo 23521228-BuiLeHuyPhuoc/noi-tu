@@ -225,7 +225,7 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     vi.useRealTimers();
   });
 
-  it('thời gian mặc định clue_turn >= 40s, discussion = 80s, vote >= 35s, mrwhite/spy_guess >= 25s', () => {
+  it('thời gian mặc định clue_turn >= 40s, discussion = 60s, vote >= 35s, mrwhite/spy_guess >= 25s', () => {
     vi.useFakeTimers();
     const { ctx } = makeCtx(seededRng(5001));
     const g = new GianDiepGame(ctx);
@@ -246,7 +246,7 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     vi.advanceTimersByTime(10_200);
     const vDisc = g.view('p0') as GianDiepView;
     expect(vDisc.phase).toBe('discussion');
-    expect(vDisc.phaseSeconds).toBe(80);
+    expect(vDisc.phaseSeconds).toBe(60);
     g.dispose();
   });
 
@@ -380,7 +380,7 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
       g.action(sp, { type: 'gd_clue', text: `Goi y ${i}` });
     }
     vi.advanceTimersByTime(10_500); // clue_summary -> discussion
-    vi.advanceTimersByTime(80_500); // discussion -> vote
+    vi.advanceTimersByTime(60_500); // discussion -> vote
     for (const id of ['p0', 'p2', 'p3', 'p4']) g.action(id, { type: 'gd_vote', target: 'p1' });
     g.action('p1', { type: 'gd_vote', target: 'p0' });
     vi.advanceTimersByTime(40_500); // vote -> defense (bị cáo là bot p1)

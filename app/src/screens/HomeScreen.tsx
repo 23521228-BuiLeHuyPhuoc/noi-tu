@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GAME_INFO, type GameType } from '../../../shared/src/types';
-import { ROOM_THEMES } from '../../../shared/src/themes';
+import { ROOM_THEMES, themeById } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { useStableWindow } from '../hooks';
 import { storage } from '../storage';
@@ -19,7 +19,7 @@ import { LeaderboardSheet, OpenRooms } from '../components/RoomTools';
 import { MapBackdrop } from '../components/MapBackdrop';
 import { Sheet } from '../components/Sheet';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
-import { RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
+import { EmojiIcon, RubyIcon, UiIcon, type UiIconName } from '../components/Icons';
 
 // Sắp xếp chuẩn theo thứ tự ra mắt: Game cũ → Game mới
 const GAMES: GameType[] = [
@@ -59,24 +59,6 @@ const CATS: { id: Category; label: string; icon?: UiIconName; games?: GameType[]
   { id: 'word', label: 'Từ vựng', icon: 'BookOpen', games: ['wordchain', 'wordchain_en'] },
 ];
 
-const GAME_ICON: Record<GameType, UiIconName> = {
-  wordchain: 'BookOpen',
-  wordchain_en: 'Globe',
-  baucua: 'Dices',
-  typhu: 'Diamond',
-  masoi: 'Moon',
-  giandiep: 'Fingerprint',
-  ve_doan: 'Brush',
-  bom_tu: 'Flame',
-  do_vui: 'HelpCircle',
-  loto: 'Layers',
-  caro: 'Crosshair',
-  croaksquad: 'Zap',
-  ca_sau: 'Triangle',
-  boom_online: 'Bomb',
-  uno_mercy: 'Swords',
-};
-
 const GAME_TAG: Partial<Record<GameType, string>> = {
   boom_online: 'Mới',
   uno_mercy: 'Mới',
@@ -110,6 +92,7 @@ export function HomeScreen({ game }: { game: Game }) {
   const user = game.user;
   const activeThemeId = localTheme ?? user?.equipped?.roomTheme ?? 'son_mac_dinh';
   const pal = backdropPalette(activeThemeId);
+  const theme = themeById(activeThemeId);
 
   useEffect(() => {
     storage.getName().then((n) => n && setName(n));
@@ -216,7 +199,7 @@ export function HomeScreen({ game }: { game: Game }) {
           )}
           <Pressable onPress={() => setWalletOpen(true)} style={styles.rubyInlinePill}>
             <RubyIcon size={13} />
-            <T testID="home-ruby" style={styles.rubyInlineTxt}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
+            <T testID="home-ruby" style={[styles.rubyInlineTxt, (user.ruby ?? 0) < 0 && { color: C.danger }]}>{(user.ruby ?? 0).toLocaleString('vi-VN')} Ruby</T>
           </Pressable>
         </View>
         <View style={styles.userMiniActions}>
@@ -268,7 +251,7 @@ export function HomeScreen({ game }: { game: Game }) {
         <View style={styles.topRow}>
           <View style={styles.brandGroup}>
             <View style={[styles.brandEmblem, pal.dark && { backgroundColor: C.darkSurface, borderColor: C.darkBorder }]}>
-              <T style={styles.brandMono}>XL</T>
+              <EmojiIcon emoji={theme.emoji} size={26} />
             </View>
             <View style={{ flex: 1, minWidth: 120, gap: 1 }}>
               <T style={[styles.logo, { color: pal.text }]}>Xóm Lầy</T>
@@ -367,7 +350,7 @@ export function HomeScreen({ game }: { game: Game }) {
                       ]}
                     >
                       <View style={styles.gameIconBox}>
-                        <UiIcon name={GAME_ICON[g]} size={20} color={C.ink} strokeWidth={1.65} />
+                        <EmojiIcon emoji={GAME_META[g].emoji} size={28} />
                       </View>
                       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                         <View style={styles.gameTitleRow}>
@@ -634,16 +617,15 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   brandGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
   brandEmblem: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: C.ink,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: C.son,
     borderWidth: 1,
-    borderColor: C.ink,
+    borderColor: 'rgba(180, 83, 9, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandMono: { color: C.onSon, fontSize: 15, fontWeight: '600', letterSpacing: -0.2, fontFamily: FONT },
   logo: { fontSize: 20, fontWeight: '600', letterSpacing: -0.2, lineHeight: 24, fontFamily: FONT },
   tagline: { fontSize: 12.5, fontWeight: '400' },
 

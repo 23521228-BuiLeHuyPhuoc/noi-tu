@@ -5,30 +5,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type LeaderRow, type PublicPlayer, type RoomState, type RoomSummary } from '../../../shared/src/types';
 import type { Game } from '../useGame';
+import { GAME_META } from '../messages';
 import { C, sticker } from '../theme';
 import { Button, Card, T, useFeed } from '../ui';
 import { Portrait } from './Avatar';
 import { Sheet } from './Sheet';
-import { RankMedal, UiIcon, type UiIconName } from './Icons';
+import { EmojiIcon, RankMedal, UiIcon } from './Icons';
 
 const GAME_TYPES = Object.keys(GAME_INFO) as GameType[];
-const GAME_UI_ICON: Record<GameType, UiIconName> = {
-  wordchain: 'MessageCircle',
-  wordchain_en: 'Globe',
-  baucua: 'Dices',
-  typhu: 'Crown',
-  masoi: 'Moon',
-  giandiep: 'Search',
-  ve_doan: 'Brush',
-  bom_tu: 'Bomb',
-  do_vui: 'HelpCircle',
-  loto: 'Star',
-  caro: 'LayoutGrid',
-  croaksquad: 'Zap',
-  ca_sau: 'AlertTriangle',
-  boom_online: 'Flame',
-  uno_mercy: 'Layers',
-};
 const PHASE: Record<RoomSummary['phase'], { text: string; color: string }> = {
   lobby: { text: 'Đang chờ người', color: C.jadeDeep },
   playing: { text: 'Đang chơi · vào xem', color: C.goldDeep },
@@ -76,7 +60,7 @@ export function OpenRooms({ game, disabled, onJoin }: { game: Game; disabled: bo
               <Portrait p={{ avatar: r.hostAvatar, avatarUrl: r.hostAvatarUrl }} size={44} />
               <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <UiIcon name={GAME_UI_ICON[r.gameType]} size={15} color={C.secondary} />
+                  <EmojiIcon emoji={GAME_META[r.gameType].emoji} size={17} />
                   <T numberOfLines={1} style={styles.roomTitle}>
                     {GAME_INFO[r.gameType].name} · {r.hostName}
                   </T>
@@ -132,6 +116,7 @@ export function LeaderboardSheet({ game, onClose, initial }: { game: Game; onClo
               testID={`lb-tab-${t}`}
               small
               variant={t === tab ? 'ink' : 'paper'}
+              iconNode={t === 'all' ? undefined : <EmojiIcon emoji={GAME_META[t].emoji} size={15} />}
               title={t === 'all' ? 'Tất cả' : GAME_INFO[t].name}
               style={styles.tab}
               onPress={() => setTab(t)}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/types';
+import { GAME_LOSS_RUBY, GAME_WIN_RUBY } from '../../../shared/src/ruby';
 import type { Game } from '../useGame';
+import { GAME_META } from '../messages';
 import { play } from '../sound';
 import { C, backdropPalette, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
@@ -9,7 +11,7 @@ import { Shell } from '../components/Shell';
 import { Confetti } from '../components/Fun';
 import { Portrait } from '../components/Avatar';
 import { NameText, TitleBadge } from '../components/Cosmetics';
-import { UiIcon } from '../components/Icons';
+import { EmojiIcon, RubyIcon, UiIcon } from '../components/Icons';
 
 const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
@@ -25,6 +27,9 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const iWon = !!game.me && winIds.includes(game.me);
   const [error, setError] = useState<string | null>(null);
   const playerById = new Map(room.players.map((p) => [p.id, p]));
+  const mePlayer = game.me ? playerById.get(game.me) : undefined;
+  const activeParticipants = room.players.filter((p) => !p.spectator).length;
+  const showMatchRuby = !!game.user && !!mePlayer && !mePlayer.spectator && activeParticipants >= 2 && hasWinner;
   const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
   const pal = backdropPalette(activeThemeId);
 
@@ -64,6 +69,17 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
           {iWon ? 'Bạn đã chiến thắng' : cleanHeadline}
         </T>
         {iWon && <T style={styles.sub}>{cleanHeadline}</T>}
+        {showMatchRuby && (
+          <View
+            testID="result-ruby-delta"
+            style={[styles.rubyResultPill, iWon ? styles.rubyResultWin : styles.rubyResultLoss]}
+          >
+            <RubyIcon size={14} />
+            <T style={[styles.rubyResultTxt, { color: iWon ? C.jadeDeep : C.danger }]}>
+              {iWon ? `+${GAME_WIN_RUBY.toLocaleString('vi-VN')} Ruby` : `-${GAME_LOSS_RUBY.toLocaleString('vi-VN')} Ruby`}
+            </T>
+          </View>
+        )}
       </Card>
 
       <Card style={{ gap: 6 }}>
@@ -113,6 +129,7 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
                 testID={`switch-${g}`}
                 small
                 variant="paper"
+                iconNode={<EmojiIcon emoji={GAME_META[g].emoji} size={16} />}
                 title={GAME_INFO[g].name}
                 style={{ flexGrow: 1, minWidth: 112 }}
                 onPress={async () => setError(await game.configure({ gameType: g }))}
@@ -143,6 +160,19 @@ const styles = StyleSheet.create({
   },
   headline: { fontSize: 20, fontWeight: '600', color: C.ink, textAlign: 'center', lineHeight: 26 },
   sub: { color: C.secondary, fontSize: 13.5, textAlign: 'center', fontWeight: '400' },
+  rubyResultPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  rubyResultWin: { backgroundColor: C.jadeSoft, borderColor: 'rgba(21, 128, 61, 0.35)' },
+  rubyResultLoss: { backgroundColor: C.dangerSoft, borderColor: 'rgba(185, 28, 28, 0.32)' },
+  rubyResultTxt: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
   rank: {
     flexDirection: 'row',
     alignItems: 'center',

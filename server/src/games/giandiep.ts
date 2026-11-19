@@ -1,6 +1,8 @@
 import {
+  countWordChars,
   GIAN_DIEP_ROLE_META,
   GIAN_DIEP_WORDS,
+  matchGianDiepGuess,
   MR_WHITE_GENERIC_CLUES,
   type GianDiepClue,
   type GianDiepFeedItem,
@@ -17,7 +19,7 @@ const DEFAULT_SEC: Record<GianDiepPhase, number> = {
   word_reveal: 10,
   clue_turn: 40,
   clue_summary: 10,
-  discussion: 80,
+  discussion: 60,
   vote: 40,
   defense: 48,
   final_vote: 40,
@@ -141,6 +143,21 @@ export class GianDiepGame implements GameEngine {
       round: this.round,
       kind: 'system',
       text,
+      at: Date.now(),
+    });
+    if (this.timeline.length > 160) this.timeline.shift();
+  }
+
+  private pushElimination(chosen: string, role: GianDiepRole): void {
+    const roleMeta = GIAN_DIEP_ROLE_META[role];
+    this.timeline.push({
+      id: ++this.feedSeq,
+      round: this.round,
+      kind: 'elimination',
+      playerId: chosen,
+      name: this.names.get(chosen) ?? chosen,
+      role,
+      text: `${this.seatTag(chosen)} bị trục xuất · Thân phận: ${roleMeta.name}`,
       at: Date.now(),
     });
     if (this.timeline.length > 160) this.timeline.shift();
@@ -285,6 +302,7 @@ export class GianDiepGame implements GameEngine {
   private startVote(): void {
     if (this.finished) return;
     this.votes.clear();
+    this.readySkip.clear();
     this.pushSystem(`Bỏ phiếu Vòng ${this.round}`);
     this.enterPhase('vote', () => this.resolveVote());
     this.ctx.changed();
@@ -359,6 +377,7 @@ export class GianDiepGame implements GameEngine {
       return;
     }
     this.finalVotes.clear();
+    this.readySkip.clear();
     if (this.defendants.length === 1) {
       this.pushSystem(`Phán quyết cho ${this.seatTag(this.defendants[0])}`);
     } else {
@@ -375,6 +394,20 @@ export class GianDiepGame implements GameEngine {
       return aliveList.filter((id) => id !== this.defendants[0]);
     }
     return aliveList;
+  }
+
+  private eligibleConnectedVerdictVoters(): string[] {
+    return this.eligibleVerdictVoters().filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
+  }
+
+  private allVoteCast(): boolean {
+    const conn = this.aliveConnected();
+    return conn.length > 0 && conn.every((id) => this.votes.has(id));
+  }
+
+  private allVerdictCast(): boolean {
+    const voters = this.eligibleConnectedVerdictVoters();
+    return voters.length > 0 && voters.every((id) => this.finalVotes.has(id));
   }
 
   private resolveFinalVote(): void {
@@ -453,10 +486,9 @@ export class GianDiepGame implements GameEngine {
 
   private eliminatePlayer(chosen: string): void {
     const role = this.roles.get(chosen)!;
-    const roleMeta = GIAN_DIEP_ROLE_META[role];
     this.alive.delete(chosen);
     this.eliminated.push({ id: chosen, role, round: this.round, word: this.words.get(chosen) ?? null });
-    this.pushSystem(`${this.seatTag(chosen)} bị trục xuất · Thân phận: ${roleMeta.name}`);
+    this.pushElimination(chosen, role);
 
     if (role === 'mrwhite') {
       this.mrWhiteId = chosen;
@@ -618,10 +650,9 @@ export class GianDiepGame implements GameEngine {
       return false;
     }
     if (this.phase === 'vote') {
-      // Khi còn người chơi thật: luôn đợi hết giờ bỏ phiếu để mọi người tự do đổi phiếu và quan sát ai bầu ai
-      if (!this.hasAliveConnectedHuman()) {
+      if (this.allVoteCast()) {
         const conn = this.aliveConnected();
-        if (conn.length > 0 && conn.every((id) => this.votes.has(id))) {
+        if (!this.hasAliveConnectedHuman() || conn.every((id) => this.readySkip.has(id))) {
           this.clearTimers();
           this.resolveVote();
           return true;
@@ -633,7 +664,12 @@ export class GianDiepGame implements GameEngine {
       const activeDefs = this.defendants.filter(
         (id) => this.alive.has(id) && (this.ctx.isBot?.(id) || this.ctx.isConnected(id)),
       );
-      if (activeDefs.length === 0 || activeDefs.every((id) => this.readySkip.has(id))) {
+      const conn = this.aliveConnected();
+      if (
+        activeDefs.length === 0 ||
+        activeDefs.every((id) => this.readySkip.has(id)) ||
+        (conn.length > 0 && conn.every((id) => this.readySkip.has(id)))
+      ) {
         this.clearTimers();
         this.startFinalVote();
         return true;
@@ -641,10 +677,16 @@ export class GianDiepGame implements GameEngine {
       return false;
     }
     if (this.phase === 'final_vote') {
-      // Tương tự pha vote: khi còn người chơi thật, đợi hết giờ phán quyết để người chơi cân nhắc & đổi quyết định
-      if (!this.hasAliveConnectedHuman()) {
-        const connVoters = this.eligibleVerdictVoters().filter((id) => this.ctx.isBot?.(id) || this.ctx.isConnected(id));
-        if (connVoters.length > 0 && connVoters.every((id) => this.finalVotes.has(id))) {
+      if (this.allVerdictCast()) {
+        const connVoters = this.eligibleConnectedVerdictVoters();
+        const eligibleHumans = connVoters.filter((id) => !this.ctx.isBot?.(id));
+        const aliveConnectedHumans = this.aliveConnected().filter((id) => !this.ctx.isBot?.(id));
+        if (
+          !this.hasAliveConnectedHuman() ||
+          (eligibleHumans.length > 0
+            ? connVoters.every((id) => this.readySkip.has(id))
+            : aliveConnectedHumans.every((id) => this.readySkip.has(id)))
+        ) {
           this.clearTimers();
           this.resolveFinalVote();
           return true;
@@ -683,9 +725,7 @@ export class GianDiepGame implements GameEngine {
       if (!guess) return { ok: false, reason: 'bad_action' };
       this.mrWhiteGuessed = true;
       this.clearTimers();
-      const matched =
-        normPhrase(guess) === normPhrase(this.danWord) ||
-        stripAccents(normPhrase(guess)) === stripAccents(normPhrase(this.danWord));
+      const matched = matchGianDiepGuess(guess, this.danWord, this.spyWord);
       const guiserLabel = role === 'mrwhite' ? 'Mr. White' : 'Gián Điệp';
       if (matched) {
         const winners =
@@ -790,9 +830,26 @@ export class GianDiepGame implements GameEngine {
         if (!this.checkPhaseAdvance()) this.ctx.changed();
         return { ok: true };
       }
-      if (this.phase === 'defense' && this.defendants.includes(playerId)) {
+      if (this.phase === 'defense') {
         this.readySkip.add(playerId);
-        this.defendedIds.add(playerId);
+        if (this.defendants.includes(playerId)) this.defendedIds.add(playerId);
+        if (!this.checkPhaseAdvance()) this.ctx.changed();
+        return { ok: true };
+      }
+      if (this.phase === 'vote') {
+        if (!this.allVoteCast()) return { ok: false, reason: 'not_your_turn' };
+        this.readySkip.add(playerId);
+        if (!this.checkPhaseAdvance()) this.ctx.changed();
+        return { ok: true };
+      }
+      if (this.phase === 'final_vote') {
+        if (!this.allVerdictCast()) return { ok: false, reason: 'not_your_turn' };
+        const connVoters = this.eligibleConnectedVerdictVoters();
+        const eligibleHumans = connVoters.filter((id) => !this.ctx.isBot?.(id));
+        if (!this.eligibleVerdictVoters().includes(playerId) && eligibleHumans.length > 0) {
+          return { ok: false, reason: 'not_your_turn' };
+        }
+        this.readySkip.add(playerId);
         if (!this.checkPhaseAdvance()) this.ctx.changed();
         return { ok: true };
       }
@@ -804,7 +861,10 @@ export class GianDiepGame implements GameEngine {
       if (action.target !== 'skip' && (!this.alive.has(action.target) || action.target === playerId)) {
         return { ok: false, reason: 'bad_action' };
       }
-      this.votes.set(playerId, action.target);
+      if (this.votes.get(playerId) !== action.target) {
+        this.votes.set(playerId, action.target);
+        this.readySkip.clear();
+      }
       if (!this.checkPhaseAdvance()) this.ctx.changed();
       return { ok: true };
     }
@@ -824,7 +884,10 @@ export class GianDiepGame implements GameEngine {
         }
       }
 
-      this.finalVotes.set(playerId, action.verdict);
+      if (this.finalVotes.get(playerId) !== action.verdict) {
+        this.finalVotes.set(playerId, action.verdict);
+        this.readySkip.clear();
+      }
       if (!this.checkPhaseAdvance()) this.ctx.changed();
       return { ok: true };
     }
@@ -954,45 +1017,62 @@ export class GianDiepGame implements GameEngine {
       return null;
     }
 
-    if (this.phase === 'vote' && !this.votes.has(playerId)) {
-      const candidates = [...this.alive].filter((id) => {
-        if (id === playerId) return false;
-        if (role === 'giandiep' && this.roles.get(id) === 'giandiep') return false;
-        return true;
-      });
-      if (candidates.length === 0) return { type: 'gd_vote', target: 'skip' };
-      const pick = candidates[Math.floor(this.ctx.rng() * candidates.length) % candidates.length];
-      return { type: 'gd_vote', target: pick };
-    }
-
-    if (this.phase === 'defense' && this.defendants.includes(playerId)) {
-      if (!this.defendedIds.has(playerId)) {
-        const line = BOT_DEFENSE_LINES[Math.floor(this.ctx.rng() * BOT_DEFENSE_LINES.length)];
-        return { type: 'gd_defense', text: line };
+    if (this.phase === 'vote') {
+      if (!this.votes.has(playerId)) {
+        const candidates = [...this.alive].filter((id) => {
+          if (id === playerId) return false;
+          if (role === 'giandiep' && this.roles.get(id) === 'giandiep') return false;
+          return true;
+        });
+        if (candidates.length === 0) return { type: 'gd_vote', target: 'skip' };
+        const pick = candidates[Math.floor(this.ctx.rng() * candidates.length) % candidates.length];
+        return { type: 'gd_vote', target: pick };
       }
-      if (!this.readySkip.has(playerId)) {
-        const aliveHumans = [...this.alive].filter((id) => !this.ctx.isBot?.(id));
-        // Nếu có người chơi thật, bot KHÔNG tự kết thúc sớm pha biện minh để cả phòng kịp đọc và thảo luận
-        if (aliveHumans.length === 0) {
+      if (this.allVoteCast() && !this.readySkip.has(playerId)) {
+        const aliveHumans = this.aliveConnected().filter((id) => !this.ctx.isBot?.(id));
+        if (aliveHumans.length === 0 || aliveHumans.every((id) => this.readySkip.has(id))) {
           return { type: 'gd_ready' };
         }
       }
       return null;
     }
 
-    if (this.phase === 'final_vote' && !this.finalVotes.has(playerId)) {
+    if (this.phase === 'defense') {
+      if (this.defendants.includes(playerId) && !this.defendedIds.has(playerId)) {
+        const line = BOT_DEFENSE_LINES[Math.floor(this.ctx.rng() * BOT_DEFENSE_LINES.length)];
+        return { type: 'gd_defense', text: line };
+      }
+      if (!this.readySkip.has(playerId)) {
+        const aliveHumans = this.aliveConnected().filter((id) => !this.ctx.isBot?.(id));
+        if (aliveHumans.length === 0 || aliveHumans.every((id) => this.readySkip.has(id))) {
+          return { type: 'gd_ready' };
+        }
+      }
+      return null;
+    }
+
+    if (this.phase === 'final_vote') {
       const voters = this.eligibleVerdictVoters();
       if (!voters.includes(playerId)) return null;
-      if (this.defendants.length === 1) {
-        const acc = this.defendants[0];
-        if (role === 'giandiep' && this.roles.get(acc) === 'giandiep') {
-          return { type: 'gd_verdict', verdict: 'forgive' };
+      if (!this.finalVotes.has(playerId)) {
+        if (this.defendants.length === 1) {
+          const acc = this.defendants[0];
+          if (role === 'giandiep' && this.roles.get(acc) === 'giandiep') {
+            return { type: 'gd_verdict', verdict: 'forgive' };
+          }
+          return { type: 'gd_verdict', verdict: this.ctx.rng() < 0.78 ? 'banish' : 'forgive' };
         }
-        return { type: 'gd_verdict', verdict: this.ctx.rng() < 0.78 ? 'banish' : 'forgive' };
+        const choices = this.defendants.filter((id) => id !== playerId && !(role === 'giandiep' && this.roles.get(id) === 'giandiep'));
+        if (choices.length === 0) return { type: 'gd_verdict', verdict: 'skip' };
+        return { type: 'gd_verdict', verdict: choices[Math.floor(this.ctx.rng() * choices.length) % choices.length] };
       }
-      const choices = this.defendants.filter((id) => id !== playerId && !(role === 'giandiep' && this.roles.get(id) === 'giandiep'));
-      if (choices.length === 0) return { type: 'gd_verdict', verdict: 'skip' };
-      return { type: 'gd_verdict', verdict: choices[Math.floor(this.ctx.rng() * choices.length) % choices.length] };
+      if (this.allVerdictCast() && !this.readySkip.has(playerId)) {
+        const eligibleHumans = this.eligibleConnectedVerdictVoters().filter((id) => !this.ctx.isBot?.(id));
+        if (!this.hasAliveConnectedHuman() || (eligibleHumans.length > 0 && eligibleHumans.every((id) => this.readySkip.has(id)))) {
+          return { type: 'gd_ready' };
+        }
+      }
+      return null;
     }
 
     return null;
@@ -1030,9 +1110,11 @@ export class GianDiepGame implements GameEngine {
       defendants: [...this.defendants],
       finalVotes: Object.fromEntries(this.finalVotes),
       mrWhiteId: (this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') ? this.mrWhiteId : null,
+      targetCharCount: (this.phase === 'mrwhite_guess' || this.phase === 'spy_guess') ? countWordChars(this.danWord) : null,
       roleSummary,
       aliveCounts,
       revealedAll: this.phase === 'reveal_end' ? this.revealedAll : null,
+      winnerIds: this.phase === 'reveal_end' && this.pendingResult ? [...this.pendingResult.winnerIds] : null,
       wordPairReveal: this.phase === 'reveal_end' ? this.wordPairReveal : null,
       myRole,
       myWord,

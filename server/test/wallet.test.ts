@@ -165,4 +165,84 @@ describe('Ví Ruby qua Socket.IO', () => {
     await boss.emitWithAck('admin:creditCode', { code: w.topupCode, amount: 10_000, nonce: 'n-revenue' });
     expect(await boss.emitWithAck('admin:revenue')).toEqual({ ok: true, today: 60_000, month: 60_000, total: 60_000 });
   });
+
+  it('thắng ván +2.000 Ruby, thua ván -2.000 Ruby (cho phép âm), số dư âm vẫn bị chặn mua/tặng quà, nhận quà hưởng 70%', async () => {
+    const an = await account('anvui');
+    const bi = await account('binh');
+    const boss = await account('boss');
+
+    let latestState: { phase: string; game: { currentPlayerId?: string | null; revealEndsAt?: number | null } | null } | null = null;
+    an.c.on('room:state', (s) => {
+      latestState = s as unknown as typeof latestState;
+    });
+
+    const playCaroMatch = async (winnerSock: Client, winnerPid: string, loserSock: Client, _loserPid: string) => {
+      await winnerSock.emitWithAck('room:config', { gameType: 'caro' });
+      expect(await winnerSock.emitWithAck('game:start')).toEqual({ ok: true });
+      await wait(40);
+      let wCol = 3;
+      let lCol = 0;
+      for (let step = 0; step < 14; step++) {
+        if (latestState?.phase === 'finished') break;
+        if (latestState?.game?.revealEndsAt != null) {
+          await winnerSock.emitWithAck('game:action', { type: 'caro_finish_reveal' });
+          await wait(30);
+          continue;
+        }
+        const turnId = latestState?.game?.currentPlayerId;
+        if (turnId === winnerPid) {
+          await winnerSock.emitWithAck('game:action', { type: 'caro_move', row: 7, col: wCol++ });
+        } else if (turnId) {
+          // Đánh rải ô xen kẽ hàng để bên thua không bao giờ tạo thành 5 quân thẳng hàng dù đi trước
+          const row = (lCol % 2) * 2;
+          const col = lCol * 2;
+          lCol++;
+          await loserSock.emitWithAck('game:action', { type: 'caro_move', row, col });
+        }
+        await wait(15);
+      }
+      if (latestState?.phase !== 'finished' && latestState?.game?.revealEndsAt != null) {
+        await winnerSock.emitWithAck('game:action', { type: 'caro_finish_reveal' });
+      }
+      await wait(60);
+    };
+
+    const cr = await an.c.emitWithAck('room:create', { name: 'An' });
+    if (!cr.ok) throw new Error();
+    const jr = await bi.c.emitWithAck('room:join', { code: cr.code, name: 'Binh' });
+    if (!jr.ok) throw new Error();
+
+    // Ván 1: An thắng (+2000), Bình thua (0 -> -2000)
+    await playCaroMatch(an.c, cr.playerId, bi.c, jr.playerId);
+    const wAn1 = await an.c.emitWithAck('wallet:get');
+    const wBi1 = await bi.c.emitWithAck('wallet:get');
+    expect(wAn1.ok && wAn1.ruby).toBe(2000);
+    expect(wBi1.ok && wBi1.ruby).toBe(-2000);
+    expect(an.c.updates.at(-1)).toEqual({ ruby: 2000, delta: 2000, reason: 'game_win' });
+    expect(bi.c.updates.at(-1)).toEqual({ ruby: -2000, delta: -2000, reason: 'game_loss' });
+
+    // Số dư âm (-2000) KHÔNG được mua shop hoặc tặng quà
+    expect(await bi.c.emitWithAck('shop:buy', { itemId: 'frame_gold' })).toEqual({ ok: false, error: 'insufficient' });
+    expect(await bi.c.emitWithAck('fun:send', { kind: 'gift', to: cr.playerId, gift: 'gift_rose' })).toEqual({ ok: false, reason: 'need_ruby' });
+
+    // An tặng Siêu xe (200 Ruby) cho Bình -> Bình đang -2000 được +140 Ruby => -1860
+    expect(await an.c.emitWithAck('fun:send', { kind: 'gift', to: jr.playerId, gift: 'gift_car' })).toEqual({ ok: true });
+    await wait(30);
+    const wAnAfterGift = await an.c.emitWithAck('wallet:get');
+    const wBiAfterGift = await bi.c.emitWithAck('wallet:get');
+    expect(wAnAfterGift.ok && wAnAfterGift.ruby).toBe(1800);
+    expect(wBiAfterGift.ok && wBiAfterGift.ruby).toBe(-1860);
+
+    // Chơi lại ván 2: Bình thua tiếp (-1860 - 2000 = -3860), An thắng tiếp (1800 + 2000 = 3800)
+    expect(await an.c.emitWithAck('game:restart')).toEqual({ ok: true });
+    await wait(30);
+    await playCaroMatch(an.c, cr.playerId, bi.c, jr.playerId);
+    const wAn2 = await an.c.emitWithAck('wallet:get');
+    const wBi2 = await bi.c.emitWithAck('wallet:get');
+    expect(wAn2.ok && wAn2.ruby).toBe(3800);
+    expect(wBi2.ok && wBi2.ruby).toBe(-3860);
+
+    // Nạp / admin cộng bù cho Bình rồi chơi lại: kiểm tra vẫn trả thưởng chuẩn
+    expect(await boss.c.emitWithAck('admin:adjust', { username: 'binh', delta: 500, reason: 'ho_tro' })).toEqual({ ok: true, balance: -3360 });
+  });
 });

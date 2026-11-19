@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { GianDiepView } from '../../../shared/src/giandiep';
+import { GIAN_DIEP_ROLE_META, type GianDiepView } from '../../../shared/src/giandiep';
 import type { PublicPlayer } from '../../../shared/src/types';
 import type { PortraitSource } from '../avatars';
 import { useKeyboardInset, useSecondsLeft, useStableWindow } from '../hooks';
@@ -17,6 +17,7 @@ import { play } from '../sound';
 import { FONT } from '../theme';
 import { T } from '../ui';
 import { Portrait } from './Avatar';
+import { Confetti } from './Fun';
 import { UiIcon, type UiIconName } from './Icons';
 
 export function portraitSrc(pl?: PublicPlayer, seatNo?: number): PortraitSource {
@@ -437,7 +438,14 @@ export function CounterGuessPopup({
           : 'Cơ hội cuối cùng. Dựa vào lời khai vừa nghe để đoán từ khóa của Dân thường.'}
       </T>
 
-      <T style={styles.metaText}>Chủ đề: {view.category}</T>
+      <View style={styles.metaLineWrap}>
+        <T style={styles.metaText}>Chủ đề: {view.category}</T>
+        {typeof view.targetCharCount === 'number' && view.targetCharCount > 0 && (
+          <View testID="gd-counter-char-count" style={styles.charCountPill}>
+            <T style={styles.charCountTxt}>Độ dài: {view.targetCharCount} chữ cái</T>
+          </View>
+        )}
+      </View>
 
       {err && <T style={styles.counterErr}>{err}</T>}
 
@@ -490,6 +498,7 @@ export const VoteLivePanel = memo(function VoteLivePanel({
   voteTally,
   latestClueByPlayer,
   onVote,
+  onConfirm,
   onToggleCollapse,
 }: {
   view: GianDiepView;
@@ -504,12 +513,21 @@ export const VoteLivePanel = memo(function VoteLivePanel({
   voteTally: Record<string, number>;
   latestClueByPlayer: Map<string, string>;
   onVote: (target: string | 'skip') => void;
+  onConfirm: () => void;
   onToggleCollapse: () => void;
 }) {
   const { width, height } = useStableWindow();
   const candidates = view.order.filter((id) => id !== me && view.alive.includes(id));
   const myVote = view.votes[me];
+  const activeVoters = view.alive.filter((id) => {
+    const p = playerMap.get(id);
+    return !p || p.bot || p.connected;
+  });
+  const totalVoters = activeVoters.length || view.alive.length;
   const votedCount = view.alive.filter((id) => Boolean(view.votes[id])).length;
+  const allVoted = activeVoters.length > 0 && activeVoters.every((id) => Boolean(view.votes[id]));
+  const confirmCount = activeVoters.filter((id) => view.readySkip.includes(id)).length;
+  const myConfirmed = view.readySkip.includes(me);
   const cols = width >= 340 ? 2 : 1;
 
   const votersByTarget: Record<string, string[]> = {};
@@ -544,9 +562,11 @@ export const VoteLivePanel = memo(function VoteLivePanel({
         }}
         style={({ pressed }) => [styles.dockedBanner, pressed && !kbOpen && styles.pressedSoft]}
       >
-        <View style={[styles.accentIndicator, { backgroundColor: GD.accent }]} />
+        <View style={[styles.accentIndicator, { backgroundColor: allVoted && !myConfirmed ? GD.positive : GD.accent }]} />
         <T numberOfLines={1} style={styles.dockedBannerTxt}>
-          Bỏ phiếu · {votedCount}/{view.alive.length} đã chọn · {pickedLabel}
+          {allVoted && !myConfirmed
+            ? `Tất cả đã bầu · Mở để xác nhận (${confirmCount}/${totalVoters})`
+            : `Bỏ phiếu · ${votedCount}/${totalVoters} đã chọn · ${pickedLabel}`}
         </T>
         <T style={styles.tabularTimerSm}>{sec}s</T>
         {!kbOpen && (
@@ -568,7 +588,7 @@ export const VoteLivePanel = memo(function VoteLivePanel({
             <UiIcon name="Fingerprint" size={15} color={GD.accent} strokeWidth={1.65} />
             <T style={styles.liveTitle}>Bỏ phiếu loại</T>
             <T style={styles.liveCountTabular}>
-              {votedCount}/{view.alive.length}
+              {votedCount}/{totalVoters}
             </T>
           </View>
           <Pressable
@@ -586,7 +606,11 @@ export const VoteLivePanel = memo(function VoteLivePanel({
           </Pressable>
         </View>
 
-        <T style={styles.liveSubtleNote}>Đổi phiếu tự do tới khi hết giờ ({sec}s)</T>
+        <T style={styles.liveSubtleNote}>
+          {allVoted
+            ? `Cả phòng đã bỏ phiếu — bấm Xác nhận để qua vòng ngay (${sec}s)`
+            : `Đổi phiếu tự do tới khi hết giờ (${sec}s)`}
+        </T>
 
         <ScrollView
           style={{ maxHeight: compact ? 150 : Math.min(204, height * 0.27) }}
@@ -685,6 +709,32 @@ export const VoteLivePanel = memo(function VoteLivePanel({
             )}
           </View>
         </Pressable>
+
+        {allVoted && (
+          <Pressable
+            testID="gd-vote-confirm"
+            accessibilityRole="button"
+            accessibilityState={{ selected: myConfirmed, disabled: busy || myConfirmed }}
+            disabled={busy || myConfirmed}
+            onPress={() => {
+              play('pop');
+              onConfirm();
+            }}
+            style={({ pressed }) => [
+              styles.confirmActionBtn,
+              myConfirmed && styles.confirmActionBtnDone,
+              pressed && !(busy || myConfirmed) && styles.pressedBtn,
+              busy && { opacity: 0.55 },
+            ]}
+          >
+            <UiIcon name="Check" size={15} color={myConfirmed ? GD.positive : '#FFFFFF'} strokeWidth={2} />
+            <T style={[styles.confirmActionTxt, myConfirmed && { color: GD.positive }]}>
+              {myConfirmed
+                ? `Đã xác nhận · Chờ cả phòng (${confirmCount}/${totalVoters})`
+                : `Xác nhận bỏ phiếu (${confirmCount}/${totalVoters})`}
+            </T>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -705,6 +755,7 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
   voteTally,
   latestClueByPlayer,
   onVerdict,
+  onConfirm,
   onToggleCollapse,
 }: {
   view: GianDiepView;
@@ -718,6 +769,7 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
   voteTally: Record<string, number>;
   latestClueByPlayer: Map<string, string>;
   onVerdict: (verdict: string) => void;
+  onConfirm: () => void;
   onToggleCollapse: () => void;
 }) {
   const { height } = useStableWindow();
@@ -751,6 +803,48 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
   const banishVotes = banishVoters.length;
   const forgiveVotes = forgiveVoters.length;
 
+  const rawEligible = isSingle && view.alive.length > 2 ? view.alive.filter((id) => id !== accId) : view.alive;
+  const eligibleVoters = rawEligible.filter((id) => {
+    const p = playerMap.get(id);
+    return !p || p.bot || p.connected;
+  });
+  const allVerdicted = eligibleVoters.length > 0 && eligibleVoters.every((id) => Boolean(view.finalVotes?.[id]));
+  const eligibleHumans = eligibleVoters.filter((id) => !playerMap.get(id)?.bot);
+  const canConfirm = allVerdicted && (eligibleVoters.includes(me) || eligibleHumans.length === 0);
+  const confirmPool = eligibleHumans.length > 0 ? eligibleVoters : [me];
+  const confirmCount = confirmPool.filter((id) => view.readySkip.includes(id)).length;
+  const myConfirmed = view.readySkip.includes(me);
+
+  const confirmNode = canConfirm ? (
+    <Pressable
+      testID="gd-verdict-confirm"
+      accessibilityRole="button"
+      accessibilityState={{ selected: myConfirmed, disabled: busy || myConfirmed }}
+      disabled={busy || myConfirmed}
+      onPress={() => {
+        play('pop');
+        onConfirm();
+      }}
+      style={({ pressed }) => [
+        styles.confirmActionBtn,
+        myConfirmed && styles.confirmActionBtnDone,
+        pressed && !(busy || myConfirmed) && styles.pressedBtn,
+        busy && { opacity: 0.55 },
+      ]}
+    >
+      <UiIcon name="Check" size={15} color={myConfirmed ? GD.positive : '#FFFFFF'} strokeWidth={2} />
+      <T style={[styles.confirmActionTxt, myConfirmed && { color: GD.positive }]}>
+        {myConfirmed
+          ? confirmPool.length === 1
+            ? 'Đã xác nhận phán quyết'
+            : `Đã xác nhận · Chờ cả phòng (${confirmCount}/${confirmPool.length})`
+          : confirmPool.length === 1
+            ? 'Xác nhận phán quyết'
+            : `Xác nhận phán quyết (${confirmCount}/${confirmPool.length})`}
+      </T>
+    </Pressable>
+  ) : null;
+
   if (collapsed || kbOpen) {
     return (
       <Pressable
@@ -764,11 +858,13 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
         }}
         style={({ pressed }) => [styles.dockedBanner, pressed && !kbOpen && styles.pressedSoft]}
       >
-        <View style={[styles.accentIndicator, { backgroundColor: GD.danger }]} />
+        <View style={[styles.accentIndicator, { backgroundColor: canConfirm && !myConfirmed ? GD.positive : GD.danger }]} />
         <T numberOfLines={1} style={styles.dockedBannerTxt}>
-          {isSingle
-            ? `Phán quyết ${accSeat ? `#${accSeat} ` : ''}${accName} · Loại ${banishVotes} · Tha ${forgiveVotes}`
-            : `Chung kết đồng phiếu (${defs.length} người)`}
+          {canConfirm && !myConfirmed
+            ? 'Tất cả đã chọn · Mở để xác nhận phán quyết'
+            : isSingle
+              ? `Phán quyết ${accSeat ? `#${accSeat} ` : ''}${accName} · Loại ${banishVotes} · Tha ${forgiveVotes}`
+              : `Chung kết đồng phiếu (${defs.length} người)`}
         </T>
         <T style={styles.tabularTimerSm}>{sec}s</T>
         {!kbOpen && (
@@ -817,7 +913,11 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
             </Pressable>
           </View>
 
-          <T style={styles.liveSubtleNote}>Đổi quyết định tự do tới khi hết giờ ({sec}s)</T>
+          <T style={styles.liveSubtleNote}>
+            {allVerdicted
+              ? `Cả phòng đã chọn — bấm Xác nhận để sang bước tiếp theo (${sec}s)`
+              : `Đổi quyết định tự do tới khi hết giờ (${sec}s)`}
+          </T>
 
           <View style={styles.accusedCompactRow}>
             <Portrait p={portraitSrc(accPlayer, accSeat)} size={34} border={1} />
@@ -902,6 +1002,8 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
               </Pressable>
             </View>
           )}
+
+          {confirmNode}
         </View>
       </View>
     );
@@ -931,7 +1033,11 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
           </Pressable>
         </View>
 
-        <T style={styles.liveSubtleNote}>Đổi quyết định tự do tới khi hết giờ ({sec}s)</T>
+        <T style={styles.liveSubtleNote}>
+          {allVerdicted
+            ? `Cả phòng đã chọn — bấm Xác nhận để sang bước tiếp theo (${sec}s)`
+            : `Đổi quyết định tự do tới khi hết giờ (${sec}s)`}
+        </T>
 
         <ScrollView
           style={{ maxHeight: Math.min(170, height * 0.25) }}
@@ -1015,10 +1121,282 @@ export const VerdictLivePanel = memo(function VerdictLivePanel({
             )}
           </View>
         </Pressable>
+
+        {confirmNode}
       </View>
     </View>
   );
 });
+
+/**
+ * Pop-up Lật Mở Kết Quả Cuối Ván với hào quang vàng rực rỡ & pháo giấy:
+ * làm nổi bật rõ người chiến thắng, cặp từ khóa hai phe và toàn bộ vai trò mọi người.
+ */
+export function RevealEndPopup({
+  view,
+  clockOffset,
+  me,
+  busy,
+  playerMap,
+  seatIndexMap,
+  onContinue,
+  onMinimize,
+}: {
+  view: GianDiepView;
+  clockOffset: number;
+  me: string;
+  busy: boolean;
+  playerMap: Map<string, PublicPlayer>;
+  seatIndexMap: Map<string, number>;
+  onContinue: () => void;
+  onMinimize: () => void;
+}) {
+  const { width, height } = useStableWindow();
+  const sec = useSecondsLeft(view.phaseEndsAt, clockOffset, view.phaseSeconds || 12);
+  const pct = view.phaseSeconds > 0 ? Math.max(0, Math.min(1, sec / view.phaseSeconds)) : 0;
+
+  const [enterAnim] = useState(() => new Animated.Value(0));
+  const [haloAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    enterAnim.setValue(0);
+    Animated.timing(enterAnim, {
+      toValue: 1,
+      duration: 240,
+      easing: EASE_OUT,
+      useNativeDriver: false,
+    }).start();
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(haloAnim, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(haloAnim, {
+          toValue: 0,
+          duration: 1100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [enterAnim, haloAnim]);
+
+  const revealed = view.revealedAll ?? [];
+  const winSet = new Set(
+    view.winnerIds && view.winnerIds.length > 0
+      ? view.winnerIds
+      : revealed.filter((r) => r.alive).map((r) => r.id),
+  );
+  const winners = revealed.filter((r) => winSet.has(r.id));
+  const iWon = winSet.has(me);
+
+  const cardWidth = Math.min(440, Math.max(300, width - 20));
+  const listMaxHeight = Math.max(130, Math.min(240, height - 390));
+  const haloScale = haloAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] });
+  const haloOpacity = haloAnim.interpolate({ inputRange: [0, 1], outputRange: [0.38, 0.78] });
+  const scaleIn = enterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+
+  return (
+    <View testID="gd-reveal-modal" style={styles.overlayBackdrop}>
+      <Confetti />
+      <Animated.View
+        style={[
+          styles.revealAuraWrap,
+          {
+            width: cardWidth,
+            opacity: enterAnim,
+            transform: [{ scale: scaleIn }],
+          },
+        ]}
+      >
+        {/* Hào quang vàng tỏa sáng xung quanh khung công bố */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.revealHaloRing,
+            {
+              opacity: haloOpacity,
+              transform: [{ scale: haloScale }],
+            },
+          ]}
+        />
+
+        <View
+          style={[
+            styles.revealModalCard,
+            { maxHeight: Math.min(640, height - 24) },
+            Platform.OS === 'web'
+              ? ({
+                  boxShadow:
+                    '0 0 38px rgba(245, 158, 11, 0.45), 0 18px 42px rgba(28, 25, 23, 0.34)',
+                } as object)
+              : {
+                  shadowColor: '#F59E0B',
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.42,
+                  shadowRadius: 22,
+                  elevation: 18,
+                },
+          ]}
+        >
+          <View style={styles.revealTopRibbon}>
+            <View style={styles.revealHeaderMain}>
+              <Animated.View style={[styles.revealTrophyHalo, { transform: [{ scale: haloScale }] }]}>
+                <UiIcon name={iWon ? 'Crown' : 'Trophy'} size={20} color="#1F1B16" strokeWidth={2} />
+              </Animated.View>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <T style={styles.revealEyebrow}>CÔNG BỐ KẾT QUẢ</T>
+                <T numberOfLines={2} style={styles.revealModalHeadline}>
+                  {view.wordPairReveal?.winnerHeadline ?? 'Ván đấu kết thúc'}
+                </T>
+              </View>
+            </View>
+            <View style={styles.modalRightGroup}>
+              {view.phaseEndsAt !== null && (
+                <T style={[styles.tabularTimer, sec <= 5 && { color: GD.danger }]}>{sec}s</T>
+              )}
+              <Pressable
+                testID="gd-reveal-minimize"
+                accessibilityRole="button"
+                onPress={() => {
+                  play('pop');
+                  onMinimize();
+                }}
+                hitSlop={6}
+                style={({ pressed }) => [styles.quietActionBtn, pressed && styles.pressedSoft]}
+              >
+                <T style={styles.quietActionTxt}>Xem chat</T>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.revealProgressTrack}>
+            <View style={[styles.revealProgressFill, { width: `${pct * 100}%` }]} />
+          </View>
+
+          <View style={styles.revealModalBody}>
+            {/* Vinh danh người chiến thắng */}
+            {winners.length > 0 && (
+              <View testID="gd-reveal-winners" style={styles.winnerSpotlightBox}>
+                <T style={styles.winnerSpotlightLabel}>
+                  Người chiến thắng ({winners.length})
+                </T>
+                <View style={styles.winnerChipsWrap}>
+                  {winners.map((w) => {
+                    const seatNo = seatIndexMap.get(w.id);
+                    const pl = playerMap.get(w.id);
+                    const isMe = w.id === me;
+                    return (
+                      <View
+                        key={w.id}
+                        style={[styles.winnerChip, isMe && styles.winnerChipMe]}
+                      >
+                        <Portrait p={portraitSrc(pl, seatNo)} size={24} border={1} />
+                        <T numberOfLines={1} style={styles.winnerChipName}>
+                          {seatNo !== undefined ? `#${seatNo} ` : ''}
+                          {w.name}
+                          {isMe ? ' (Bạn)' : ''}
+                        </T>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Cặp từ khóa Dân thường vs Gián điệp */}
+            <View style={styles.revealWordCompareRow}>
+              <View style={[styles.revealWordCard, { backgroundColor: GD.positiveSoft, borderColor: GD.positiveBorder }]}>
+                <T style={[styles.revealWordRole, { color: GD.positive }]}>Dân thường</T>
+                <T style={styles.revealWordVal}>{view.wordPairReveal?.wordA ?? '---'}</T>
+              </View>
+              <View style={[styles.revealWordCard, { backgroundColor: GD.accentSoft, borderColor: GD.accentBorder }]}>
+                <T style={[styles.revealWordRole, { color: GD.accent }]}>Gián điệp</T>
+                <T style={styles.revealWordVal}>{view.wordPairReveal?.wordB ?? '---'}</T>
+              </View>
+            </View>
+
+            {/* Từ khóa & vai trò của từng người chơi */}
+            <ScrollView
+              style={{ maxHeight: listMaxHeight }}
+              contentContainerStyle={{ gap: 6, paddingVertical: 2 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {revealed.map((item, idx) => {
+                const pl = playerMap.get(item.id);
+                const rMeta = GIAN_DIEP_ROLE_META[item.role];
+                const isSpy = item.role === 'giandiep';
+                const isWhite = item.role === 'mrwhite';
+                const isWinner = winSet.has(item.id);
+                return (
+                  <View
+                    key={item.id}
+                    testID={`gd-reveal-${item.id}`}
+                    style={[
+                      styles.revealPlayerRow,
+                      isWinner && styles.revealPlayerRowWin,
+                      isSpy && !isWinner && { borderColor: GD.accentBorder, backgroundColor: '#FFFBEB' },
+                    ]}
+                  >
+                    <T style={styles.seatTabular}>#{idx + 1}</T>
+                    <Portrait p={portraitSrc(pl, idx + 1)} size={30} border={1} />
+                    <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <T numberOfLines={1} style={styles.revealPlayerName}>
+                          {item.name}{item.id === me ? ' (Bạn)' : ''}
+                        </T>
+                        {isWinner && (
+                          <View style={styles.winMiniBadge}>
+                            <T style={styles.winMiniBadgeTxt}>Thắng</T>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.revealPlayerRoleRow}>
+                        <View
+                          style={[
+                            styles.revealRoleDot,
+                            { backgroundColor: isSpy ? GD.accent : isWhite ? GD.textMuted : GD.positive },
+                          ]}
+                        />
+                        <T style={styles.revealPlayerRoleTxt}>{rMeta.name}</T>
+                      </View>
+                    </View>
+                    <View style={styles.revealWordSlip}>
+                      <T style={styles.revealWordSlipTxt}>{item.word ?? 'Không có từ'}</T>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <Pressable
+              testID="gd-finish-reveal-btn"
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => {
+                play('pop');
+                onContinue();
+              }}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                pressed && !busy && styles.pressedBtn,
+                busy && styles.btnDisabled,
+              ]}
+            >
+              <T style={styles.primaryBtnTxt}>Sang bảng tổng kết ({sec}s)</T>
+            </Pressable>
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   overlayBackdrop: {
@@ -1112,6 +1490,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     fontFamily: FONT,
+  },
+  charCountPill: {
+    backgroundColor: GD.accentSoft,
+    borderWidth: 1,
+    borderColor: GD.accentBorder,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  charCountTxt: {
+    color: GD.accent,
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   metaMutedTabular: {
     color: GD.textMuted,
@@ -1604,6 +1997,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: FONT,
   },
+  confirmActionBtn: {
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: GD.positive,
+    borderWidth: 1,
+    borderColor: GD.positive,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  confirmActionBtnDone: {
+    backgroundColor: GD.positiveSoft,
+    borderColor: GD.positiveBorder,
+  },
+  confirmActionTxt: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
   tieRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1614,5 +2030,216 @@ const styles = StyleSheet.create({
     borderColor: GD.hairline,
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+
+  /* ---- Celebratory End-of-Game Reveal Modal ---- */
+  revealAuraWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revealHaloRing: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    bottom: -6,
+    left: -6,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(254, 243, 199, 0.22)',
+  },
+  revealModalCard: {
+    width: '100%',
+    backgroundColor: GD.card,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    overflow: 'hidden',
+  },
+  revealTopRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(245, 158, 11, 0.28)',
+  },
+  revealHeaderMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  revealTrophyHalo: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  revealEyebrow: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: GD.accent,
+    fontFamily: FONT,
+    letterSpacing: 0.4,
+  },
+  revealModalHeadline: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: GD.textPrimary,
+    fontFamily: FONT,
+    lineHeight: 19,
+  },
+  revealProgressTrack: {
+    height: 3,
+    backgroundColor: GD.subtle,
+    width: '100%',
+  },
+  revealProgressFill: {
+    height: '100%',
+    backgroundColor: '#F59E0B',
+  },
+  revealModalBody: {
+    padding: 14,
+    gap: 10,
+  },
+  winnerSpotlightBox: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.42)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  winnerSpotlightLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GD.accent,
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  winnerChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  winnerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    paddingVertical: 3,
+    paddingLeft: 4,
+    paddingRight: 10,
+    maxWidth: '100%',
+  },
+  winnerChipMe: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#B45309',
+  },
+  winnerChipName: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: GD.textPrimary,
+    fontFamily: FONT,
+    flexShrink: 1,
+  },
+  revealWordCompareRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  revealWordCard: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 2,
+  },
+  revealWordRole: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  revealWordVal: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: GD.textPrimary,
+    fontFamily: FONT,
+  },
+  revealPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: GD.raised,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  revealPlayerRowWin: {
+    backgroundColor: '#FFFBEB',
+    borderColor: 'rgba(245, 158, 11, 0.5)',
+  },
+  revealPlayerName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: GD.textPrimary,
+    fontFamily: FONT,
+    flexShrink: 1,
+  },
+  winMiniBadge: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    flexShrink: 0,
+  },
+  winMiniBadgeTxt: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#1F1B16',
+    fontFamily: FONT,
+  },
+  revealPlayerRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  revealRoleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  revealPlayerRoleTxt: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: GD.textSecondary,
+    fontFamily: FONT,
+  },
+  revealWordSlip: {
+    backgroundColor: GD.inkSurface,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 7,
+  },
+  revealWordSlipTxt: {
+    color: GD.textOnInk,
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: FONT,
   },
 });

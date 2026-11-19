@@ -22,6 +22,7 @@ import {
   CounterGuessPopup,
   GD,
   portraitSrc,
+  RevealEndPopup,
   VerdictLivePanel,
   VoteLivePanel,
   WordRevealPopup,
@@ -119,7 +120,7 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
     return res.ok;
   };
 
-  // Chỉ mở DossierModal toàn màn hình cho các pha KHÔNG cho phép chat (`word_reveal`, `clue_summary`, `counter`, xem lại gợi ý).
+  // Chỉ mở DossierModal toàn màn hình cho các pha KHÔNG cho phép chat (`word_reveal`, `clue_summary`, `counter`, `reveal_end`, xem lại gợi ý).
   // Pha `vote` và `final_vote` hiển thị dạng LivePanel không chặn chat phía trên khung chat!
   const isDismissed = dismissedKey === modalKey;
   const activeModalKind:
@@ -127,7 +128,9 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
     | 'word_reveal'
     | 'clue_summary'
     | 'counter'
+    | 'reveal_end'
     | null = (() => {
+    if (view.phase === 'reveal_end' && view.revealedAll && !isDismissed) return 'reveal_end';
     if (view.phase === 'reveal_end') return null;
     if (manualRecapOpen) return 'recap_manual';
     if (view.phase === 'word_reveal' && iAlive && !isDismissed) return 'word_reveal';
@@ -140,6 +143,19 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 
   const overlay = (() => {
     switch (activeModalKind) {
+      case 'reveal_end':
+        return (
+          <RevealEndPopup
+            view={view}
+            clockOffset={game.clockOffset}
+            me={me}
+            busy={busy}
+            playerMap={playerMap}
+            seatIndexMap={seatIndexMap}
+            onContinue={() => void act({ type: 'gd_ready' })}
+            onMinimize={() => setDismissedKey(modalKey)}
+          />
+        );
       case 'recap_manual':
         return (
           <ClueRecapPopup
@@ -330,81 +346,6 @@ const GianDiepBody = memo(function GianDiepBody({
   const defendantSet = useMemo(() => new Set(view.defendants ?? []), [view.defendants]);
   const pct = view.phaseSeconds > 0 ? Math.max(0, Math.min(1, sec / view.phaseSeconds)) : 0;
 
-  // Màn Lật Mở Từ Khóa cuối ván
-  if (view.phase === 'reveal_end' && view.revealedAll) {
-    return (
-      <View style={styles.root}>
-        <View style={styles.revealHeader}>
-          <T style={styles.revealHeadline}>{view.wordPairReveal?.winnerHeadline ?? 'Kết quả ván đấu'}</T>
-          <View style={styles.wordCompareRow}>
-            <View style={[styles.wordCompareCard, { backgroundColor: GD.positiveSoft, borderColor: GD.positiveBorder }]}>
-              <T style={[styles.wordCompareRole, { color: GD.positive }]}>Dân thường</T>
-              <T style={styles.wordCompareVal}>{view.wordPairReveal?.wordA ?? '---'}</T>
-            </View>
-            <View style={[styles.wordCompareCard, { backgroundColor: GD.accentSoft, borderColor: GD.accentBorder }]}>
-              <T style={[styles.wordCompareRole, { color: GD.accent }]}>Gián điệp</T>
-              <T style={styles.wordCompareVal}>{view.wordPairReveal?.wordB ?? '---'}</T>
-            </View>
-          </View>
-          <View style={styles.revealTrack}>
-            <View style={[styles.revealTrackFill, { width: `${pct * 100}%` }]} />
-          </View>
-        </View>
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.revealList} showsVerticalScrollIndicator={false}>
-          {view.revealedAll.map((item, idx) => {
-            const pl = playerMap.get(item.id);
-            const rMeta = GIAN_DIEP_ROLE_META[item.role];
-            const isSpy = item.role === 'giandiep';
-            const isWhite = item.role === 'mrwhite';
-            return (
-              <View
-                key={item.id}
-                testID={`gd-reveal-${item.id}`}
-                style={[
-                  styles.revealRow,
-                  isSpy && { borderColor: GD.accentBorder, backgroundColor: '#FFFBEB' },
-                  isWhite && { borderColor: GD.hairlineStrong },
-                ]}
-              >
-                <T style={styles.revealSeat}>#{idx + 1}</T>
-                <Portrait p={portraitSrc(pl, idx + 1)} size={32} border={1} />
-                <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                  <T numberOfLines={1} style={styles.revealName}>{item.name}</T>
-                  <View style={styles.revealRoleRow}>
-                    <View
-                      style={[
-                        styles.roleDot,
-                        { backgroundColor: isSpy ? GD.accent : isWhite ? GD.textMuted : GD.positive },
-                      ]}
-                    />
-                    <T style={styles.revealRoleTxt}>{rMeta.name}</T>
-                  </View>
-                </View>
-                <View style={styles.revealWordSlip}>
-                  <T style={styles.revealWordTxt}>{item.word ?? 'Không có từ'}</T>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        <Pressable
-          testID="gd-finish-reveal-btn"
-          accessibilityRole="button"
-          disabled={busy}
-          onPress={() => {
-            play('pop');
-            void act({ type: 'gd_ready' });
-          }}
-          style={({ pressed }) => [styles.primaryDockBtn, pressed && styles.pressedBtn, busy && { opacity: 0.5 }]}
-        >
-          <T style={styles.primaryDockBtnTxt}>Sang bảng tổng kết</T>
-        </Pressable>
-      </View>
-    );
-  }
-
   const wordLabel =
     view.myRole === 'mrwhite'
       ? 'Mr. White'
@@ -551,6 +492,7 @@ const GianDiepBody = memo(function GianDiepBody({
           voteTally={voteTally}
           latestClueByPlayer={latestClueByPlayer}
           onVote={(target) => void act({ type: 'gd_vote', target })}
+          onConfirm={() => void act({ type: 'gd_ready' })}
           onToggleCollapse={onTogglePanel}
         />
       )}
@@ -568,6 +510,7 @@ const GianDiepBody = memo(function GianDiepBody({
           voteTally={voteTally}
           latestClueByPlayer={latestClueByPlayer}
           onVerdict={(verdict) => void act({ type: 'gd_verdict', verdict })}
+          onConfirm={() => void act({ type: 'gd_ready' })}
           onToggleCollapse={onTogglePanel}
         />
       )}
@@ -587,6 +530,70 @@ const GianDiepBody = memo(function GianDiepBody({
             </View>
           )}
           {timeline.map((item) => {
+            if (item.kind === 'elimination') {
+              const pid = item.playerId ?? '';
+              const seatNo = pid ? seatIndexMap.get(pid) : undefined;
+              const pl = pid ? playerMap.get(pid) : undefined;
+              const avatarData = portraitSrc(pl, seatNo);
+              const elimRole = item.role ?? 'dan';
+              const tone =
+                elimRole === 'giandiep'
+                  ? {
+                      bg: '#FFFBEB',
+                      border: '#F59E0B',
+                      bar: '#B45309',
+                      badgeBg: '#F59E0B',
+                      badgeTxt: '#1F1B16',
+                      roleLabel: 'Gián điệp',
+                      subColor: '#92400E',
+                      subText: 'Phát hiện Gián điệp · Vào lượt đoán từ',
+                    }
+                  : elimRole === 'mrwhite'
+                    ? {
+                        bg: '#F1F5F9',
+                        border: '#64748B',
+                        bar: '#1F1B16',
+                        badgeBg: '#1F1B16',
+                        badgeTxt: '#FBF9F5',
+                        roleLabel: 'Mr. White',
+                        subColor: '#475569',
+                        subText: 'Phát hiện Mr. White · Vào lượt đoán từ',
+                      }
+                    : {
+                        bg: '#FEF2F2',
+                        border: '#FCA5A5',
+                        bar: '#B91C1C',
+                        badgeBg: '#15803D',
+                        badgeTxt: '#FFFFFF',
+                        roleLabel: 'Dân thường',
+                        subColor: '#991B1B',
+                        subText: 'Loại nhầm người phe Dân thường',
+                      };
+              const targetLabel = `${seatNo !== undefined ? `#${seatNo} ` : ''}${item.name ?? pid}${pid === me ? ' (Bạn)' : ''} đã bị loại`;
+
+              return (
+                <View
+                  key={item.id}
+                  testID={`gd-elim-card-${item.id}`}
+                  style={[
+                    styles.elimBannerCard,
+                    { backgroundColor: tone.bg, borderColor: tone.border, borderLeftColor: tone.bar },
+                  ]}
+                >
+                  <Portrait p={avatarData} size={32} border={1.5} />
+                  <View style={styles.elimBannerContent}>
+                    <View style={styles.elimBannerTopRow}>
+                      <T numberOfLines={1} style={styles.elimBannerTitle}>{targetLabel}</T>
+                      <View style={[styles.elimRoleBadge, { backgroundColor: tone.badgeBg }]}>
+                        <T style={[styles.elimRoleBadgeTxt, { color: tone.badgeTxt }]}>{tone.roleLabel}</T>
+                      </View>
+                    </View>
+                    <T style={[styles.elimBannerSub, { color: tone.subColor }]}>{tone.subText}</T>
+                  </View>
+                </View>
+              );
+            }
+
             if (item.kind === 'system') {
               return (
                 <View key={item.id} style={styles.sysRow}>
@@ -761,7 +768,24 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
     setPhaseKey(curPhaseKey);
   }
 
-  if (view.phase === 'reveal_end') return null;
+  if (view.phase === 'reveal_end') {
+    if (!isDismissed) return null;
+    return (
+      <View style={styles.dock}>
+        <Pressable
+          testID="gd-reopen-reveal-btn"
+          accessibilityRole="button"
+          onPress={() => {
+            play('pop');
+            onReopenModal();
+          }}
+          style={({ pressed }) => [styles.primaryDockBtn, pressed && styles.pressedBtn]}
+        >
+          <T style={styles.primaryDockBtnTxt}>Mở công bố kết quả ({sec}s)</T>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (view.phase === 'mrwhite_guess' || view.phase === 'spy_guess') {
     if (view.mrWhiteId === me) {
@@ -1010,9 +1034,9 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
           <UiIcon name="Send" size={16} color={chatReady ? GD.textOnInk : GD.textMuted} strokeWidth={1.75} />
         </Pressable>
 
-        {view.phase === 'discussion' && !kbOpen && (
+        {(view.phase === 'discussion' || (view.phase === 'defense' && !iAmDefendant)) && !kbOpen && (
           <Pressable
-            testID="gd-ready-btn"
+            testID={view.phase === 'defense' ? 'gd-defense-skip' : 'gd-ready-btn'}
             accessibilityRole="button"
             disabled={busy || myReady}
             onPress={() => {
@@ -1027,7 +1051,11 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
             ]}
           >
             <T style={[styles.voteSkipReadyTxt, myReady && { color: '#FFFFFF' }]}>
-              Vote {view.readySkip.length}/{needReady}
+              {view.phase === 'defense'
+                ? myReady
+                  ? `Đã qua ${view.readySkip.length}/${needReady}`
+                  : `Bỏ qua ${view.readySkip.length}/${needReady}`
+                : `Vote ${view.readySkip.length}/${needReady}`}
             </T>
           </Pressable>
         )}
@@ -1206,6 +1234,53 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: FONT,
     textAlign: 'center',
+  },
+
+  elimBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  elimBannerContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  elimBannerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  elimBannerTitle: {
+    flexShrink: 1,
+    minWidth: 0,
+    color: GD.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  elimRoleBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  elimRoleBadgeTxt: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  elimBannerSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: FONT,
   },
 
   statementCard: {
@@ -1526,68 +1601,6 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
 
-  revealHeader: {
-    backgroundColor: GD.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GD.hairline,
-    padding: 14,
-    gap: 10,
-  },
-  revealHeadline: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: GD.textPrimary,
-    fontFamily: FONT,
-  },
-  wordCompareRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  wordCompareCard: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  wordCompareRole: {
-    fontSize: 11.5,
-    fontWeight: '500',
-    fontFamily: FONT,
-  },
-  wordCompareVal: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: GD.textPrimary,
-    fontFamily: FONT,
-  },
-  revealTrack: {
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: GD.subtle,
-    overflow: 'hidden',
-  },
-  revealTrackFill: {
-    height: '100%',
-    backgroundColor: GD.accent,
-  },
-  revealList: {
-    gap: 6,
-    paddingVertical: 2,
-  },
-  revealRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: GD.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: GD.hairline,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
   revealSeat: {
     color: GD.textMuted,
     fontSize: 12,
@@ -1599,34 +1612,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '600',
     color: GD.textPrimary,
-    fontFamily: FONT,
-  },
-  revealRoleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  roleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  revealRoleTxt: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: GD.textSecondary,
-    fontFamily: FONT,
-  },
-  revealWordSlip: {
-    backgroundColor: GD.inkSurface,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  revealWordTxt: {
-    color: GD.textOnInk,
-    fontSize: 12.5,
-    fontWeight: '500',
     fontFamily: FONT,
   },
 });

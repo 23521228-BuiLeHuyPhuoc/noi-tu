@@ -4,15 +4,18 @@
 
 export type VeDoanPhase = 'pick_word' | 'drawing' | 'round_end';
 
-export type VeDoanTool = 'pen' | 'eraser' | 'fill' | 'line' | 'rect' | 'circle';
-export const VE_DOAN_TOOLS: readonly VeDoanTool[] = ['pen', 'fill', 'eraser', 'line', 'rect', 'circle'];
+export type VeDoanTool = 'pen' | 'spray' | 'fill' | 'eraser' | 'line' | 'rect' | 'circle';
+export const VE_DOAN_TOOLS: readonly VeDoanTool[] = ['pen', 'spray', 'fill', 'eraser', 'line', 'rect', 'circle'];
 
 export interface VeDoanStroke {
+  id?: number;
   tool?: VeDoanTool;
   color: string;
   width: number;
   /** Tọa độ chuẩn hóa [0..1000, 0..1000] */
   points: [number, number][];
+  /** Seed ngẫu nhiên tất định cho bình xịt sơn (chỉ có khi tool === 'spray') */
+  seed?: number;
   /** Đường SVG path được dựng từ thuật toán Flood-Fill 2D (chỉ có khi tool === 'fill') */
   fillPath?: string;
 }
@@ -40,6 +43,8 @@ export interface VeDoanView {
   scores: Record<string, number>;
   strokes: VeDoanStroke[];
   maskedWord: string;
+  /** Danh sách từng tiếng đã che của từ khóa (giúp hiển thị khoảng cách tách tiếng rõ ràng) */
+  maskedWords?: string[];
   wordLength: number;
   guessedIds: string[];
   feed: VeDoanGuessEntry[];
@@ -187,6 +192,7 @@ export function computeFloodFillPath(
   for (const s of strokes) {
     if (!s.points.length) continue;
     const tool = s.tool ?? 'pen';
+    if (tool === 'spray') continue;
     if (tool === 'fill') {
       const [px, py] = s.points[0];
       const gx = Math.max(0, Math.min(G - 1, Math.floor((px / 1000) * G)));
@@ -1105,3 +1111,362 @@ export const VE_DOAN_WORDS: string[] = Array.from(
     ),
   ),
 );
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Sinh các hạt sơn tất định `[x, y, r]` trong không gian `0..1000` từ một nét bình xịt `spray`. */
+export function generateSprayDots(stroke: VeDoanStroke): [number, number, number][] {
+  if (!stroke.points.length) return [];
+  const w = stroke.width || 9;
+  const R = w <= 4 ? 22 : w <= 9 ? 38 : 58;
+  const perPt = w <= 4 ? 12 : w <= 9 ? 18 : 26;
+  const maxDotR = w <= 4 ? 1.8 : 2.8;
+  const rng = mulberry32(stroke.seed ?? 1337);
+  const pts = stroke.points.slice(0, 160);
+  const dots: [number, number, number][] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const [px, py] = pts[i];
+    for (let k = 0; k < perPt; k++) {
+      const ang = rng() * Math.PI * 2;
+      const dist = R * Math.sqrt(rng()) * (0.35 + 0.65 * rng());
+      const dx = Math.max(2, Math.min(998, Math.round((px + Math.cos(ang) * dist) * 10) / 10));
+      const dy = Math.max(2, Math.min(998, Math.round((py + Math.sin(ang) * dist) * 10) / 10));
+      const r = Math.round((1.6 + rng() * maxDotR) * 10) / 10;
+      dots.push([dx, dy, r]);
+    }
+  }
+  return dots;
+}
+
+/** Biên dịch nét bình xịt `spray` thành một chuỗi SVG `<path d="...">` nhẹ và đồng bộ Web/Native. */
+export function sprayStrokeToPath(stroke: VeDoanStroke): string {
+  const dots = generateSprayDots(stroke);
+  if (!dots.length) return '';
+  return dots
+    .map(([x, y, r]) => {
+      const startX = Math.round((x - r) * 10) / 10;
+      const d = Math.round(r * 2 * 10) / 10;
+      return `M${startX} ${y}a${r} ${r} 0 1 0 ${d} 0a${r} ${r} 0 1 0 ${-d} 0`;
+    })
+    .join('');
+}
+
+function pointToSegDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.0001) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function hitFloodFillPath(fillPath: string, x: number, y: number): boolean {
+  if (!fillPath) return false;
+  if (fillPath === 'M0 0H1000V1000H0Z') {
+    return x >= 0 && x <= 1000 && y >= 0 && y <= 1000;
+  }
+  const re = /M(\d+)\s+(\d+)h(\d+)v(\d+)h-\d+z/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(fillPath)) !== null) {
+    const rx = Number(m[1]);
+    const ry = Number(m[2]);
+    const rw = Number(m[3]);
+    const rh = Number(m[4]);
+    if (x >= rx - 2 && x <= rx + rw + 2 && y >= ry - 2 && y <= ry + rh + 2) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Tìm nét hoặc vùng tô (line, rect, circle, pen, spray, fill) nằm dưới điểm `(x, y)` từ trên xuống dưới.
+ * Bỏ qua nét tẩy pixel (`eraser`) để thao tác tẩy đối tượng đánh trúng thẳng nét/vùng sơn bên dưới.
+ */
+export function findHitStrokeIndex(
+  strokes: readonly VeDoanStroke[],
+  x: number,
+  y: number,
+  hitRadius = 18,
+): number {
+  for (let i = strokes.length - 1; i >= 0; i--) {
+    const s = strokes[i];
+    if (!s.points.length) continue;
+    const tool = s.tool ?? 'pen';
+    if (tool === 'eraser') continue;
+
+    if (tool === 'fill') {
+      const pathStr = s.fillPath || computeFloodFillPath(strokes.slice(0, i), s.points[0][0], s.points[0][1]);
+      if (hitFloodFillPath(pathStr, x, y)) return i;
+      continue;
+    }
+
+    if (tool === 'spray') {
+      const w = s.width || 9;
+      const sprayRad = (w <= 4 ? 22 : w <= 9 ? 38 : 58) + hitRadius * 0.4;
+      if (s.points.length === 1) {
+        if (Math.hypot(x - s.points[0][0], y - s.points[0][1]) <= sprayRad) return i;
+      } else {
+        for (let k = 0; k < s.points.length - 1; k++) {
+          if (pointToSegDist(x, y, s.points[k][0], s.points[k][1], s.points[k + 1][0], s.points[k + 1][1]) <= sprayRad) {
+            return i;
+          }
+        }
+      }
+      continue;
+    }
+
+    const thresh = hitRadius + Math.max(6, (s.width || 9) * 0.65);
+    if (s.points.length === 1) {
+      if (Math.hypot(x - s.points[0][0], y - s.points[0][1]) <= thresh) return i;
+      continue;
+    }
+    for (let k = 0; k < s.points.length - 1; k++) {
+      if (pointToSegDist(x, y, s.points[k][0], s.points[k][1], s.points[k + 1][0], s.points[k + 1][1]) <= thresh) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+function stripVdAccents(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+}
+
+function normVdBase(s: string): string {
+  return s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const VD_SYNONYMS_ACC: readonly [string, string][] = [
+  ['xe hơi', 'ô tô'],
+  ['xe ô tô', 'ô tô'],
+  ['bánh pizza', 'pizza'],
+  ['ti vi', 'tivi'],
+  ['tv', 'tivi'],
+  ['ba lô', 'balo'],
+  ['va li', 'vali'],
+  ['cafe', 'cà phê'],
+  ['bánh mỳ', 'bánh mì'],
+  ['mỳ tôm', 'mì tôm'],
+  ['nón', 'mũ'],
+  ['muỗng', 'thìa'],
+  ['ô che mưa', 'dù'],
+  ['cây dù', 'dù'],
+  ['cái dù', 'dù'],
+  ['cây ô', 'dù'],
+  ['cái ô', 'dù'],
+];
+
+const VD_SYNONYMS_NOACC: readonly [string, string][] = [
+  ['xe hoi', 'o to'],
+  ['xe o to', 'o to'],
+  ['banh pizza', 'pizza'],
+  ['ti vi', 'tivi'],
+  ['tv', 'tivi'],
+  ['ba lo', 'balo'],
+  ['va li', 'vali'],
+  ['cafe', 'ca phe'],
+  ['banh my', 'banh mi'],
+  ['my tom', 'mi tom'],
+  ['non', 'mu'],
+  ['muong', 'thia'],
+  ['o che mua', 'du'],
+  ['cay du', 'du'],
+  ['cai du', 'du'],
+  ['cay o', 'du'],
+  ['cai o', 'du'],
+];
+
+function replaceVdPhrases(s: string, pairs: readonly [string, string][]): string {
+  let padded = ` ${s} `;
+  for (const [from, to] of pairs) {
+    padded = padded.split(` ${from} `).join(` ${to} `);
+  }
+  return padded.replace(/\s+/g, ' ').trim();
+}
+
+function applyVdSynonymsAccented(s: string): string {
+  return replaceVdPhrases(s, VD_SYNONYMS_ACC);
+}
+
+function applyVdSynonymsNoAccents(s: string): string {
+  return replaceVdPhrases(s, VD_SYNONYMS_NOACC);
+}
+
+const SIMPLE_CLASSIFIERS_ACC = new Set([
+  'quả', 'cái', 'chiếc', 'đôi', 'quyển', 'cuốn', 'củ', 'ly', 'cốc',
+  'thanh', 'ngọn', 'đám', 'hòn', 'dòng', 'khu', 'cơn', 'vầng',
+]);
+const SIMPLE_CLASSIFIERS_NOACC = new Set([
+  'qua', 'cai', 'chiec', 'doi', 'quyen', 'cuon', 'cu', 'ly', 'coc',
+  'thanh', 'ngon', 'dam', 'hon', 'dong', 'khu', 'con', 'vang',
+]);
+const AMBIGUOUS_TREES_ACC = new Set(['dừa', 'chuối', 'tre', 'thông', 'phong']);
+const AMBIGUOUS_TREES_NOACC = new Set(['dua', 'chuoi', 'tre', 'thong', 'phong']);
+
+function stripVdClassifiers(
+  tokens: string[],
+  fromGuess: boolean,
+  accented: boolean,
+): string[] {
+  const cur = [...tokens];
+  const simple = accented ? SIMPLE_CLASSIFIERS_ACC : SIMPLE_CLASSIFIERS_NOACC;
+  const trees = accented ? AMBIGUOUS_TREES_ACC : AMBIGUOUS_TREES_NOACC;
+  const wCon = 'con';
+  const wTrai = accented ? 'trái' : 'trai';
+  const wCay = accented ? 'cây' : 'cay';
+  const wDan = accented ? 'đàn' : 'dan';
+  const wChim = 'chim';
+  const wBong = accented ? 'bông' : 'bong';
+  const wHoa = 'hoa';
+  const wCuc = accented ? 'cục' : 'cuc';
+  const wChu = accented ? 'chú' : 'chu';
+  const wMot = accented ? 'một' : 'mot';
+
+  // Bỏ tối đa 1 từ số đếm "một" ở đầu câu đoán (vd: "một con mèo" -> "con mèo")
+  if (fromGuess && cur.length > 1 && cur[0] === wMot) {
+    cur.shift();
+  }
+  // Cụm 2 từ "cây đàn" (vd: "cây đàn guitar" -> "guitar")
+  if (cur.length >= 3 && cur[0] === wCay && cur[1] === wDan) {
+    cur.splice(0, 2);
+    return cur;
+  }
+  if (cur.length <= 1) return cur;
+
+  const head = cur[0];
+  const rest = cur.slice(1);
+  const restJoined = rest.join(' ');
+
+  if (head === wCon) {
+    if (restJoined === 'dấu' || restJoined === 'dau' || restJoined === 'quay') return cur;
+    cur.shift();
+    return cur;
+  }
+  if (head === wTrai) {
+    if (restJoined === 'đất' || restJoined === 'dat' || restJoined === 'tim') return cur;
+    cur.shift();
+    return cur;
+  }
+  if (head === wCay) {
+    if ((rest.length === 1 && trees.has(rest[0])) || restJoined === 'lau nhà' || restJoined === 'lau nha') {
+      return cur;
+    }
+    cur.shift();
+    return cur;
+  }
+  if (head === wDan && (restJoined === 'guitar' || restJoined === 'piano')) {
+    cur.shift();
+    return cur;
+  }
+  if (head === wChim && rest.length >= 2) {
+    cur.shift();
+    return cur;
+  }
+  if (head === wBong && restJoined === wHoa) {
+    cur.shift();
+    return cur;
+  }
+  if (head === wCuc && (restJoined === 'pin' || restJoined === 'sạc' || restJoined === 'sac' || restJoined === 'tẩy' || restJoined === 'tay')) {
+    cur.shift();
+    return cur;
+  }
+  if (head === wChu && rest.length >= 2) {
+    cur.shift();
+    return cur;
+  }
+  if (simple.has(head)) {
+    cur.shift();
+  }
+  return cur;
+}
+
+function vdLevenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i - 1;
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+/**
+ * So khớp từ đoán Vẽ & Đoán dựa theo từ khóa cốt lõi:
+ * - Bỏ qua tiền tố loại từ ("quả bóng đá" <-> "bóng đá", "con chó" <-> "chó"), đồng thời từ chối đoán bare ("con", "quả", "diều" với "diều giấy").
+ * - Chấp nhận gõ không dấu toàn phần ("bong da" -> "quả bóng đá"), nhưng chặn sai dấu thanh rõ ràng ("bò" không trúng "quả bơ").
+ */
+export function matchVeDoanGuess(
+  guess: string,
+  secretWord: string,
+): { hit: boolean; close: boolean; accentHint: boolean } {
+  const gNorm = normVdBase(guess);
+  const tNorm = normVdBase(secretWord);
+  if (!gNorm || !tNorm) return { hit: false, close: false, accentHint: false };
+
+  const gAccFull = applyVdSynonymsAccented(gNorm);
+  const tAccFull = applyVdSynonymsAccented(tNorm);
+  const gNoAccFull = applyVdSynonymsNoAccents(stripVdAccents(gNorm));
+  const tNoAccFull = applyVdSynonymsNoAccents(stripVdAccents(tNorm));
+  const guessHasNoAccents = gNorm === stripVdAccents(gNorm);
+
+  // 1. Khớp chính xác nguyên cụm trước khi tách loại từ (đảm bảo mọi từ trong bộ đều tự khớp chính nó)
+  if (gAccFull === tAccFull) {
+    return { hit: true, close: false, accentHint: false };
+  }
+  if (guessHasNoAccents && gNoAccFull === tNoAccFull) {
+    return { hit: true, close: false, accentHint: false };
+  }
+
+  const gAccTokens = gAccFull.split(' ').filter(Boolean);
+  const tAccTokens = tAccFull.split(' ').filter(Boolean);
+  const gNoAccTokens = gNoAccFull.split(' ').filter(Boolean);
+  const tNoAccTokens = tNoAccFull.split(' ').filter(Boolean);
+
+  if (gAccTokens.length > tAccTokens.length + 2) {
+    return { hit: false, close: false, accentHint: false };
+  }
+
+  const gCoreAcc = stripVdClassifiers(gAccTokens, true, true);
+  const gCoreNoAcc = stripVdClassifiers(gNoAccTokens, true, false);
+  const tCoreAcc = stripVdClassifiers(tAccTokens, false, true);
+  const tCoreNoAcc = stripVdClassifiers(tNoAccTokens, false, false);
+
+  // 2. Khớp lõi có dấu sau khi bỏ loại từ
+  if (gCoreAcc.join(' ') === tCoreAcc.join(' ')) {
+    return { hit: true, close: false, accentHint: false };
+  }
+
+  // 3. Người chơi gõ hoàn toàn không dấu -> chấp nhận khớp lõi không dấu
+  if (guessHasNoAccents && gCoreNoAcc.join(' ') === tCoreNoAcc.join(' ')) {
+    return { hit: true, close: false, accentHint: false };
+  }
+
+  // 4. Có gõ dấu nhưng sai thanh/vần (vd: "bò" vs "quả bơ", "chợ" vs "con chó") -> không tính đúng, báo gợi ý nhẹ
+  if (gCoreNoAcc.join(' ') === tCoreNoAcc.join(' ')) {
+    return { hit: false, close: true, accentHint: true };
+  }
+
+  // 5. Lệch tối đa 1 ký tự với cụm từ >= 4 ký tự không dấu
+  const gStr = gCoreNoAcc.join(' ');
+  const tStr = tCoreNoAcc.join(' ');
+  const close = tStr.length >= 4 && vdLevenshtein(gStr, tStr) <= 1;
+  return { hit: false, close, accentHint: false };
+}

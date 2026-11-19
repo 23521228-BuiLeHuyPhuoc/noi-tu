@@ -2,6 +2,7 @@ import {
   BOT_SKETCHES,
   computeFloodFillPath,
   getBotSketch,
+  matchVeDoanGuess,
   VE_DOAN_COLORS,
   VE_DOAN_TOOLS,
   VE_DOAN_WIDTHS,
@@ -21,29 +22,8 @@ const DEFAULT_SEC: Record<VeDoanPhase, number> = {
   round_end: 4,
 };
 
-function stripAccents(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-}
-
 function normGuess(s: string): string {
   return s.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function levenshtein(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let prev = i - 1;
-    dp[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const tmp = dp[j];
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
-      prev = tmp;
-    }
-  }
-  return dp[b.length];
 }
 
 export class VeDoanGame implements GameEngine {
@@ -68,6 +48,8 @@ export class VeDoanGame implements GameEngine {
   private usedWords = new Set<string>();
   private revealedIdx = new Set<number>();
   private strokes: VeDoanStroke[] = [];
+  private strokeSeq = 0;
+  private undoStack: VeDoanStroke[][] = [];
   private botTargetSketch: VeDoanStroke[] = [];
   private guessed = new Set<string>();
   private feed: VeDoanGuessEntry[] = [];
@@ -125,6 +107,11 @@ export class VeDoanGame implements GameEngine {
     return 420;
   }
 
+  private pushUndo(): void {
+    this.undoStack.push([...this.strokes]);
+    if (this.undoStack.length > 40) this.undoStack.shift();
+  }
+
   private scheduleNextBotStroke(): void {
     this.botDrawTimer.clear();
     if (this.finished || this.phase !== 'drawing' || !this.ctx.isBot?.(this.drawerId)) return;
@@ -135,7 +122,7 @@ export class VeDoanGame implements GameEngine {
       const next = this.botTargetSketch[this.strokes.length];
       if (!next || this.strokes.length >= 80) return;
       if (!this.strokes.some((s) => this.isSameStroke(s, next))) {
-        this.strokes.push(next);
+        this.strokes.push({ ...next, id: ++this.strokeSeq });
       }
       this.scheduleNextBotStroke();
       this.ctx.changed();
@@ -176,6 +163,8 @@ export class VeDoanGame implements GameEngine {
     this.round = Math.floor(this.turnIndex / this.order.length) + 1;
     this.drawerId = this.order[this.turnIndex % this.order.length];
     this.strokes = [];
+    this.strokeSeq = 0;
+    this.undoStack = [];
     this.botTargetSketch = [];
     this.guessed.clear();
     this.revealedIdx.clear();
@@ -198,7 +187,9 @@ export class VeDoanGame implements GameEngine {
     this.usedWords.add(word);
     this.revealedIdx.clear();
     this.strokes = [];
-    this.botTargetSketch = getBotSketch(word).map((s) => this.sanitizeStroke(s));
+    this.strokeSeq = 0;
+    this.undoStack = [];
+    this.botTargetSketch = getBotSketch(word).map((s) => this.sanitizeStroke(s, [], false));
     this.guessed.clear();
     this.enterPhase('drawing', () => this.endTurn());
 
@@ -259,18 +250,39 @@ export class VeDoanGame implements GameEngine {
     });
   }
 
+  private buildMaskedWords(): string[] {
+    if (!this.secretWord) return [];
+    const chars = [...this.secretWord];
+    const out: string[] = [];
+    let cur: string[] = [];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      if (ch === ' ') {
+        if (cur.length > 0) {
+          out.push(cur.join(' '));
+          cur = [];
+        }
+      } else {
+        cur.push(this.revealedIdx.has(i) ? ch.toUpperCase() : '_');
+      }
+    }
+    if (cur.length > 0) out.push(cur.join(' '));
+    return out;
+  }
+
   private buildMaskedWord(): string {
-    if (!this.secretWord) return '';
-    return [...this.secretWord]
-      .map((ch, idx) => (ch === ' ' ? '  ' : this.revealedIdx.has(idx) ? ch.toUpperCase() : '_'))
-      .join(' ');
+    return this.buildMaskedWords().join('\u00A0\u00A0\u00A0');
   }
 
   private clampPt(v: number): number {
     return Math.max(0, Math.min(1000, Math.round(Number.isFinite(v) ? v : 0)));
   }
 
-  private sanitizeStroke(raw: VeDoanStroke, existingStrokes: readonly VeDoanStroke[] = []): VeDoanStroke {
+  private sanitizeStroke(
+    raw: VeDoanStroke,
+    existingStrokes: readonly VeDoanStroke[] = [],
+    assignId = true,
+  ): VeDoanStroke {
     const tool: VeDoanTool =
       raw.tool && (VE_DOAN_TOOLS as readonly string[]).includes(raw.tool) ? raw.tool : 'pen';
     const color = tool === 'eraser'
@@ -284,11 +296,18 @@ export class VeDoanGame implements GameEngine {
       ? raw.width
       : fallbackWidth;
     const points = raw.points.slice(0, 160).map(([x, y]): [number, number] => [this.clampPt(x), this.clampPt(y)]);
+    const idPatch = assignId ? { id: ++this.strokeSeq } : {};
     if (tool === 'fill' && points.length > 0) {
       const fillPath = computeFloodFillPath(existingStrokes, points[0][0], points[0][1]);
-      return { tool, color, width, points: [points[0]], ...(fillPath ? { fillPath } : {}) };
+      return { ...idPatch, tool, color, width, points: [points[0]], ...(fillPath ? { fillPath } : {}) };
     }
-    return { ...(tool !== 'pen' ? { tool } : {}), color, width, points };
+    if (tool === 'spray') {
+      const seed = Number.isFinite(raw.seed)
+        ? Math.max(0, Math.min(999_999, Math.round(raw.seed!)))
+        : Math.floor(this.ctx.rng() * 1_000_000);
+      return { ...idPatch, tool, color, width, points, seed };
+    }
+    return { ...idPatch, ...(tool !== 'pen' ? { tool } : {}), color, width, points };
   }
 
   private isSameStroke(a: VeDoanStroke, b: VeDoanStroke): boolean {
@@ -322,6 +341,7 @@ export class VeDoanGame implements GameEngine {
         this.scheduleNextBotStroke();
         return { ok: true };
       }
+      this.pushUndo();
       this.strokes.push(cleanStroke);
       if (this.ctx.isBot?.(playerId)) {
         this.scheduleNextBotStroke();
@@ -330,17 +350,39 @@ export class VeDoanGame implements GameEngine {
       return { ok: true };
     }
 
+    if (action.type === 'vd_erase_stroke') {
+      if (this.phase !== 'drawing' || playerId !== this.drawerId) return { ok: false, reason: 'not_your_turn' };
+      if (!Array.isArray(action.strokeIds) || action.strokeIds.length === 0) return { ok: false, reason: 'bad_action' };
+      const killSet = new Set(action.strokeIds.filter((n) => Number.isInteger(n)));
+      if (killSet.size === 0) return { ok: false, reason: 'bad_action' };
+      const next = this.strokes.filter((s) => s.id === undefined || !killSet.has(s.id));
+      if (next.length !== this.strokes.length) {
+        this.pushUndo();
+        this.strokes = next;
+        this.ctx.changed();
+      }
+      return { ok: true };
+    }
+
     if (action.type === 'vd_undo') {
       if (this.phase !== 'drawing' || playerId !== this.drawerId) return { ok: false, reason: 'not_your_turn' };
-      if (this.strokes.length > 0) this.strokes.pop();
-      this.ctx.changed();
+      if (this.undoStack.length > 0) {
+        this.strokes = this.undoStack.pop()!;
+        this.ctx.changed();
+      } else if (this.strokes.length > 0) {
+        this.strokes.pop();
+        this.ctx.changed();
+      }
       return { ok: true };
     }
 
     if (action.type === 'vd_clear') {
       if (this.phase !== 'drawing' || playerId !== this.drawerId) return { ok: false, reason: 'not_your_turn' };
-      this.strokes = [];
-      this.ctx.changed();
+      if (this.strokes.length > 0) {
+        this.pushUndo();
+        this.strokes = [];
+        this.ctx.changed();
+      }
       return { ok: true };
     }
 
@@ -351,11 +393,9 @@ export class VeDoanGame implements GameEngine {
       const clean = normGuess(action.text).slice(0, 60);
       if (!clean) return { ok: false, reason: 'bad_action' };
 
-      const target = normGuess(this.secretWord);
-      const exact = clean === target;
-      const noAccentExact = stripAccents(clean) === stripAccents(target);
+      const match = matchVeDoanGuess(clean, this.secretWord);
 
-      if (exact) {
+      if (match.hit) {
         this.guessed.add(playerId);
         const remRatio = this.phaseEndsAt ? Math.max(0, Math.min(1, (this.phaseEndsAt - Date.now()) / this.phaseMs)) : 0;
         const hitRank = this.guessed.size;
@@ -393,14 +433,13 @@ export class VeDoanGame implements GameEngine {
         return { ok: true };
       }
 
-      const close = noAccentExact || levenshtein(stripAccents(clean), stripAccents(target)) <= 1;
       this.feed.push({
         id: ++this.feedSeq,
         playerId,
         name: this.names.get(playerId) ?? playerId,
         // Nếu khớp sát không dấu thì tránh in nguyên chữ có dấu gần giống để giữ kịch tính
-        text: noAccentExact ? '🔥 Suýt trúng rồi (kiểm tra lại dấu tiếng Việt)!' : clean,
-        close,
+        text: match.accentHint ? '🔥 Suýt trúng rồi (kiểm tra lại dấu tiếng Việt)!' : clean,
+        close: match.close,
       });
       if (this.feed.length > 24) this.feed.shift();
       this.ctx.changed();
@@ -483,6 +522,7 @@ export class VeDoanGame implements GameEngine {
       scores: Object.fromEntries(this.scores),
       strokes: [...this.strokes],
       maskedWord: this.buildMaskedWord(),
+      maskedWords: this.buildMaskedWords(),
       wordLength: [...this.secretWord.replace(/\s+/g, '')].length,
       guessedIds: [...this.guessed],
       feed: [...this.feed],

@@ -1015,7 +1015,7 @@ export function ThrowSheet({ game, target, onClose }: { game: Game; target: Publ
         <>
           <View style={styles.secHeadingRow}>
             <UiIcon name="Gift" size={15} color={C.secondary} />
-            <T style={styles.sectionLabel}>Tặng quà Phú Hào (tặng điểm quà & lên VIP)</T>
+            <T style={styles.sectionLabel}>Tặng quà Phú Hào (người nhận hưởng 70% Ruby & điểm quà)</T>
           </View>
           <View style={styles.trolls}>
             {GIFT_IDS.map((id) => {

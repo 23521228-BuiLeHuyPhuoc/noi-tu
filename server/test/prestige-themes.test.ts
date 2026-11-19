@@ -153,6 +153,9 @@ describe('Phase 2 — Cấp VIP Đại Gia, 8 ô trang bị, Map phòng & Kỹ n
     }
     const infoRec = await receiver.emitWithAck('shop:get');
     expect(infoRec.ok).toBe(true);
-    if (infoRec.ok) expect(infoRec.giftPoints).toBe(5000);
+    if (infoRec.ok) {
+      expect(infoRec.giftPoints).toBe(5000);
+      expect(infoRec.ruby).toBe(3500);
+    }
   });
 });

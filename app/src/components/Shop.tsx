@@ -157,7 +157,7 @@ export function ShopPreviewDock({
               accessibilityLabel="Số dư Ruby"
             >
               <RubyIcon size={13} />
-              <T style={styles.dockRubyTxt}>{fmtRuby(user.ruby)}</T>
+              <T style={[styles.dockRubyTxt, user.ruby < 0 && { color: '#FCA5A5' }]}>{fmtRuby(user.ruby)}</T>
             </Pressable>
           )}
           {hasPreview && (
@@ -443,7 +443,7 @@ export function ShopBody({
         <View style={styles.balanceRow}>
           <View style={styles.rubyInline}>
             <RubyIcon size={20} />
-            <T testID="shop-balance" style={styles.balance}>{fmtRuby(ruby)}</T>
+            <T testID="shop-balance" style={[styles.balance, ruby < 0 && { color: C.danger }]}>{fmtRuby(ruby)}</T>
           </View>
           <Button
             testID="shop-topup"
@@ -658,7 +658,7 @@ export function ShopBody({
       {tab === 'gift' && (
         <>
           <T style={styles.note}>
-            15 siêu quà đại gia: chạm avatar bạn bè trong phòng rồi bấm Tặng quà để kích hoạt pháo hoa và điểm VIP.
+            15 siêu quà đại gia: chạm avatar bạn bè trong phòng rồi bấm Tặng quà — người nhận hưởng 70% kim cương và điểm VIP.
           </T>
           {section('gift').map((it) =>
             row(

@@ -24,7 +24,12 @@ import {
 import {
   buildVeDoanShapePoints,
   computeFloodFillPath,
+  findHitStrokeIndex,
+  generateSprayDots,
+  matchVeDoanGuess,
+  sprayStrokeToPath,
   VE_DOAN_TOOLS,
+  VE_DOAN_WORDS,
 } from '../../shared/src/vedoan';
 import type { GameResult, RoomSettings } from '../../shared/src/types';
 import { Dictionary } from '../src/dictionary';
@@ -250,16 +255,27 @@ describe('Phase 40 — Vẽ & Đoán: Flood-Fill 2D, Hình học & Điểm công
     vi.useRealTimers();
   });
 
-  it('đủ 6 công cụ & computeFloodFillPath tô kín đúng miền khép kín mà không tràn ra ngoài', () => {
-    expect(VE_DOAN_TOOLS).toEqual(['pen', 'fill', 'eraser', 'line', 'rect', 'circle']);
+  it('đủ 7 công cụ (gồm Xịt sơn) & computeFloodFillPath tô kín đúng miền khép kín mà không bị xịt sơn cản', () => {
+    expect(VE_DOAN_TOOLS).toEqual(['pen', 'spray', 'fill', 'eraser', 'line', 'rect', 'circle']);
 
     const sq = buildVeDoanShapePoints('rect', [300, 300], [700, 700]);
     expect(sq).toHaveLength(5);
     const circ = buildVeDoanShapePoints('circle', [200, 200], [800, 800]);
     expect(circ.length).toBeGreaterThanOrEqual(24);
 
-    // Click đổ màu vào tâm hình vuông [300..700, 300..700]
-    const fillInside = computeFloodFillPath([{ tool: 'rect', color: '#111827', width: 9, points: sq }], 500, 500);
+    // Bình xịt sơn tất định & không làm cản biên flood-fill
+    const sprayStroke = { tool: 'spray' as const, color: '#1971C2', width: 9, seed: 4242, points: [[500, 500] as [number, number]] };
+    const dots = generateSprayDots(sprayStroke);
+    expect(dots.length).toBe(18);
+    expect(dots).toEqual(generateSprayDots(sprayStroke));
+    expect(sprayStrokeToPath(sprayStroke).startsWith('M')).toBe(true);
+
+    // Click đổ màu vào tâm hình vuông [300..700, 300..700] dù bên trong có vết xịt sơn
+    const fillInside = computeFloodFillPath(
+      [{ tool: 'rect', color: '#111827', width: 9, points: sq }, sprayStroke],
+      500,
+      500,
+    );
     expect(fillInside.startsWith('M')).toBe(true);
     expect(fillInside).not.toBe('M0 0H1000V1000H0Z');
 
@@ -268,7 +284,7 @@ describe('Phase 40 — Vẽ & Đoán: Flood-Fill 2D, Hình học & Điểm công
     expect(fillBlank).toBe('M0 0H1000V1000H0Z');
   });
 
-  it('tính điểm công bằng: Họa sĩ vẽ rõ để đoán sớm nhận thưởng tốc độ + thưởng cả phòng hiểu (120+đ)', () => {
+  it('tính điểm công bằng + maskedWords phân cách từng tiếng rõ + dò từ khóa cốt lõi + bình xịt & tẩy nét/vùng sơn', () => {
     vi.useFakeTimers();
     const { ctx } = makeCtx(() => 0.1, { veDoanRounds: 1 }, 5000);
     const g = new VeDoanGame(ctx);
@@ -277,15 +293,66 @@ describe('Phase 40 — Vẽ & Đoán: Flood-Fill 2D, Hình học & Điểm công
     const word = g.view('p0').wordOptions![0];
     expect(g.action('p0', { type: 'vd_pick', word }).ok).toBe(true);
 
-    // Họa sĩ vẽ hình chữ nhật + đổ màu + dùng tẩy
-    expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'rect', color: '#111827', width: 9, points: buildVeDoanShapePoints('rect', [250, 250], [750, 750]) } }).ok).toBe(true);
+    const vPick = g.view('p1');
+    const expectedParts = word.split(' ').map((tok) => Array.from(tok).map(() => '_').join(' '));
+    expect(vPick.maskedWords).toEqual(expectedParts);
+
+    // Họa sĩ vẽ hình chữ nhật + đường thẳng + đổ màu + xịt sơn + dùng tẩy pixel
+    const rectPts = buildVeDoanShapePoints('rect', [250, 250], [750, 750]);
+    expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'rect', color: '#111827', width: 9, points: rectPts } }).ok).toBe(true);
+    expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'line', color: '#1971C2', width: 9, points: [[100, 100], [900, 100]] } }).ok).toBe(true);
     expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'fill', color: '#E03131', width: 9, points: [[500, 500]] } }).ok).toBe(true);
+    expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'spray', color: '#2F9E44', width: 16, seed: 777, points: [[180, 820]] } }).ok).toBe(true);
     expect(g.action('p0', { type: 'vd_stroke', stroke: { tool: 'eraser', color: '#FFFFFF', width: 22, points: [[450, 450], [550, 550]] } }).ok).toBe(true);
 
     const viewAfterFill = g.view('p1');
-    expect(viewAfterFill.strokes).toHaveLength(3);
-    expect(viewAfterFill.strokes[1].fillPath).toBeTruthy();
-    expect(viewAfterFill.strokes[2].color).toBe('#FFFFFF');
+    expect(viewAfterFill.strokes).toHaveLength(5);
+    expect(viewAfterFill.strokes[2].fillPath).toBeTruthy();
+    expect(viewAfterFill.strokes[3].seed).toBe(777);
+    expect(viewAfterFill.strokes[4].color).toBe('#FFFFFF');
+
+    // Chế độ tẩy nét / vùng sơn: hit-test giữa đường thẳng -> xóa cả đường thẳng; hit-test giữa vùng đổ màu -> xóa cả vùng sơn; undo khôi phục lại
+    const hitLineIdx = findHitStrokeIndex(viewAfterFill.strokes, 500, 100);
+    expect(hitLineIdx).toBe(1);
+    const hitFillIdx = findHitStrokeIndex(viewAfterFill.strokes, 490, 490);
+    expect(hitFillIdx).toBe(2);
+    const hitSprayIdx = findHitStrokeIndex(viewAfterFill.strokes, 185, 825);
+    expect(hitSprayIdx).toBe(3);
+
+    const lineId = viewAfterFill.strokes[hitLineIdx].id!;
+    const fillId = viewAfterFill.strokes[hitFillIdx].id!;
+    expect(g.action('p0', { type: 'vd_erase_stroke', strokeIds: [lineId] })).toEqual({ ok: true });
+    expect(g.view('p1').strokes.some((s) => s.id === lineId)).toBe(false);
+    expect(g.action('p0', { type: 'vd_erase_stroke', strokeIds: [fillId] })).toEqual({ ok: true });
+    expect(g.view('p1').strokes.some((s) => s.id === fillId)).toBe(false);
+    expect(g.action('p0', { type: 'vd_undo' })).toEqual({ ok: true });
+    expect(g.view('p1').strokes.some((s) => s.id === fillId)).toBe(true);
+
+    // Kiểm tra matchVeDoanGuess trên toàn bộ kho từ + case thực tế
+    const bare = ['con', 'quả', 'trái', 'cái', 'chiếc', 'chim'];
+    for (const w of VE_DOAN_WORDS) {
+      expect(matchVeDoanGuess(w, w).hit).toBe(true);
+      if (w.includes(' ')) {
+        for (const b of bare) expect(matchVeDoanGuess(b, w).hit).toBe(false);
+      }
+    }
+    expect(matchVeDoanGuess('bóng đá', 'quả bóng đá').hit).toBe(true);
+    expect(matchVeDoanGuess('bong da', 'quả bóng đá').hit).toBe(true);
+    expect(matchVeDoanGuess('bóng', 'quả bóng đá').hit).toBe(false);
+    expect(matchVeDoanGuess('diều', 'diều giấy').hit).toBe(false);
+    expect(matchVeDoanGuess('diều giấy', 'diều giấy').hit).toBe(true);
+    expect(matchVeDoanGuess('chó', 'con chó').hit).toBe(true);
+    expect(matchVeDoanGuess('con', 'con chó').hit).toBe(false);
+    expect(matchVeDoanGuess('bò', 'quả bơ')).toEqual({ hit: false, close: true, accentHint: true });
+    expect(matchVeDoanGuess('dừa', 'cây dừa').hit).toBe(false);
+    expect(matchVeDoanGuess('dừa', 'quả dừa').hit).toBe(true);
+    expect(matchVeDoanGuess('guitar', 'cây đàn guitar').hit).toBe(true);
+    expect(matchVeDoanGuess('xe ô tô', 'ô tô').hit).toBe(true);
+    expect(matchVeDoanGuess('pizza', 'bánh pizza').hit).toBe(true);
+    expect(matchVeDoanGuess('dơi', 'con dơi').hit).toBe(true);
+    expect(matchVeDoanGuess('doi', 'con dơi').hit).toBe(true);
+    expect(matchVeDoanGuess('cóc', 'quả cóc').hit).toBe(true);
+    expect(matchVeDoanGuess('coc', 'quả cóc').hit).toBe(true);
 
     // p1 và p2 đều đoán trúng nhanh
     expect(g.action('p1', { type: 'vd_guess', text: word }).ok).toBe(true);
