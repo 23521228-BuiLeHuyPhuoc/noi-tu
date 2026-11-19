@@ -242,7 +242,7 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     g.dispose();
   });
 
-  it('khóa tuyệt đối chat (gd_chat & Room.addChat) khi clue_turn/word_reveal/clue_summary/defense/người bị loại & hỗ trợ nhảy sớm + removePlayer không treo pha', () => {
+  it('khóa tuyệt đối chat khi clue_turn/word_reveal/clue_summary/spy_guess & mở chat suốt discussion/vote/defense/final_vote + removePlayer không treo pha', () => {
     vi.useFakeTimers();
     const dict = new Dictionary(SMALL_WORDS);
     const room = new Room('GDCHAT', dict, { rng: () => 0.9999 });
@@ -307,10 +307,12 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
       });
     }
 
-    // Chuyển sang vote -> bỏ phiếu thiếu 1 người rồi removePlayer / disconnect để kiểm tra không treo pha
+    // Chuyển vote -> chat vẫn mở khi bỏ phiếu
     expect(room.action(h.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
     expect(room.action(p1.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
     expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('vote');
+    expect(room.action(h.playerId, { type: 'gd_chat', text: 'Chot phieu nha' })).toEqual({ ok: true });
+    expect(room.addChat(p1.playerId, 'Dang vote roi')).not.toBeNull();
 
     expect(room.action(h.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
     expect(room.action(p1.playerId, { type: 'gd_vote', target: p2.playerId })).toEqual({ ok: true });
@@ -318,7 +320,16 @@ describe('Phase 50 — Ai Là Gián Điệp V6: thời gian pha kéo dài đủ 
     // p3 rời/mất kết nối khi còn là người cuối chưa vote -> tự chuyển sang defense ngay!
     room.setConnected(p3.playerId, false);
     expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('defense');
-    expect(room.addChat(h.playerId, 'Im lang nghe bien minh')).toBeNull();
+    // Trong defense: cả bị cáo lẫn người khác đều chat được
+    expect(room.addChat(h.playerId, 'Nghe bien minh ne')).not.toBeNull();
+    expect(room.action(p2.playerId, { type: 'gd_chat', text: 'Minh la dan thuong' })).toEqual({ ok: true });
+    expect(room.action(p2.playerId, { type: 'gd_ready' })).toEqual({ ok: true });
+
+    // Trong final_vote: cả bị cáo lẫn cử tri vẫn chat & biện minh bình thường!
+    expect((room.toPublic(h.playerId).game as GianDiepView).phase).toBe('final_vote');
+    expect(room.action(p2.playerId, { type: 'gd_chat', text: 'Dung truc xuat minh ma!' })).toEqual({ ok: true });
+    expect(room.action(h.playerId, { type: 'gd_chat', text: 'De minh xem lai loi khai' })).toEqual({ ok: true });
+    expect(room.addChat(p1.playerId, 'Chot phan quyet')).not.toBeNull();
 
     room.dispose();
   });

@@ -190,6 +190,51 @@ describe('Phase 39 — Ai Là Gián Điệp: Kịch tính nhiều vòng & Phản
     expect(getResult()?.winnerIds).toEqual(['p0']);
     g.dispose();
   });
+
+  it('khi 1 Gián Điệp bị bắt dù vẫn còn Mr. White hoặc Gián Điệp khác sống, vẫn cho phép đoán từ Dân Thường (spy_guess)', () => {
+    vi.useFakeTimers();
+    // Test A: 5 người (3 Dân + 1 Spy p0 + 1 Mr.White p1) -> bắt p0 dù còn p1 sống vẫn vào spy_guess; đoán trật -> sang Vòng 2
+    const { ctx: c1, getResult: r1 } = makeCtx(() => 0.9999, { giandiepMrWhite: true, giandiepSpies: 1 }, 2000);
+    const g1 = new GianDiepGame(c1);
+    g1.start(makePlayers(5));
+    vi.advanceTimersByTime(2100);
+    for (let i = 0; i < 5; i++) g1.action(g1.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý A${i}` });
+    for (const id of ['p0', 'p1', 'p2']) g1.action(id, { type: 'gd_ready' });
+    for (const id of ['p0', 'p1', 'p2']) g1.action(id, { type: 'gd_ready' });
+    for (const id of ['p1', 'p2', 'p3', 'p4']) g1.action(id, { type: 'gd_vote', target: 'p0' });
+    g1.action('p0', { type: 'gd_vote', target: 'p2' });
+    g1.action('p0', { type: 'gd_ready' });
+    for (const id of ['p1', 'p2', 'p3', 'p4']) g1.action(id, { type: 'gd_verdict', verdict: 'banish' });
+
+    expect(g1.view('p0').phase).toBe('spy_guess');
+    expect(g1.view('p1').mrWhiteId).toBe('p0');
+    expect(g1.action('p0', { type: 'gd_guess', word: 'từ đoán sai hoàn toàn' })).toEqual({ ok: true });
+    expect(g1.view('p1').round).toBe(2);
+    expect(g1.view('p1').alive).toContain('p1');
+    expect(r1()).toBeNull();
+    g1.dispose();
+
+    // Test B: 6 người (4 Dân + 2 Spy p0, p1) -> bắt p0 -> p0 vào spy_guess đoán đúng từ Dân -> phe Gián Điệp thắng
+    const { ctx: c2, getResult: r2 } = makeCtx(() => 0.9999, { giandiepMrWhite: false, giandiepSpies: 2 }, 2000);
+    const g2 = new GianDiepGame(c2);
+    g2.start(makePlayers(6));
+    const danWord = g2.view('p2').myWord!;
+    vi.advanceTimersByTime(2100);
+    for (let i = 0; i < 6; i++) g2.action(g2.view().currentSpeakerId!, { type: 'gd_clue', text: `Gợi ý B${i}` });
+    for (const id of ['p0', 'p1', 'p2']) g2.action(id, { type: 'gd_ready' });
+    for (const id of ['p0', 'p1', 'p2']) g2.action(id, { type: 'gd_ready' });
+    for (const id of ['p1', 'p2', 'p3', 'p4', 'p5']) g2.action(id, { type: 'gd_vote', target: 'p0' });
+    g2.action('p0', { type: 'gd_vote', target: 'p2' });
+    g2.action('p0', { type: 'gd_ready' });
+    for (const id of ['p1', 'p2', 'p3', 'p4', 'p5']) g2.action(id, { type: 'gd_verdict', verdict: 'banish' });
+
+    expect(g2.view('p0').phase).toBe('spy_guess');
+    expect(g2.action('p0', { type: 'gd_guess', word: danWord })).toEqual({ ok: true });
+    expect(g2.view('p2').phase).toBe('reveal_end');
+    expect(g2.action('p2', { type: 'gd_ready' })).toEqual({ ok: true });
+    expect(r2()?.winnerIds).toEqual(['p0', 'p1']);
+    g2.dispose();
+  });
 });
 
 describe('Phase 40 — Vẽ & Đoán: Flood-Fill 2D, Hình học & Điểm công bằng Họa sĩ / Người đoán', () => {

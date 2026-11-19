@@ -106,7 +106,12 @@ export class GianDiepGame implements GameEngine {
   }
 
   private isChatAllowedPhase(): boolean {
-    return this.phase === 'discussion' || this.phase === 'vote' || this.phase === 'final_vote';
+    return (
+      this.phase === 'discussion' ||
+      this.phase === 'vote' ||
+      this.phase === 'defense' ||
+      this.phase === 'final_vote'
+    );
   }
 
   canRoomChat(playerId: string): boolean {
@@ -175,7 +180,7 @@ export class GianDiepGame implements GameEngine {
     });
 
     this.pushSystem(
-      `🕵️ Ván bắt đầu! Chủ đề: «${this.pair.category}» (${danCount} Dân · ${spyCount} Gián Điệp${whiteCount ? ' · 1 Mr. White' : ''}) — Loại hết Gián Điệp để thắng!`,
+      `Ván bắt đầu · Chủ đề «${this.pair.category}» (${danCount} Dân · ${spyCount} Gián điệp${whiteCount ? ' · 1 Mr. White' : ''})`,
     );
     this.enterPhase('word_reveal', () => this.startRound());
     this.botReadyTimer.set(Math.min(2000, Math.floor(this.msFor('word_reveal') / 2)), () => {
@@ -211,7 +216,7 @@ export class GianDiepGame implements GameEngine {
     this.defendedIds.clear();
     this.finalVotes.clear();
     this.botChattedRound.clear();
-    this.pushSystem(`🔔 Vòng ${this.round} — Lần lượt từng người khai 1 câu mô tả (tạm khóa chat tới khi khai xong).`);
+    this.pushSystem(`Vòng ${this.round} · Lần lượt khai 1 gợi ý`);
     this.beginSpeakerTurn();
   }
 
@@ -227,7 +232,7 @@ export class GianDiepGame implements GameEngine {
     const speakerId = this.speakerOrder[this.speakerIdx];
     this.enterPhase('clue_turn', () => {
       const name = this.names.get(speakerId) ?? speakerId;
-      const silentText = '🤐 (Im lặng hết giờ)';
+      const silentText = '(Hết giờ chưa khai gợi ý)';
       const now = Date.now();
       this.clues.push({
         id: ++this.clueSeq,
@@ -255,7 +260,6 @@ export class GianDiepGame implements GameEngine {
   private startClueSummary(): void {
     if (this.finished) return;
     this.readySkip.clear();
-    this.pushSystem(`📋 Tổng hợp lời khai Vòng ${this.round} — Đối chiếu toàn bộ gợi ý trước khi thảo luận!`);
     this.enterPhase('clue_summary', () => this.startDiscussion());
     this.botReadyTimer.set(Math.min(2500, Math.floor(this.msFor('clue_summary') / 2)), () => {
       if (!this.finished && this.phase === 'clue_summary') this.ctx.changed();
@@ -266,7 +270,7 @@ export class GianDiepGame implements GameEngine {
   private startDiscussion(): void {
     if (this.finished) return;
     this.readySkip.clear();
-    this.pushSystem(`💬 Thảo luận Vòng ${this.round} — Đối chiếu lời khai ngay trong khung chat!`);
+    this.pushSystem(`Thảo luận Vòng ${this.round}`);
     this.enterPhase('discussion', () => this.startVote());
     this.botReadyTimer.set(Math.min(7200, Math.floor(this.msFor('discussion') * 0.6)), () => {
       if (!this.finished && this.phase === 'discussion') this.ctx.changed();
@@ -277,7 +281,7 @@ export class GianDiepGame implements GameEngine {
   private startVote(): void {
     if (this.finished) return;
     this.votes.clear();
-    this.pushSystem(`🗳️ Bỏ phiếu Vòng ${this.round} — Bảng chọn nghi phạm đã mở! Hãy chọn người đáng ngờ nhất.`);
+    this.pushSystem(`Bỏ phiếu Vòng ${this.round}`);
     this.enterPhase('vote', () => this.resolveVote());
     this.ctx.changed();
   }
@@ -293,7 +297,7 @@ export class GianDiepGame implements GameEngine {
     }
 
     if (tally.size === 0) {
-      this.pushSystem('🏳️ Không ai nhận phiếu bầu — chuyển sang vòng tiếp theo!');
+      this.pushSystem('Không ai nhận phiếu — sang vòng tiếp theo');
       this.round++;
       this.startRound();
       return;
@@ -301,7 +305,7 @@ export class GianDiepGame implements GameEngine {
 
     const max = Math.max(...tally.values());
     if (max <= skips) {
-      this.pushSystem(`🏳️ Phiếu trắng áp đảo (${skips} phiếu) — không ai bị đưa lên biện minh!`);
+      this.pushSystem(`Phiếu trắng áp đảo (${skips} phiếu) — sang vòng tiếp theo`);
       this.round++;
       this.startRound();
       return;
@@ -316,7 +320,7 @@ export class GianDiepGame implements GameEngine {
     this.defendedIds.clear();
     this.readySkip.clear();
     const names = top.map((id) => this.seatTag(id)).join(', ');
-    this.pushSystem(`⚖️ ${names} bị nghi ngờ cao nhất (${max} phiếu) — bước vào Pha Biện Minh!`);
+    this.pushSystem(`${names} nhận ${max} phiếu — vào biện minh`);
     this.enterPhase('defense', () => this.startFinalVote());
     this.botReadyTimer.set(Math.min(4700, Math.floor(this.msFor('defense') * 0.5)), () => {
       if (!this.finished && this.phase === 'defense') this.ctx.changed();
@@ -334,10 +338,10 @@ export class GianDiepGame implements GameEngine {
     }
     this.finalVotes.clear();
     if (this.defendants.length === 1) {
-      this.pushSystem(`🔨 Phán quyết cuối cùng: Trục xuất hay Tha bổng cho ${this.seatTag(this.defendants[0])}?`);
+      this.pushSystem(`Phán quyết cho ${this.seatTag(this.defendants[0])}`);
     } else {
-      const names = this.defendants.map((id) => this.seatTag(id)).join(' vs ');
-      this.pushSystem(`🔨 Bầu chung kết giữa các bị cáo đồng phiếu: ${names}!`);
+      const names = this.defendants.map((id) => this.seatTag(id)).join(' · ');
+      this.pushSystem(`Bầu chung kết: ${names}`);
     }
     this.enterPhase('final_vote', () => this.resolveFinalVote());
     this.ctx.changed();
@@ -367,7 +371,7 @@ export class GianDiepGame implements GameEngine {
         }
         // Nếu người chơi bỏ phiếu Trục xuất >= Tha bổng (hoặc hết giờ không ai ấn Tha bổng khi đã bị vote cao nhất ở vòng trước)
         if (forgiveCount > banishCount) {
-          this.pushSystem(`🕊️ Cả phòng quyết định THA BỔNG cho ${this.seatTag(acc)} (${forgiveCount} tha / ${banishCount} loại)!`);
+          this.pushSystem(`Tha bổng ${this.seatTag(acc)} (${forgiveCount} tha · ${banishCount} loại)`);
         } else {
           banished = acc;
         }
@@ -388,7 +392,7 @@ export class GianDiepGame implements GameEngine {
         if (top.length === 1 && max > skips) banished = top[0];
       }
       if (!banished) {
-        this.pushSystem('⚖️ Phán quyết vẫn hòa phiếu — không ai bị trục xuất ở vòng này!');
+        this.pushSystem('Hòa phiếu phán quyết — không ai bị trục xuất');
       }
     }
 
@@ -409,12 +413,12 @@ export class GianDiepGame implements GameEngine {
     const roleMeta = GIAN_DIEP_ROLE_META[role];
     this.alive.delete(chosen);
     this.eliminated.push({ id: chosen, role, round: this.round, word: this.words.get(chosen) ?? null });
-    this.pushSystem(`💥 ${this.seatTag(chosen)} bị trục xuất — Thân phận: ${roleMeta.emoji} ${roleMeta.name}!`);
+    this.pushSystem(`${this.seatTag(chosen)} bị trục xuất · Thân phận: ${roleMeta.name}`);
 
     if (role === 'mrwhite') {
       this.mrWhiteId = chosen;
       this.mrWhiteGuessed = false;
-      this.pushSystem(`🤍 Mr. White ${this.seatTag(chosen)} có ${DEFAULT_SEC.mrwhite_guess} giây đoán từ khóa của Dân Thường để lật kèo!`);
+      this.pushSystem(`Mr. White ${this.seatTag(chosen)} có ${DEFAULT_SEC.mrwhite_guess} giây đoán từ khóa của Dân Thường`);
       this.enterPhase('mrwhite_guess', () => {
         this.mrWhiteId = null;
         if (!this.checkWin()) {
@@ -426,12 +430,11 @@ export class GianDiepGame implements GameEngine {
       return;
     }
 
-    // Nếu Gián Điệp cuối cùng bị bắt khi phe Dân vẫn chưa lộ hết, cho Gián Điệp 15s phản đòn đoán từ khóa phe Dân!
-    const remainingHidden = [...this.alive].filter((id) => this.roles.get(id) !== 'dan');
-    if (role === 'giandiep' && remainingHidden.length === 0) {
+    // Bất kỳ Gián Điệp nào bị bắt đều có quyền đoán từ khóa phe Dân Thường để lật kèo
+    if (role === 'giandiep') {
       this.mrWhiteId = chosen;
       this.mrWhiteGuessed = false;
-      this.pushSystem(`🕵️ Gián Điệp cuối cùng ${this.seatTag(chosen)} bị lộ! Có ${DEFAULT_SEC.spy_guess} giây phản đòn đoán đúng từ Dân Thường để lật kèo!`);
+      this.pushSystem(`Gián Điệp ${this.seatTag(chosen)} bị lộ — có ${DEFAULT_SEC.spy_guess} giây đoán từ khóa của Dân Thường`);
       this.enterPhase('spy_guess', () => {
         this.mrWhiteId = null;
         if (!this.checkWin()) {
@@ -456,7 +459,7 @@ export class GianDiepGame implements GameEngine {
 
     if (hiddenAlive.length === 0) {
       const winners = this.order.filter((id) => this.roles.get(id) === 'dan');
-      this.beginRevealEnd(winners, `🎉 Bắt gọn toàn bộ Gián Điệp! Dân Thường thắng (${this.danWord} / ${this.spyWord})`);
+      this.beginRevealEnd(winners, `Dân Thường thắng (${this.danWord} / ${this.spyWord})`);
       return true;
     }
 
@@ -466,7 +469,7 @@ export class GianDiepGame implements GameEngine {
         const r = this.roles.get(id);
         return r === 'giandiep' || (r === 'mrwhite' && this.alive.has(id));
       });
-      this.beginRevealEnd(winners, `🕵️ Gián Điệp trụ tới vòng cuối thành công! Phe Gián Điệp thắng (${this.spyWord} vs ${this.danWord})`);
+      this.beginRevealEnd(winners, `Phe Gián Điệp thắng (${this.spyWord} / ${this.danWord})`);
       return true;
     }
     return false;
@@ -488,7 +491,7 @@ export class GianDiepGame implements GameEngine {
       wordB: this.spyWord,
       winnerHeadline: headline,
     };
-    this.pushSystem(`🔓 LẬT MỞ TỪ KHÓA: Dân Thường «${this.danWord}» · Gián Điệp «${this.spyWord}»!`);
+    this.pushSystem(`Lật mở từ khóa · Dân Thường «${this.danWord}» · Gián Điệp «${this.spyWord}»`);
 
     // Nếu không còn người thật nào đang kết nối trong phòng (vd chạy bot test hoặc chủ phòng thoát), kết thúc luôn
     const anyHumanAlive = this.order.some((id) => !this.ctx.isBot?.(id) && this.ctx.isConnected(id));
@@ -634,14 +637,18 @@ export class GianDiepGame implements GameEngine {
       const matched =
         normPhrase(guess) === normPhrase(this.danWord) ||
         stripAccents(normPhrase(guess)) === stripAccents(normPhrase(this.danWord));
-      const guiserLabel = role === 'mrwhite' ? '🤍 Mr. White' : '🕵️ Gián Điệp';
+      const guiserLabel = role === 'mrwhite' ? 'Mr. White' : 'Gián Điệp';
       if (matched) {
+        const winners =
+          role === 'mrwhite'
+            ? [playerId]
+            : [playerId, ...this.order.filter((id) => id !== playerId && this.roles.get(id) === 'giandiep')];
         this.beginRevealEnd(
-          [playerId],
-          `${guiserLabel} ${this.names.get(playerId)} đoán trúng "${this.danWord}" và LẬT KÈO THẮNG ĐỘC LẬP!`,
+          winners,
+          `${guiserLabel} ${this.names.get(playerId)} đoán trúng "${this.danWord}" và lật kèo thắng`,
         );
       } else {
-        this.pushSystem(`❌ ${guiserLabel} đoán «${guess}» — trật lất!`);
+        this.pushSystem(`${guiserLabel} đoán «${guess}» chưa chính xác`);
         this.mrWhiteId = null;
         if (!this.checkWin()) {
           this.round++;

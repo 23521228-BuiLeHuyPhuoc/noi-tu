@@ -11,19 +11,52 @@ import {
 } from 'react-native';
 import type { GianDiepView } from '../../../shared/src/giandiep';
 import type { PublicPlayer } from '../../../shared/src/types';
+import type { PortraitSource } from '../avatars';
 import { useKeyboardInset, useSecondsLeft, useStableWindow } from '../hooks';
-import { useSmoothMode } from '../smoothMode';
-import { C, FONT } from '../theme';
-import { Button, T } from '../ui';
+import { play } from '../sound';
+import { FONT } from '../theme';
+import { T } from '../ui';
 import { Portrait } from './Avatar';
-import { EmojiIcon, UiIcon } from './Icons';
+import { UiIcon, type UiIconName } from './Icons';
 
-interface GlowingPopupProps {
+export function portraitSrc(pl?: PublicPlayer, seatNo?: number): PortraitSource {
+  return pl ?? { avatar: seatNo ?? 0 };
+}
+
+/**
+ * Bảng màu & token theo hướng Dossier Giấy Ấm + Mực (unslop):
+ * - Bề mặt trung tính ấm áp, tương phản rõ, loại bỏ neon glow và emoji trang trí.
+ */
+export const GD = {
+  card: '#FDFBF7',
+  feedBg: '#F6F2EA',
+  raised: '#FFFFFF',
+  subtle: '#EFEAE0',
+  inkSurface: '#1F1B16',
+  hairline: 'rgba(31, 27, 22, 0.10)',
+  hairlineStrong: 'rgba(31, 27, 22, 0.18)',
+  textPrimary: '#1F1B16',
+  textSecondary: '#5E554A',
+  textMuted: '#7B7266',
+  textOnInk: '#FBF9F5',
+  textOnInkMuted: 'rgba(251, 249, 245, 0.72)',
+  accent: '#B45309',
+  accentSoft: '#FEF3C7',
+  accentBorder: 'rgba(180, 83, 9, 0.35)',
+  positive: '#15803D',
+  positiveSoft: '#F0FDF4',
+  positiveBorder: 'rgba(21, 128, 61, 0.32)',
+  danger: '#B91C1C',
+  dangerSoft: '#FEF2F2',
+  dangerBorder: 'rgba(185, 28, 28, 0.32)',
+} as const;
+
+const EASE_OUT = Easing.bezier(0.22, 1, 0.36, 1);
+
+interface DossierModalProps {
   testID?: string;
   title: string;
-  emoji: string;
-  accent: string;
-  glowRgba: string;
+  icon: UiIconName;
   endsAt: number | null;
   totalSeconds: number;
   clockOffset: number;
@@ -33,70 +66,37 @@ interface GlowingPopupProps {
   children: ReactNode;
 }
 
-export const GlowingPopup = memo(function GlowingPopup({
+const DossierModal = memo(function DossierModal({
   testID,
   title,
-  emoji,
-  accent,
-  glowRgba,
+  icon,
   endsAt,
   totalSeconds,
   clockOffset,
   onMinimize,
   minimizeTestID,
-  minimizeLabel = 'Xem chat',
+  minimizeLabel = 'Thu gọn',
   children,
-}: GlowingPopupProps) {
-  const [smooth] = useSmoothMode();
+}: DossierModalProps) {
   const { width, height } = useStableWindow();
   const rawKbInset = useKeyboardInset();
   const kbInset = Platform.OS === 'web' ? rawKbInset : 0;
   const sec = useSecondsLeft(endsAt, clockOffset, totalSeconds || 999);
 
-  const [pulse] = useState(() => new Animated.Value(0));
-  const [popIn] = useState(() => new Animated.Value(0));
+  const [enterAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    popIn.setValue(0);
-    Animated.timing(popIn, {
+    enterAnim.setValue(0);
+    Animated.timing(enterAnim, {
       toValue: 1,
-      duration: 210,
-      easing: Easing.out(Easing.back(1.25)),
+      duration: 200,
+      easing: EASE_OUT,
       useNativeDriver: false,
     }).start();
-  }, [popIn]);
+  }, [enterAnim]);
 
-  useEffect(() => {
-    if (smooth) {
-      pulse.setValue(0.65);
-      return;
-    }
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 850,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [pulse, smooth]);
-
-  const auraOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  const auraScale = smooth
-    ? 1
-    : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.992, 1.018] });
-  const cardScale = popIn.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
-  const cardWidth = Math.min(440, Math.max(300, width - 24));
+  const translateY = enterAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  const cardWidth = Math.min(420, Math.max(300, width - 24));
   const usableHeight = Math.max(260, height - kbInset - 28);
 
   return (
@@ -104,75 +104,58 @@ export const GlowingPopup = memo(function GlowingPopup({
       testID={testID}
       style={[
         styles.overlayBackdrop,
-        kbInset > 0 && { paddingBottom: 14 + kbInset },
+        kbInset > 0 && { paddingBottom: 16 + kbInset },
       ]}
     >
       <Animated.View
         style={[
-          styles.auraShell,
+          styles.modalCard,
           {
             width: cardWidth,
-            maxHeight: Math.min(620, usableHeight),
-            borderColor: accent,
-            opacity: popIn,
-            transform: [{ scale: cardScale }],
+            maxHeight: Math.min(580, usableHeight),
+            opacity: enterAnim,
+            transform: [{ translateY }],
           },
           Platform.OS === 'web'
-            ? ({
-                boxShadow: `0 0 36px 8px ${glowRgba}, 0 0 14px 2px ${accent}, 0 18px 40px rgba(0,0,0,0.65)`,
-              } as object)
+            ? ({ boxShadow: '0 16px 40px rgba(28, 25, 23, 0.24)' } as object)
             : {
-                shadowColor: accent,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.85,
+                shadowColor: '#1C1917',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.22,
                 shadowRadius: 20,
-                elevation: 18,
+                elevation: 14,
               },
         ]}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.auraHaloRing,
-            {
-              borderColor: accent,
-              opacity: auraOpacity,
-              transform: [{ scale: auraScale }],
-            },
-            Platform.OS === 'web'
-              ? ({
-                  boxShadow: `inset 0 0 22px ${glowRgba}, 0 0 28px 6px ${glowRgba}`,
-                } as object)
-              : null,
-          ]}
-        />
-
-        <View style={styles.cardInner}>
-          <View style={[styles.headerRow, { borderBottomColor: 'rgba(255,255,255,0.12)' }]}>
-            <View style={[styles.headerIconBadge, { backgroundColor: glowRgba, borderColor: accent }]}>
-              <EmojiIcon emoji={emoji} size={18} />
-            </View>
-            <T numberOfLines={1} style={[styles.headerTitle, width < 390 && { fontSize: 13.5 }]}>{title}</T>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleGroup}>
+            <UiIcon name={icon} size={16} color={GD.textSecondary} strokeWidth={1.65} />
+            <T numberOfLines={1} style={styles.modalTitle}>{title}</T>
+          </View>
+          <View style={styles.modalRightGroup}>
             {endsAt !== null && (
-              <View style={[styles.timerPill, sec <= 5 && styles.timerPillUrgent]}>
-                <T style={styles.timerTxt}>{sec}s</T>
-              </View>
+              <T style={[styles.tabularTimer, sec <= 5 && { color: GD.danger }]}>
+                {sec}s
+              </T>
             )}
             {onMinimize && (
               <Pressable
                 testID={minimizeTestID}
-                onPress={onMinimize}
+                accessibilityRole="button"
+                onPress={() => {
+                  play('pop');
+                  onMinimize();
+                }}
                 hitSlop={6}
-                style={({ pressed }) => [styles.minimizeBtn, pressed && { opacity: 0.75 }]}
+                style={({ pressed }) => [styles.quietActionBtn, pressed && styles.pressedSoft]}
               >
-                <UiIcon name="Eye" size={13} color="#E2E8F0" />
-                <T style={styles.minimizeTxt}>{minimizeLabel}</T>
+                <T style={styles.quietActionTxt}>{minimizeLabel}</T>
               </Pressable>
             )}
           </View>
-
-          <View style={styles.body}>{children}</View>
         </View>
+
+        <View style={styles.modalBody}>{children}</View>
       </Animated.View>
     </View>
   );
@@ -200,84 +183,87 @@ export function WordRevealPopup({
   const isWhite = view.myRole === 'mrwhite';
 
   return (
-    <GlowingPopup
+    <DossierModal
       testID="gd-word-reveal-modal"
-      title={`Nhận Từ Khóa · V${view.round}`}
-      emoji="🔐"
-      accent={isWhite ? '#94A3B8' : '#FACC15'}
-      glowRgba={isWhite ? 'rgba(148, 163, 184, 0.45)' : 'rgba(250, 204, 21, 0.55)'}
+      title={`Từ khóa Vòng ${view.round}`}
+      icon="KeyRound"
       endsAt={view.phaseEndsAt}
       totalSeconds={view.phaseSeconds}
       clockOffset={clockOffset}
       onMinimize={onMinimize}
       minimizeLabel="Thu gọn"
     >
-      <View style={styles.metaPillsRow}>
-        <View style={styles.metaChip}>
-          <T style={styles.metaChipTxt}>🏷️ Chủ đề: {view.category}</T>
-        </View>
+      <View style={styles.metaLineWrap}>
+        <T style={styles.metaText}>Chủ đề: {view.category}</T>
         {view.roleSummary && (
-          <View testID="gd-role-summary" style={styles.metaChipIndigo}>
-            <T style={styles.metaChipIndigoTxt}>
-              🧑{view.roleSummary.dan} · 🕵️{view.roleSummary.giandiep}
-              {view.roleSummary.mrwhite > 0 ? ` · 🤍${view.roleSummary.mrwhite}` : ''}
-            </T>
-          </View>
+          <T testID="gd-role-summary" style={styles.metaMutedTabular}>
+            {view.roleSummary.dan} Dân · {view.roleSummary.giandiep} Gián điệp
+            {view.roleSummary.mrwhite > 0 ? ` · ${view.roleSummary.mrwhite} Mr. White` : ''}
+          </T>
         )}
       </View>
 
       <Pressable
+        accessibilityRole="button"
         onPress={() => setShown((v) => !v)}
-        style={[
-          styles.wordShowcase,
-          !shown && { borderColor: '#475569', backgroundColor: '#1E293B' },
+        style={({ pressed }) => [
+          styles.wordSlip,
+          !shown && styles.wordSlipHidden,
+          pressed && styles.pressedSoft,
         ]}
       >
-        <View style={styles.wordShowcaseTop}>
-          <T style={styles.wordShowcaseLabel}>
-            {isWhite ? 'THÂN PHẬN CỦA BẠN' : '🔑 TỪ KHÓA BÍ MẬT CỦA BẠN'}
+        <View style={styles.wordSlipTop}>
+          <T style={styles.wordSlipLabel}>
+            {isWhite ? 'Thân phận của bạn' : 'Từ khóa bí mật'}
           </T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <UiIcon name={shown ? 'Eye' : 'EyeOff'} size={13} color="#CBD5E1" />
-            <T style={styles.wordToggleHint}>{shown ? 'Chạm che' : 'Chạm mở'}</T>
+          <View style={styles.wordSlipToggle}>
+            <UiIcon name={shown ? 'Eye' : 'EyeOff'} size={14} color={GD.textOnInkMuted} strokeWidth={1.6} />
+            <T style={styles.wordSlipToggleTxt}>{shown ? 'Che' : 'Hiện'}</T>
           </View>
         </View>
 
         {shown ? (
-          <T
-            testID="gd-secret-word"
-            style={[
-              styles.wordShowcaseValue,
-              isWhite && { color: '#F1F5F9', fontSize: 22 },
-            ]}
-          >
-            {isWhite ? '🤍 MR. WHITE (Không có từ)' : (view.myWord ?? '---').toUpperCase()}
+          <T testID="gd-secret-word" style={[styles.wordSlipValue, isWhite && { fontSize: 20 }]}>
+            {isWhite ? 'Mr. White (Không có từ)' : (view.myWord ?? '---')}
           </T>
         ) : (
-          <T testID="gd-secret-word" style={styles.wordShowcaseMask}>
-            •••••••••• (Đã che)
+          <T testID="gd-secret-word" style={styles.wordSlipMasked}>
+            ••••••
           </T>
         )}
       </Pressable>
 
-      <T style={styles.popupSubNote}>
+      <T style={styles.helperCopy}>
         {isWhite
-          ? 'Bạn không có từ — lắng nghe gợi ý của mọi người để đoán từ Dân Thường!'
-          : 'Ghi nhớ kỹ từ khóa và KHÔNG nhắc trực tiếp khi khai gợi ý nhé!'}
+          ? 'Bạn chưa có từ khóa. Hãy nghe gợi ý từ mọi người để suy luận từ Dân thường.'
+          : 'Ghi nhớ từ khóa này và không nhắc trực tiếp khi khai gợi ý.'}
       </T>
 
-      <Button
+      <Pressable
         testID="gd-word-ready-btn"
-        variant={myReady ? 'jade' : 'gold'}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy || myReady }}
+        aria-disabled={busy || myReady ? true : undefined}
         disabled={busy || myReady}
-        title={
-          myReady
-            ? `✓ Đã sẵn sàng (${readyCount}/${totalAlive})`
-            : `✓ Đã nhớ từ — Sẵn sàng! (${readyCount}/${totalAlive})`
-        }
-        onPress={onReady}
-      />
-    </GlowingPopup>
+        onPress={() => {
+          play('pop');
+          onReady();
+        }}
+        style={({ pressed }) => [
+          styles.primaryBtn,
+          myReady && styles.primaryBtnDone,
+          pressed && !(busy || myReady) && styles.pressedBtn,
+          busy && styles.btnDisabled,
+        ]}
+      >
+        {myReady && <UiIcon name="Check" size={16} color={GD.textOnInk} strokeWidth={1.8} />}
+        <T style={styles.primaryBtnTxt}>
+          {myReady
+            ? `Đã sẵn sàng (${readyCount}/${totalAlive})`
+            : `Đã nhớ từ · Sẵn sàng (${readyCount}/${totalAlive})`}
+        </T>
+      </Pressable>
+    </DossierModal>
   );
 }
 
@@ -308,59 +294,43 @@ export function ClueRecapPopup({
   const needReady = Math.max(1, Math.ceil(view.alive.length / 2));
 
   return (
-    <GlowingPopup
+    <DossierModal
       testID="gd-clue-recap-modal"
-      title="Tổng Hợp Lời Khai"
-      emoji="📋"
-      accent="#10B981"
-      glowRgba="rgba(16, 185, 129, 0.5)"
+      title={`Lời khai Vòng ${view.round}`}
+      icon="BookOpen"
       endsAt={isPhaseRecap ? view.phaseEndsAt : null}
       totalSeconds={view.phaseSeconds}
       clockOffset={clockOffset}
       onMinimize={onClose}
       minimizeLabel={isPhaseRecap ? 'Thu gọn' : 'Đóng'}
     >
-      <T style={styles.popupSubNote}>
-        Đối chiếu toàn bộ câu gợi ý mọi người vừa khai để tìm ra điểm bất thường:
+      <T style={styles.helperCopy}>
+        Đối chiếu toàn bộ gợi ý vừa khai trước khi mở thảo luận.
       </T>
 
       <ScrollView
-        style={{ maxHeight: Math.min(320, Math.max(170, height * 0.42)) }}
+        style={{ maxHeight: Math.min(300, Math.max(160, height * 0.4)) }}
         contentContainerStyle={styles.recapList}
         showsVerticalScrollIndicator={false}
       >
         {roundClues.length === 0 ? (
-          <T style={styles.emptyRecapTxt}>Chưa có lời khai nào ở vòng này.</T>
+          <T style={styles.emptyRecapTxt}>Chưa có lời khai nào ở vòng này</T>
         ) : (
           roundClues.map((clue) => {
             const seatNo = seatIndexMap.get(clue.playerId);
             const pl = playerMap.get(clue.playerId);
             const isMine = clue.playerId === me;
             return (
-              <View
-                key={clue.id}
-                style={[
-                  styles.recapRow,
-                  isMine && styles.recapRowMine,
-                ]}
-              >
-                {pl ? (
-                  <Portrait p={pl} size={32} border={2} />
-                ) : (
-                  <UiIcon name="User" size={24} color="#94A3B8" />
-                )}
+              <View key={clue.id} style={[styles.recapRow, isMine && styles.recapRowMine]}>
+                <Portrait p={portraitSrc(pl, seatNo)} size={28} border={1} />
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    {seatNo && (
-                      <View style={[styles.miniSeatPill, isMine && { backgroundColor: '#FACC15' }]}>
-                        <T style={[styles.miniSeatTxt, isMine && { color: '#0F172A' }]}>#{seatNo}</T>
-                      </View>
-                    )}
+                  <View style={styles.recapMetaRow}>
+                    {seatNo !== undefined && <T style={styles.seatTabular}>#{seatNo}</T>}
                     <T numberOfLines={1} style={styles.recapName}>
                       {clue.name}{isMine ? ' (Bạn)' : ''}
                     </T>
                   </View>
-                  <T style={styles.recapClueTxt}>«{clue.text}»</T>
+                  <T style={styles.recapClueTxt}>“{clue.text}”</T>
                 </View>
               </View>
             );
@@ -369,354 +339,43 @@ export function ClueRecapPopup({
       </ScrollView>
 
       {isPhaseRecap ? (
-        <Button
+        <Pressable
           testID="gd-recap-ready-btn"
-          variant={myReady ? 'jade' : 'gold'}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy || myReady }}
+          aria-disabled={busy || myReady ? true : undefined}
           disabled={busy || myReady}
-          title={
-            myReady
-              ? `✓ Đã xem xong (${view.readySkip.length}/${needReady})`
-              : `💬 Vào thảo luận! (${view.readySkip.length}/${needReady})`
-          }
-          onPress={onReady}
-        />
-      ) : (
-        <Button
-          variant="paper"
-          title="Đóng bảng lời khai"
-          onPress={onClose}
-        />
-      )}
-    </GlowingPopup>
-  );
-}
-
-export function VotePopup({
-  view,
-  clockOffset,
-  me,
-  busy,
-  playerMap,
-  seatIndexMap,
-  voteTally,
-  latestClueByPlayer,
-  onVote,
-  onMinimize,
-}: {
-  view: GianDiepView;
-  clockOffset: number;
-  me: string;
-  busy: boolean;
-  playerMap: Map<string, PublicPlayer>;
-  seatIndexMap: Map<string, number>;
-  voteTally: Record<string, number>;
-  latestClueByPlayer: Map<string, string>;
-  onVote: (target: string | 'skip') => void;
-  onMinimize: () => void;
-}) {
-  const { width, height } = useStableWindow();
-  const candidates = view.order.filter((id) => id !== me && view.alive.includes(id));
-  const myVote = view.votes[me];
-  const votedCount = view.alive.filter((id) => Boolean(view.votes[id])).length;
-  const cols = width >= 350 ? 2 : 1;
-
-  return (
-    <GlowingPopup
-      testID="gd-vote-modal"
-      title={`Bỏ Phiếu · V${view.round}`}
-      emoji="🗳️"
-      accent="#F59E0B"
-      glowRgba="rgba(245, 158, 11, 0.56)"
-      endsAt={view.phaseEndsAt}
-      totalSeconds={view.phaseSeconds}
-      clockOffset={clockOffset}
-      onMinimize={onMinimize}
-      minimizeTestID="gd-vote-minimize"
-      minimizeLabel="Xem chat"
-    >
-      <View testID="gd-vote-panel" style={{ gap: 8 }}>
-        <T style={styles.popupSubNote}>
-          Chọn nghi phạm đáng ngờ nhất để đưa lên Biện Minh ({votedCount}/{view.alive.length} đã bầu):
-        </T>
-
-        <ScrollView
-          style={{ maxHeight: Math.min(310, Math.max(160, height * 0.4)) }}
-          contentContainerStyle={styles.voteGrid}
-          showsVerticalScrollIndicator={false}
+          onPress={() => {
+            play('pop');
+            onReady();
+          }}
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            myReady && styles.primaryBtnDone,
+            pressed && !(busy || myReady) && styles.pressedBtn,
+            busy && styles.btnDisabled,
+          ]}
         >
-          {candidates.map((id) => {
-            const pl = playerMap.get(id);
-            const seatNo = seatIndexMap.get(id);
-            const votes = voteTally[id] ?? 0;
-            const selected = myVote === id;
-            const clueText = latestClueByPlayer.get(id);
-            return (
-              <Pressable
-                key={id}
-                testID={`gd-vote-pick-${id}`}
-                disabled={busy}
-                onPress={() => onVote(id)}
-                style={({ pressed }) => [
-                  styles.voteCard,
-                  { width: cols === 2 ? '48.5%' : '100%' },
-                  selected && styles.voteCardSelected,
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <View style={styles.voteCardTop}>
-                  {seatNo && (
-                    <View style={styles.miniSeatPill}>
-                      <T style={styles.miniSeatTxt}>#{seatNo}</T>
-                    </View>
-                  )}
-                  {votes > 0 && (
-                    <View style={styles.voteCountBadge}>
-                      <T style={styles.voteCountTxt}>🗳️ {votes}</T>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.voteCardProfile}>
-                  {pl ? (
-                    <Portrait p={pl} size={34} border={2} />
-                  ) : (
-                    <UiIcon name="User" size={26} color="#94A3B8" />
-                  )}
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <T numberOfLines={1} style={[styles.voteCardName, selected && { color: '#FEF08A' }]}>
-                      {view.names[id] ?? id}
-                    </T>
-                    <T numberOfLines={1} style={styles.voteCardStatus}>
-                      {selected ? '✓ Đang chọn' : 'Chạm để bầu'}
-                    </T>
-                  </View>
-                </View>
-
-                {clueText && (
-                  <T numberOfLines={1} style={styles.voteCardClue}>
-                    🎤 «{clueText}»
-                  </T>
-                )}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <Button
-          testID="gd-skip-vote"
-          variant={myVote === 'skip' ? 'gold' : 'paper'}
-          disabled={busy}
-          icon="🏳️"
-          title={myVote === 'skip' ? '✓ Đã chọn Bỏ phiếu trắng' : 'Bỏ phiếu trắng (Chưa loại ai)'}
-          onPress={() => onVote('skip')}
-        />
-      </View>
-    </GlowingPopup>
-  );
-}
-
-export function VerdictPopup({
-  view,
-  clockOffset,
-  me,
-  busy,
-  playerMap,
-  seatIndexMap,
-  voteTally,
-  latestClueByPlayer,
-  onVerdict,
-  onMinimize,
-}: {
-  view: GianDiepView;
-  clockOffset: number;
-  me: string;
-  busy: boolean;
-  playerMap: Map<string, PublicPlayer>;
-  seatIndexMap: Map<string, number>;
-  voteTally: Record<string, number>;
-  latestClueByPlayer: Map<string, string>;
-  onVerdict: (verdict: string) => void;
-  onMinimize: () => void;
-}) {
-  const { height } = useStableWindow();
-  const defs = view.defendants ?? [];
-  const myVerdict = view.finalVotes?.[me];
-  const isSingle = defs.length === 1;
-
-  if (isSingle) {
-    const accId = defs[0];
-    const accName = view.names[accId] ?? accId;
-    const accSeat = seatIndexMap.get(accId);
-    const accPlayer = playerMap.get(accId);
-    const accClue = latestClueByPlayer.get(accId);
-    const latestDef = [...view.timeline]
-      .reverse()
-      .find((m) => m.round === view.round && m.kind === 'defense' && m.playerId === accId)?.text;
-
-    const banishVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'banish').length;
-    const forgiveVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'forgive').length;
-    const isSelfProtected = accId === me && view.alive.length > 2;
-
-    return (
-      <GlowingPopup
-        testID="gd-verdict-modal"
-        title="Phán Quyết Cuối"
-        emoji="🔨"
-        accent="#E11D48"
-        glowRgba="rgba(225, 29, 72, 0.56)"
-        endsAt={view.phaseEndsAt}
-        totalSeconds={view.phaseSeconds}
-        clockOffset={clockOffset}
-        onMinimize={onMinimize}
-        minimizeTestID="gd-verdict-minimize"
-        minimizeLabel="Xem chat"
-      >
-        <View style={styles.defendantSpotlight}>
-          {accPlayer ? (
-            <Portrait p={accPlayer} size={50} border={2} />
-          ) : (
-            <UiIcon name="User" size={34} color="#FCA5A5" />
-          )}
-          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {accSeat && (
-                <View style={[styles.miniSeatPill, { backgroundColor: '#DC2626' }]}>
-                  <T style={styles.miniSeatTxt}>#{accSeat}</T>
-                </View>
-              )}
-              <T numberOfLines={1} style={styles.spotlightName}>{accName}</T>
-            </View>
-            {accClue && (
-              <T numberOfLines={2} style={styles.spotlightQuote}>🎤 Gợi ý: «{accClue}»</T>
-            )}
-            {latestDef && (
-              <T numberOfLines={2} style={[styles.spotlightQuote, { color: '#FECDD3' }]}>
-                ⚖️ Biện minh: «{latestDef}»
-              </T>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.tallyStrip}>
-          <T style={styles.tallyBanish}>👎 Trục xuất: {banishVotes}</T>
-          <T style={styles.tallyDivider}>·</T>
-          <T style={styles.tallyForgive}>👍 Tha bổng: {forgiveVotes}</T>
-        </View>
-
-        {isSelfProtected ? (
-          <View style={styles.waitingBox}>
-            <T style={styles.waitingBoxTxt}>
-              ⚖️ Cả phòng đang bỏ phiếu phán quyết số phận của bạn…
-            </T>
-          </View>
-        ) : (
-          <View style={styles.verdictBtnRow}>
-            <Button
-              testID="gd-verdict-banish"
-              small
-              variant="danger"
-              disabled={busy}
-              icon="👎"
-              title={myVerdict === 'banish' ? '✓ TRỤC XUẤT' : 'TRỤC XUẤT'}
-              onPress={() => onVerdict('banish')}
-              style={[
-                { flex: 1 },
-                myVerdict === 'banish' && styles.selectedActionOutline,
-              ]}
-            />
-            <Button
-              testID="gd-verdict-forgive"
-              small
-              variant="jade"
-              disabled={busy}
-              icon="👍"
-              title={myVerdict === 'forgive' ? '✓ THA BỔNG' : 'THA BỔNG'}
-              onPress={() => onVerdict('forgive')}
-              style={[
-                { flex: 1 },
-                myVerdict === 'forgive' && styles.selectedActionOutline,
-              ]}
-            />
-          </View>
-        )}
-
-        <T style={styles.popupSubNote}>
-          Hết giờ nếu phiếu Tha Bổng không vượt Trục Xuất, {accName} sẽ bị loại!
-        </T>
-      </GlowingPopup>
-    );
-  }
-
-  return (
-    <GlowingPopup
-      testID="gd-verdict-modal"
-      title="Chung Kết Đồng Phiếu"
-      emoji="🔨"
-      accent="#A855F7"
-      glowRgba="rgba(168, 85, 247, 0.56)"
-      endsAt={view.phaseEndsAt}
-      totalSeconds={view.phaseSeconds}
-      clockOffset={clockOffset}
-      onMinimize={onMinimize}
-      minimizeTestID="gd-verdict-minimize"
-      minimizeLabel="Xem chat"
-    >
-      <T style={styles.popupSubNote}>
-        Các nghi phạm có số phiếu bằng nhau! Chọn 1 người để trục xuất hoặc tha cả nhóm:
-      </T>
-
-      <ScrollView
-        style={{ maxHeight: Math.min(260, Math.max(150, height * 0.36)) }}
-        contentContainerStyle={{ gap: 8 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {defs.filter((id) => id !== me).map((id) => {
-          const pl = playerMap.get(id);
-          const seatNo = seatIndexMap.get(id);
-          const votes = voteTally[id] ?? 0;
-          const selected = myVerdict === id;
-          const clueText = latestClueByPlayer.get(id);
-          return (
-            <Pressable
-              key={id}
-              testID={`gd-vote-pick-${id}`}
-              disabled={busy}
-              onPress={() => onVerdict(id)}
-              style={[styles.tieCard, selected && styles.voteCardSelected]}
-            >
-              {pl ? <Portrait p={pl} size={36} border={2} /> : <UiIcon name="User" size={26} color="#94A3B8" />}
-              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {seatNo && (
-                    <View style={styles.miniSeatPill}>
-                      <T style={styles.miniSeatTxt}>#{seatNo}</T>
-                    </View>
-                  )}
-                  <T numberOfLines={1} style={styles.voteCardName}>{view.names[id] ?? id}</T>
-                </View>
-                {clueText && (
-                  <T numberOfLines={1} style={styles.voteCardClue}>🎤 «{clueText}»</T>
-                )}
-              </View>
-              <View style={[styles.voteCountBadge, selected && { backgroundColor: '#FACC15' }]}>
-                <T style={[styles.voteCountTxt, selected && { color: '#0F172A' }]}>
-                  {selected ? '✓ ' : ''}🗳️ {votes}
-                </T>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <Button
-        testID="gd-verdict-skip"
-        variant={myVerdict === 'skip' ? 'gold' : 'paper'}
-        disabled={busy}
-        icon="🏳️"
-        title={myVerdict === 'skip' ? '✓ Đã chọn Tha cả nhóm' : 'Tha bổng tất cả (Phiếu trắng)'}
-        onPress={() => onVerdict('skip')}
-      />
-    </GlowingPopup>
+          {myReady && <UiIcon name="Check" size={16} color={GD.textOnInk} strokeWidth={1.8} />}
+          <T style={styles.primaryBtnTxt}>
+            {myReady
+              ? `Đã xem (${view.readySkip.length}/${needReady})`
+              : `Vào thảo luận (${view.readySkip.length}/${needReady})`}
+          </T>
+        </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            play('pop');
+            onClose();
+          }}
+          style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressedSoft]}
+        >
+          <T style={styles.secondaryBtnTxt}>Đóng bảng lời khai</T>
+        </Pressable>
+      )}
+    </DossierModal>
   );
 }
 
@@ -745,28 +404,24 @@ export function CounterGuessPopup({
   };
 
   return (
-    <GlowingPopup
+    <DossierModal
       testID="gd-counter-modal"
-      title={isSpyCounter ? 'Gián Điệp Phản Đòn!' : 'Mr. White Lật Kèo!'}
-      emoji={isSpyCounter ? '🕵️' : '🤍'}
-      accent="#EA580C"
-      glowRgba="rgba(234, 88, 12, 0.58)"
+      title={isSpyCounter ? 'Gián điệp đoán từ' : 'Mr. White đoán từ'}
+      icon="ShieldAlert"
       endsAt={view.phaseEndsAt}
       totalSeconds={view.phaseSeconds}
       clockOffset={clockOffset}
       onMinimize={onMinimize}
       minimizeTestID="gd-counter-minimize"
-      minimizeLabel="Xem chat"
+      minimizeLabel="Xem gợi ý"
     >
-      <T style={styles.popupSubNote}>
+      <T style={styles.helperCopy}>
         {isSpyCounter
-          ? 'Bạn đã bị lộ! Hãy đoán ĐÚNG TỪ KHÓA của phe Dân Thường để lật kèo thắng độc lập!'
-          : 'Cơ hội cuối! Dựa vào gợi ý vừa nghe, đoán ĐÚNG TỪ KHÓA phe Dân Thường để thắng ngay!'}
+          ? 'Bạn vừa bị lộ. Đoán đúng từ khóa của Dân thường để lật kèo thắng ngay.'
+          : 'Cơ hội cuối cùng. Dựa vào lời khai vừa nghe để đoán từ khóa của Dân thường.'}
       </T>
 
-      <View style={styles.metaChip}>
-        <T style={styles.metaChipTxt}>🏷️ Chủ đề: {view.category}</T>
-      </View>
+      <T style={styles.metaText}>Chủ đề: {view.category}</T>
 
       {err && <T style={styles.counterErr}>{err}</T>}
 
@@ -775,23 +430,489 @@ export function CounterGuessPopup({
         value={val}
         onChangeText={setVal}
         onSubmitEditing={() => void submit()}
-        placeholder="Nhập từ khóa của Dân Thường..."
-        placeholderTextColor="#64748B"
+        placeholder="Nhập từ khóa Dân thường"
+        placeholderTextColor={GD.textMuted}
         maxLength={50}
         style={styles.counterInput}
       />
 
-      <Button
+      <Pressable
         testID="gd-mrwhite-submit"
-        variant="gold"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy || !val.trim() }}
+        aria-disabled={busy || !val.trim() ? true : undefined}
         disabled={busy || !val.trim()}
-        icon="💥"
-        title="CHỐT TỪ LẬT KÈO!"
-        onPress={() => void submit()}
-      />
-    </GlowingPopup>
+        onPress={() => {
+          play('pop');
+          void submit();
+        }}
+        style={({ pressed }) => [
+          styles.primaryBtn,
+          pressed && !(busy || !val.trim()) && styles.pressedBtn,
+          (busy || !val.trim()) && styles.btnDisabled,
+        ]}
+      >
+        <T style={styles.primaryBtnTxt}>Xác nhận từ đoán</T>
+      </Pressable>
+    </DossierModal>
   );
 }
+
+/**
+ * Thẻ Bỏ Phiếu nổi không chặn nền: đặt phía trên khung chat để người chơi vừa chọn nghi phạm vừa nhắn tin trực tiếp.
+ */
+export const VoteLivePanel = memo(function VoteLivePanel({
+  view,
+  sec,
+  me,
+  busy,
+  compact,
+  collapsed,
+  kbOpen,
+  playerMap,
+  seatIndexMap,
+  voteTally,
+  latestClueByPlayer,
+  onVote,
+  onToggleCollapse,
+}: {
+  view: GianDiepView;
+  sec: number;
+  me: string;
+  busy: boolean;
+  compact: boolean;
+  collapsed: boolean;
+  kbOpen: boolean;
+  playerMap: Map<string, PublicPlayer>;
+  seatIndexMap: Map<string, number>;
+  voteTally: Record<string, number>;
+  latestClueByPlayer: Map<string, string>;
+  onVote: (target: string | 'skip') => void;
+  onToggleCollapse: () => void;
+}) {
+  const { width, height } = useStableWindow();
+  const candidates = view.order.filter((id) => id !== me && view.alive.includes(id));
+  const myVote = view.votes[me];
+  const votedCount = view.alive.filter((id) => Boolean(view.votes[id])).length;
+  const cols = width >= 340 ? 2 : 1;
+
+  if (collapsed || kbOpen) {
+    const pickedLabel =
+      myVote === 'skip'
+        ? 'Phiếu trắng'
+        : myVote
+          ? `#${seatIndexMap.get(myVote) ?? '?'} ${view.names[myVote] ?? myVote}`
+          : 'Chưa chọn';
+    return (
+      <Pressable
+        testID="gd-reopen-vote-btn"
+        accessibilityRole="button"
+        onPress={() => {
+          if (!kbOpen) {
+            play('pop');
+            onToggleCollapse();
+          }
+        }}
+        style={({ pressed }) => [styles.dockedBanner, pressed && !kbOpen && styles.pressedSoft]}
+      >
+        <View style={[styles.accentIndicator, { backgroundColor: GD.accent }]} />
+        <T numberOfLines={1} style={styles.dockedBannerTxt}>
+          Bỏ phiếu · {votedCount}/{view.alive.length} đã chọn · {pickedLabel}
+        </T>
+        <T style={styles.tabularTimerSm}>{sec}s</T>
+        {!kbOpen && (
+          <View style={styles.bannerToggleTag}>
+            <UiIcon name="ChevronDown" size={14} color={GD.textSecondary} strokeWidth={1.65} />
+            <T style={styles.bannerToggleTxt}>Mở</T>
+          </View>
+        )}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View testID="gd-vote-modal" style={[styles.liveCard, styles.liveCardElevation]}>
+      <View style={[styles.liveTopHairline, { backgroundColor: GD.accent }]} />
+      <View testID="gd-vote-panel" style={styles.liveCardInner}>
+        <View style={styles.liveHeaderRow}>
+          <View style={styles.liveHeaderLeft}>
+            <UiIcon name="Fingerprint" size={15} color={GD.accent} strokeWidth={1.65} />
+            <T style={styles.liveTitle}>Bỏ phiếu loại</T>
+            <T style={styles.liveCountTabular}>
+              {votedCount}/{view.alive.length}
+            </T>
+          </View>
+          <Pressable
+            testID="gd-vote-minimize"
+            accessibilityRole="button"
+            onPress={() => {
+              play('pop');
+              onToggleCollapse();
+            }}
+            hitSlop={6}
+            style={({ pressed }) => [styles.quietCollapseBtn, pressed && styles.pressedSoft]}
+          >
+            <UiIcon name="ChevronUp" size={14} color={GD.textSecondary} strokeWidth={1.65} />
+            <T style={styles.quietCollapseTxt}>Thu gọn</T>
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={{ maxHeight: compact ? 136 : Math.min(188, height * 0.25) }}
+          contentContainerStyle={styles.voteGrid}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          {candidates.map((id) => {
+            const pl = playerMap.get(id);
+            const seatNo = seatIndexMap.get(id);
+            const votes = voteTally[id] ?? 0;
+            const selected = myVote === id;
+            const clueText = latestClueByPlayer.get(id);
+            return (
+              <Pressable
+                key={id}
+                testID={`gd-vote-pick-${id}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected, disabled: busy }}
+                disabled={busy}
+                onPress={() => {
+                  play('pop');
+                  onVote(id);
+                }}
+                style={({ pressed }) => [
+                  styles.voteTile,
+                  { width: cols === 2 ? '48.8%' : '100%' },
+                  selected && styles.voteTileSelected,
+                  pressed && styles.pressedSoft,
+                ]}
+              >
+                <Portrait p={portraitSrc(pl, seatNo)} size={28} border={1} />
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <View style={styles.voteTileTop}>
+                    {seatNo !== undefined && (
+                      <T style={[styles.seatTabular, selected && { color: GD.accent }]}>#{seatNo}</T>
+                    )}
+                    <T numberOfLines={1} style={[styles.voteTileName, selected && { color: GD.textPrimary }]}>
+                      {view.names[id] ?? id}
+                    </T>
+                    {votes > 0 && (
+                      <T style={[styles.voteCountTabular, selected && { color: GD.accent }]}>
+                        {votes}
+                      </T>
+                    )}
+                  </View>
+                  {clueText ? (
+                    <T numberOfLines={1} style={styles.voteTileClue}>“{clueText}”</T>
+                  ) : (
+                    <T numberOfLines={1} style={styles.voteTileClue}>
+                      {selected ? 'Đang chọn' : 'Chạm để bầu'}
+                    </T>
+                  )}
+                </View>
+                {selected && <UiIcon name="Check" size={14} color={GD.accent} strokeWidth={2} />}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <Pressable
+          testID="gd-skip-vote"
+          accessibilityRole="button"
+          accessibilityState={{ selected: myVote === 'skip', disabled: busy }}
+          disabled={busy}
+          onPress={() => {
+            play('pop');
+            onVote('skip');
+          }}
+          style={({ pressed }) => [
+            styles.skipVoteBtn,
+            myVote === 'skip' && styles.skipVoteBtnSelected,
+            pressed && styles.pressedSoft,
+          ]}
+        >
+          {myVote === 'skip' && <UiIcon name="Check" size={14} color={GD.accent} strokeWidth={1.8} />}
+          <T style={[styles.skipVoteTxt, myVote === 'skip' && { color: GD.accent }]}>
+            {myVote === 'skip' ? 'Đã chọn bỏ phiếu trắng' : 'Bỏ phiếu trắng'}
+          </T>
+        </Pressable>
+      </View>
+    </View>
+  );
+});
+
+/**
+ * Thẻ Phán Quyết Cuối không chặn nền: cho phép bị cáo và cả phòng vừa phán quyết vừa nhắn tin biện minh trực tiếp.
+ */
+export const VerdictLivePanel = memo(function VerdictLivePanel({
+  view,
+  sec,
+  me,
+  busy,
+  collapsed,
+  kbOpen,
+  playerMap,
+  seatIndexMap,
+  voteTally,
+  latestClueByPlayer,
+  onVerdict,
+  onToggleCollapse,
+}: {
+  view: GianDiepView;
+  sec: number;
+  me: string;
+  busy: boolean;
+  collapsed: boolean;
+  kbOpen: boolean;
+  playerMap: Map<string, PublicPlayer>;
+  seatIndexMap: Map<string, number>;
+  voteTally: Record<string, number>;
+  latestClueByPlayer: Map<string, string>;
+  onVerdict: (verdict: string) => void;
+  onToggleCollapse: () => void;
+}) {
+  const { height } = useStableWindow();
+  const defs = view.defendants ?? [];
+  const myVerdict = view.finalVotes?.[me];
+  const isSingle = defs.length === 1;
+
+  const accId = defs[0] ?? '';
+  const accName = view.names[accId] ?? accId;
+  const accSeat = seatIndexMap.get(accId);
+  const banishVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'banish').length;
+  const forgiveVotes = Object.values(view.finalVotes ?? {}).filter((v) => v === 'forgive').length;
+
+  if (collapsed || kbOpen) {
+    return (
+      <Pressable
+        testID="gd-reopen-verdict-btn"
+        accessibilityRole="button"
+        onPress={() => {
+          if (!kbOpen) {
+            play('pop');
+            onToggleCollapse();
+          }
+        }}
+        style={({ pressed }) => [styles.dockedBanner, pressed && !kbOpen && styles.pressedSoft]}
+      >
+        <View style={[styles.accentIndicator, { backgroundColor: GD.danger }]} />
+        <T numberOfLines={1} style={styles.dockedBannerTxt}>
+          {isSingle
+            ? `Phán quyết ${accSeat ? `#${accSeat} ` : ''}${accName} · Loại ${banishVotes} · Tha ${forgiveVotes}`
+            : `Chung kết đồng phiếu (${defs.length} người)`}
+        </T>
+        <T style={styles.tabularTimerSm}>{sec}s</T>
+        {!kbOpen && (
+          <View style={styles.bannerToggleTag}>
+            <UiIcon name="ChevronDown" size={14} color={GD.textSecondary} strokeWidth={1.65} />
+            <T style={styles.bannerToggleTxt}>Mở</T>
+          </View>
+        )}
+      </Pressable>
+    );
+  }
+
+  if (isSingle) {
+    const accPlayer = playerMap.get(accId);
+    const accClue = latestClueByPlayer.get(accId);
+    const latestDef = [...view.timeline]
+      .reverse()
+      .find((m) => m.round === view.round && m.kind === 'defense' && m.playerId === accId)?.text;
+    const isSelfProtected = accId === me && view.alive.length > 2;
+    const quoteText = latestDef ?? accClue;
+
+    return (
+      <View testID="gd-verdict-modal" style={[styles.liveCard, styles.liveCardElevation]}>
+        <View style={[styles.liveTopHairline, { backgroundColor: GD.danger }]} />
+        <View style={styles.liveCardInner}>
+          <View style={styles.liveHeaderRow}>
+            <View style={styles.liveHeaderLeft}>
+              <UiIcon name="ShieldAlert" size={15} color={GD.danger} strokeWidth={1.65} />
+              <T style={styles.liveTitle}>Phán quyết cuối</T>
+              <T style={styles.liveCountTabular}>
+                Loại {banishVotes} · Tha {forgiveVotes}
+              </T>
+            </View>
+            <Pressable
+              testID="gd-verdict-minimize"
+              accessibilityRole="button"
+              onPress={() => {
+                play('pop');
+                onToggleCollapse();
+              }}
+              hitSlop={6}
+              style={({ pressed }) => [styles.quietCollapseBtn, pressed && styles.pressedSoft]}
+            >
+              <UiIcon name="ChevronUp" size={14} color={GD.textSecondary} strokeWidth={1.65} />
+              <T style={styles.quietCollapseTxt}>Thu gọn</T>
+            </Pressable>
+          </View>
+
+          <View style={styles.accusedCompactRow}>
+            <Portrait p={portraitSrc(accPlayer, accSeat)} size={34} border={1} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {accSeat !== undefined && <T style={[styles.seatTabular, { color: GD.danger }]}>#{accSeat}</T>}
+                <T numberOfLines={1} style={styles.accusedName}>{accName}</T>
+              </View>
+              {quoteText && (
+                <T numberOfLines={1} style={styles.accusedQuote}>
+                  {latestDef ? `Biện minh: “${latestDef}”` : `Gợi ý: “${quoteText}”`}
+                </T>
+              )}
+            </View>
+          </View>
+
+          {isSelfProtected ? (
+            <View style={styles.defendantHintBar}>
+              <T style={styles.defendantHintTxt}>
+                Cả phòng đang phán quyết — bạn vẫn có thể nhắn tin biện minh bên dưới
+              </T>
+            </View>
+          ) : (
+            <View style={styles.verdictActionRow}>
+              <Pressable
+                testID="gd-verdict-banish"
+                accessibilityRole="button"
+                accessibilityState={{ selected: myVerdict === 'banish', disabled: busy }}
+                disabled={busy}
+                onPress={() => {
+                  play('pop');
+                  onVerdict('banish');
+                }}
+                style={({ pressed }) => [
+                  styles.verdictChoiceBtn,
+                  styles.verdictBanishIdle,
+                  myVerdict === 'banish' && styles.verdictBanishActive,
+                  pressed && styles.pressedBtn,
+                ]}
+              >
+                {myVerdict === 'banish' && <UiIcon name="Check" size={15} color="#FFFFFF" strokeWidth={2} />}
+                <T style={[styles.verdictChoiceTxt, { color: myVerdict === 'banish' ? '#FFFFFF' : GD.danger }]}>
+                  Trục xuất
+                </T>
+              </Pressable>
+
+              <Pressable
+                testID="gd-verdict-forgive"
+                accessibilityRole="button"
+                accessibilityState={{ selected: myVerdict === 'forgive', disabled: busy }}
+                disabled={busy}
+                onPress={() => {
+                  play('pop');
+                  onVerdict('forgive');
+                }}
+                style={({ pressed }) => [
+                  styles.verdictChoiceBtn,
+                  styles.verdictForgiveIdle,
+                  myVerdict === 'forgive' && styles.verdictForgiveActive,
+                  pressed && styles.pressedBtn,
+                ]}
+              >
+                {myVerdict === 'forgive' && <UiIcon name="Check" size={15} color="#FFFFFF" strokeWidth={2} />}
+                <T style={[styles.verdictChoiceTxt, { color: myVerdict === 'forgive' ? '#FFFFFF' : GD.positive }]}>
+                  Tha bổng
+                </T>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View testID="gd-verdict-modal" style={[styles.liveCard, styles.liveCardElevation]}>
+      <View style={[styles.liveTopHairline, { backgroundColor: GD.danger }]} />
+      <View style={styles.liveCardInner}>
+        <View style={styles.liveHeaderRow}>
+          <View style={styles.liveHeaderLeft}>
+            <UiIcon name="ShieldAlert" size={15} color={GD.danger} strokeWidth={1.65} />
+            <T style={styles.liveTitle}>Chung kết đồng phiếu</T>
+          </View>
+          <Pressable
+            testID="gd-verdict-minimize"
+            accessibilityRole="button"
+            onPress={() => {
+              play('pop');
+              onToggleCollapse();
+            }}
+            hitSlop={6}
+            style={({ pressed }) => [styles.quietCollapseBtn, pressed && styles.pressedSoft]}
+          >
+            <UiIcon name="ChevronUp" size={14} color={GD.textSecondary} strokeWidth={1.65} />
+            <T style={styles.quietCollapseTxt}>Thu gọn</T>
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={{ maxHeight: Math.min(160, height * 0.24) }}
+          contentContainerStyle={{ gap: 6 }}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          {defs.filter((id) => id !== me).map((id) => {
+            const pl = playerMap.get(id);
+            const seatNo = seatIndexMap.get(id);
+            const votes = voteTally[id] ?? 0;
+            const selected = myVerdict === id;
+            const clueText = latestClueByPlayer.get(id);
+            return (
+              <Pressable
+                key={id}
+                testID={`gd-vote-pick-${id}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected, disabled: busy }}
+                disabled={busy}
+                onPress={() => {
+                  play('pop');
+                  onVerdict(id);
+                }}
+                style={({ pressed }) => [
+                  styles.tieRow,
+                  selected && styles.voteTileSelected,
+                  pressed && styles.pressedSoft,
+                ]}
+              >
+                <Portrait p={portraitSrc(pl, seatNo)} size={28} border={1} />
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {seatNo !== undefined && <T style={styles.seatTabular}>#{seatNo}</T>}
+                    <T numberOfLines={1} style={styles.voteTileName}>{view.names[id] ?? id}</T>
+                  </View>
+                  {clueText && <T numberOfLines={1} style={styles.voteTileClue}>“{clueText}”</T>}
+                </View>
+                <T style={[styles.voteCountTabular, selected && { color: GD.accent }]}>
+                  {selected ? `Đã chọn · ${votes}` : `${votes}`}
+                </T>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <Pressable
+          testID="gd-verdict-skip"
+          accessibilityRole="button"
+          accessibilityState={{ selected: myVerdict === 'skip', disabled: busy }}
+          disabled={busy}
+          onPress={() => {
+            play('pop');
+            onVerdict('skip');
+          }}
+          style={({ pressed }) => [
+            styles.skipVoteBtn,
+            myVerdict === 'skip' && styles.skipVoteBtnSelected,
+            pressed && styles.pressedSoft,
+          ]}
+        >
+          <T style={[styles.skipVoteTxt, myVerdict === 'skip' && { color: GD.accent }]}>
+            {myVerdict === 'skip' ? 'Đã chọn tha cả nhóm' : 'Tha bổng tất cả'}
+          </T>
+        </Pressable>
+      </View>
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   overlayBackdrop: {
@@ -801,178 +922,208 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 60,
-    backgroundColor: 'rgba(2, 6, 23, 0.78)',
+    backgroundColor: 'rgba(28, 25, 23, 0.48)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 14,
+    padding: 16,
   },
-  auraShell: {
-    borderRadius: 22,
-    borderWidth: 2,
-    backgroundColor: '#0F172A',
-    position: 'relative',
-  },
-  auraHaloRing: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    bottom: -4,
-    left: -4,
-    borderRadius: 25,
-    borderWidth: 2,
-  },
-  cardInner: {
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
+  modalCard: {
+    backgroundColor: GD.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GD.hairline,
     overflow: 'hidden',
   },
-  headerRow: {
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: GD.hairline,
+  },
+  modalTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    backgroundColor: 'rgba(30, 41, 59, 0.9)',
-  },
-  headerIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
     flex: 1,
-    color: '#F8FAFC',
-    fontSize: 14.5,
-    fontWeight: '900',
+    minWidth: 0,
+  },
+  modalTitle: {
+    color: GD.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
     fontFamily: FONT,
+    flexShrink: 1,
   },
-  timerPill: {
-    backgroundColor: '#1E293B',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#475569',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  timerPillUrgent: {
-    backgroundColor: '#991B1B',
-    borderColor: '#F87171',
-  },
-  timerTxt: {
-    color: '#F8FAFC',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  minimizeBtn: {
+  modalRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
+    gap: 8,
+    flexShrink: 0,
   },
-  minimizeTxt: {
-    color: '#E2E8F0',
-    fontSize: 11,
-    fontWeight: '800',
+  tabularTimer: {
+    color: GD.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
-  body: {
-    padding: 14,
-    gap: 10,
-  },
-  popupSubNote: {
-    color: '#CBD5E1',
+  tabularTimerSm: {
+    color: GD.textSecondary,
     fontSize: 12,
     fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 16.5,
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
-  metaPillsRow: {
+  quietActionBtn: {
+    backgroundColor: GD.subtle,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  quietActionTxt: {
+    color: GD.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+  modalBody: {
+    padding: 16,
+    gap: 12,
+  },
+  metaLineWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  metaChip: {
-    backgroundColor: 'rgba(254, 243, 199, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.35)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'center',
-  },
-  metaChipTxt: {
-    color: '#FDE68A',
-    fontSize: 11.5,
-    fontWeight: '800',
-  },
-  metaChipIndigo: {
-    backgroundColor: 'rgba(99, 102, 241, 0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(165, 180, 252, 0.38)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  metaChipIndigoTxt: {
-    color: '#E0E7FF',
-    fontSize: 11.5,
-    fontWeight: '800',
-  },
-  wordShowcase: {
-    backgroundColor: '#020617',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#FACC15',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  wordShowcaseTop: {
+  metaText: {
+    color: GD.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+  metaMutedTabular: {
+    color: GD.textMuted,
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  wordSlip: {
+    backgroundColor: GD.inkSurface,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  wordSlipHidden: {
+    backgroundColor: '#363029',
+  },
+  wordSlipTop: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  wordShowcaseLabel: {
-    color: '#94A3B8',
-    fontSize: 10.5,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-  },
-  wordToggleHint: {
-    color: '#CBD5E1',
-    fontSize: 10.5,
-    fontWeight: '800',
-  },
-  wordShowcaseValue: {
-    color: '#FDE047',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    textAlign: 'center',
+  wordSlipLabel: {
+    color: GD.textOnInkMuted,
+    fontSize: 12,
+    fontWeight: '500',
     fontFamily: FONT,
   },
-  wordShowcaseMask: {
-    color: '#CBD5E1',
-    fontSize: 17,
-    fontWeight: '800',
+  wordSlipToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  wordSlipToggleTxt: {
+    color: GD.textOnInkMuted,
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: FONT,
+  },
+  wordSlipValue: {
+    color: GD.textOnInk,
+    fontSize: 26,
+    fontWeight: '600',
+    fontFamily: FONT,
+    textAlign: 'center',
+    paddingVertical: 4,
+  },
+  wordSlipMasked: {
+    color: GD.textOnInkMuted,
+    fontSize: 20,
+    fontWeight: '500',
+    letterSpacing: 2,
     paddingVertical: 6,
   },
+  helperCopy: {
+    color: GD.textSecondary,
+    fontSize: 13,
+    fontWeight: '400',
+    fontFamily: FONT,
+    lineHeight: 19,
+  },
+  primaryBtn: {
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: GD.inkSurface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  primaryBtnDone: {
+    backgroundColor: GD.positive,
+  },
+  primaryBtnTxt: {
+    color: GD.textOnInk,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  secondaryBtn: {
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: GD.subtle,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  secondaryBtnTxt: {
+    color: GD.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  pressedBtn: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
+  },
+  pressedSoft: {
+    opacity: 0.78,
+  },
+
   recapList: {
-    gap: 7,
+    gap: 8,
     paddingVertical: 2,
   },
   emptyRecapTxt: {
-    color: '#94A3B8',
-    fontSize: 12.5,
+    color: GD.textMuted,
+    fontSize: 13,
     textAlign: 'center',
     paddingVertical: 16,
   },
@@ -980,190 +1131,326 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#1E293B',
-    borderRadius: 13,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    backgroundColor: GD.raised,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.25)',
+    borderColor: GD.hairline,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   recapRowMine: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+    borderColor: GD.positiveBorder,
+    backgroundColor: GD.positiveSoft,
   },
-  miniSeatPill: {
-    backgroundColor: '#334155',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+  recapMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  miniSeatTxt: {
-    color: '#F8FAFC',
-    fontSize: 10,
-    fontWeight: '900',
+  seatTabular: {
+    color: GD.textMuted,
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
   },
   recapName: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '900',
-    flexShrink: 1,
-  },
-  recapClueTxt: {
-    color: '#6EE7B7',
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 19,
-  },
-  voteGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-  },
-  voteCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-    padding: 9,
-    gap: 5,
-  },
-  voteCardSelected: {
-    borderColor: '#FACC15',
-    borderWidth: 2,
-    backgroundColor: 'rgba(245, 158, 11, 0.22)',
-  },
-  voteCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 18,
-  },
-  voteCountBadge: {
-    backgroundColor: '#78350F',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  voteCountTxt: {
-    color: '#FEF08A',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  voteCardProfile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  voteCardName: {
-    color: '#F8FAFC',
+    color: GD.textSecondary,
     fontSize: 12.5,
-    fontWeight: '900',
-  },
-  voteCardStatus: {
-    color: '#FBBF24',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  voteCardClue: {
-    color: '#CBD5E1',
-    fontSize: 10.5,
     fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  defendantSpotlight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    backgroundColor: 'rgba(225, 29, 72, 0.16)',
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderColor: 'rgba(251, 113, 133, 0.5)',
-    padding: 11,
-  },
-  spotlightName: {
-    color: '#FFF1F2',
-    fontSize: 16,
-    fontWeight: '900',
     fontFamily: FONT,
     flexShrink: 1,
   },
-  spotlightQuote: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
+  recapClueTxt: {
+    color: GD.textPrimary,
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: FONT,
+    lineHeight: 19,
   },
-  tallyStrip: {
+
+  counterErr: {
+    color: GD.danger,
+    fontSize: 12.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+  counterInput: {
+    minWidth: 0,
+    height: 44,
+    backgroundColor: GD.raised,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GD.hairlineStrong,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    fontWeight: '500',
+    color: GD.textPrimary,
+    fontFamily: FONT,
+  },
+
+  /* ---- Non-blocking live panels (Vote & Verdict) ---- */
+  dockedBanner: {
+    height: 40,
+    backgroundColor: GD.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 12,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accentIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
+  dockedBannerTxt: {
+    flex: 1,
+    minWidth: 0,
+    color: GD.textPrimary,
+    fontSize: 12.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+  bannerToggleTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: GD.subtle,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  bannerToggleTxt: {
+    color: GD.textSecondary,
+    fontSize: 11.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+
+  liveCard: {
+    backgroundColor: GD.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GD.hairlineStrong,
+    overflow: 'hidden',
+  },
+  liveCardElevation: Platform.OS === 'web'
+    ? ({ boxShadow: '0 6px 18px rgba(28, 25, 23, 0.08)' } as object)
+    : {
+        shadowColor: '#1C1917',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+  liveTopHairline: {
+    height: 2,
+    width: '100%',
+  },
+  liveCardInner: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  liveHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  liveHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  liveTitle: {
+    color: GD.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  liveCountTabular: {
+    color: GD.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  quietCollapseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: GD.subtle,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  quietCollapseTxt: {
+    color: GD.textSecondary,
+    fontSize: 11.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+
+  voteGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'space-between',
+  },
+  voteTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: GD.raised,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  voteTileSelected: {
+    borderColor: GD.accent,
+    backgroundColor: GD.accentSoft,
+  },
+  voteTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  voteTileName: {
+    flex: 1,
+    minWidth: 0,
+    color: GD.textPrimary,
+    fontSize: 12.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  voteCountTabular: {
+    color: GD.textMuted,
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+    fontVariant: ['tabular-nums'],
+  },
+  voteTileClue: {
+    color: GD.textSecondary,
+    fontSize: 11,
+    fontWeight: '400',
+    fontFamily: FONT,
+  },
+
+  skipVoteBtn: {
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: GD.raised,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  skipVoteBtnSelected: {
+    borderColor: GD.accent,
+    backgroundColor: GD.accentSoft,
+  },
+  skipVoteTxt: {
+    color: GD.textSecondary,
+    fontSize: 12.5,
+    fontWeight: '500',
+    fontFamily: FONT,
+  },
+
+  accusedCompactRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: GD.raised,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  tallyBanish: {
-    color: '#FDA4AF',
-    fontSize: 12.5,
-    fontWeight: '900',
+  accusedName: {
+    color: GD.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: FONT,
+    flexShrink: 1,
   },
-  tallyDivider: {
-    color: '#64748B',
-    fontSize: 13,
-    fontWeight: '900',
+  accusedQuote: {
+    color: GD.textSecondary,
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: FONT,
+    lineHeight: 16,
   },
-  tallyForgive: {
-    color: '#6EE7B7',
-    fontSize: 12.5,
-    fontWeight: '900',
+  defendantHintBar: {
+    backgroundColor: GD.subtle,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  verdictBtnRow: {
+  defendantHintTxt: {
+    color: GD.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: FONT,
+    textAlign: 'center',
+  },
+  verdictActionRow: {
     flexDirection: 'row',
     gap: 8,
   },
-  selectedActionOutline: {
-    borderWidth: 2,
-    borderColor: '#FDE047',
-  },
-  waitingBox: {
-    backgroundColor: 'rgba(30, 41, 59, 0.9)',
-    borderRadius: 12,
-    padding: 12,
+  verdictChoiceBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#475569',
-  },
-  waitingBoxTxt: {
-    color: '#FECDD3',
-    fontSize: 13,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  tieCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#1E293B',
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: 'rgba(168, 85, 247, 0.45)',
-    padding: 10,
+    justifyContent: 'center',
+    gap: 6,
   },
-  counterErr: {
-    color: '#FCA5A5',
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
+  verdictBanishIdle: {
+    backgroundColor: GD.dangerSoft,
+    borderColor: GD.dangerBorder,
   },
-  counterInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: '800',
-    color: C.ink,
+  verdictBanishActive: {
+    backgroundColor: GD.danger,
+    borderColor: GD.danger,
+  },
+  verdictForgiveIdle: {
+    backgroundColor: GD.positiveSoft,
+    borderColor: GD.positiveBorder,
+  },
+  verdictForgiveActive: {
+    backgroundColor: GD.positive,
+    borderColor: GD.positive,
+  },
+  verdictChoiceTxt: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    fontFamily: FONT,
+  },
+  tieRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: GD.raised,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GD.hairline,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
 });
