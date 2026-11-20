@@ -384,10 +384,80 @@ export const POOL_GROUPS: Record<MemePoolKey, readonly MemeGroup[]> = {
   chat_hype: ['chill', 'hype'],
 };
 
+/**
+ * 2 sắc thái: mỗi câu là VUI hoặc BUỒN/TỨC (theo đa số nhãn; hòa thì tính vui).
+ * Hành động hay gặp nào cũng thuộc một trong 2 sắc thái và lấy TOÀN BỘ câu cùng sắc thái của giọng đang nói,
+ * nên các hành động hay gặp gộp lại phủ hết kho câu của từng giọng.
+ */
+export type MemeTone = 'vui' | 'buon';
+const SAD_ANGRY_MOODS: readonly MemeMood[] = [
+  'sad', 'flop', 'broke', 'panic', 'plea', 'out', 'excuse', 'shock', 'danger', 'taunt', 'threat', 'accuse', 'hurry',
+];
+export function toneOfMoods(moods: readonly MemeMood[]): MemeTone {
+  const sad = moods.filter((mood) => SAD_ANGRY_MOODS.includes(mood)).length;
+  return sad > moods.length - sad ? 'buon' : 'vui';
+}
+
+/** Sắc thái của từng hành động. */
+export const POOL_TONE: Record<MemePoolKey, MemeTone> = {
+  welcome: 'vui',
+  turn_move: 'vui',
+  correct: 'vui',
+  wrong: 'buon',
+  win: 'vui',
+  lose: 'buon',
+  money: 'vui',
+  broke: 'buon',
+  gift: 'vui',
+  gift_receive: 'vui',
+  help: 'buon',
+  hurry: 'buon',
+  relief: 'vui',
+  troll: 'buon',
+  vote: 'buon',
+  defense: 'buon',
+  forgive: 'vui',
+  eliminated: 'buon',
+  twist: 'vui',
+  bomb: 'buon',
+  bite: 'buon',
+  shock: 'buon',
+  chat_hype: 'vui',
+};
+
+/**
+ * Hành động hay gặp: mua nhà / thu tiền / đặt cược, gõ từ, tới lượt, nhắn tin / chat, đoán đúng / sai,
+ * thắng / thua mỗi ván, mất tiền, chọc phá. Lấy toàn bộ câu cùng sắc thái; các hành động hiếm vẫn lọc theo nhóm.
+ */
+export const FREQUENT_POOLS: readonly MemePoolKey[] = [
+  'turn_move', 'chat_hype', 'money', 'correct', 'win', 'wrong', 'lose', 'broke', 'troll',
+];
+
+function moodsById(): Map<MemeId, MemeMood[]> {
+  const blocked = new Set<MemeId>(PREVIEW_ONLY_MEMES);
+  const moodsOf = new Map<MemeId, MemeMood[]>();
+  for (const mood of Object.keys(MEME_MOODS) as MemeMood[]) {
+    for (const id of MEME_MOODS[mood]) {
+      if (!blocked.has(id)) moodsOf.set(id, [...(moodsOf.get(id) ?? []), mood]);
+    }
+  }
+  return moodsOf;
+}
+
+/** Sắc thái của từng câu tự phát. */
+export function memeTones(): Map<MemeId, MemeTone> {
+  return new Map([...moodsById()].map(([id, moods]) => [id, toneOfMoods(moods)]));
+}
+
 export function buildMemePools(): Record<MemePoolKey, readonly MemeId[]> {
   const blocked = new Set<MemeId>(PREVIEW_ONLY_MEMES);
+  const tones = memeTones();
   const pools = {} as Record<MemePoolKey, readonly MemeId[]>;
   for (const pool of Object.keys(POOL_GROUPS) as MemePoolKey[]) {
+    if (FREQUENT_POOLS.includes(pool)) {
+      pools[pool] = [...tones].filter(([, tone]) => tone === POOL_TONE[pool]).map(([id]) => id);
+      continue;
+    }
     const ids = new Set<MemeId>();
     for (const group of POOL_GROUPS[pool]) {
       for (const mood of MEME_GROUPS[group].moods) {
@@ -397,4 +467,10 @@ export function buildMemePools(): Record<MemePoolKey, readonly MemeId[]> {
     pools[pool] = [...ids];
   }
   return pools;
+}
+
+/** Toàn bộ câu tự phát (không tính câu chỉ nghe thử). */
+export function autoMemeIds(): MemeId[] {
+  const blocked = new Set<MemeId>(PREVIEW_ONLY_MEMES);
+  return [...new Set(Object.values(MEME_MOODS).flat())].filter((id) => !blocked.has(id));
 }
