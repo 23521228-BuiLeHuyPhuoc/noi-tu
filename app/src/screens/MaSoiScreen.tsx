@@ -188,7 +188,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
   const timerRatio = view.phaseSeconds > 0 ? Math.min(1, secLeft / view.phaseSeconds) : 0;
 
   useOnChange(view.dead.length, (len) => {
-    if (len > 0) playMemePool('eliminated', { cooldownMs: 2000 });
+    if (len > 0) playMemePool('eliminated', { speakerId: view.dead.at(-1)?.id ?? null, cooldownMs: 2000 });
   });
 
   // Reset transient selections & auto-channel switch for Wolves between Night and Day
@@ -199,17 +199,17 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
     setWitchSave(false);
     setWitchPoison(null);
     if (NIGHT_PHASES.has(ph)) {
-      playMemePool('shock', { cooldownMs: 2500 });
+      playMemePool('shock', { speakerId: null, cooldownMs: 2500 });
     } else if (ph.includes('vote')) {
-      playMemePool('vote', { cooldownMs: 1500 });
+      playMemePool('vote', { speakerId: null, cooldownMs: 1500 });
     } else if (ph.includes('defense')) {
-      playMemePool('defense', { cooldownMs: 1500 });
+      playMemePool('defense', { speakerId: null, cooldownMs: 1500 });
     } else if (ph === 'hunter_shot') {
-      playMemePool('twist', { cooldownMs: 1500 });
+      playMemePool('twist', { speakerId: view.hunterId, cooldownMs: 1500 });
     } else {
-      playMemePool('chat_hype', { cooldownMs: 2600 });
+      playMemePool('chat_hype', { speakerId: null, cooldownMs: 2600 });
     }
-    play('pop');
+    play('pop', { speakerId: null });
 
     const nightNow = NIGHT_PHASES.has(ph);
     if (myRole === 'soi' && iAlive) {
@@ -296,24 +296,24 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
       const res = await game.act(payload);
       setBusy(false);
       if (!res.ok) {
-        playMemePool('wrong', { cooldownMs: 1200 });
-        play('error');
+        playMemePool('wrong', { speakerId: me, cooldownMs: 1200 });
+        play('error', { speakerId: me });
         setErr(actionText[res.reason] ?? 'Không thực hiện được');
       } else {
         if (payload.type === 'ms_vote') {
-          playMemePool(payload.target === 'skip' ? 'forgive' : 'vote', { cooldownMs: 1600 });
-          play('stamp');
+          playMemePool(payload.target === 'skip' ? 'forgive' : 'vote', { speakerId: me, cooldownMs: 1600 });
+          play('stamp', { speakerId: me });
         } else if (payload.type === 'ms_hunter') {
-          playMemePool(payload.target === 'skip' ? 'forgive' : 'bomb', { cooldownMs: 1200 });
-          play(payload.target === 'skip' ? 'pop' : 'boom');
+          playMemePool(payload.target === 'skip' ? 'forgive' : 'bomb', { speakerId: me, cooldownMs: 1200 });
+          play(payload.target === 'skip' ? 'pop' : 'boom', { speakerId: me });
         } else if (payload.type === 'ms_night') {
-          playMemePool('twist', { cooldownMs: 2000 });
-          play('stamp');
+          playMemePool('twist', { speakerId: me, cooldownMs: 2000 });
+          play('stamp', { speakerId: me });
         } else if (payload.type === 'ms_wolfChat') {
-          playMemePool('chat_hype', { cooldownMs: 2800 });
-          play('chat');
+          playMemePool('chat_hype', { speakerId: me, cooldownMs: 2800 });
+          play('chat', { speakerId: me });
         } else {
-          play('pop');
+          play('pop', { speakerId: me });
         }
         if (resetSelection) {
           setSelected(null);
@@ -323,7 +323,7 @@ export function MaSoiScreen({ game, room }: { game: Game; room: RoomState }) {
         }
       }
     },
-    [busy, game],
+    [me, busy, game],
   );
 
   const toggleSuspect = (id: string) => {

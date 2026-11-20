@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +22,8 @@ import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
 import { UiIcon } from './src/components/Icons';
 import { shouldPlayBgm } from './src/audioAssets';
-import { playMemePool, setBgmActive } from './src/sound';
+import { MemeSpeakerFocus } from './src/components/MemeSpeakerFocus';
+import { playMemePool, setBgmActive, setRoomVoiceContext, stopMeme } from './src/sound';
 
 // Tách chunk (code-splitting) cho toàn bộ 15 màn chơi để giảm dung lượng JS khởi động trên di động!
 const WordChainScreen = lazy(() =>
@@ -88,6 +89,8 @@ export default function App() {
   const game = useGame();
   const { room } = game;
 
+  useLayoutEffect(() => { setRoomVoiceContext(room, game.me); }, [room, game.me]);
+  useLayoutEffect(() => () => { stopMeme(); setRoomVoiceContext(null, null); }, [room?.code]);
   const bgmOn = shouldPlayBgm(room);
   useEffect(() => {
     setBgmActive(bgmOn);
@@ -101,9 +104,9 @@ export default function App() {
     const prev = prevRoomPhaseRef.current;
     prevRoomPhaseRef.current = { inRoom, phase };
     if ((!prev.inRoom && inRoom) || (prev.phase === 'lobby' && phase === 'playing')) {
-      playMemePool('welcome', { cooldownMs: 1200 });
+      playMemePool('welcome', { cooldownMs: 1200, speakerId: game.me });
     }
-  }, [room]);
+  }, [room, game.me]);
 
   let body;
   if (!room) body = <HomeScreen game={game} />;
@@ -150,6 +153,7 @@ export default function App() {
               >
                 {body}
               </Suspense>
+              <MemeSpeakerFocus />
               <WalletNoticeLayer game={game} />
             </ShakeProvider>
           </FeedProvider>

@@ -13,6 +13,7 @@ export const errorText: Record<ErrorCode, string> = {
   color_taken: 'Màu này đã có người trong phòng chọn rồi.',
   kicked: 'Bạn đã bị chủ phòng mời ra khỏi phòng này.',
   team_full: 'Đội này đã đủ người — hãy chọn đội còn lại nhé.',
+  voice_taken: 'Nhân vật meme này đã có người chọn trước rồi!',
   bad_request: 'Có lỗi xảy ra, thử lại nhé.',
 };
 

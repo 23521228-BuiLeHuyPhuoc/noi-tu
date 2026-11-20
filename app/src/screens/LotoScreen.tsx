@@ -145,20 +145,19 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const [err, setErr] = useState<string | null>(null);
 
   useOnChange(view.currentNum, (num) => {
-    if (num !== null) play('pop');
+    if (num !== null) play('pop', { speakerId: null });
   });
 
   useOnChange(view.waitingIds.length, (len) => {
     if (len > 0) {
-      playMemePool('shock', { cooldownMs: 2000 });
-      play('turn');
+      playMemePool('shock', { speakerId: view.waitingIds.at(-1) ?? null, cooldownMs: 2000 });
+      play('turn', { speakerId: view.waitingIds.at(-1) ?? null });
     }
   });
 
   useOnChange(view.winnerId, (winId) => {
     if (winId) {
-      playMemePool(winId === me ? 'win' : 'shock', { cooldownMs: 1200 });
-      play(winId === me ? 'win' : 'reveal');
+      play(winId === me ? 'win' : 'reveal', { memePool: 'win', speakerId: winId, cooldownMs: 1200 });
     }
   });
 
@@ -183,8 +182,8 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const penaltyUntil = view.penaltyUntilCount[me] ?? 0;
   useOnChange(penaltyUntil, (p) => {
     if (p > 0) {
-      playMemePool('troll', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: me, cooldownMs: 1200 });
+      play('error', { speakerId: me });
     }
   });
   const penaltyLeft = Math.max(0, penaltyUntil - view.called.length);
@@ -206,7 +205,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act(payload);
     setBusy(false);
     if (!res.ok) {
-      play('error');
+      play('error', { speakerId: me });
       setErr(errOf(res.reason));
     }
     return res.ok;
@@ -215,18 +214,17 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
   const handleCellTap = async (num: number) => {
     if (busy || !hasMyTicket || view.status !== 'calling') return;
     if (!calledSet.has(num)) {
-      playMemePool('wrong', { cooldownMs: 1400 });
-      play('tick');
+      playMemePool('wrong', { speakerId: me, cooldownMs: 1400 });
+      play('tick', { speakerId: me });
     } else {
-      play('stamp');
+      play('stamp', { speakerId: me });
     }
     await act({ type: 'loto_mark', num });
   };
 
   const handleKinh = async (row: number) => {
     if (busy || !hasMyTicket || view.status !== 'calling') return;
-    playMemePool('twist', { cooldownMs: 1200 });
-    play('siren');
+    play('siren', { speakerId: me });
     await act({ type: 'loto_kinh', row });
   };
 
@@ -320,7 +318,7 @@ export function LotoScreen({ game, room }: { game: Game; room: RoomState }) {
               <Pressable
                 testID="loto-peek-toggle"
                 onPress={() => {
-                  play('pop');
+                  play('pop', { speakerId: me });
                   setPeekOpen(true);
                 }}
                 style={[styles.peekPillBtn, view.waitingIds.length > 0 && styles.peekPillBtnHot]}

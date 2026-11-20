@@ -117,15 +117,15 @@ export function WalletNoticeLayer({ game }: { game: Game }) {
         if (n.delta <= 0 && !showNegative) return;
       }
       if (n.kind === 'update') {
-        if (n.reason === 'game_win') playMemePool('win');
-        else if (n.reason === 'game_loss' && n.ruby < 0) playMemePool('broke');
-        else if (n.reason === 'gift_receive') playMemePool('gift');
-        else if (n.reason === 'checkin') playMemePool('money');
+        if (n.reason === 'game_win') playMemePool('win', { speakerId: game.me });
+        else if (n.reason === 'game_loss' && n.ruby < 0) playMemePool('broke', { speakerId: game.me });
+        else if (n.reason === 'gift_receive') playMemePool('gift_receive', { speakerId: game.me });
+        else if (n.reason === 'checkin') playMemePool('money', { speakerId: game.me });
       }
-      play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose');
+      play(n.kind === 'update' && n.delta > 0 ? 'win' : 'lose', { speakerId: game.me });
       setNotice({ ...n, id: ++seq });
     });
-  }, [onWallet]);
+  }, [onWallet, game.me]);
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(null), 5000);

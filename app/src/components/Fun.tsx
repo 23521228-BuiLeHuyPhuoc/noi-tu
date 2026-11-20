@@ -8,13 +8,14 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRe
 import { Dimensions, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   CHAT_MAX, DOODLE_MS, EMOJIS, MAX_HP, NICK_MS,
-  type ChatMsg, type DoodleKind, type FunEvent, type HitMove, type NicknameId, type PublicPlayer, type ThrowItem,
+  type TauntId, type ChatMsg, type DoodleKind, type FunEvent, type HitMove, type NicknameId, type PublicPlayer, type ThrowItem,
 } from '../../../shared/src/types';
 import type { Game } from '../useGame';
 import { DOODLE_OPTIONS, HITS, NICK_IDS, nickText, quip, TAUNTS, THROWS } from '../messages';
 import { ROACH_URI } from '../avatars';
 import { setCharm, setDoodle, setMood, setNick, setWobble } from '../funState';
 import { ViewportContext, useKeyboardInset, useOnNew, useStableWindow } from '../hooks';
+import type { MemePoolKey } from '../audioAssets';
 import { play, playMemePool } from '../sound';
 import { vibrate } from '../web';
 import { C, FONT, sticker } from '../theme';
@@ -31,6 +32,11 @@ import { getSmoothModeSync } from '../smoothMode';
 import { chatBubbleStyleOf, chatBubbleTextColorOf } from './Cosmetics';
 import confetti from 'canvas-confetti';
 import { EmojiIcon, UiIcon, type UiIconName } from './Icons';
+
+const tauntPools: Partial<Record<TauntId, MemePoolKey>> = {
+  nhanh: 'hurry', cuu: 'help', huhon: 'shock', ga: 'troll', anmay: 'troll',
+  run: 'troll', tuoi: 'troll', hetthuoc: 'troll',
+};
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -420,8 +426,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
 
   // tin nhắn mới: bong bóng dưới avatar người gửi
   useOnNew(chat, (m) => {
-    if (m.kind === 'sticker') playMemePool('chat_hype', { cooldownMs: 2000 });
-    if (m.from !== game.me) play('chat');
+    if (m.kind === 'sticker') playMemePool('chat_hype', { speakerId: m.from, cooldownMs: 2000 });
+    if (m.from !== game.me) play('chat', { speakerId: m.from });
     const at = rectOf(`avatar-${m.from}`, origin(), rotatedRef.current);
     const bubbleFx = playersRef.current.find((p) => p.id === m.from)?.cosmetics?.chatBubble;
     if (at) say({ from: m.from, name: m.from === game.me ? 'Bạn' : m.name, text: m.kind === 'sticker' ? (stickerOf(m.stickerId)?.alt ?? 'Nhãn dán') : m.text, stickerId: m.stickerId, at, chat: true, bubbleFx });
@@ -455,8 +461,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const hit = () => {
           setMood(e.to, nice ? 'smug' : 'shock', 2200);
           if (!nice) setWobble(e.to, 'shake', 1400);
-          playMemePool(nice ? 'gift' : 'troll', { cooldownMs: 1400 });
-          play(nice ? 'coin' : 'splat');
+          playMemePool(nice ? 'gift' : 'troll', { speakerId: e.from, cooldownMs: 1400 });
+          play(nice ? 'coin' : 'splat', { speakerId: e.from });
           if (toR) add({ kind: 'splat', emoji, at: toR });
           if (toMe) {
             // quá 3 lần rung màn hình trong 15 giây (soft): chỉ hiện trên avatar, không rung máy
@@ -467,7 +473,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
             feed(`${from} ${nice ? 'tặng' : 'ném'} ${emoji} vào mặt bạn`, nice ? 'fun' : 'bad');
           }
         };
-        play('whoosh');
+        play('whoosh', { speakerId: e.from });
         if (fromR && toR) add({ kind: 'fly', emoji, from: fromR, to: toR, after: hit });
         else {
           hit();
@@ -475,23 +481,24 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         }
       } else if (e.kind === 'taunt') {
         const text = TAUNTS.find((t) => t.id === e.taunt)?.text ?? '';
-        playMemePool('troll', { cooldownMs: 1400 });
-        play('pop');
+        const pool = tauntPools[e.taunt];
+        if (pool) playMemePool(pool, { speakerId: e.from, cooldownMs: 1400 });
+        play('pop', { speakerId: e.from });
         if (fromR) say({ from: e.from, name: from === 'bạn' ? 'Bạn' : from, text, at: fromR, chat: false });
         else feed(`${from}: ${text}`, 'fun');
       } else if (e.kind === 'poke' && !e.poke) {
         setMood(e.to, 'angry', 2500);
         setWobble(e.to, 'shake', 1800);
-        playMemePool('chat_hype', { cooldownMs: 2800 });
+        playMemePool('hurry', { speakerId: e.from, cooldownMs: 2800 });
         if (toMe) {
           vibrate(400);
           shake();
-          play('turn');
+          play('turn', { speakerId: e.from });
           feed(`${from} đang hối bạn`, 'bad');
         } else feed(`${from} đang hối ${nameOf(e.to)}`, 'fun');
       } else if (e.kind === 'emoji') {
-        playMemePool('chat_hype', { cooldownMs: 2800 });
-        play('pop');
+        playMemePool('chat_hype', { speakerId: e.from, cooldownMs: 2800 });
+        play('pop', { speakerId: e.from });
         if (fromR) add({ kind: 'float', emoji: e.emoji, at: fromR });
         else feed(`${from}: ${e.emoji}`, 'fun');
       } else if (e.kind === 'hit') {
@@ -501,8 +508,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         const land = () => {
           setMood(e.to, 'dizzy', 3000);
           setWobble(e.to, e.ko || e.move === 'chuong' ? 'spin' : 'shake', e.ko ? 2800 : 1800);
-          playMemePool(e.ko ? 'eliminated' : 'troll', { cooldownMs: 1600 });
-          play(e.ko ? 'ko' : 'punch');
+          playMemePool(e.ko ? 'eliminated' : 'troll', { speakerId: e.ko ? e.to : e.from, cooldownMs: 1600 });
+          play(e.ko ? 'ko' : 'punch', { speakerId: e.from });
           if (toR) add({ kind: 'impact', at: toR, damage, hp: e.hp ?? 0, ko: !!e.ko });
           if (toMe && !e.soft) {
             vibrate(e.ko ? [200, 80, 300] : 150);
@@ -511,25 +518,25 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
           if (e.ko) feed(`${from} hạ đo ván ${toMe ? 'bạn' : nameOf(e.to)} (hồi đầy máu)`, toMe ? 'bad' : 'fun');
           else if (toMe) feed(`${from} ${move.name.toLowerCase()} bạn ${move.emoji} -${damage} máu`, 'bad');
         };
-        play('whoosh');
+        play('whoosh', { speakerId: e.from });
         if (fromR && toR) add({ kind: 'fly', emoji: move.emoji, from: fromR, to: toR, after: land, fast: true });
         else land();
       } else if (e.kind === 'doodle') {
         setDoodle(e.to, e.doodle, DOODLE_MS);
         const what = DOODLE_OPTIONS.find((d) => d.doodle === e.doodle)?.name.toLowerCase().replace('vẽ ', '') ?? 'bậy';
-        playMemePool('chat_hype', { cooldownMs: 2800 });
-        play('pop');
+        playMemePool('chat_hype', { speakerId: e.from, cooldownMs: 2800 });
+        play('pop', { speakerId: e.from });
         feed(quip.doodle(from, toMe ? 'bạn' : nameOf(e.to), what), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'nick') {
         setNick(e.to, e.nick, NICK_MS);
-        playMemePool('chat_hype', { cooldownMs: 2800 });
-        play('pop');
+        playMemePool('chat_hype', { speakerId: e.from, cooldownMs: 2800 });
+        play('pop', { speakerId: e.from });
         feed(quip.nick(from, toMe ? 'bạn' : nameOf(e.to), nickText(e.nick)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'honk') {
         setWobble(e.to, 'shake', 1400);
-        playMemePool('troll', { cooldownMs: 1600 });
+        playMemePool('troll', { speakerId: e.from, cooldownMs: 1600 });
         if (toMe) {
-          play(['honk', 'fart', 'boing'][e.variant ?? 0] as 'honk' | 'fart' | 'boing');
+          play(['honk', 'fart', 'boing'][e.variant ?? 0] as 'honk' | 'fart' | 'boing', { speakerId: e.from });
           vibrate(120);
         }
         feed(quip.honk(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
@@ -537,21 +544,21 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setMood(e.to, 'cry', 6000);
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '😭', at: toR });
-        play('sad');
+        play('sad', { speakerId: e.from });
         feed(quip.cry(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
       } else if (e.kind === 'charm') {
         setCharm(e.from, 20_000);
         setMood(e.from, 'smug', 4000);
         if (fromR) add({ kind: 'float', emoji: '✨', at: fromR });
-        play('sparkle');
+        play('sparkle', { speakerId: e.from });
         feed(quip.charm(from === 'bạn' ? 'Bạn' : from), 'fun');
       } else if (e.kind === 'spin') {
         setMood(e.to, 'dizzy', 3600);
         setWobble(e.to, 'spin', 3600);
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '🌀', at: toR });
-        playMemePool('troll', { cooldownMs: 1600 });
-        play('spin');
+        playMemePool('troll', { speakerId: e.from, cooldownMs: 1600 });
+        play('spin', { speakerId: e.from });
         if (toMe) {
           vibrate([120, 60, 180, 60, 140]);
           shake('spin');
@@ -562,8 +569,8 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         setWobble(e.to, 'shake', 2800);
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         if (toR) add({ kind: 'float', emoji: '🌋', at: toR });
-        playMemePool('bomb', { cooldownMs: 1600 });
-        play('quake');
+        playMemePool('bomb', { speakerId: e.from, cooldownMs: 1600 });
+        play('quake', { speakerId: e.from });
         if (toMe) {
           vibrate([180, 50, 220, 50, 180]);
           shake('quake');
@@ -822,14 +829,14 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
       } else if (e.kind === 'ink') {
         feed(quip.ink(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
         if (toMe) {
-          play('inksplash');
+          play('inksplash', { speakerId: e.from });
           vibrate(120);
           setItems((xs) => [...xs, { id: ++seq.current, kind: 'ink', corner: e.corner ?? 0 }]);
         }
       } else {
         feed(quip.blackout(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
         if (toMe) {
-          play('blackout');
+          play('blackout', { speakerId: e.from });
           vibrate([100, 50, 220]);
           setItems((xs) => [...xs.filter((x) => x.kind !== 'blackout'), { id: ++seq.current, kind: 'blackout' }]);
         }

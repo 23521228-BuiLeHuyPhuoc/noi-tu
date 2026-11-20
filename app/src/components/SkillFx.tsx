@@ -981,8 +981,8 @@ export function SkillLayer({
       const origin = viewRect(layer.current);
       const rot = rotatedRef.current;
       if (e.kind === "entrance") {
-        playMemePool("welcome", { cooldownMs: 2200 });
-        play("sparkle");
+        playMemePool("welcome", { speakerId: e.from, cooldownMs: 2200 });
+        play("sparkle", { speakerId: e.from });
         setShows((xs) => [
           ...xs.slice(-2),
           {
@@ -997,8 +997,8 @@ export function SkillLayer({
       if (e.kind === "gift") {
         const item = shopItem(e.gift);
         const toMe = e.to === game.me;
-        playMemePool("gift", { cooldownMs: 1200 });
-        play(e.gift === "gift_rose" ? "sparkle" : "win");
+        playMemePool("gift", { speakerId: e.from, cooldownMs: 1200 });
+        play(e.gift === "gift_rose" ? "sparkle" : "win", { speakerId: e.from });
         if (toMe) vibrate([60, 40, 120]);
         setShows((xs) => [
           ...xs.slice(-2),
@@ -1033,7 +1033,7 @@ export function SkillLayer({
       );
       if (k === "duck" || k === "ufo" || k === "disco" || k === "money") {
         setMood(e.to, k === "disco" || k === "money" ? "smug" : "shock", 2500);
-        play(k === "ufo" ? "whoosh" : "pop");
+        play(k === "ufo" ? "whoosh" : "pop", { speakerId: e.from });
         if (toMe && !e.soft) {
           const target = playersRef.current.find((p) => p.id === e.to);
           const player = target
@@ -1053,7 +1053,7 @@ export function SkillLayer({
         setTint(e.to, "burnt", 5000);
         setMood(e.to, "shock", 3000);
         setWobble(e.to, "shake", 1200);
-        play("zap");
+        play("zap", { speakerId: e.from });
         if (toMe && !e.soft) {
           vibrate([60, 30, 200]);
           setScreens((xs) => [
@@ -1064,7 +1064,7 @@ export function SkillLayer({
       } else if (k === "freeze") {
         setTint(e.to, "ice", 4000);
         setMood(e.to, "shock", 2500);
-        play("sad");
+        play("sad", { speakerId: e.from });
         if (toMe && !e.soft) {
           vibrate(150);
           setScreens((xs) => [
@@ -1074,7 +1074,7 @@ export function SkillLayer({
         }
       } else if (k === "cake") {
         setMood(e.to, "shock", 3000);
-        play("splat");
+        play("splat", { speakerId: e.from });
         if (toMe && !e.soft) {
           vibrate(100);
           setScreens((xs) => [
@@ -1084,7 +1084,7 @@ export function SkillLayer({
         }
       } else if (k === "water") {
         setMood(e.to, "shock", 2500);
-        play("splat");
+        play("splat", { speakerId: e.from });
         if (toMe && !e.soft)
           setScreens((xs) => [
             ...xs.filter((x) => x.kind !== "water").slice(-3),
@@ -1092,7 +1092,7 @@ export function SkillLayer({
           ]);
       } else if (k === "dog") {
         setMood(e.to, "shock", 2500);
-        play("bark");
+        play("bark", { speakerId: e.from });
         if (toMe && !e.soft) {
           vibrate([80, 60, 80]);
           setScreens((xs) => [
@@ -1108,12 +1108,12 @@ export function SkillLayer({
           if (rocket) {
             setMood(e.to, "dizzy", 3000);
             setWobble(e.to, "shake", 1500);
-            play("boom");
+            play("boom", { speakerId: e.from });
             if (toMe) vibrate([120, 50, 200]);
           } else {
             setTint(e.to, "blush", 3000);
             setMood(e.to, "smug", 3000);
-            play("sparkle");
+            play("sparkle", { speakerId: e.from });
           }
           if (toR)
             setBursts((xs) => [
@@ -1126,7 +1126,7 @@ export function SkillLayer({
               },
             ]);
         };
-        play(rocket ? "rocket" : "whoosh");
+        play(rocket ? "rocket" : "whoosh", { speakerId: e.from });
         if (fromR && toR && !reducedRef.current)
           setFlights((xs) => [
             ...xs.slice(-6),
@@ -1149,11 +1149,11 @@ export function SkillLayer({
           if (isCupid) {
             setTint(e.to, "blush", 3500);
             setMood(e.to, "smug", 3000);
-            play("sparkle");
+            play("sparkle", { speakerId: e.from });
           } else {
             setMood(e.to, "shock", 3000);
             setWobble(e.to, "shake", 1600);
-            play("boom");
+            play("boom", { speakerId: e.from });
             if (toMe && !e.soft) {
               vibrate([120, 60, 160]);
               shakeRef.current("normal");
@@ -1165,7 +1165,7 @@ export function SkillLayer({
               { id: ++seq.current, emoji: isCupid ? "💖" : "💥", at: toR, big: !isCupid },
             ]);
         };
-        play("whoosh");
+        play("whoosh", { speakerId: e.from });
         if (fromR && toR && !reducedRef.current)
           setFlights((xs) => [
             ...xs.slice(-6),
@@ -1192,11 +1192,11 @@ export function SkillLayer({
         setMood(e.to, k === "blackhole" || k === "bsod_crash" || k === "ban_hammer" ? "dizzy" : k === "clown_honk" ? "cry" : "shock", 3600);
         setWobble(e.to, k === "blackhole" || k === "rainbow_overload" ? "spin" : "shake", 2400);
         if (k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement") {
-          playMemePool("shock");
+          playMemePool("shock", { speakerId: e.from });
         } else if (k === "clown_honk" || k === "gold_slipper_storm" || k === "coffin_meme") {
-          playMemePool("troll");
+          playMemePool("troll", { speakerId: e.from });
         }
-        play(k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement" ? "boom" : k === "paparazzi" || k === "bsod_crash" ? "zap" : "siren");
+        play(k === "dragon_roar" || k === "meteor" || k === "ban_hammer" || k === "supreme_judgement" ? "boom" : k === "paparazzi" || k === "bsod_crash" ? "zap" : "siren", { speakerId: e.from });
         const toR = rectOf(`avatar-${e.to}`, origin, rot);
         const burstEmoji: Record<string, string> = {
           paparazzi: "📸", ghost_scare: "👻", royal_seal: "🏮", meteor: "💥", blackhole: "🌀", dragon_roar: "🐉",

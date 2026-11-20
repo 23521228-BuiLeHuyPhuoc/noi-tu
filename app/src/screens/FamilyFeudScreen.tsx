@@ -113,28 +113,28 @@ export function FamilyFeudScreen({ game, room }: { game: Game; room: RoomState }
   const lastAttempt = view.attempts.at(-1) ?? null;
 
   useOnChange(view.round, () => {
-    playMemePool('shock', { cooldownMs: 1400 });
-    play('turn');
+    playMemePool('shock', { speakerId: null, cooldownMs: 1400 });
+    play('turn', { speakerId: null });
   });
 
   useOnChange(revealedCount, (cur) => {
     if (cur > 0) {
-      playMemePool('correct', { cooldownMs: 900 });
-      play('stamp');
+      playMemePool('correct', { speakerId: lastAttempt?.playerId ?? null, cooldownMs: 900 });
+      play('stamp', { speakerId: lastAttempt?.playerId ?? null });
     }
   });
 
   useOnChange(view.strikes, (cur) => {
     if (cur > 0) {
-      playMemePool('wrong', { cooldownMs: 900 });
-      play('error');
+      playMemePool('wrong', { speakerId: lastAttempt?.playerId ?? null, cooldownMs: 900 });
+      play('error', { speakerId: lastAttempt?.playerId ?? null });
     }
   });
 
   useOnChange(view.phase, (ph) => {
     if (ph === 'steal') {
-      playMemePool('twist', { cooldownMs: 1200 });
-      play('sparkle');
+      playMemePool('twist', { speakerId: view.activePlayerId, cooldownMs: 1200 });
+      play('sparkle', { speakerId: view.activePlayerId });
     }
   });
 
@@ -163,18 +163,17 @@ export function FamilyFeudScreen({ game, room }: { game: Game; room: RoomState }
     setBusy(false);
     if (!res.ok) {
       if (res.reason === 'used') {
-        playMemePool('troll', { cooldownMs: 1200 });
-        play('pop');
+        playMemePool('wrong', { speakerId: game.me, cooldownMs: 1200 });
+        play('pop', { speakerId: game.me });
         feed('Đáp án này đã được mở trên bảng rồi — gõ ý khác nhé!', 'info');
       } else {
-        playMemePool('wrong', { cooldownMs: 1200 });
-        play('error');
+        playMemePool('wrong', { speakerId: game.me, cooldownMs: 1200 });
+        play('error', { speakerId: game.me });
         feed(actionText[res.reason] ?? 'Chưa gửi được đáp án', 'bad');
       }
       return;
     }
-    playMemePool('turn_move', { cooldownMs: 2500 });
-    play('pop');
+    play('pop', { speakerId: game.me });
     setAnswerText('');
   };
 
@@ -186,8 +185,8 @@ export function FamilyFeudScreen({ game, room }: { game: Game; room: RoomState }
     if (!res.ok) {
       feed(actionText[res.reason] ?? 'Không chọn được', 'bad');
     } else {
-      playMemePool(choice === 'play' ? 'turn_move' : 'twist', { cooldownMs: 1200 });
-      play('pop');
+      playMemePool(choice === 'play' ? 'turn_move' : 'twist', { speakerId: game.me, cooldownMs: 1200 });
+      play('pop', { speakerId: game.me });
     }
   };
 
@@ -197,7 +196,7 @@ export function FamilyFeudScreen({ game, room }: { game: Game; room: RoomState }
     const res = await game.act({ type: 'ff_team_chat', text: txt });
     if (res.ok) {
       if (!textOverride) setChatInput('');
-      play('pop');
+      play('pop', { speakerId: game.me });
     }
   };
 

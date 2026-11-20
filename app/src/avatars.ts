@@ -32,7 +32,7 @@ import {
 } from '../../shared/src/types';
 import { AVATAR_PRESETS, AVATAR_PRESET_NAMES } from '../../shared/src/avatars';
 
-type AvataaarsOpts = typeof avataaars extends Style<infer O> ? Partial<O> : never;
+export type AvataaarsOpts = typeof avataaars extends Style<infer O> ? Partial<O> : never;
 type TopKey = NonNullable<AvataaarsOpts['top']>[number];
 type ClothingKey = NonNullable<AvataaarsOpts['clothing']>[number];
 type GraphicKey = NonNullable<AvataaarsOpts['clothingGraphic']>[number];
@@ -755,6 +755,23 @@ export function portraitOf(p: PortraitSource, mood: Mood = 'normal'): { uri: str
   const cfg = p.character ?? presetOf(p.avatar);
   const col = playerColorOf(cfg);
   return { uri: p.avatarUrl ?? (p.character ? portraitUri(p.character, mood) : presetUri(p.avatar, mood)), light: col.light, hex: col.hex };
+}
+
+/** Render & cache chân dung nhân vật meme bằng `@dicebear/collection` (`avataaars`). */
+export function renderDivaPortraitUri(seed: string, opts: AvataaarsOpts, bgColorHex: string): string {
+  const key = `diva|${seed}|${bgColorHex}`;
+  const hit = svgCache.get(key);
+  if (hit) return hit;
+  const rawSvg = createAvatar(avataaars, {
+    seed: `diva-${seed}`,
+    style: ['default'],
+    backgroundColor: [stripHex(bgColorHex)],
+    ...opts,
+  }).toString();
+  const cleanSvg = rawSvg.replace(/<metadata[\s\S]*?<\/metadata>/, '');
+  const uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cleanSvg)}`;
+  svgCache.set(key, uri);
+  return uri;
 }
 
 /** Tên gọi gọn: giữ nguyên nếu ngắn, nếu dài thì lấy từ cuối (tên riêng trong tiếng Việt). */

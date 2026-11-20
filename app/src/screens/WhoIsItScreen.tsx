@@ -174,11 +174,11 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
 
   useOnChange(view.phase, (ph) => {
     if (ph === 'ask' && view.roundCount === 1) {
-      playMemePool('shock', { cooldownMs: 1200 });
-      play('turn');
+      playMemePool('shock', { speakerId: view.activePlayerId, cooldownMs: 1200 });
+      play('turn', { speakerId: view.activePlayerId });
     } else if (ph === 'answer_free') {
-      playMemePool('vote', { cooldownMs: 1200 });
-      play('pop');
+      playMemePool('vote', { speakerId: view.activePlayerId, cooldownMs: 1200 });
+      play('pop', { speakerId: view.activePlayerId });
     }
     if (ph !== 'ask') setGuessMode(false);
   });
@@ -186,11 +186,11 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
   useOnChange(view.lastQA?.id, (id) => {
     if (!id || !view.lastQA) return;
     if (view.lastQA.kind === 'guess') {
-      playMemePool(view.lastQA.answer ? 'win' : 'wrong', { cooldownMs: 800 });
-      play(view.lastQA.answer ? 'stamp' : 'error');
+      playMemePool(view.lastQA.answer ? 'win' : 'wrong', { speakerId: view.lastQA.askedById, cooldownMs: 800 });
+      play(view.lastQA.answer ? 'stamp' : 'error', { speakerId: view.lastQA.askedById });
     } else {
-      playMemePool(view.lastQA.answer ? 'correct' : 'twist', { cooldownMs: 1100 });
-      play('pop');
+      playMemePool(view.lastQA.answer ? 'correct' : 'twist', { speakerId: view.lastQA.askedById, cooldownMs: 1100 });
+      play('pop', { speakerId: view.lastQA.askedById });
     }
   });
 
@@ -222,8 +222,8 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     if (view.phase === 'pick_secret') {
       const ok = await actSafe({ type: 'wi_pick_secret', characterId: ch.id });
       if (ok) {
-        playMemePool('turn_move', { cooldownMs: 1200 });
-        play('stamp');
+        playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1200 });
+        play('stamp', { speakerId: game.me });
       }
       return;
     }
@@ -232,15 +232,15 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
       return;
     }
     const ok = await actSafe({ type: 'wi_toggle_flip', characterId: ch.id });
-    if (ok) play('flip');
+    if (ok) play('flip', { speakerId: game.me });
   };
 
   const handleAskTrait = async (traitKey: string) => {
     const ok = await actSafe({ type: 'wi_ask_trait', traitKey });
     if (ok) {
       setBoardSide('mine');
-      playMemePool('turn_move', { cooldownMs: 1500 });
-      play('pop');
+      playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1500 });
+      play('pop', { speakerId: game.me });
     }
   };
 
@@ -251,8 +251,8 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     if (ok) {
       setFreeQuestion('');
       setFreeAskMode(false);
-      playMemePool('turn_move', { cooldownMs: 1500 });
-      play('pop');
+      playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1500 });
+      play('pop', { speakerId: game.me });
     }
   };
 
@@ -270,7 +270,7 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     const ok = await actSafe({ type: 'wi_team_chat', text: txt });
     if (ok) {
       if (!textOverride) setChatInput('');
-      play('pop');
+      play('pop', { speakerId: game.me });
     }
   };
 
@@ -329,8 +329,8 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
             onPress={async () => {
               const pick = view.characters[Math.floor(Math.random() * view.characters.length)];
               if (pick && (await actSafe({ type: 'wi_pick_secret', characterId: pick.id }))) {
-                playMemePool('turn_move', { cooldownMs: 1200 });
-                play('stamp');
+                playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1200 });
+                play('stamp', { speakerId: game.me });
               }
             }}
           />
@@ -355,7 +355,7 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
               style={{ flex: 1 }}
               onPress={async () => {
                 setBoardSide('mine');
-                if (await actSafe({ type: 'wi_auto_flip' })) play('sparkle');
+                if (await actSafe({ type: 'wi_auto_flip' })) play('sparkle', { speakerId: game.me });
               }}
             />
           )}

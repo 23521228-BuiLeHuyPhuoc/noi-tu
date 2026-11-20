@@ -428,36 +428,36 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
 
     switch (view.lastBanner.kind) {
       case 'mercy_ko':
-        playMemePool('eliminated', { cooldownMs: 2000 });
-        play(view.lastBanner.targetId === me ? 'ko' : 'boom');
+        playMemePool('eliminated', { speakerId: view.lastBanner.targetId ?? null, cooldownMs: 2000 });
+        play(view.lastBanner.targetId === me ? 'ko' : 'boom', { speakerId: view.lastBanner.targetId ?? null });
         break;
       case 'stack':
-        playMemePool('troll', { cooldownMs: view.drawStack >= 4 ? 1800 : 2400 });
-        play(view.drawStack >= 10 ? 'zap' : 'punch');
+        playMemePool('troll', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: view.drawStack >= 4 ? 1800 : 2400 });
+        play(view.drawStack >= 10 ? 'zap' : 'punch', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'swap_7':
-        playMemePool('twist', { cooldownMs: 2400 });
-        play('whoosh');
+        playMemePool('twist', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 2400 });
+        play('whoosh', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'rotate_0':
-        playMemePool('twist', { cooldownMs: 2400 });
-        play('spin');
+        playMemePool('twist', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 2400 });
+        play('spin', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'discard_all':
-        playMemePool('win', { cooldownMs: 1800 });
-        play('rocket');
+        playMemePool('turn_move', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 1800 });
+        play('rocket', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'skip_all':
-        playMemePool('troll', { cooldownMs: 2000 });
-        play('stamp');
+        playMemePool('troll', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 2000 });
+        play('stamp', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'roulette':
-        playMemePool('shock', { cooldownMs: 1800 });
-        play('dice');
+        playMemePool('shock', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 1800 });
+        play('dice', { speakerId: view.lastBanner.actorId ?? null });
         break;
       case 'uno_catch':
-        playMemePool('shock', { cooldownMs: 2200 });
-        play('siren');
+        playMemePool('shock', { speakerId: view.lastBanner.actorId ?? null, cooldownMs: 2200 });
+        play('siren', { speakerId: view.lastBanner.actorId ?? null });
         break;
     }
   });
@@ -466,7 +466,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
     setPendingWild(null);
     setPendingSeven(null);
     if (cur === me) {
-      play('turn');
+      play('turn', { speakerId: me });
     }
   });
 
@@ -568,7 +568,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       try {
         const res = await game.act(actPayload);
         if (!res.ok) {
-          play('error');
+          play('error', { speakerId: me });
           feed(errOf(res.reason), 'bad');
           return false;
         }
@@ -577,7 +577,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
         setBusy(false);
       }
     },
-    [busy, game, feed],
+    [me, busy, game, feed],
   );
 
   const handleCardPress = useCallback(
@@ -585,19 +585,19 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       if (!isMyTurn || view.phase !== 'playing' || !playableIds.has(card.id) || busy) return;
 
       if (isUnoWild(card)) {
-        play('pop');
+        play('pop', { speakerId: me });
         setPendingWild(card);
         return;
       }
 
       // Đánh Số 7 khi còn >= 2 lá trên tay và có từ 2 đối thủ còn sống trở lên -> mở bảng chọn nạn nhân cướp bài!
       if (card.kind === '7' && view.myHand.length > 1 && aliveOpponentsForSwap.length >= 2) {
-        play('pop');
+        play('pop', { speakerId: me });
         setPendingSeven(card);
         return;
       }
 
-      play('flip');
+      play('flip', { speakerId: me });
       const autoTarget =
         card.kind === '7' && view.myHand.length > 1 && aliveOpponentsForSwap.length === 1
           ? aliveOpponentsForSwap[0].id
@@ -608,7 +608,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
         ...(autoTarget ? { swapTargetId: autoTarget } : {}),
       });
     },
-    [isMyTurn, view.phase, playableIds, busy, view.myHand.length, aliveOpponentsForSwap, runAction],
+    [me, isMyTurn, view.phase, playableIds, busy, view.myHand.length, aliveOpponentsForSwap, runAction],
   );
 
   const handleConfirmWild = useCallback(
@@ -616,10 +616,10 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       const card = pendingWild;
       if (!card) return;
       setPendingWild(null);
-      play('flip');
+      play('flip', { speakerId: me });
       void runAction({ type: 'um_play', cardId: card.id, chosenColor: color });
     },
-    [pendingWild, runAction],
+    [me, pendingWild, runAction],
   );
 
   const handleConfirmSwapTarget = useCallback(
@@ -627,45 +627,43 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
       if (pendingSeven) {
         const card = pendingSeven;
         setPendingSeven(null);
-        play('whoosh');
+        play('whoosh', { speakerId: me });
         void runAction({ type: 'um_play', cardId: card.id, swapTargetId: targetId });
         return;
       }
       if (isMyTurn && view.phase === 'choose_swap') {
-        play('whoosh');
+        play('whoosh', { speakerId: me });
         void runAction({ type: 'um_pick_swap', targetId });
       }
     },
-    [pendingSeven, isMyTurn, view.phase, runAction],
+    [me, pendingSeven, isMyTurn, view.phase, runAction],
   );
 
   const handleDrawPress = useCallback(() => {
     if (!isMyTurn || view.phase !== 'playing' || view.drewThisTurn || busy) return;
-    playMemePool(view.drawStack > 0 || view.roulettePending ? 'lose' : 'turn_move', { cooldownMs: 1800 });
-    play('pop');
+    playMemePool(view.drawStack > 0 || view.roulettePending ? 'lose' : 'turn_move', { speakerId: me, cooldownMs: 1800 });
+    play('pop', { speakerId: me });
     void runAction({ type: 'um_draw' });
-  }, [isMyTurn, view.phase, view.drewThisTurn, view.drawStack, view.roulettePending, busy, runAction]);
+  }, [me, isMyTurn, view.phase, view.drewThisTurn, view.drawStack, view.roulettePending, busy, runAction]);
 
   const handlePassPress = useCallback(() => {
     if (!isMyTurn || !view.drewThisTurn || busy) return;
-    playMemePool('wrong', { cooldownMs: 2200 });
-    play('pop');
+    play('pop', { speakerId: me });
     void runAction({ type: 'um_pass' });
-  }, [isMyTurn, view.drewThisTurn, busy, runAction]);
+  }, [me, isMyTurn, view.drewThisTurn, busy, runAction]);
 
   const handleShoutUnoPress = useCallback(() => {
     if (!showShoutUno || busy) return;
-    playMemePool('win', { cooldownMs: 1400 });
-    play('sparkle');
+    play('sparkle', { speakerId: me });
     void runAction({ type: 'um_shout_uno' });
-  }, [showShoutUno, busy, runAction]);
+  }, [me, showShoutUno, busy, runAction]);
 
   const handleCatchUnoPress = useCallback(() => {
     if (!catchTargetId || busy) return;
-    playMemePool('troll', { cooldownMs: 1400 });
-    play('siren');
+    playMemePool('troll', { speakerId: me, cooldownMs: 1400 });
+    play('siren', { speakerId: me });
     void runAction({ type: 'um_catch_uno', targetId: catchTargetId });
-  }, [catchTargetId, busy, runAction]);
+  }, [me, catchTargetId, busy, runAction]);
 
   // Thông tin màu hiệu lực & hướng dẫn trạng thái dưới khay bài
   const activeMeta = UNO_COLOR_META[view.activeColor];
@@ -753,7 +751,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
             accessibilityRole="button"
             accessibilityLabel="Lịch sử bàn chơi"
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               setLogOpen(true);
             }}
             style={styles.miniToolBtn}
@@ -766,7 +764,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
             accessibilityRole="button"
             accessibilityLabel="Luật UNO No Mercy"
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               setRulesOpen(true);
             }}
             style={styles.miniToolBtn}
@@ -780,7 +778,7 @@ function UnoMercyTable({ game, room, view }: { game: Game; room: RoomState; view
               accessibilityRole="button"
               accessibilityLabel="Kết thúc ván sớm"
               onPress={() => {
-                play('pop');
+                play('pop', { speakerId: me });
                 setConfirmEnd(true);
               }}
               style={[styles.miniToolBtn, { borderColor: 'rgba(248, 113, 113, 0.35)' }]}

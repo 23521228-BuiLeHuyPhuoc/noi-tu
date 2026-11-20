@@ -1,55 +1,23 @@
 import { Asset } from 'expo-asset';
 import {
-  ALL_MEME_IDS,
+  MEME_BY_ID,
   BGM_ASSETS,
   BGM_PLAYLIST,
   MEME_ASSETS,
-  MEME_POOLS,
   type BgmId,
   type MemeId,
   type MemePoolKey,
 } from './audioAssets';
+import type { VoicePersonaId } from '../../shared/src/types';
+import { drawForSpeaker, getActiveMeme, isCurrentPlayback, markEnded, markPlaying, resetPlayback, resolveSpeaker, type MemeOptions } from './memePlayback';
+export { getActiveMeme, setActiveSpeakerFallback, setRoomVoiceContext, subscribeActiveMeme, type ActiveMemePlayback } from './memePlayback';
 
-/** Âm thanh tổng hợp bằng Web Audio + Playlist 6 Nhạc Hát & 99 Giọng Meme lầy lội MP3. Tắt/bật được, nhớ trong máy. */
+/** Âm thanh tổng hợp bằng Web Audio + Playlist 6 Nhạc Hát & các giọng meme lầy lội MP3. Tắt/bật được, nhớ trong máy. */
 export type Sfx =
   | 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose'
   | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'stamp' | 'siren' | 'cash' | 'flip' | 'boom'
   | 'honk' | 'fart' | 'boing' | 'squash' | 'inksplash' | 'sparkle' | 'clink' | 'blackout'
   | 'spin' | 'quake' | 'bark' | 'zap' | 'rocket';
-
-const SFX_MEME_MAP: Partial<Record<Sfx, { pool: MemePoolKey; cooldownMs: number }>> = {
-  win: { pool: 'win', cooldownMs: 1200 },
-  lose: { pool: 'lose', cooldownMs: 1200 },
-  sad: { pool: 'lose', cooldownMs: 1200 },
-  ko: { pool: 'eliminated', cooldownMs: 1200 },
-  boom: { pool: 'bomb', cooldownMs: 1400 },
-  quake: { pool: 'bomb', cooldownMs: 1400 },
-  error: { pool: 'wrong', cooldownMs: 2200 },
-  coin: { pool: 'money', cooldownMs: 3200 },
-  cash: { pool: 'money', cooldownMs: 3200 },
-  clink: { pool: 'money', cooldownMs: 3200 },
-  dice: { pool: 'turn_move', cooldownMs: 3400 },
-  flip: { pool: 'turn_move', cooldownMs: 3400 },
-  spin: { pool: 'turn_move', cooldownMs: 3400 },
-  punch: { pool: 'troll', cooldownMs: 1800 },
-  zap: { pool: 'troll', cooldownMs: 1800 },
-  rocket: { pool: 'troll', cooldownMs: 1800 },
-  splat: { pool: 'troll', cooldownMs: 1800 },
-  inksplash: { pool: 'troll', cooldownMs: 1800 },
-  squash: { pool: 'troll', cooldownMs: 1800 },
-  boing: { pool: 'troll', cooldownMs: 1800 },
-  honk: { pool: 'troll', cooldownMs: 1800 },
-  bark: { pool: 'troll', cooldownMs: 1800 },
-  siren: { pool: 'shock', cooldownMs: 1800 },
-  blackout: { pool: 'shock', cooldownMs: 1800 },
-  reveal: { pool: 'twist', cooldownMs: 2200 },
-  sparkle: { pool: 'twist', cooldownMs: 2200 },
-  stamp: { pool: 'correct', cooldownMs: 2400 },
-  chat: { pool: 'chat_hype', cooldownMs: 4200 },
-  turn: { pool: 'turn_move', cooldownMs: 4500 },
-  whoosh: { pool: 'turn_move', cooldownMs: 4000 },
-  pop: { pool: 'chat_hype', cooldownMs: 5500 },
-};
 
 const KEY = 'xomlay.muted';
 const KEY_BGM = 'xomlay.bgm';
@@ -118,11 +86,6 @@ let bgmEl: HTMLAudioElement | null = null;
 let memeEl: HTMLAudioElement | null = null;
 let memeDuckTimer: ReturnType<typeof setTimeout> | null = null;
 let lastMemePlayedAt = 0;
-let globalMemeBag: MemeId[] = [];
-let lastGlobalMeme: MemeId | null = null;
-const poolBags: Partial<Record<MemePoolKey, MemeId[]>> = {};
-const playedThisSession = new Set<MemeId>();
-const recentMemes: MemeId[] = [];
 const listeners = new Set<() => void>();
 let gestureRetryInstalled = false;
 
@@ -315,113 +278,58 @@ function clearMemeDuck(): void {
   applyBgmVolume();
 }
 
-export function stopMeme(): void {
+function releaseMeme(): void {
   if (memeEl) {
     memeEl.pause();
-    memeEl.currentTime = 0;
+    memeEl = null;
   }
   clearMemeDuck();
 }
 
-export function playMeme(id: MemeId, opts?: { force?: boolean; cooldownMs?: number }): void {
-  if (muted || !memeEnabled) return;
-  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
-  const now = Date.now();
-  const cooldown = opts?.cooldownMs ?? 1350;
-  if (!opts?.force && now - lastMemePlayedAt < cooldown) return;
+export function stopMeme(): void {
+  resetPlayback();
+  releaseMeme();
+}
 
+export function playMeme(id: MemeId, opts?: MemeOptions): void {
+  if (muted || !memeEnabled || typeof Audio === 'undefined') return;
+  if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
+  const speaker = resolveSpeaker(opts);
+  if (speaker.persona && MEME_BY_ID[id].persona !== speaker.persona) return;
+  const seq = resetPlayback();
+  releaseMeme();
+  lastMemePlayedAt = Date.now();
   const uri = resolveAssetUri(MEME_ASSETS[id]);
   if (!uri) return;
-
-  stopMeme();
-  lastMemePlayedAt = now;
-
   try {
     const el = new Audio(uri);
-    el.volume = 1.0;
     memeEl = el;
     bgmDuckCount = 1;
     applyBgmVolume();
-
-    const finish = () => {
-      if (memeEl === el) clearMemeDuck();
+    el.onended = () => {
+      if (memeEl !== el) return;
+      memeEl = null;
+      clearMemeDuck();
+      markEnded(seq);
     };
-    el.addEventListener('ended', finish, { once: true });
-    el.addEventListener('error', finish, { once: true });
-    memeDuckTimer = setTimeout(finish, 6000);
-    void el.play().catch(() => {
-      finish();
-    });
-  } catch {
-    clearMemeDuck();
-  }
+    const fail = () => { if (memeEl === el) stopMeme(); };
+    el.onerror = fail;
+    memeDuckTimer = setTimeout(stopMeme, 7500);
+    void el.play().then(() => { if (memeEl === el) markPlaying(seq, id, speaker); }).catch(fail);
+  } catch { if (isCurrentPlayback(seq)) stopMeme(); }
 }
 
-function recordMemeHistory(id: MemeId): void {
-  if (playedThisSession.size >= ALL_MEME_IDS.length) {
-    playedThisSession.clear();
-  }
-  playedThisSession.add(id);
-  recentMemes.push(id);
-  if (recentMemes.length > 8) recentMemes.shift();
+function playFromBag(pool: MemePoolKey | 'all' | 'preview', opts?: MemeOptions): void {
+  if (muted || !memeEnabled || typeof Audio === 'undefined') return;
+  if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
+  if (!opts?.force && getActiveMeme()) return;
+  const id = drawForSpeaker(pool, resolveSpeaker(opts));
+  if (id) playMeme(id, { ...opts, force: true });
 }
+export function playRandomMeme(opts?: MemeOptions): void { playFromBag('all', opts); }
+export function playMemePool(pool: MemePoolKey, opts?: MemeOptions): void { playFromBag(pool, opts); }
+export function playPersonaPreview(persona: VoicePersonaId, speakerId: string | null): void { playFromBag('preview', { persona, speakerId, force: true }); }
 
-export function playRandomMeme(opts?: { force?: boolean; cooldownMs?: number }): void {
-  if (muted || !memeEnabled) return;
-  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
-  const cooldown = opts?.cooldownMs ?? 1350;
-  if (!opts?.force && Date.now() - lastMemePlayedAt < cooldown) return;
-
-  if (globalMemeBag.length === 0) {
-    globalMemeBag = shuffleCopy(ALL_MEME_IDS, lastGlobalMeme);
-  }
-  const pick = globalMemeBag.shift() ?? ALL_MEME_IDS[0];
-  if (!pick) return;
-  lastGlobalMeme = pick;
-  recordMemeHistory(pick);
-  playMeme(pick, { ...opts, force: true });
-}
-
-export function playMemePool(pool: MemePoolKey, opts?: { cooldownMs?: number }): void {
-  if (muted || !memeEnabled) return;
-  if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
-  const cooldown = opts?.cooldownMs ?? 1350;
-  if (Date.now() - lastMemePlayedAt < cooldown) return;
-
-  const list = MEME_POOLS[pool];
-  if (!list || list.length === 0) return;
-
-  if (playedThisSession.size >= ALL_MEME_IDS.length) {
-    playedThisSession.clear();
-  }
-
-  let bag = poolBags[pool];
-  if (!bag || bag.length === 0) {
-    bag = shuffleCopy(list, recentMemes[recentMemes.length - 1]);
-    poolBags[pool] = bag;
-  }
-
-  let idx = bag.findIndex((id) => !playedThisSession.has(id) && !recentMemes.includes(id));
-  if (idx < 0) idx = bag.findIndex((id) => !recentMemes.includes(id));
-  if (idx < 0) idx = 0;
-
-  const pick = bag.splice(idx, 1)[0] ?? list[0];
-  if (!pick) return;
-  recordMemeHistory(pick);
-  playMeme(pick, { ...opts, force: true });
-}
-
-function triggerSfxMeme(sfx: Sfx): void {
-  if (muted || !memeEnabled) return;
-  if (sfx === 'fart') {
-    playMemePool('troll', { cooldownMs: 1400 });
-    return;
-  }
-  const mapped = SFX_MEME_MAP[sfx];
-  if (mapped) {
-    playMemePool(mapped.pool, { cooldownMs: mapped.cooldownMs });
-  }
-}
 
 // ---------- Web Audio SFX tổng hợp ----------
 
@@ -464,9 +372,9 @@ function noise(dur: number, vol = 0.12, at = 0) {
   s.start(a.currentTime + at);
 }
 
-export function play(sfx: Sfx): void {
+export function play(sfx: Sfx, opts?: MemeOptions & { memePool?: MemePoolKey }): void {
   if (muted) return;
-  triggerSfxMeme(sfx);
+  if (opts?.memePool) playMemePool(opts.memePool, opts);
   try {
     switch (sfx) {
       case 'tick':

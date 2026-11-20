@@ -1,11 +1,12 @@
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GAME_INFO, type ChatMsg, type PublicPlayer, type RoomState } from '../../../shared/src/types';
 import { CHAOS_POKE_RUBY } from '../../../shared/src/shop';
 import { ROOM_THEMES } from '../../../shared/src/themes';
 import type { Game } from '../useGame';
 import { GAME_META } from '../messages';
-import { isMuted, setMuted, subscribeAudioSettings } from '../sound';
+import { useSpeakingMemeFor } from './MemeSpeakerFocus';
+import { setActiveSpeakerFallback, isMuted, setMuted, subscribeAudioSettings } from '../sound';
 import { copyText } from '../web';
 import { C, backdropPalette } from '../theme';
 import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
@@ -136,6 +137,17 @@ export function Shell({
     }
   }, [webKbInset]);
 
+  const stripRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const offsets = useRef(new Map<string, number>());
+  const speakerId = useSpeakingMemeFor()?.speakerId;
+  useEffect(() => {
+    setActiveSpeakerFallback(strip.active ?? null);
+    return () => setActiveSpeakerFallback(null);
+  }, [strip.active]);
+  useEffect(() => {
+    const offset = speakerId ? offsets.current.get(speakerId) : undefined;
+    if (offset !== undefined) stripRef.current?.scrollTo({ x: Math.max(0, offset - 20), animated: true });
+  }, [speakerId]);
   const [smooth, setSmooth] = useSmoothMode();
   const [localTheme, setLocalTheme] = useLocalTheme();
   const activeThemeId = room.settings.roomTheme ?? localTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
@@ -199,7 +211,7 @@ export function Shell({
     </View>
   );
   const stripItems = players.map((p) => (
-    <View key={p.id} style={compactLandscape ? (inlineStrip ? styles.avatarCompact : styles.avatarRow) : undefined}>
+    <View key={p.id} onLayout={({ nativeEvent }) => offsets.current.set(p.id, nativeEvent.layout.x)} style={compactLandscape ? (inlineStrip ? styles.avatarCompact : styles.avatarRow) : undefined}>
       <Avatar
         player={p}
         me={p.id === game.me}
@@ -277,7 +289,7 @@ export function Shell({
           </View>
 
           {!hideStrip && inlineStrip && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
+            <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollLandscape} contentContainerStyle={styles.stripLandscape}>
               {stripItems}
             </ScrollView>
           )}
@@ -328,13 +340,13 @@ export function Shell({
         </View>
 
         {!hideStrip && !compactLandscape && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
+          <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
             {stripItems}
           </ScrollView>
         )}
 
         {compactLandscape && !inlineStrip && !hideStrip && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollRow} contentContainerStyle={styles.stripLandscape}>
+          <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={styles.stripScrollRow} contentContainerStyle={styles.stripLandscape}>
             {stripItems}
           </ScrollView>
         )}

@@ -4,6 +4,7 @@ import {
   CHARACTER_ACCESSORIES, CHARACTER_AGES, CHARACTER_BROWS, CHARACTER_BUILDS, CHARACTER_DETAILS, CHARACTER_EYES, CHARACTER_FACES, SKIN_TONES, CHARACTER_GENDERS, CHARACTER_OUTFITS, CHARACTER_HAIRS, PLAYER_COLORS,
   type CharacterAccessory, type CharacterAge, type CharacterBrows, type CharacterBuild, type CharacterEyes, type CharacterFace, type CharacterConfig, type CharacterDetail, type CharacterOutfit, type CharacterGender, type CharacterHair,
   STICKER_IDS, type StickerId, CHAT_MAX, GAME_INFO, MAX_NAME, MAX_PLAYERS,
+  VOICE_PERSONA_IDS, type VoicePersonaId,
   type ActionResult, type ChatMsg, type ErrorCode, type GameAction, type GameResult, type GameType, type Phase,
   type RoomSettings, type RoomState, type RoomSummary,
 } from '../../shared/src/types';
@@ -67,6 +68,8 @@ interface Player {
   bot?: boolean;
   /** đội người chơi chọn ở phòng chờ */
   team?: 'red' | 'blue';
+  /** nhân vật meme độc quyền người chơi chọn ở phòng chờ */
+  voice?: VoicePersonaId;
   removeTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -497,6 +500,26 @@ export class Room {
     return { ok: true };
   }
 
+  /** Người chơi tự chọn 1 nhân vật meme độc quyền trong phòng chờ (ai bấm sớm lấy trước, không trùng). */
+  pickVoice(playerId: string, voice: unknown): Result {
+    if (this.phase === 'playing') return { ok: false, error: 'room_playing' };
+    const p = this.find(playerId);
+    if (!p) return { ok: false, error: 'not_in_room' };
+    if (voice === null) {
+      p.voice = undefined;
+      this.changed();
+      return { ok: true };
+    }
+    if (typeof voice !== 'string' || !VOICE_PERSONA_IDS.includes(voice as VoicePersonaId)) {
+      return { ok: false, error: 'bad_request' };
+    }
+    const taken = this.players.some((x) => x.id !== playerId && x.voice === voice);
+    if (taken) return { ok: false, error: 'voice_taken' };
+    p.voice = voice as VoicePersonaId;
+    this.changed();
+    return { ok: true };
+  }
+
   /** Chủ phòng đổi phòng thành công khai / riêng tư (được cả lúc đang chơi). */
   setPublic(byId: string, value: unknown): Result {
     if (byId !== this.hostId) return { ok: false, error: 'not_host' };
@@ -682,6 +705,22 @@ export class Room {
       const j = Math.floor(this.rng() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
+    // Giữ nguyên nhân vật meme người chơi đã chọn, tự chia đều các nhân vật còn trống cho người chưa chọn / máy
+    const usedVoices = new Set<VoicePersonaId>();
+    for (const p of this.players) {
+      if (p.voice && !usedVoices.has(p.voice)) usedVoices.add(p.voice);
+      else if (p.voice) p.voice = undefined;
+    }
+    const freeVoices = VOICE_PERSONA_IDS.filter((v) => !usedVoices.has(v));
+    for (let i = freeVoices.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [freeVoices[i], freeVoices[j]] = [freeVoices[j], freeVoices[i]];
+    }
+    for (const p of order) {
+      if (!p.voice && freeVoices.length > 0) {
+        p.voice = freeVoices.shift();
+      }
+    }
     this.result = null;
     this.participants = order.map((p) => p.id);
     this.engine = this.createEngine();
@@ -734,6 +773,7 @@ export class Room {
       ...(p.vipTier ? { vipTier: p.vipTier } : {}),
       ...(p.bot ? { bot: true } : {}),
       ...(p.team ? { team: p.team } : {}),
+      ...(p.voice ? { voice: p.voice } : {}),
     }));
     const serverNow = Date.now();
     const cache = new Map<string, RoomState>();
@@ -848,6 +888,9 @@ export class Room {
     this.engine = null;
     this.result = null;
     this.phase = 'lobby';
+    for (const p of this.players) {
+      if (p.bot) p.voice = undefined;
+    }
   }
 
   private find(id: string): Player | undefined {

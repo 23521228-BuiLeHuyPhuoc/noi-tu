@@ -55,15 +55,13 @@ function getCroakAudioCtx(): AudioContext | null {
   return sharedAudioCtx;
 }
 
-function playCroakSfx(sfx: CroakSoundFx): void {
+function playCroakSfx(sfx: CroakSoundFx, speakerId: string | null): void {
   if (isMuted()) return;
-  if (sfx === 'swallow' || sfx === 'spit') playMemePool('troll', { cooldownMs: 1800 });
-  else if (sfx === 'bounce') playMemePool('turn_move', { cooldownMs: 3000 });
-  else if (sfx === 'switch') playMemePool('twist', { cooldownMs: 2200 });
-  else if (sfx === 'key') playMemePool('money', { cooldownMs: 1800 });
-  else if (sfx === 'checkpoint') playMemePool('correct', { cooldownMs: 2200 });
-  else if (sfx === 'stage_clear') playMemePool('win', { cooldownMs: 1800 });
-  else if (sfx === 'die') playMemePool('bite', { cooldownMs: 2200 });
+  if (sfx === 'swallow' || sfx === 'spit') playMemePool('troll', { speakerId, cooldownMs: 1800 });
+  else if (sfx === 'switch') playMemePool('twist', { speakerId, cooldownMs: 2200 });
+  else if (sfx === 'checkpoint') playMemePool('correct', { speakerId, cooldownMs: 2200 });
+  else if (sfx === 'stage_clear') playMemePool('win', { speakerId, cooldownMs: 1800 });
+  else if (sfx === 'die') playMemePool('eliminated', { speakerId, cooldownMs: 2200 });
 
   if (Platform.OS !== 'web') return;
   try {
@@ -686,7 +684,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
               ((ev.sfx === 'tongue' && now - lastLocalSfxRef.current.tongue < 250) ||
                 (ev.sfx === 'spit' && now - lastLocalSfxRef.current.spit < 250));
             if (!suppressDupLocal) {
-              playCroakSfx(ev.sfx);
+              playCroakSfx(ev.sfx, ev.actorId ?? null);
             }
             if (ev.text) setToastText(ev.text);
           }
@@ -770,7 +768,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           predRef.current.onGround = false;
           lastJumpAtRef.current = now;
           jumpBufferUntilRef.current = 0;
-          playCroakSfx('jump');
+          playCroakSfx('jump', me);
         } else {
           // Đệm nhảy (Jump Buffer 130ms): bấm nhảy sát mặt đất sẽ tự bật ngay khi chân vừa chạm đất!
           jumpBufferUntilRef.current = now + 130;
@@ -786,7 +784,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           endY: startY - 4,
         };
         lastLocalSfxRef.current.tongue = now;
-        playCroakSfx('tongue');
+        playCroakSfx('tongue', me);
       }
       if (patch.spit && hud.myState === 'carrying') {
         const pr = predRef.current;
@@ -798,7 +796,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           angle: patch.aimAngle ?? curAim.angle,
         };
         lastLocalSfxRef.current.spit = now;
-        playCroakSfx('spit');
+        playCroakSfx('spit', me);
       }
       const curAim = aimRef.current;
       const includeAim = patch.spit || patch.aimAngle !== undefined;
@@ -818,7 +816,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
       };
       void game.act({ type: 'cs_input', input: payload });
     },
-    [game, hud.myState],
+    [me, game, hud.myState],
   );
 
   const setMoveDir = useCallback(
@@ -991,7 +989,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
           pr.onGround = false;
           lastJumpAtRef.current = now;
           jumpBufferUntilRef.current = 0;
-          playCroakSfx('jump');
+          playCroakSfx('jump', me);
         }
       }
 
@@ -1489,7 +1487,7 @@ function CroakSquadLandscape({ game, room }: { game: Game; room: RoomState }) {
 
     rafId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(rafId);
-  }, [game]);
+  }, [me, game]);
 
   // ============================================================================
   // TAY CẦM CẢM ỨNG TRƯỢT MƯỢT CHUẨN CẢ KHI AUTO-LANDSCAPE ROTATOR XOAY 90°!

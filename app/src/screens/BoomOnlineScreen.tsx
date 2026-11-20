@@ -126,7 +126,7 @@ interface HudState {
 
 const lastSfxAt: Partial<Record<BoomSfxKind, number>> = {};
 
-function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
+function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean, speakerId: string | null): void {
   const now = performance.now();
   const prev = lastSfxAt[kind] ?? 0;
   const minGap = kind === 'explode' || kind === 'ring_drop' ? 75 : 35;
@@ -135,56 +135,55 @@ function triggerBoomSfx(kind: BoomSfxKind, isMeRelated: boolean): void {
 
   switch (kind) {
     case 'place':
-      play('pop');
+      play('pop', { speakerId });
       if (isMeRelated) vibrate(16);
       break;
     case 'explode':
-      play('boom');
+      play('boom', { speakerId });
       break;
     case 'pickup':
-      playMemePool('money', { cooldownMs: 2600 });
-      play('sparkle');
+      play('sparkle', { speakerId });
       if (isMeRelated) vibrate(18);
       break;
     case 'trap':
-      playMemePool('shock', { cooldownMs: 1800 });
-      play('inksplash');
+      playMemePool('shock', { speakerId, cooldownMs: 1800 });
+      play('inksplash', { speakerId });
       if (isMeRelated) vibrate(45);
       break;
     case 'pop_kill':
-      playMemePool('bomb', { cooldownMs: 1800 });
-      play('ko');
+      playMemePool('eliminated', { speakerId, cooldownMs: 1800 });
+      play('ko', { speakerId });
       if (isMeRelated) vibrate([30, 40, 55]);
       break;
     case 'rescue':
-      playMemePool('forgive', { cooldownMs: 1600 });
-      play('sparkle');
+      playMemePool('relief', { speakerId, cooldownMs: 1600 });
+      play('sparkle', { speakerId });
       if (isMeRelated) vibrate(30);
       break;
     case 'needle':
-      playMemePool('twist', { cooldownMs: 1600 });
-      play('pop');
+      playMemePool('twist', { speakerId, cooldownMs: 1600 });
+      play('pop', { speakerId });
       if (isMeRelated) vibrate(28);
       break;
     case 'kick':
-      play('punch');
+      play('punch', { speakerId });
       break;
     case 'throw':
-      play('boing');
+      play('boing', { speakerId });
       break;
     case 'ufo_throw':
-      play('whoosh');
+      play('whoosh', { speakerId });
       break;
     case 'ring_warn':
-      play('siren');
+      play('siren', { speakerId });
       vibrate([40, 60, 40]);
       break;
     case 'ring_drop':
-      play('stamp');
+      play('stamp', { speakerId });
       break;
     case 'round_win':
-      playMemePool('win', { cooldownMs: 1800 });
-      play('win');
+      playMemePool('win', { speakerId, cooldownMs: 1800 });
+      play('win', { speakerId });
       break;
   }
 }
@@ -1533,7 +1532,8 @@ function BoomOnlineInner({
           ev.actorId === me &&
           now - lastLocalBombAtRef.current < 400;
         if (!suppressDupPlace) {
-          triggerBoomSfx(ev.kind, related);
+          const reactsToHit = ev.kind === 'trap' || ev.kind === 'pop_kill' || ev.kind === 'rescue';
+          triggerBoomSfx(ev.kind, related, (reactsToHit ? ev.targetId : ev.actorId) ?? null);
         }
 
         if (ev.kind === 'explode' && ev.x !== undefined && ev.y !== undefined) {
@@ -1617,7 +1617,7 @@ function BoomOnlineInner({
       if (tileFree && !bombAlreadyThere) {
         ghostBombsRef.current.push({ tx, ty, placedAt: now, range: srvMe.range });
         lastLocalBombAtRef.current = now;
-        triggerBoomSfx('place', true);
+        triggerBoomSfx('place', true, me);
       }
     }
     emitInput(moveVecRef.current.dx, moveVecRef.current.dy, { placeBomb: true });

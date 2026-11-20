@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { BGM_LIST, MEME_LIST, type BgmId, type MemeId, type MemePersona } from '../audioAssets';
+import { BGM_LIST, MEME_LIST, type BgmId, type MemePersona } from '../audioAssets';
 import {
+  getActiveMeme,
+  subscribeActiveMeme,
   getBgmVolume,
   getCurrentBgmId,
   getManualBgmOverride,
@@ -30,6 +32,7 @@ const PERSONA_TABS: readonly { key: MemePersona; label: string }[] = [
   { key: 'phuonghang', label: 'Cô Phương Hằng' },
   { key: 'chiphien', label: 'Chị Phiến' },
   { key: 'coba', label: 'Cô Ba Vàng Ngọc' },
+  { key: 'kyduyen', label: 'Hoa hậu Kỳ Duyên' },
   { key: 'game_fx', label: 'Hỗ trợ Game' },
 ];
 
@@ -63,8 +66,13 @@ function readSnapshot(): Snapshot {
 
 export function AudioSheet({ onClose }: { onClose: () => void }) {
   const [snap, setSnap] = useState<Snapshot>(readSnapshot);
-  const [tab, setTab] = useState<MemePersona>('linda');
-  const [lastPlayedId, setLastPlayedId] = useState<MemeId | null>(null);
+  const [tab, setTab] = useState<MemePersona>(() => getActiveMeme()?.persona ?? 'linda');
+  const [activeMeme, setActiveMeme] = useState(getActiveMeme);
+  useEffect(() => subscribeActiveMeme(() => {
+    const active = getActiveMeme();
+    setActiveMeme(active);
+    if (active) setTab(active.persona);
+  }), []);
 
   useEffect(() => subscribeAudioSettings(() => setSnap(readSnapshot())), []);
 
@@ -181,7 +189,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
             onPress={() => {
               if (snap.muted) setMuted(false);
               if (!snap.memeOn) setMemeEnabled(true);
-              playRandomMeme({ force: true });
+              playRandomMeme({ force: true, speakerId: null });
             }}
             style={[styles.volBtn, styles.volBtnOn]}
           >
@@ -208,7 +216,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
 
         <View style={styles.memeGrid}>
           {visibleMemes.map((m) => {
-            const active = lastPlayedId === m.id;
+            const active = activeMeme?.id === m.id;
             return (
               <Pressable
                 key={m.id}
@@ -216,8 +224,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
                 onPress={() => {
                   if (snap.muted) setMuted(false);
                   if (!snap.memeOn) setMemeEnabled(true);
-                  setLastPlayedId(m.id);
-                  playMeme(m.id, { force: true });
+                  playMeme(m.id, { force: true, speakerId: null, persona: m.persona });
                 }}
                 style={({ pressed }) => [
                   styles.memeCard,

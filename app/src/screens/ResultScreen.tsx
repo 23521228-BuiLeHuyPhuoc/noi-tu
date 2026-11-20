@@ -4,7 +4,7 @@ import { GAME_INFO, type GameType, type RoomState } from '../../../shared/src/ty
 import { GAME_LOSS_RUBY, GAME_WIN_RUBY } from '../../../shared/src/ruby';
 import type { Game } from '../useGame';
 import { GAME_META } from '../messages';
-import { play, playMemePool } from '../sound';
+import { play } from '../sound';
 import { C, backdropPalette, sticker } from '../theme';
 import { Button, Card, T } from '../ui';
 import { Shell } from '../components/Shell';
@@ -34,10 +34,11 @@ export function ResultScreen({ game, room }: { game: Game; room: RoomState }) {
   const activeThemeId = room.settings.roomTheme ?? game.user?.equipped?.roomTheme ?? 'son_mac_dinh';
   const pal = backdropPalette(activeThemeId);
 
+  const isParticipant = !!mePlayer && !mePlayer.spectator;
   useEffect(() => {
-    playMemePool(hasWinner ? (iWon ? 'win' : 'lose') : 'shock', { cooldownMs: 800 });
-    play(iWon || !hasWinner ? 'win' : 'lose');
-  }, [iWon, hasWinner]);
+    const memePool = hasWinner && isParticipant ? (iWon ? 'win' : 'lose') : undefined;
+    play(iWon || !hasWinner ? 'win' : 'lose', { memePool, speakerId: game.me, cooldownMs: 800 });
+  }, [game.me, isParticipant, iWon, hasWinner]);
 
   const cleanHeadline = r.headline.replace(/!+$/g, '').trim();
 

@@ -400,38 +400,41 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
   }, [isBite, isMeBitten, jawAnim, shakeAnim, shakeYAnim, lungeScale, strobeOpacity, burstScale]);
 
   // Twitch jaw slightly when any safe tooth is pressed
+  const priorPressedBy = useRef(view.pressedBy);
   const prevPressedRef = useRef(pressedCount);
   useEffect(() => {
+    const pressActor = Object.entries(view.pressedBy).find(([tooth]) => !(tooth in priorPressedBy.current))?.[1] ?? null;
+    priorPressedBy.current = view.pressedBy;
     const prev = prevPressedRef.current;
     prevPressedRef.current = pressedCount;
     if (!isBite && pressedCount > prev) {
       const remaining = view.teeth.length - pressedCount;
-      if (remaining > 0 && remaining <= 4) playMemePool('shock', { cooldownMs: 2200 });
-      play('pop');
+      if (remaining > 0 && remaining <= 4) playMemePool('shock', { speakerId: pressActor, cooldownMs: 2200 });
+      play('pop', { speakerId: pressActor });
       Animated.sequence([
         Animated.timing(jawAnim, { toValue: 0.14, duration: 65, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.spring(jawAnim, { toValue: 0, friction: 6, tension: 140, useNativeDriver: USE_NATIVE_DRIVER }),
       ]).start();
     }
-  }, [pressedCount, isBite, jawAnim, view.teeth.length]);
+  }, [pressedCount, isBite, jawAnim, view.teeth.length, view.pressedBy]);
 
   useOnChange(view.phase, (ph) => {
     setErr(null);
     if (ph === 'bite_reveal') {
-      playMemePool('bite', { cooldownMs: 800 });
+      playMemePool('bite', { speakerId: view.bittenPlayerId, cooldownMs: 800 });
       if (view.bittenPlayerId === me) {
         playCrocJumpscareSfx();
       } else {
-        play('error');
+        play('error', { speakerId: view.bittenPlayerId });
       }
     } else {
-      play('pop');
+      play('pop', { speakerId: null });
     }
   });
 
   useOnChange(view.currentPlayerId, (cur) => {
     if (cur === me && view.phase === 'pressing') {
-      play('turn');
+      play('turn', { speakerId: me });
     }
   });
 
@@ -441,11 +444,11 @@ export function CaSauScreen({ game, room }: { game: Game; room: RoomState }) {
     if (!isMyTurn || busyTooth !== null || view.teeth[idx] !== 'intact') return;
     setBusyTooth(idx);
     setErr(null);
-    play('stamp');
+    play('stamp', { speakerId: me });
     const res = await game.act({ type: 'cs_press', tooth: idx });
     setBusyTooth(null);
     if (!res.ok) {
-      play('error');
+      play('error', { speakerId: me });
       setErr(errOf(res.reason));
     }
   };

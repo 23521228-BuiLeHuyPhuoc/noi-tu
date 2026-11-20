@@ -24,8 +24,8 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
 
   useOnChange(view.index, () => {
     if (view.doublePoints) {
-      playMemePool('twist', { cooldownMs: 1800 });
-      play('sparkle');
+      playMemePool('twist', { speakerId: null, cooldownMs: 1800 });
+      play('sparkle', { speakerId: null });
     }
   });
 
@@ -33,8 +33,8 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
     if (ph === 'reveal') {
       const ok = view.myAnswer !== null && view.myAnswer === view.correctIndex;
       const streak = view.streaks[game.me ?? ''] ?? 0;
-      playMemePool(ok ? (streak >= 2 ? 'win' : 'correct') : 'wrong', { cooldownMs: 900 });
-      play(ok ? 'stamp' : 'error');
+      playMemePool(ok ? (streak >= 2 ? 'win' : 'correct') : 'wrong', { speakerId: game.me, cooldownMs: 900 });
+      play(ok ? 'stamp' : 'error', { speakerId: game.me });
     }
   });
 
@@ -61,12 +61,12 @@ export function DoVuiScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act({ type: 'dv_answer', choice });
     setBusy(false);
     if (!res.ok) {
-      playMemePool('wrong', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: game.me, cooldownMs: 1200 });
+      play('error', { speakerId: game.me });
       setErr(actionText[res.reason] ?? 'Không gửi được đáp án');
     } else {
-      playMemePool('turn_move', { cooldownMs: 2200 });
-      play('pop');
+      playMemePool('turn_move', { speakerId: game.me, cooldownMs: 2200 });
+      play('pop', { speakerId: game.me });
     }
   };
 

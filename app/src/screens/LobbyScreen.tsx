@@ -5,7 +5,7 @@ import {
   AVATAR_PRESET_NAMES, AVATAR_PRESETS,
 } from '../../../shared/src/avatars';
 import {
-  BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, GAME_INFO, PLAYER_COLORS,
+  BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, GAME_INFO, PLAYER_COLORS, VOICE_PERSONA_IDS,
   type CharacterConfig, type CharacterLook, type GameType, type RoomState, type TeamId,
 } from '../../../shared/src/types';
 import { ROOM_THEMES } from '../../../shared/src/themes';
@@ -23,7 +23,9 @@ import {
   SKIN_NAMES, SKIN_PALETTE, characterSvgUri, playerColorOf, randomCharacter,
 } from '../avatars';
 import { shareInvite } from '../web';
-import { playMemePool } from '../sound';
+import { VOICE_PERSONA_META } from '../audioAssets';
+import { DivaBadge } from '../components/MemeSpeakerFocus';
+import { playMemePool, playPersonaPreview } from '../sound';
 import { GAME_META, RULES } from '../messages';
 import { RoomManageCard } from '../components/RoomTools';
 import { C, backdropPalette, sticker } from '../theme';
@@ -166,6 +168,29 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </T>
       </Card>
 
+      <Card style={{ gap: 6 }}>
+        <T style={styles.label}>Chọn nhân vật meme</T>
+        <T style={styles.hint}>Ai chọn trước được trước. Chạm lại để nhả giọng.</T>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6 }}>
+          {VOICE_PERSONA_IDS.map((id) => {
+            const owner = room.players.find((player) => player.voice === id);
+            const mine = !!owner && owner.id === game.me;
+            const disabled = !!owner && !mine;
+            const meta = VOICE_PERSONA_META[id];
+            return <Pressable key={id} testID={`pick-voice-${id}`} accessibilityRole="button" accessibilityLabel={meta.name}
+              accessibilityState={{ disabled, selected: mine }} disabled={disabled} onPress={async () => {
+                const error = await game.pickVoice(mine ? null : id);
+                if (error) feed(error, 'bad');
+                else if (!mine) playPersonaPreview(id, game.me);
+              }} style={{ width: '32%', alignItems: 'center', paddingVertical: 6, gap: 2, borderRadius: 10, borderWidth: 1, borderColor: mine ? meta.accent : C.borderSubtle, backgroundColor: mine ? meta.badgeBg : C.paper, opacity: disabled ? 0.65 : 1 }}>
+              <DivaBadge persona={id} size={30} />
+              <T numberOfLines={1} style={{ fontSize: 12, color: C.ink, fontWeight: '700' }}>{meta.shortName}</T>
+              <T numberOfLines={1} style={styles.hint}>{mine ? 'Bạn đã chọn' : owner?.name ?? 'Còn trống'}</T>
+            </Pressable>;
+          })}
+        </View>
+      </Card>
+
       <RoomManageCard game={game} room={room} />
 
       {/* Hỗ trợ thêm máy chơi cùng trên toàn bộ 15 game */}
@@ -178,7 +203,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
           {room.players.filter((p) => p.bot).map((p) => (
             <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <T style={{ flex: 1, fontWeight: '500', fontSize: 14 }}>{p.name}</T>
-              {isHost && <Button testID={`bot-remove-${p.id}`} small variant="paper" title="Bỏ" onPress={async () => { const e = await game.removeBot(p.id); if (e) feed(e, 'bad'); else playMemePool('eliminated', { cooldownMs: 2000 }); }} />}
+              {isHost && <Button testID={`bot-remove-${p.id}`} small variant="paper" title="Bỏ" onPress={async () => { const e = await game.removeBot(p.id); if (e) feed(e, 'bad'); else playMemePool('eliminated', { speakerId: game.me, cooldownMs: 2000 }); }} />}
             </View>
           ))}
           {isHost && (
@@ -189,7 +214,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
               iconNode={<UiIcon name="Plus" size={15} color={n >= Math.min(room.maxPlayers, info.max) ? C.muted : C.ink} strokeWidth={1.65} />}
               title={n >= Math.min(room.maxPlayers, info.max) ? `Đã đủ tối đa ${Math.min(room.maxPlayers, info.max)} người` : 'Thêm máy chơi cùng'}
               disabled={n >= Math.min(room.maxPlayers, info.max)}
-              onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); else playMemePool('welcome', { cooldownMs: 2000 }); }}
+              onPress={async () => { const e = await game.addBot(); if (e) feed(e, 'bad'); else playMemePool('welcome', { speakerId: game.me, cooldownMs: 2000 }); }}
             />
           )}
         </Card>
@@ -211,7 +236,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                 onPress={async () => {
                   const e = await game.shuffleTeams();
                   if (e) feed(e, 'bad');
-                  else playMemePool('turn_move', { cooldownMs: 1200 });
+                  else playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1200 });
                 }}
               />
             )}
@@ -249,7 +274,7 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
                     onPress={async () => {
                       const e = await game.pickTeam(joined ? null : tm.id);
                       if (e) feed(e, 'bad');
-                      else playMemePool('turn_move', { cooldownMs: 1200 });
+                      else playMemePool('turn_move', { speakerId: game.me, cooldownMs: 1200 });
                     }}
                   />
                 </View>

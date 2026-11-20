@@ -66,43 +66,43 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
   useEffect(() => {
     if (!myTurn) return;
     vibrate();
-    play('turn');
+    play('turn', { speakerId: game.me });
     const t = setTimeout(() => inputRef.current?.focus(), 60);
     return () => clearTimeout(t);
-  }, [myTurn, word]);
+  }, [game.me, myTurn, word]);
 
   const left = useSecondsLeft(g.turnEndsAt, game.clockOffset, g.turnSeconds);
   const lastTick = useRef(-1);
   useEffect(() => {
-    if (myTurn && left === 3 && left !== lastTick.current) playMemePool('shock', { cooldownMs: 3200 });
-    if (myTurn && left > 0 && left <= 5 && left !== lastTick.current) play('tick');
+    if (myTurn && left === 3 && left !== lastTick.current) playMemePool('shock', { speakerId: game.me, cooldownMs: 3200 });
+    if (myTurn && left > 0 && left <= 5 && left !== lastTick.current) play('tick', { speakerId: game.me });
     lastTick.current = left;
-  }, [left, myTurn]);
+  }, [game.me, left, myTurn]);
 
   useOnNew(g.history, (h: WordHistoryItem) => {
-    if (h.kind === 'word' && h.playerId !== game.me) play('pop');
+    if (h.kind === 'word' && h.playerId !== game.me) play('pop', { memePool: 'correct', speakerId: h.playerId, cooldownMs: 2200 });
     if (h.kind === 'eliminated') {
-      playMemePool(h.playerId === game.me ? 'lose' : 'eliminated', { cooldownMs: 1800 });
-      play(h.playerId === game.me ? 'lose' : 'splat');
+      playMemePool(h.playerId === game.me ? 'lose' : 'eliminated', { speakerId: h.playerId, cooldownMs: 1800 });
+      play(h.playerId === game.me ? 'lose' : 'splat', { speakerId: h.playerId });
       feed(h.reason === 'left' ? quip.left(h.name) : quip.eliminated(h.playerId === game.me ? 'Bạn' : h.name), 'bad');
       if (h.playerId === game.me) shake();
     }
     if (h.kind === 'newWord') {
-      playMemePool('twist', { cooldownMs: 1600 });
-      play('reveal');
+      playMemePool('twist', { speakerId: null, cooldownMs: 1600 });
+      play('reveal', { speakerId: null });
       feed(`Hết đường nối, đổi sang từ mới: ${h.word}`, 'info');
     }
     if (h.kind === 'hint' && h.playerId !== game.me) {
-      playMemePool('troll', { cooldownMs: 2400 });
+      playMemePool('help', { speakerId: h.playerId, cooldownMs: 2400 });
       feed(quip.hint(h.name), 'fun');
     }
     if (h.kind === 'vote') {
-      playMemePool(h.approved ? 'forgive' : 'lose', { cooldownMs: 1400 });
+      playMemePool(h.approved ? 'correct' : 'wrong', { speakerId: h.playerId, cooldownMs: 1400 });
       if (h.approved) {
-        play('win');
+        play('win', { speakerId: h.playerId });
         feed(`Cả phòng duyệt “${h.word}” và thêm vào từ điển`, 'good');
       } else {
-        play('lose');
+        play('lose', { speakerId: h.playerId });
         feed(`“${h.word}” chưa được duyệt`, 'bad');
       }
     }
@@ -123,11 +123,11 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
           : actionText[r.reason],
       );
       setRejected(r.reason === 'not_in_dictionary' ? r.word ?? w : null);
-      playMemePool('wrong', { cooldownMs: 1000 });
-      play('error');
+      playMemePool('wrong', { speakerId: game.me, cooldownMs: 1000 });
+      play('error', { speakerId: game.me });
     } else {
-      playMemePool('correct', { cooldownMs: 2200 });
-      play('coin');
+      playMemePool('correct', { speakerId: game.me, cooldownMs: 2200 });
+      play('coin', { speakerId: game.me });
     }
   };
 
@@ -137,11 +137,11 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     if (r.ok) {
       setError(null);
       setRejected(null);
-      playMemePool('defense', { cooldownMs: 1400 });
-      play('pop');
+      playMemePool('defense', { speakerId: game.me, cooldownMs: 1400 });
+      play('pop', { speakerId: game.me });
     } else {
-      playMemePool('wrong', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: game.me, cooldownMs: 1200 });
+      play('error', { speakerId: game.me });
       setError(actionText[r.reason]);
     }
   };
@@ -153,12 +153,12 @@ export function WordChainScreen({ game, room }: { game: Game; room: RoomState })
     const r = await game.act({ type: 'hint' });
     setHinting(false);
     if (r.ok && r.hint) {
-      playMemePool('gift', { cooldownMs: 1500 });
-      play('coin');
+      playMemePool('help', { speakerId: game.me, cooldownMs: 1500 });
+      play('coin', { speakerId: game.me });
       feed(`Cứu trợ nối hộ: ${r.hint}`, 'good');
     } else if (!r.ok) {
-      playMemePool('wrong', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: game.me, cooldownMs: 1200 });
+      play('error', { speakerId: game.me });
       setError(actionText[r.reason]);
     }
   };
@@ -350,8 +350,7 @@ function VoteCard({ vote, game }: { vote: WordVote; game: Game }) {
   const canVote = vote.voters.includes(me);
   const myVote = vote.yes.includes(me) ? 'yes' : vote.no.includes(me) ? 'no' : null;
   const cast = (yes: boolean) => {
-    playMemePool(yes ? 'forgive' : 'vote', { cooldownMs: 1400 });
-    play('pop');
+    play('pop', { speakerId: game.me });
     void game.act({ type: 'vote', yes });
   };
   return (

@@ -221,6 +221,12 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
       ack(room.shuffleTeams(session.playerId));
     });
+    socket.on('room:pickVoice', (p, ack) => {
+      if (typeof ack !== 'function') return;
+      const room = currentRoom();
+      if (!room || !session) return ack({ ok: false, error: 'not_in_room' });
+      ack(room.pickVoice(session.playerId, p?.voice ?? null));
+    });
 
     socket.on('player:customize', (p, ack) => {
       if (typeof ack !== 'function') return;

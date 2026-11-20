@@ -76,7 +76,7 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
 
   useEffect(() => {
     if (view.phase === 'word_reveal' && view.round === 1) {
-      playMemePool('shock', { cooldownMs: 1200 });
+      playMemePool('shock', { speakerId: null, cooldownMs: 1200 });
     }
     // chỉ phát 1 lần khi mới vào ván nếu mở ở vòng 1 word_reveal
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,33 +89,33 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
       elimAtFinalVoteRef.current = view.eliminated.length;
     }
     if (ph === 'word_reveal' && view.round === 1) {
-      playMemePool('shock', { cooldownMs: 1200 });
+      playMemePool('shock', { speakerId: null, cooldownMs: 1200 });
     } else if (
       prevPh === 'final_vote' &&
       view.eliminated.length === elimAtFinalVoteRef.current &&
       (ph === 'clue_turn' || ph === 'discussion' || ph === 'word_reveal')
     ) {
-      playMemePool('forgive');
+      playMemePool('forgive', { speakerId: null });
     } else if (ph === 'defense') {
-      playMemePool('defense');
+      playMemePool('defense', { speakerId: view.defendants[0] ?? null });
     } else if (ph === 'discussion') {
-      playMemePool('chat_hype', { cooldownMs: 2000 });
+      playMemePool('chat_hype', { speakerId: null, cooldownMs: 2000 });
     } else if (ph === 'vote' || ph === 'final_vote') {
-      playMemePool('vote');
+      playMemePool('vote', { speakerId: null });
     } else if (ph === 'spy_guess' || ph === 'mrwhite_guess') {
-      playMemePool('twist');
+      playMemePool('twist', { speakerId: null });
     } else if (ph === 'reveal_end') {
-      playMemePool('shock');
+      playMemePool('shock', { speakerId: null });
     } else if (ph === 'clue_turn' && view.round > 1) {
-      playMemePool('turn_move', { cooldownMs: 2400 });
+      playMemePool('turn_move', { speakerId: view.currentSpeakerId, cooldownMs: 2400 });
     }
   });
 
   useOnChange(view.eliminated.length, (len) => {
-    if (len > 0) playMemePool('eliminated');
+    if (len > 0) playMemePool('eliminated', { speakerId: view.eliminated.at(-1)?.id ?? null });
   });
   useOnChange(view.clues.length, (len) => {
-    if (len > 0) playMemePool('chat_hype', { cooldownMs: 3000 });
+    if (len > 0) playMemePool('chat_hype', { speakerId: view.clues.at(-1)?.playerId ?? null, cooldownMs: 3000 });
   });
   const modalKey = `${view.round}:${view.phase}:${view.mrWhiteId ?? ''}:${(view.defendants ?? []).join(',')}`;
   const curPhaseKey = `${view.phase}:${view.currentSpeakerId ?? ''}:${view.round}`;
@@ -163,27 +163,27 @@ export function GianDiepScreen({ game, room }: { game: Game; room: RoomState }) 
     const res = await game.act(payload);
     setBusy(false);
     if (!res.ok) {
-      playMemePool('wrong', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: me, cooldownMs: 1200 });
+      play('error', { speakerId: me });
       setErr(actionText[res.reason] ?? 'Thao tác không hợp lệ');
     } else if (payload.type === 'gd_clue') {
-      playMemePool('turn_move', { cooldownMs: 2400 });
-      play('stamp');
+      playMemePool('turn_move', { speakerId: me, cooldownMs: 2400 });
+      play('stamp', { speakerId: me });
     } else if (payload.type === 'gd_defense') {
-      playMemePool('defense', { cooldownMs: 1600 });
-      play('pop');
+      playMemePool('defense', { speakerId: me, cooldownMs: 1600 });
+      play('pop', { speakerId: me });
     } else if (payload.type === 'gd_vote') {
-      playMemePool('vote', { cooldownMs: 1800 });
-      play('pop');
+      playMemePool('vote', { speakerId: me, cooldownMs: 1800 });
+      play('pop', { speakerId: me });
     } else if (payload.type === 'gd_verdict') {
-      playMemePool(payload.verdict === 'forgive' ? 'forgive' : 'vote', { cooldownMs: 1400 });
-      play('stamp');
+      playMemePool(payload.verdict === 'forgive' ? 'forgive' : 'vote', { speakerId: me, cooldownMs: 1400 });
+      play('stamp', { speakerId: me });
     } else if (payload.type === 'gd_guess') {
-      playMemePool('twist', { cooldownMs: 1200 });
-      play('reveal');
+      playMemePool('twist', { speakerId: me, cooldownMs: 1200 });
+      play('reveal', { speakerId: me });
     } else if (payload.type === 'gd_chat') {
-      playMemePool('chat_hype', { cooldownMs: 3200 });
-      play('chat');
+      playMemePool('chat_hype', { speakerId: me, cooldownMs: 3200 });
+      play('chat', { speakerId: me });
     }
     return res.ok;
   };
@@ -472,7 +472,7 @@ const GianDiepBody = memo(function GianDiepBody({
                 testID="gd-recap-open-btn"
                 accessibilityRole="button"
                 onPress={() => {
-                  play('pop');
+                  play('pop', { speakerId: me });
                   onOpenRecap();
                 }}
                 style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressedSoft]}
@@ -486,7 +486,7 @@ const GianDiepBody = memo(function GianDiepBody({
               testID="gd-players-btn"
               accessibilityRole="button"
               onPress={() => {
-                play('pop');
+                play('pop', { speakerId: me });
                 onOpenPlayers();
               }}
               style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressedSoft]}
@@ -844,7 +844,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
           testID="gd-reopen-reveal-btn"
           accessibilityRole="button"
           onPress={() => {
-            play('pop');
+            play('pop', { speakerId: me });
             onReopenModal();
           }}
           style={({ pressed }) => [styles.primaryDockBtn, pressed && styles.pressedBtn]}
@@ -864,7 +864,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
               testID="gd-reopen-counter-btn"
               accessibilityRole="button"
               onPress={() => {
-                play('pop');
+                play('pop', { speakerId: me });
                 onReopenModal();
               }}
               style={({ pressed }) => [styles.primaryDockBtn, pressed && styles.pressedBtn]}
@@ -913,7 +913,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
             testID="gd-reopen-modal-btn"
             accessibilityRole="button"
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               onReopenModal();
             }}
             style={({ pressed }) => [styles.primaryDockBtn, pressed && styles.pressedBtn]}
@@ -963,7 +963,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
               accessibilityRole="button"
               disabled={!clueReady}
               onPress={() => {
-                play('pop');
+                play('pop', { speakerId: me });
                 void submitClue();
               }}
               style={({ pressed }) => [
@@ -1023,7 +1023,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
             accessibilityRole="button"
             disabled={!defReady}
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               void submitDef();
             }}
             style={({ pressed }) => [
@@ -1039,7 +1039,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
             accessibilityRole="button"
             disabled={busy || myReady}
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               void act({ type: 'gd_ready' });
             }}
             style={({ pressed }) => [
@@ -1090,7 +1090,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
           accessibilityRole="button"
           disabled={!chatReady}
           onPress={() => {
-            play('pop');
+            play('pop', { speakerId: me });
             void sendChatLine();
           }}
           style={({ pressed }) => [
@@ -1108,7 +1108,7 @@ const GianDiepBottomDock = memo(function GianDiepBottomDock({
             accessibilityRole="button"
             disabled={busy || myReady}
             onPress={() => {
-              play('pop');
+              play('pop', { speakerId: me });
               void act({ type: 'gd_ready' });
             }}
             style={({ pressed }) => [

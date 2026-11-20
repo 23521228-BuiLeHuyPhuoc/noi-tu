@@ -3,7 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   Ack, ActionResult, AuthAck, ChaosAck, CharacterConfig, ChatMsg, ClientToServerEvents, FunAck, FunEvent, FunSend, GameAction, GameType, JoinResult,
   LeaderRow, PublicUser, RoomSettings, RoomState, RoomSummary, RubyLedgerRow, ServerToClientEvents, StickerId, TeamId, TopupRequest,
-  WalletError, WalletInfo,
+  VoicePersonaId, WalletError, WalletInfo,
 } from '../../shared/src/types';
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
@@ -56,6 +56,7 @@ export interface Game {
   removeBot(id: string): Promise<string | null>;
   pickTeam(team: TeamId | null): Promise<string | null>;
   shuffleTeams(): Promise<string | null>;
+  pickVoice(voice: VoicePersonaId | null): Promise<string | null>;
   start(): Promise<string | null>;
   act(a: GameAction): Promise<ActionResult>;
   restart(): Promise<string | null>;
@@ -535,6 +536,10 @@ export function useGame(): Game {
     () => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:shuffleTeams')),
     [simple],
   );
+  const pickVoice = useCallback(
+    (voice: VoicePersonaId | null) => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('room:pickVoice', { voice })),
+    [simple],
+  );
   const start = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:start')), [simple]);
   const restart = useCallback(() => simple((s) => s.timeout(ACK_TIMEOUT).emitWithAck('game:restart')), [simple]);
   const act = useCallback(
@@ -724,6 +729,7 @@ export function useGame(): Game {
       removeBot,
       pickTeam,
       shuffleTeams,
+      pickVoice,
       start,
       restart,
       act,
@@ -771,6 +777,7 @@ export function useGame(): Game {
       removeBot,
       pickTeam,
       shuffleTeams,
+      pickVoice,
       start,
       restart,
       act,

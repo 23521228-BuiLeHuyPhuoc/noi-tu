@@ -56,23 +56,23 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
   useOnChange(lastRecent?.id ?? 0, (id) => {
     if (!id || !lastRecent) return;
     if (lastRecent.boom) {
-      playMemePool('bomb', { cooldownMs: 1000 });
-      play('boom');
+      playMemePool('bomb', { speakerId: lastRecent.playerId, cooldownMs: 1000 });
+      play('boom', { speakerId: lastRecent.playerId });
     } else if (lastRecent.playerId !== me) {
-      playMemePool('turn_move', { cooldownMs: 2400 });
-      play('pop');
+      playMemePool('turn_move', { speakerId: lastRecent.playerId, cooldownMs: 2400 });
+      play('pop', { speakerId: lastRecent.playerId });
     }
   });
   useOnChange(view.alive.length, (len) => {
     if (len < view.order.length) {
-      playMemePool('eliminated', { cooldownMs: 1200 });
-      play('ko');
+      playMemePool('eliminated', { speakerId: view.lastBoom?.playerId ?? null, cooldownMs: 1200 });
+      play('ko', { speakerId: view.lastBoom?.playerId ?? null });
     }
   });
   useOnChange(panic && isHolder, (isPanic) => {
     if (isPanic) {
-      playMemePool('shock', { cooldownMs: 3000 });
-      play('siren');
+      playMemePool('shock', { speakerId: view.holderId, cooldownMs: 3000 });
+      play('siren', { speakerId: view.holderId });
     }
   });
   const playerMap = useMemo(() => new Map(room.players.map((p) => [p.id, p])), [room.players]);
@@ -85,12 +85,12 @@ export function BomTuScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act({ type: 'bt_submit', word: clean });
     setBusy(false);
     if (!res.ok) {
-      playMemePool('wrong', { cooldownMs: 1000 });
-      play('error');
+      playMemePool('wrong', { speakerId: me, cooldownMs: 1000 });
+      play('error', { speakerId: me });
       setErr(actionText[res.reason] ?? 'Từ chưa hợp lệ');
     } else {
-      playMemePool('turn_move', { cooldownMs: 2000 });
-      play('stamp');
+      playMemePool('turn_move', { speakerId: me, cooldownMs: 2000 });
+      play('stamp', { speakerId: me });
       setWord('');
     }
   };

@@ -204,26 +204,25 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   }
 
   useOnChange(view.moveCount, () => {
-    play('pop');
+    play('pop', { speakerId: view.lastMove?.playerId ?? null });
   });
 
   useOnChange(view.currentPlayerId, (cur) => {
     if (cur === me && !view.winnerId && !view.isDraw) {
-      play('turn');
+      play('turn', { speakerId: me });
     }
   });
 
   useOnChange(view.winnerId, (w) => {
     if (w) {
-      playMemePool(w === me ? 'win' : 'lose', { cooldownMs: 1200 });
-      play(w === me ? 'win' : 'lose');
+      play(w === me ? 'win' : 'lose', { memePool: 'win', speakerId: w, cooldownMs: 1200 });
     }
   });
 
   useOnChange(view.isDraw, (d) => {
     if (d) {
-      playMemePool('shock', { cooldownMs: 1200 });
-      play('reveal');
+      playMemePool('shock', { speakerId: null, cooldownMs: 1200 });
+      play('reveal', { speakerId: null });
     }
   });
 
@@ -298,7 +297,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     const res = await game.act(payload);
     setBusy(false);
     if (!res.ok) {
-      play('error');
+      play('error', { speakerId: me });
       setErr(errOf(res.reason));
     }
     return res.ok;
@@ -308,14 +307,14 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
     const cur = actRef.current;
     if (cur.busy || cur.gameEnded || !cur.isMyTurn) return;
     if (cur.view.board[r * cur.view.size + c] !== null) return;
-    playMemePool('turn_move', { cooldownMs: 2600 });
-    play('stamp');
+    playMemePool('turn_move', { speakerId: cur.view.currentPlayerId, cooldownMs: 2600 });
+    play('stamp', { speakerId: cur.view.currentPlayerId });
     setBusy(true);
     setErr(null);
     const res = await cur.act({ type: 'caro_move', row: r, col: c });
     setBusy(false);
     if (!res.ok) {
-      play('error');
+      play('error', { speakerId: cur.view.currentPlayerId });
       setErr(errOf(res.reason));
     }
   }, []);
@@ -331,7 +330,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
   };
 
   const cycleZoom = () => {
-    play('pop');
+    play('pop', { speakerId: me });
     if (isLargeBoard) {
       setZoomMode((m) => (m === 'comfort' ? 'zoom' : m === 'zoom' ? 'fit' : 'comfort'));
     } else {
@@ -650,7 +649,7 @@ export function CaroScreen({ game, room }: { game: Game; room: RoomState }) {
               <Pressable
                 testID="caro-center-btn"
                 onPress={() => {
-                  play('pop');
+                  play('pop', { speakerId: me });
                   const mid = Math.floor(view.size / 2);
                   focusBoardCell(
                     view.lastMove ? view.lastMove.row : mid,

@@ -121,7 +121,7 @@ function CoinPile({ stakes, total, small }: { stakes: Stake[]; total: number; sm
 const SPIN = [1, 0.12, 1, 0.12, 1, 0.12, 1];
 
 /** Đồng xu quay lật 3D (scaleX), bay vòng cung, chạm ô thì nảy nhẹ và "keng" */
-function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: string; onDone: () => void }) {
+function FlyCoin({ speakerId, from, to, color, onDone }: { speakerId: string; from: Rect; to: Rect; color: string; onDone: () => void }) {
   const t = useState(() => new Animated.Value(0))[0];
   const bounce = useState(() => new Animated.Value(0))[0];
   const done = useRef(onDone);
@@ -134,10 +134,10 @@ function FlyCoin({ from, to, color, onDone }: { from: Rect; to: Rect; color: str
       Animated.timing(bounce, { toValue: 0.4, duration: 70, easing: Easing.out(Easing.quad), useNativeDriver: false }),
       Animated.timing(bounce, { toValue: 0, duration: 70, easing: Easing.in(Easing.quad), useNativeDriver: false }),
     ]);
-    const clink = setTimeout(() => play('clink'), 560);
+    const clink = setTimeout(() => play('clink', { speakerId }), 560);
     anim.start(({ finished }) => finished && done.current());
     return () => { clearTimeout(clink); anim.stop(); };
-  }, [t, bounce]);
+  }, [speakerId, t, bounce]);
   const S = 30;
   const fx = from.x + from.w / 2 - S / 2;
   const fy = from.y + from.h / 2 - S / 2;
@@ -268,7 +268,8 @@ function Drop({ x, d, delay }: { x: number; d: number; delay: number }) {
   );
 }
 
-function Reveal({ dice, myBets, delta, onDone }: {
+function Reveal({ speakerId, dice, myBets, delta, onDone }: {
+  speakerId: string;
   dice: BauCuaSymbol[];
   myBets: Partial<Record<BauCuaSymbol, number>>;
   delta: number | undefined;
@@ -285,7 +286,7 @@ function Reveal({ dice, myBets, delta, onDone }: {
   const lost = anyBet && !dice.some(betOn);
 
   useEffect(() => {
-    play('reveal');
+    play('reveal', { speakerId });
     Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: false }).start();
     const t1 = setTimeout(() => {
       // con nào trúng ô mình đặt thì bay vào ô đó
@@ -293,19 +294,18 @@ function Reveal({ dice, myBets, delta, onDone }: {
       setTargets(dice.map((s) => (betOn(s) ? rectOf(`sym-${s}`, origin) : null)));
       setPhase('after');
       if (lost) {
-        playMemePool('lose', { cooldownMs: 1600 });
-        play('sad');
+        playMemePool('lose', { speakerId, cooldownMs: 1600 });
+        play('sad', { speakerId });
         vibrate([60, 80, 60]);
         Animated.timing(sad, { toValue: 1, duration: 400, useNativeDriver: false }).start();
       } else if ((delta ?? 0) > 0) {
-        playMemePool('win', { cooldownMs: 1600 });
-        play('win');
+        playMemePool('win', { speakerId, cooldownMs: 1600 });
+        play('win', { speakerId });
         vibrate(80);
       } else if ((delta ?? 0) < 0) {
-        playMemePool('broke', { cooldownMs: 1600 });
-        play('sad');
-      } else if (anyBet && delta === 0) {
-        playMemePool('twist', { cooldownMs: 1600 });
+        playMemePool('lose', { speakerId, cooldownMs: 1600 });
+        play('sad', { speakerId });
+
       }
     }, FLY_AT);
     const t2 = setTimeout(() => Animated.timing(fade, { toValue: 0, duration: 300, useNativeDriver: false }).start(onDone), REVEAL_MS);
@@ -435,7 +435,7 @@ function Tile({ s, chip, step, hits, mine, stakes, total, glow, compact, disable
 
 // ---------------- Màn hình ----------------
 
-type Fly = { id: number; from: Rect; to: Rect; color: string };
+type Fly = { id: number; speakerId: string; from: Rect; to: Rect; color: string };
 
 export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const g = room.game as BauCuaView;
@@ -478,10 +478,10 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const [boardOpen, setBoardOpen] = useState(false);
 
   useOnChange(g.step, (step) => {
-    if (step === 'rolling') play('dice');
+    if (step === 'rolling') play('dice', { speakerId: null });
     if (step === 'betting') {
-      if (g.tripleStorm) playMemePool('shock', { cooldownMs: 1800 });
-      play('pop');
+      if (g.tripleStorm) playMemePool('shock', { speakerId: null, cooldownMs: 1800 });
+      play('pop', { speakerId: null });
     }
     if (step === 'result' && g.dice) {
       setResultBets({ round: g.round, bets: lastBets.current });
@@ -518,8 +518,8 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
             const from = rectOf(`avatar-${id}`, origin);
             const to = rectOf(`sym-${s}`, origin);
             const col = colorOf(id);
-            if (from && to) add.push({ id: ++flySeq.current, from, to, color: id === me ? `gold|${col}` : col });
-            if (id !== me) play('coin');
+            if (from && to) add.push({ speakerId: id, id: ++flySeq.current, from, to, color: id === me ? `gold|${col}` : col });
+            if (id !== me) play('coin', { speakerId: id });
           }
         }
       }
@@ -532,16 +532,16 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
   const debtsKey = JSON.stringify(g.debts);
   const prevDebts = useRef(g.debts);
   useEffect(() => {
-    let increased = false;
+    let increased: string | null = null;
     for (const [id, n] of Object.entries(g.debts)) {
       if (n > (prevDebts.current[id] ?? 0)) {
-        increased = true;
+        increased = id;
         feed(quip.loan(nameOf(id)), 'fun');
       }
     }
     if (increased) {
-      playMemePool('broke', { cooldownMs: 1600 });
-      play('siren');
+      playMemePool('broke', { speakerId: increased, cooldownMs: 1600 });
+      play('siren', { speakerId: increased });
     }
     prevDebts.current = g.debts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,19 +551,18 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
     const r = await game.act(a);
     if (!r.ok) {
       setError(actionText[r.reason]);
-      playMemePool('wrong', { cooldownMs: 1200 });
-      play('error');
+      playMemePool('wrong', { speakerId: me, cooldownMs: 1200 });
+      play('error', { speakerId: me });
     } else {
       setError(null);
       if (a.type === 'bc_allin') {
-        playMemePool('money', { cooldownMs: 1500 });
-        play('cash');
+        playMemePool('money', { speakerId: me, cooldownMs: 1500 });
+        play('cash', { speakerId: me });
       } else if (a.type === 'bc_double' || a.type === 'bc_rebet') {
-        playMemePool('money', { cooldownMs: 2200 });
-        play('coin');
+        playMemePool('money', { speakerId: me, cooldownMs: 2200 });
+        play('coin', { speakerId: me });
       } else if (a.type === 'clearBets') {
-        playMemePool('defense', { cooldownMs: 2200 });
-        play('whoosh');
+        play('whoosh', { speakerId: me });
       }
     }
     return r.ok;
@@ -571,7 +570,7 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const bet = async (s: BauCuaSymbol) => {
     if (g.step !== 'betting' || isSpectator) return;
-    if (await act({ type: 'bet', symbol: s, amount: Math.min(chip, available) || chip })) play('coin');
+    if (await act({ type: 'bet', symbol: s, amount: Math.min(chip, available) || chip })) play('coin', { speakerId: me });
   };
 
   // tiền cả phòng trên từng ô, theo từng người
@@ -605,11 +604,11 @@ export function BauCuaScreen({ game, room }: { game: Game; room: RoomState }) {
         <>
           <View ref={fxRoot} pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 65 }]}>
             {flies.map((f) => (
-              <FlyCoin key={f.id} from={f.from} to={f.to} color={f.color} onDone={() => dropFly(f.id)} />
+              <FlyCoin speakerId={f.speakerId} key={f.id} from={f.from} to={f.to} color={f.color} onDone={() => dropFly(f.id)} />
             ))}
           </View>
           {reveal === g.round && g.step === 'result' && g.dice && (
-            <Reveal key={reveal} dice={g.dice} myBets={roundBets} delta={myDelta} onDone={() => setReveal(null)} />
+            <Reveal speakerId={me} key={reveal} dice={g.dice} myBets={roundBets} delta={myDelta} onDone={() => setReveal(null)} />
           )}
         </>
       }

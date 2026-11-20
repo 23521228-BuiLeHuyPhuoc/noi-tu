@@ -1,8 +1,11 @@
+import { useSpeakingMemeFor, useVoicePulse } from './MemeSpeakerFocus';
+import { getPersonaDisplay } from '../audioAssets';
 import { Image } from './Image';
+import { PortraitImage } from './PortraitImage';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Mood, PublicPlayer } from '../../../shared/src/types';
-import { avatarOf, configCacheKey, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
+import type { PublicPlayer } from '../../../shared/src/types';
+import { configCacheKey, doodleUri, MOOD_EMOJI, portraitOf, type PortraitSource } from '../avatars';
 import { useFace } from '../funState';
 import { nickText } from '../messages';
 import { C, FONT } from '../theme';
@@ -41,23 +44,6 @@ function BombBadge() {
     </View>
   );
 }
-
-const PortraitImage = memo(function PortraitImage({ p, mood = 'normal', size, resolvedUri }: { p: PortraitSource; mood?: Mood; size: number; resolvedUri?: string }) {
-  const [failedUri, setFailedUri] = useState<string | null>(null);
-  const primary = resolvedUri ?? portraitOf(p, mood).uri;
-  const uri = failedUri === primary ? portraitOf({ ...p, avatarUrl: undefined }, mood).uri : primary;
-  const needFallbackUnderlay = !uri.startsWith('data:');
-  return (
-    <>
-      {needFallbackUnderlay && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <EmojiIcon emoji={avatarOf(p.avatar).emoji} size={Math.max(16, Math.round(size * 0.56))} />
-        </View>
-      )}
-      <Image source={{ uri }} onError={() => setFailedUri(primary)} style={{ width: '100%', height: '100%', borderRadius: size / 2 }} resizeMode="cover" />
-    </>
-  );
-});
 
 interface AvatarProps {
   player: PublicPlayer;
@@ -100,6 +86,7 @@ function samePlayerVisual(a: PublicPlayer, b: PublicPlayer): boolean {
   if (a === b) return true;
   if (
     a.id !== b.id ||
+    a.voice !== b.voice ||
     a.name !== b.name ||
     a.connected !== b.connected ||
     a.spectator !== b.spectator ||
@@ -137,10 +124,14 @@ function areAvatarPropsEqual(prev: AvatarProps, next: AvatarProps): boolean {
 export const Avatar = memo(function Avatar({
   player, size = 52, active, dim, host, sub, me, onPress, onSelectPlayer, ring, rank, editable, crowded, darkBg = false,
 }: AvatarProps) {
+  const speaking = useSpeakingMemeFor(player.id);
+  const pulse = useVoicePulse(!!speaking);
+  const voice = speaking?.persona ?? player.voice;
+  const persona = voice ? getPersonaDisplay(voice) : null;
   const face = useFace(player.id);
   const avatarRef = useMeasuredView(`avatar-${player.id}`);
   const pt = portraitOf(player, face.mood);
-  const borderCol = ring ?? (player.character ? pt.hex : C.ink);
+  const borderCol = (speaking && persona?.accent) || ring || (player.character ? pt.hex : C.ink);
   const rot = useState(() => new Animated.Value(0))[0];
   const shiftX = useState(() => new Animated.Value(0))[0];
   const grow = useState(() => new Animated.Value(1))[0];
@@ -286,6 +277,8 @@ export const Avatar = memo(function Avatar({
       accessibilityLabel={editable ? `Sửa tên và ảnh của bạn (${player.name})` : interactive ? `Chọc ${player.name}` : player.name}
       style={[styles.wrap, { minWidth: size + 22, maxWidth: size + 64 }, dim && { opacity: 0.4 }]}
     >
+      <View style={speaking ? { transform: [{ scale: 1.07 }] } : undefined}>
+      {!!speaking && persona && <Animated.View pointerEvents="none" style={{ position: 'absolute', top: -3, left: -3, right: -3, bottom: -3, borderRadius: size, borderWidth: 2, borderColor: persona.accent, opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }} />}
       <FrameWrap size={size} frame={cos?.frame} aura={cos?.aura} pet={cos?.pet} active={active} crowded={crowded}>
         {face.wobble ? (
           <Animated.View
@@ -334,6 +327,9 @@ export const Avatar = memo(function Avatar({
           </View>
         )}
       </FrameWrap>
+      {persona && !speaking && <View pointerEvents="none" style={{ position: 'absolute', bottom: 1, right: 1, borderRadius: 4, width: 8, height: 8, backgroundColor: persona.accent, borderWidth: 1, borderColor: C.paper }} />}
+      </View>
+      {speaking && persona && <Text numberOfLines={1} style={{ color: C.ink, backgroundColor: persona.badgeBg, borderRadius: 6, paddingHorizontal: 4, fontSize: 9 }}>Đang nói</Text>}
       {(cos?.title || (player.vipTier && player.vipTier > 0)) && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, flexWrap: 'wrap', marginTop: active ? 4 : 1 }}>
           {player.vipTier && player.vipTier > 0 ? <VipBadge tier={player.vipTier} compact /> : null}

@@ -47,6 +47,36 @@ function makeCtx(rng: () => number, settings: EngineContext['settings'] = {}, tu
   return { ctx, getResult: () => result };
 }
 
+describe('Room voice selection', () => {
+  it('reserves and releases a voice, assigns distinct voices at start and frees bot voices on restart', () => {
+    const room = new Room('VOICE', new Dictionary(SMALL_WORDS), { rng: () => 0.2 });
+    try {
+      const host = room.addPlayer('An');
+      const guest = room.addPlayer('Bình');
+      if (!host.ok || !guest.ok) throw new Error('join');
+      expect(room.configure(host.playerId, 'baucua')).toEqual({ ok: true });
+      expect(room.pickVoice(host.playerId, 'invalid')).toEqual({ ok: false, error: 'bad_request' });
+      expect(room.pickVoice(host.playerId, 'kyduyen')).toEqual({ ok: true });
+      expect(room.pickVoice(guest.playerId, 'kyduyen')).toEqual({ ok: false, error: 'voice_taken' });
+      expect(room.pickVoice(host.playerId, null)).toEqual({ ok: true });
+      expect(room.pickVoice(guest.playerId, 'kyduyen')).toEqual({ ok: true });
+      for (let index = 0; index < 4; index++) expect(room.addBot(host.playerId).ok).toBe(true);
+      expect(room.start(host.playerId)).toEqual({ ok: true });
+      const playing = room.toPublic(host.playerId).players;
+      expect(new Set(playing.map((player) => player.voice)).size).toBe(6);
+      expect(playing.every((player) => !!player.voice)).toBe(true);
+      expect(playing.find((player) => player.id === guest.playerId)?.voice).toBe('kyduyen');
+      expect(room.pickVoice(guest.playerId, null)).toEqual({ ok: false, error: 'room_playing' });
+      expect(room.action(host.playerId, { type: 'end' })).toEqual({ ok: true });
+      expect(room.restart(host.playerId)).toEqual({ ok: true });
+      const lobby = room.toPublic(host.playerId).players;
+      for (const player of lobby) {
+        expect(player.voice).toBe(player.bot ? undefined : playing.find((other) => other.id === player.id)?.voice);
+      }
+    } finally { room.dispose(); }
+  });
+});
+
 describe('Room Lobby Team Picking (Ai bấm sớm vào trước)', () => {
   it('cho phép chọn đội ở phòng chờ, chặn team_full đúng sĩ số và giữ đội khi start', () => {
     const dict = new Dictionary(SMALL_WORDS);

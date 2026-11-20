@@ -292,9 +292,21 @@ export interface PublicPlayer {
   bot?: boolean;
   /** đội người chơi đã tự chọn ở phòng chờ (game chia đội) */
   team?: TeamId;
+  /** nhân vật meme độc quyền người chơi chọn trong phòng chờ (ai chọn trước được trước) */
+  voice?: VoicePersonaId;
 }
 
 export type TeamId = 'red' | 'blue';
+
+export type VoicePersonaId = 'phuonghang' | 'linda' | 'minhhieu' | 'coba' | 'chiphien' | 'kyduyen';
+export const VOICE_PERSONA_IDS: readonly VoicePersonaId[] = [
+  'phuonghang',
+  'linda',
+  'minhhieu',
+  'coba',
+  'chiphien',
+  'kyduyen',
+];
 
 export interface RankEntry {
   playerId: string;
@@ -880,6 +892,7 @@ export type ErrorCode =
   /** đã bị chủ phòng mời ra: không vào lại được phòng đó */
   | 'kicked'
   | 'team_full'
+  | 'voice_taken'
   | 'bad_request';
 
 export type Ack<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
@@ -904,6 +917,8 @@ export interface ClientToServerEvents {
   'room:pickTeam': (p: { team: TeamId | null }, ack: (r: Ack) => void) => void;
   /** chủ phòng trộn ngẫu nhiên lại 2 đội Đỏ/Xanh */
   'room:shuffleTeams': (ack: (r: Ack) => void) => void;
+  /** người chơi chọn 1 nhân vật meme độc quyền trong phòng chờ (ai bấm sớm lấy trước) */
+  'room:pickVoice': (p: { voice: VoicePersonaId | null }, ack: (r: Ack) => void) => void;
   'game:start': (ack: (r: Ack) => void) => void;
   'game:action': (a: GameAction, ack: (r: ActionResult) => void) => void;
   /** gửi input vật lý thời gian thực một chiều (không chờ ACK để giảm nửa độ trễ mạng) */
