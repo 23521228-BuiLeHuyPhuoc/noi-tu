@@ -271,7 +271,7 @@ export type MemeId =
   | 'chiphien_dungghep'
   | 'chiphien_thongminh'
   | 'chiphien_dangngo'
-  // Cô Ba Vàng Ngọc (29)
+  // Cô Ba Vàng Ngọc (85)
   | 'coba_banchetroi'
   | 'coba_batphelon'
   | 'coba_baxaobala'
@@ -301,6 +301,62 @@ export type MemeId =
   | 'coba_totote'
   | 'coba_trinhphen'
   | 'coba_votungoi'
+  | 'coba_nuoctuban'
+  | 'coba_matthem1ty'
+  | 'coba_chauhophu'
+  | 'coba_chovangquamy'
+  | 'coba_chenkieu'
+  | 'coba_tonbaonhieuty'
+  | 'coba_demtiendo'
+  | 'coba_tiemngando'
+  | 'coba_vuivelam'
+  | 'coba_dephomnay'
+  | 'coba_mandoinhunglua'
+  | 'coba_muaguilien'
+  | 'coba_cogapma'
+  | 'coba_chophulam'
+  | 'coba_bactyty'
+  | 'coba_vuivelucnao'
+  | 'coba_tiemvangkhongdam'
+  | 'coba_ngannguoicoi'
+  | 'coba_bachucngando'
+  | 'coba_xaycau'
+  | 'coba_tiensan'
+  | 'coba_chodimaimai'
+  | 'coba_choinhagiau'
+  | 'coba_bahoangbachua'
+  | 'coba_ngandodanhdu'
+  | 'coba_toikholam'
+  | 'coba_chetbenmy'
+  | 'coba_thetayninh'
+  | 'coba_chuabietchuno'
+  | 'coba_chanthatlam'
+  | 'coba_nghiepnang'
+  | 'coba_metmoiqua'
+  | 'coba_thietvayha'
+  | 'coba_chuakiemchuyen'
+  | 'coba_dungbuon'
+  | 'coba_nhucvinh'
+  | 'coba_no50cayvang'
+  | 'coba_trieuphukhoqua'
+  | 'coba_thualo'
+  | 'coba_taivigian'
+  | 'coba_quylay'
+  | 'coba_mangtoi'
+  | 'coba_conmatconnguoi'
+  | 'coba_nguduvay'
+  | 'coba_hoitoi'
+  | 'coba_choidi'
+  | 'coba_tra100trieu'
+  | 'coba_mattienhem'
+  | 'coba_nhinphaibiet'
+  | 'coba_noimau'
+  | 'coba_tinhnong'
+  | 'coba_khongngan'
+  | 'coba_napthe'
+  | 'coba_xuongbien'
+  | 'coba_cahatchovui'
+  | 'coba_lamlanh'
   // Hoa hậu Kỳ Duyên (16)
   | 'kyduyen_amanh'
   | 'kyduyen_chacchanloai'
@@ -596,7 +652,7 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   chiphien_dungghep: require('../assets/audio/memes/chiphien_dungghep.mp3'),
   chiphien_thongminh: require('../assets/audio/memes/chiphien_thongminh.mp3'),
   chiphien_dangngo: require('../assets/audio/memes/chiphien_dangngo.mp3'),
-  // Cô Ba Vàng Ngọc (29)
+  // Cô Ba Vàng Ngọc (85)
   coba_banchetroi: require('../assets/audio/memes/coba_banchetroi.mp3'),
   coba_batphelon: require('../assets/audio/memes/coba_batphelon.mp3'),
   coba_baxaobala: require('../assets/audio/memes/coba_baxaobala.mp3'),
@@ -626,6 +682,62 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   coba_totote: require('../assets/audio/memes/coba_totote.mp3'),
   coba_trinhphen: require('../assets/audio/memes/coba_trinhphen.mp3'),
   coba_votungoi: require('../assets/audio/memes/coba_votungoi.mp3'),
+  coba_nuoctuban: require('../assets/audio/memes/coba_nuoctuban.mp3'),
+  coba_matthem1ty: require('../assets/audio/memes/coba_matthem1ty.mp3'),
+  coba_chauhophu: require('../assets/audio/memes/coba_chauhophu.mp3'),
+  coba_chovangquamy: require('../assets/audio/memes/coba_chovangquamy.mp3'),
+  coba_chenkieu: require('../assets/audio/memes/coba_chenkieu.mp3'),
+  coba_tonbaonhieuty: require('../assets/audio/memes/coba_tonbaonhieuty.mp3'),
+  coba_demtiendo: require('../assets/audio/memes/coba_demtiendo.mp3'),
+  coba_tiemngando: require('../assets/audio/memes/coba_tiemngando.mp3'),
+  coba_vuivelam: require('../assets/audio/memes/coba_vuivelam.mp3'),
+  coba_dephomnay: require('../assets/audio/memes/coba_dephomnay.mp3'),
+  coba_mandoinhunglua: require('../assets/audio/memes/coba_mandoinhunglua.mp3'),
+  coba_muaguilien: require('../assets/audio/memes/coba_muaguilien.mp3'),
+  coba_cogapma: require('../assets/audio/memes/coba_cogapma.mp3'),
+  coba_chophulam: require('../assets/audio/memes/coba_chophulam.mp3'),
+  coba_bactyty: require('../assets/audio/memes/coba_bactyty.mp3'),
+  coba_vuivelucnao: require('../assets/audio/memes/coba_vuivelucnao.mp3'),
+  coba_tiemvangkhongdam: require('../assets/audio/memes/coba_tiemvangkhongdam.mp3'),
+  coba_ngannguoicoi: require('../assets/audio/memes/coba_ngannguoicoi.mp3'),
+  coba_bachucngando: require('../assets/audio/memes/coba_bachucngando.mp3'),
+  coba_xaycau: require('../assets/audio/memes/coba_xaycau.mp3'),
+  coba_tiensan: require('../assets/audio/memes/coba_tiensan.mp3'),
+  coba_chodimaimai: require('../assets/audio/memes/coba_chodimaimai.mp3'),
+  coba_choinhagiau: require('../assets/audio/memes/coba_choinhagiau.mp3'),
+  coba_bahoangbachua: require('../assets/audio/memes/coba_bahoangbachua.mp3'),
+  coba_ngandodanhdu: require('../assets/audio/memes/coba_ngandodanhdu.mp3'),
+  coba_toikholam: require('../assets/audio/memes/coba_toikholam.mp3'),
+  coba_chetbenmy: require('../assets/audio/memes/coba_chetbenmy.mp3'),
+  coba_thetayninh: require('../assets/audio/memes/coba_thetayninh.mp3'),
+  coba_chuabietchuno: require('../assets/audio/memes/coba_chuabietchuno.mp3'),
+  coba_chanthatlam: require('../assets/audio/memes/coba_chanthatlam.mp3'),
+  coba_nghiepnang: require('../assets/audio/memes/coba_nghiepnang.mp3'),
+  coba_metmoiqua: require('../assets/audio/memes/coba_metmoiqua.mp3'),
+  coba_thietvayha: require('../assets/audio/memes/coba_thietvayha.mp3'),
+  coba_chuakiemchuyen: require('../assets/audio/memes/coba_chuakiemchuyen.mp3'),
+  coba_dungbuon: require('../assets/audio/memes/coba_dungbuon.mp3'),
+  coba_nhucvinh: require('../assets/audio/memes/coba_nhucvinh.mp3'),
+  coba_no50cayvang: require('../assets/audio/memes/coba_no50cayvang.mp3'),
+  coba_trieuphukhoqua: require('../assets/audio/memes/coba_trieuphukhoqua.mp3'),
+  coba_thualo: require('../assets/audio/memes/coba_thualo.mp3'),
+  coba_taivigian: require('../assets/audio/memes/coba_taivigian.mp3'),
+  coba_quylay: require('../assets/audio/memes/coba_quylay.mp3'),
+  coba_mangtoi: require('../assets/audio/memes/coba_mangtoi.mp3'),
+  coba_conmatconnguoi: require('../assets/audio/memes/coba_conmatconnguoi.mp3'),
+  coba_nguduvay: require('../assets/audio/memes/coba_nguduvay.mp3'),
+  coba_hoitoi: require('../assets/audio/memes/coba_hoitoi.mp3'),
+  coba_choidi: require('../assets/audio/memes/coba_choidi.mp3'),
+  coba_tra100trieu: require('../assets/audio/memes/coba_tra100trieu.mp3'),
+  coba_mattienhem: require('../assets/audio/memes/coba_mattienhem.mp3'),
+  coba_nhinphaibiet: require('../assets/audio/memes/coba_nhinphaibiet.mp3'),
+  coba_noimau: require('../assets/audio/memes/coba_noimau.mp3'),
+  coba_tinhnong: require('../assets/audio/memes/coba_tinhnong.mp3'),
+  coba_khongngan: require('../assets/audio/memes/coba_khongngan.mp3'),
+  coba_napthe: require('../assets/audio/memes/coba_napthe.mp3'),
+  coba_xuongbien: require('../assets/audio/memes/coba_xuongbien.mp3'),
+  coba_cahatchovui: require('../assets/audio/memes/coba_cahatchovui.mp3'),
+  coba_lamlanh: require('../assets/audio/memes/coba_lamlanh.mp3'),
   // Hoa hậu Kỳ Duyên (16)
   kyduyen_amanh: require('../assets/audio/memes/kyduyen_amanh.mp3'),
   kyduyen_chacchanloai: require('../assets/audio/memes/kyduyen_chacchanloai.mp3'),
@@ -1112,7 +1224,7 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'chiphien_dungghep', persona: 'chiphien', label: 'Tao bán hàng, đừng vô ghẹo chị', quote: 'Tao nói tao bán hàng, đừng có vô ghẹo chị nha.', context: 'Bị chọc / Hối' },
   { id: 'chiphien_thongminh', persona: 'chiphien', label: 'Chị là người thông minh nhanh nhẹn', quote: 'Chị là người thông minh, là người nhanh nhẹn.', context: 'Gáy / Đoán trúng' },
   { id: 'chiphien_dangngo', persona: 'chiphien', label: 'Ai làm gì mà đáng ngờ?', quote: 'Ai làm gì mà đáng ngờ? Ủa ai làm gì mà đáng ngờ?', context: 'Biện minh lúc bị nghi' },
-  // Cô Ba Vàng Ngọc (29)
+  // Cô Ba Vàng Ngọc (85)
   { id: 'coba_banchetroi', persona: 'coba', label: 'Nó bị bắn chết rồi chị Ba cũng bỏ', quote: 'Bị bắn chết rồi á chị Ba cũng buông bỏ, nói thôi kệ.', context: 'Loại đối thủ / Phũ phàng' },
   { id: 'coba_batphelon', persona: 'coba', label: 'Tụi bay bắt phe lộn rồi!', quote: 'Tụi bay bắt phe lộn rồi! Tụi bay bắt lộn rồi đó! Tụi bay bắt bồ mà bắt lộn...', context: 'Vote nhầm đồng đội / chọn sai' },
   { id: 'coba_baxaobala', persona: 'coba', label: 'Bà xạo ba láo con Trần My á, đụ má cái…', quote: 'Bà xạo ba láo con Trần My á, đụ má cái thân thì giống như là đói vậy', context: 'Bắt bài nói xạo' },
@@ -1142,6 +1254,62 @@ export const MEME_LIST: readonly MemeInfo[] = [
   { id: 'coba_totote', persona: 'coba', label: 'To tò te đây là ban kèn hơi', quote: 'To tò te, đây là ban kèn hơi, tò là tò te tí co...', context: 'Ăn mừng rộn ràng / chọc quê / tung xúc xắc' },
   { id: 'coba_trinhphen', persona: 'coba', label: 'Còn con đĩ Minh Hiếu bận nhiêu? Hai ba…', quote: 'Còn con đĩ Minh Hiếu bận nhiêu? Hai ba trăm ngàn! Đụ má chân phèn là vẫn là phèn thôi. Đó!', context: 'Cà khịa / Khoe tiền' },
   { id: 'coba_votungoi', persona: 'coba', label: 'Cho mày chiếc này vô tù ngồi nè', quote: 'Mày, tao cho mày chuyến này vô tù mày ngồi', context: 'Vào ô Tù / bị trục xuất khỏi ván' },
+  { id: 'coba_nuoctuban', persona: 'coba', label: 'Cô Ba Vàng Ngọc, nước tư bản', quote: 'Cô Ba Vàng Ngọc, nước tư bản, OK!', context: 'Vào phòng / Gáy' },
+  { id: 'coba_matthem1ty', persona: 'coba', label: 'Thà chị Ba mất thêm 1 tỷ nữa', quote: 'Thà là chị Ba mất thêm 1 tỷ nữa.', context: 'Đặt cược / Mua nhà' },
+  { id: 'coba_chauhophu', persona: 'coba', label: 'Tao là cháu bà hộ Ngọc Lan', quote: 'Dù sao đi nữa tao là cháu của bà hộ Ngọc Lan.', context: 'Gáy' },
+  { id: 'coba_chovangquamy', persona: 'coba', label: 'Chở vàng qua Mỹ, bỏ lại hai villa', quote: 'Chở vàng qua Mỹ, bỏ lại hai cái villa ở Sài Gòn.', context: 'Mua nhà / Khoe giàu' },
+  { id: 'coba_chenkieu', persona: 'coba', label: 'Cô Ba chén kiểu muôn đời', quote: 'Dù sao nữa cô Ba cũng chén kiểu muôn đời.', context: 'Gáy / Thắng' },
+  { id: 'coba_tonbaonhieuty', persona: 'coba', label: 'Tốn bao nhiêu tỷ chị cũng cho', quote: 'Tốn bao nhiêu tỷ nữa chị cũng cho.', context: 'Tặng quà / Đặt cược' },
+  { id: 'coba_demtiendo', persona: 'coba', label: 'Tối về đếm tiền đô không à', quote: 'Rồi tối về cái đếm tiền à, ngộ vậy đó, đếm tiền đô không à.', context: 'Thu tiền / Lụm tiền' },
+  { id: 'coba_tiemngando', persona: 'coba', label: 'Tiệm làm ngày 3–4 ngàn đô', quote: 'Con cái tiệm để làm ngày 3–4 ngàn đô không.', context: 'Thu tiền thuê / Giàu' },
+  { id: 'coba_vuivelam', persona: 'coba', label: 'Cho nên chị vui vẻ lắm', quote: 'Cho nên chị vui vẻ lắm, mà kệ.', context: 'Vui / Tám chuyện' },
+  { id: 'coba_dephomnay', persona: 'coba', label: 'Hôm nay chị Ba đẹp tuyệt vời', quote: 'Hôm nay chị Ba đẹp tuyệt vời, cảm ơn em.', context: 'Nhận quà / Được khen' },
+  { id: 'coba_mandoinhunglua', persona: 'coba', label: 'Xài tới mãn đời trong nhung lụa', quote: 'Tao ca, tao hát, tao chơi, tao ăn, tao xài tới mãn đời trong nhung lụa đó.', context: 'Giàu có / Thắng' },
+  { id: 'coba_muaguilien', persona: 'coba', label: 'Em cần gì chị mua liền gởi liền', quote: 'Bây giờ em cần cái món gì nói chị là đi mua liền, làm liền, gởi liền cho em.', context: 'Tặng quà / Mua đồ' },
+  { id: 'coba_cogapma', persona: 'coba', label: 'Hôm nay có duyên quá được gặp má', quote: 'Má ơi, hôm nay có duyên quá được gặp má nữa đó.', context: 'Vào phòng / Chào sân' },
+  { id: 'coba_chophulam', persona: 'coba', label: 'Lật hết chợ Phú Lâm không ai như em', quote: 'Lật hết cái chợ Phú Lâm không có người nào như em.', context: 'Gáy / Thắng' },
+  { id: 'coba_bactyty', persona: 'coba', label: 'Bán ra cũng bạc tỷ tỷ', quote: 'Có tiền của bán ra cũng bạc tỷ tỷ.', context: 'Bán đất / Giàu' },
+  { id: 'coba_vuivelucnao', persona: 'coba', label: 'Lúc nào chị Ba cũng vui vẻ', quote: 'Lúc nào chị Ba cũng vui vẻ.', context: 'Vui / Tám chuyện' },
+  { id: 'coba_tiemvangkhongdam', persona: 'coba', label: 'Tiệm vàng cũng không dám xài như chị Ba', quote: 'Tao nói tiệm vàng cũng không có dám xài như chị Ba nữa.', context: 'Mua nhà / Khoe giàu' },
+  { id: 'coba_ngannguoicoi', persona: 'coba', label: 'Chị ca hát là ngàn người vô coi', quote: 'Mày biết khi chị ca hát là bao nhiêu ngàn người người ta vô coi đó.', context: 'Gáy' },
+  { id: 'coba_bachucngando', persona: 'coba', label: 'Dám đưa cho chị 30 ngàn đô', quote: 'Dám đưa cho chị 30 ngàn đô.', context: 'Nhận tiền / Giàu' },
+  { id: 'coba_xaycau', persona: 'coba', label: 'Tao cất nhà tình thương, tao xây cầu', quote: 'Tao cất nhà tình thương nè, tao xây cầu.', context: 'Gáy / Xây nhà' },
+  { id: 'coba_tiensan', persona: 'coba', label: 'Ta có tiền của sẵn, ở nước tư bản', quote: 'Tại vì ta có tiền của sẵn mà, mà ở nước tư bản nữa.', context: 'Giàu có' },
+  { id: 'coba_chodimaimai', persona: 'coba', label: 'Cho đi là còn mãi mãi', quote: 'Cứ cho đi, cho đi, cho đi là còn mãi mãi.', context: 'Tặng quà / Tha' },
+  { id: 'coba_choinhagiau', persona: 'coba', label: 'Tánh chị Ba thích chơi nhà giàu', quote: 'Cái tánh chị Ba thích chơi nhà giàu xưa giờ vậy đó, ha ha ha.', context: 'Vui / Khoe giàu' },
+  { id: 'coba_bahoangbachua', persona: 'coba', label: 'Chị về như bà Hoàng bà Chúa', quote: 'Chị về giống như bà Hoàng, bà Chúa vậy đó.', context: 'Gáy / Vào phòng' },
+  { id: 'coba_ngandodanhdu', persona: 'coba', label: 'Tao cho nó một ngàn đô danh dự', quote: 'Tao cho nó một ngàn đô danh dự đó.', context: 'Thách đấu / Khoe tiền' },
+  { id: 'coba_toikholam', persona: 'coba', label: 'Tôi khổ lắm, tôi nghèo lắm', quote: 'Tôi khổ lắm, hoàn cảnh tôi nghèo lắm chị, tôi không có tiền.', context: 'Cháy túi / Xin xỏ' },
+  { id: 'coba_chetbenmy', persona: 'coba', label: 'Chắc tao chết ở bên Mỹ luôn', quote: 'Chắc tao chết ở bên Mỹ luôn.', context: 'Thua / Hoảng' },
+  { id: 'coba_thetayninh', persona: 'coba', label: 'Kêu lên mẹ Tây Ninh tao cũng thề', quote: 'Kêu lên mẹ Tây Ninh tao cũng thề nữa, mà kêu lên mẹ Châu Đốc tao cũng thề nữa.', context: 'Chối tội / Thề' },
+  { id: 'coba_chuabietchuno', persona: 'coba', label: 'Chưa biết mặt con chủ nợ ra sao', quote: 'Tao chưa biết mặt cái con chủ nợ mà ra làm sao nữa.', context: 'Chối nợ / Biện minh' },
+  { id: 'coba_chanthatlam', persona: 'coba', label: 'Chị Ba nói chân thật lắm', quote: 'Chị Ba mày tao nói chân thật lắm.', context: 'Biện minh' },
+  { id: 'coba_nghiepnang', persona: 'coba', label: 'Cái nghiệp con cũng nặng lắm', quote: 'Trời ơi, cái nghiệp con cũng nặng vậy lắm nè.', context: 'Thua / Xui' },
+  { id: 'coba_metmoiqua', persona: 'coba', label: 'Tôi mệt mỏi quá', quote: 'Rồi tôi thấy, tôi mệt mỏi quá, giờ nói hoài cũng vậy.', context: 'Thua / Chán' },
+  { id: 'coba_thietvayha', persona: 'coba', label: 'Thiệt vậy hả? Sao giờ mới biết', quote: 'Mà thiệt vậy hả? Sao giờ em mới biết nó vậy dạ?', context: 'Sốc / Bất ngờ' },
+  { id: 'coba_chuakiemchuyen', persona: 'coba', label: 'Chị Ba chưa bao giờ kiếm chuyện', quote: 'Chị Ba mày từ hồi xưa giờ tao chưa bao giờ mà kiếm chuyện.', context: 'Biện minh lúc bị nghi' },
+  { id: 'coba_dungbuon', persona: 'coba', label: 'Đừng buồn chị Ba ơi', quote: 'Đừng buồn chị Ba ơi.', context: 'Thua / An ủi' },
+  { id: 'coba_nhucvinh', persona: 'coba', label: 'Con người có lúc nhục lúc vinh', quote: 'Còn con người có lúc nhục, lúc vinh.', context: 'Thua / Lật kèo' },
+  { id: 'coba_no50cayvang', persona: 'coba', label: 'Hồi xưa nợ 50 cây vàng', quote: 'Hồi xưa chị thiếu nợ 50 cây vàng, là lúc đó chị nghèo, rồi chị không có tiền.', context: 'Cháy túi / Mất tiền' },
+  { id: 'coba_trieuphukhoqua', persona: 'coba', label: 'Triệu phú mà giờ khổ quá', quote: 'Hồi xưa mình triệu phú mà giờ sao mình khổ quá vậy.', context: 'Mất tiền / Buồn' },
+  { id: 'coba_thualo', persona: 'coba', label: 'Làm ăn thua lỗ cả chục tỷ', quote: 'Có 3 năm mà làm ăn thua lỗ cả chục tỷ vậy đó.', context: 'Mất tiền / Thua' },
+  { id: 'coba_taivigian', persona: 'coba', label: 'Tại chị giận nên chị nói vậy', quote: 'Thôi là tại vì chị giận là chị nói vậy rồi thôi.', context: 'Chống chế' },
+  { id: 'coba_quylay', persona: 'coba', label: 'Chị sai thì tao quỳ tao lạy nó', quote: 'Nếu mà chị sai với nó á, tao quỳ tao lạy nó á.', context: 'Biện minh / Xin tha' },
+  { id: 'coba_mangtoi', persona: 'coba', label: 'Chửi người ta cũng mang tội lắm', quote: 'Mình chửi người ta cũng mang cái tội lắm em.', context: 'Chống chế / Hối lỗi' },
+  { id: 'coba_conmatconnguoi', persona: 'coba', label: 'Có con mắt mà không có con ngươi', quote: 'Có con mắt mà không có con ngươi.', context: 'Cà khịa' },
+  { id: 'coba_nguduvay', persona: 'coba', label: 'Sao mày ngu dữ vậy?', quote: 'Sao mà mày ngu dữ vậy?', context: 'Cà khịa / Bực' },
+  { id: 'coba_hoitoi', persona: 'coba', label: 'Tao qua tao hỏi tội nữa đó', quote: 'Tao cũng qua tao hỏi tội nữa đó.', context: 'Hù dọa / Ra đòn' },
+  { id: 'coba_choidi', persona: 'coba', label: 'Chơi đi rồi bà gỡ tiền khác về', quote: 'Chơi đi, chơi đi rồi bà gỡ tiền khác về.', context: 'Đặt cược / Vào lượt' },
+  { id: 'coba_tra100trieu', persona: 'coba', label: 'Tao trả 100 triệu, ra công an lấy đi', quote: 'Tao trả cho 100 triệu chứ, đi ra ngoài công an lấy đi con.', context: 'Thách thức / Trả tiền' },
+  { id: 'coba_mattienhem', persona: 'coba', label: 'Ra mặt tiền ở chứ đừng ở trong hẻm', quote: 'Thì ra ngoài mặt tiền ở chứ đừng ở trong hẻm.', context: 'Cà khịa đối thủ nghèo' },
+  { id: 'coba_nhinphaibiet', persona: 'coba', label: 'Mày nhìn mày phải biết chứ', quote: 'Mày nhìn mày phải biết người ta làm sao chứ.', context: 'Cà khịa' },
+  { id: 'coba_noimau', persona: 'coba', label: 'Nói bậy là nổi máu lên liền', quote: 'Nó nói bậy cái là nổi máu lên liền.', context: 'Bực / Ra đòn' },
+  { id: 'coba_tinhnong', persona: 'coba', label: 'Tính chị Ba nóng lắm', quote: 'Tính chị Ba mẹ tao nóng lắm, tao nói thiệt mày.', context: 'Hù dọa' },
+  { id: 'coba_khongngan', persona: 'coba', label: 'Nhà đất có sẵn, không ngán con nào', quote: 'Nhà đất Việt Nam tao đã có sẵn rồi nên không có con nào mà tao ngán hết á.', context: 'Gáy / Hù dọa' },
+  { id: 'coba_napthe', persona: 'coba', label: 'Em nạp thẻ liền cho chị', quote: 'Trần Hậu, bây giờ em rảnh không? Em nạp thẻ liền cho chị.', context: 'Hối / Hết tiền' },
+  { id: 'coba_xuongbien', persona: 'coba', label: 'Chưa xuống biển sao biết biển thẳm', quote: 'Chưa xuống biển thì sao biết rằng biển thẳm, mà chưa trèo non thì sao biết đặng non cao.', context: 'Cà khịa / Dạy đời' },
+  { id: 'coba_cahatchovui', persona: 'coba', label: 'Bây giờ chị hát ca cho vui nè', quote: 'Bây giờ chị hát ca cho nó vui nè.', context: 'Vào lượt / Tám chuyện' },
+  { id: 'coba_lamlanh', persona: 'coba', label: 'Cứ làm lành, lánh dữ, chia sẻ vui vẻ', quote: 'Cứ làm lành, lánh dữ, có tiền giúp đỡ chia sẻ vui vẻ.', context: 'Hòa giải / Tặng quà' },
   // Hoa hậu Kỳ Duyên (16)
   { id: 'kyduyen_amanh', persona: 'kyduyen', label: 'Duyên bị ám ảnh rất nhiều luôn', quote: 'Bây giờ mỗi lần mà Duyên nhắc về chặng đường ở Mexico thì Duyên bị ám ảnh rất nhiều luôn.', context: 'Sốc / Thua đau' },
   { id: 'kyduyen_chacchanloai', persona: 'kyduyen', label: 'Và nếu như mà em gặp Tuấn Ngọc ở phòng…', quote: 'Và nếu như mà em gặp Tuấn Ngọc ở phòng loại, em chắc chắn sẽ loại Tuấn Ngọc.', context: 'Bỏ phiếu / Kết liễu' },
@@ -1179,7 +1347,7 @@ export const MEME_IDS_BY_PERSONA: Record<MemePersona, readonly MemeId[]> = {
   minhhieu: ['minhhieu_1000do', 'minhhieu_10trieu', 'minhhieu_cadonhuquy', 'minhhieu_camtiendo_dq', 'minhhieu_conquyxao', 'minhhieu_cuutoi', 'minhhieu_duongquyen', 'minhhieu_hoihan', 'minhhieu_khoe', 'minhhieu_khungthichet', 'minhhieu_laytienche', 'minhhieu_lubu', 'minhhieu_maccuoi', 'minhhieu_matphoiphoi', 'minhhieu_muonkhoc', 'minhhieu_nganruoido', 'minhhieu_rotmuocmat', 'minhhieu_soqua', 'minhhieu_tienchicho', 'minhhieu_tiendo_quat', 'minhhieu_tiendohay', 'minhhieu_tiendomat', 'minhhieu_tientuoi', 'minhhieu_tinhlai', 'minhhieu_chaomayanh', 'minhhieu_soquakhongbiet', 'minhhieu_xinloithathu', 'minhhieu_noiduakhongchui', 'minhhieu_hettrontien', 'minhhieu_voduyen', 'minhhieu_saokhongdo', 'minhhieu_themngando', 'minhhieu_xammuongiangho', 'minhhieu_divedicha', 'minhhieu_cotiendikhong', 'minhhieu_buonghe', 'minhhieu_dungdieuqua', 'minhhieu_canvang', 'minhhieu_xaolao', 'minhhieu_byebye', 'minhhieu_dienhoai', 'minhhieu_hetpin', 'minhhieu_matsangsua', 'minhhieu_fanmanh', 'minhhieu_muanhachucty', 'minhhieu_muadi', 'minhhieu_chotdonkhongaimua', 'minhhieu_chotdonquatroi', 'minhhieu_vangthat', 'minhhieu_disingapore', 'minhhieu_dexnoiten', 'minhhieu_hellomayem', 'minhhieu_khuyroi', 'minhhieu_xinchaomaycon', 'minhhieu_kicucvay', 'minhhieu_taodaymay', 'minhhieu_khongchuikhongngu', 'minhhieu_nguoitathuong', 'minhhieu_metkhach', 'minhhieu_dethuongkhong', 'minhhieu_giauhontao', 'minhhieu_baikinhte'],
   phuonghang: ['phuonghang_50tuoi', 'phuonghang_cangchuicangdien', 'phuonghang_chanhcho_ngu', 'phuonghang_chanly', 'phuonghang_chomochui', 'phuonghang_chuabaogiobochay', 'phuonghang_connguo_nao', 'phuonghang_dosup', 'phuonghang_dungdien', 'phuonghang_dunglacham', 'phuonghang_haoquang', 'phuonghang_khonhon', 'phuonghang_kimcuong', 'phuonghang_laokhongduoc', 'phuonghang_laymayxuithem', 'phuonghang_luadao', 'phuonghang_motminhtao', 'phuonghang_ngongang', 'phuonghang_nguyhiem', 'phuonghang_quantutrathu', 'phuonghang_taophaimatday', 'phuonghang_thanhcong', 'phuonghang_thayvay', 'phuonghang_tienphuongtien', 'phuonghang_tinhhinh', 'phuonghang_trongcuoc', 'phuonghang_tubitritue', 'phuonghang_tuongvay', 'phuonghang_voquytday', 'phuonghang_khonggikhongthe', 'phuonghang_coloiqua', 'phuonghang_emdepkhong', 'phuonghang_tulamdep', 'phuonghang_tientrongnao', 'phuonghang_lieugan', 'phuonghang_hoanhap', 'phuonghang_khonganbam', 'phuonghang_toidadu', 'phuonghang_lamchucuocchoi', 'phuonghang_suthatloira', 'phuonghang_saodola', 'phuonghang_chuyennhieu', 'phuonghang_trathu', 'phuonghang_nomoney', 'phuonghang_chiuduockhong', 'phuonghang_bominhde', 'phuonghang_thangheo', 'phuonghang_khongbietlamsao', 'phuonghang_nguoigiau', 'phuonghang_khongquygoi', 'phuonghang_tienrotnuocmat', 'phuonghang_emtonthuong', 'phuonghang_choiluon', 'phuonghang_bagai', 'phuonghang_tuithan', 'phuonghang_tientuibay', 'phuonghang_noitieng', 'phuonghang_ngheokhongtoi', 'phuonghang_canhcua', 'phuonghang_thuongbanthan', 'phuonghang_lietsi'],
   chiphien: ['chiphien_30ty', 'chiphien_aiepmay', 'chiphien_bonghong', 'chiphien_capdoimanh', 'chiphien_chinhquyenbat', 'chiphien_chitoitiec', 'chiphien_depxuatsac', 'chiphien_dingu', 'chiphien_hoahau', 'chiphien_hoahauphukhoa', 'chiphien_ke_trithuc_do', 'chiphien_kemay', 'chiphien_kholam', 'chiphien_khongbannua_chet', 'chiphien_khongvon', 'chiphien_khonlamkeme', 'chiphien_lendonchet', 'chiphien_loilam', 'chiphien_maydien', 'chiphien_metlamroi', 'chiphien_miengdat', 'chiphien_nhinchidi', 'chiphien_odaumaxai', 'chiphien_sochongboss', 'chiphien_taisancuachi', 'chiphien_taividepqua', 'chiphien_villa', 'chiphien_xetda8cai', 'chiphien_xinhdep', 'chiphien_conghenoi', 'chiphien_noihay', 'chiphien_dongluc', 'chiphien_thomsangtrong', 'chiphien_thatbainamdo', 'chiphien_laycaisai', 'chiphien_cuuchi', 'chiphien_bihai', 'chiphien_bacodoi', 'chiphien_chuadukho', 'chiphien_khongmuonon', 'chiphien_chotdonnha', 'chiphien_ghequa', 'chiphien_daoboi', 'chiphien_giaubaonam', 'chiphien_conbado', 'chiphien_amtham', 'chiphien_thichvay', 'chiphien_ngatdungcho', 'chiphien_chinhkien', 'chiphien_30thangchong', 'chiphien_loiroi', 'chiphien_ditu', 'chiphien_doithua', 'chiphien_xutoido', 'chiphien_khongnoigi', 'chiphien_loichivo', 'chiphien_khongtontrong', 'chiphien_nuoiong', 'chiphien_manhme', 'chiphien_blockbanhbeo', 'chiphien_dungghep', 'chiphien_thongminh', 'chiphien_dangngo'],
-  coba: ['coba_banchetroi', 'coba_batphelon', 'coba_baxaobala', 'coba_bebe', 'coba_buoccungchan', 'coba_chaygiet', 'coba_chedauchetme', 'coba_chitaimaychet', 'coba_damnha', 'coba_dethuong', 'coba_futani', 'coba_giadinhtannat', 'coba_giangho', 'coba_khongguitien', 'coba_luchongheo', 'coba_luocmay', 'coba_mayimtaotha', 'coba_maylamenothienha', 'coba_minhhieu_chui', 'coba_muonchoi', 'coba_ngaychon', 'coba_nhinquancanh', 'coba_phenguoigiau', 'coba_quatbatieu', 'coba_saucannha', 'coba_thuamaythuan', 'coba_totote', 'coba_trinhphen', 'coba_votungoi'],
+  coba: ['coba_banchetroi', 'coba_batphelon', 'coba_baxaobala', 'coba_bebe', 'coba_buoccungchan', 'coba_chaygiet', 'coba_chedauchetme', 'coba_chitaimaychet', 'coba_damnha', 'coba_dethuong', 'coba_futani', 'coba_giadinhtannat', 'coba_giangho', 'coba_khongguitien', 'coba_luchongheo', 'coba_luocmay', 'coba_mayimtaotha', 'coba_maylamenothienha', 'coba_minhhieu_chui', 'coba_muonchoi', 'coba_ngaychon', 'coba_nhinquancanh', 'coba_phenguoigiau', 'coba_quatbatieu', 'coba_saucannha', 'coba_thuamaythuan', 'coba_totote', 'coba_trinhphen', 'coba_votungoi', 'coba_nuoctuban', 'coba_matthem1ty', 'coba_chauhophu', 'coba_chovangquamy', 'coba_chenkieu', 'coba_tonbaonhieuty', 'coba_demtiendo', 'coba_tiemngando', 'coba_vuivelam', 'coba_dephomnay', 'coba_mandoinhunglua', 'coba_muaguilien', 'coba_cogapma', 'coba_chophulam', 'coba_bactyty', 'coba_vuivelucnao', 'coba_tiemvangkhongdam', 'coba_ngannguoicoi', 'coba_bachucngando', 'coba_xaycau', 'coba_tiensan', 'coba_chodimaimai', 'coba_choinhagiau', 'coba_bahoangbachua', 'coba_ngandodanhdu', 'coba_toikholam', 'coba_chetbenmy', 'coba_thetayninh', 'coba_chuabietchuno', 'coba_chanthatlam', 'coba_nghiepnang', 'coba_metmoiqua', 'coba_thietvayha', 'coba_chuakiemchuyen', 'coba_dungbuon', 'coba_nhucvinh', 'coba_no50cayvang', 'coba_trieuphukhoqua', 'coba_thualo', 'coba_taivigian', 'coba_quylay', 'coba_mangtoi', 'coba_conmatconnguoi', 'coba_nguduvay', 'coba_hoitoi', 'coba_choidi', 'coba_tra100trieu', 'coba_mattienhem', 'coba_nhinphaibiet', 'coba_noimau', 'coba_tinhnong', 'coba_khongngan', 'coba_napthe', 'coba_xuongbien', 'coba_cahatchovui', 'coba_lamlanh'],
   kyduyen: ['kyduyen_amanh', 'kyduyen_chacchanloai', 'kyduyen_dubanlinh', 'kyduyen_giacmohong', 'kyduyen_giamapluc', 'kyduyen_karen_danong', 'kyduyen_khonghoitiec', 'kyduyen_khongmakesure', 'kyduyen_loingonngot', 'kyduyen_nguhaitieng', 'kyduyen_nongsau_lanh', 'kyduyen_thanhtuu', 'kyduyen_thigio_giacmo', 'kyduyen_tinchinhminh', 'kyduyen_tuconsoam', 'kyduyen_vuotquakhokhan'],
   game_fx: ['tienbip_cainit', 'vn_amongus', 'vn_batngochua', 'vn_fartmic', 'vn_hettien', 'vn_toicongchuyen', 'vn_vineboom', 'vn_vinhbietcu'],
 };

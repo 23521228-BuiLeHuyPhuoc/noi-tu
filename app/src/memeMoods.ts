@@ -82,6 +82,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_emdepkhong',
     'minhhieu_chaomayanh', 'minhhieu_hellomayem', 'minhhieu_xinchaomaycon',
     'linda_batngocacban', 'linda_tinhyeucuatrinh', 'linda_chaomungamthuc',
+    'coba_nuoctuban', 'coba_cogapma',
   ],
   ready: [
     'linda_xuongnuiquay', 'linda_emquaday', 'linda_toasang', 'linda_level',
@@ -94,6 +95,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_khonggikhongthe', 'phuonghang_lieugan', 'phuonghang_lamchucuocchoi', 'phuonghang_choiluon',
     'chiphien_xutoido',
     'linda_daynaucanh',
+    'coba_choidi', 'coba_cahatchovui',
   ],
   brag: [
     'linda_dangcap', 'linda_toasang', 'linda_level',
@@ -106,6 +108,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_matsangsua', 'minhhieu_fanmanh', 'minhhieu_vangthat', 'minhhieu_nguoitathuong', 'minhhieu_dethuongkhong',
     'chiphien_noihay', 'chiphien_thomsangtrong', 'chiphien_amtham', 'chiphien_thichvay', 'chiphien_ngatdungcho', 'chiphien_chinhkien', 'chiphien_thongminh',
     'linda_chuaailuadoi', 'linda_hienhau', 'linda_ngotnam', 'linda_ngonroiday', 'linda_suchutcuaco', 'linda_tienganh', 'linda_cuoixinh',
+    'coba_nuoctuban', 'coba_matthem1ty', 'coba_chauhophu', 'coba_chenkieu', 'coba_dephomnay', 'coba_mandoinhunglua', 'coba_chophulam', 'coba_tiemvangkhongdam', 'coba_ngannguoicoi', 'coba_xaycau', 'coba_bahoangbachua', 'coba_khongngan',
   ],
   laugh: [
     'linda_maccuoi',
@@ -115,6 +118,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_coloiqua',
     'chiphien_thichvay', 'chiphien_30thangchong',
     'linda_hienhau', 'linda_cuoixinh', 'linda_bochuithe',
+    'coba_vuivelam', 'coba_vuivelucnao', 'coba_choinhagiau',
   ],
   chill: [
     'linda_uongnuocmia', 'linda_buoitoivuive',
@@ -125,6 +129,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'kyduyen_giacmohong', 'kyduyen_nguhaitieng', 'kyduyen_karen_danong',
     'phuonghang_toidadu', 'phuonghang_chuyennhieu', 'phuonghang_thuongbanthan',
     'linda_daynaucanh',
+    'coba_vuivelam', 'coba_vuivelucnao', 'coba_cahatchovui',
   ],
   rich: [
     'linda_dangcap', 'linda_emquaday', 'linda_toasang',
@@ -138,6 +143,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_themngando', 'minhhieu_canvang', 'minhhieu_muanhachucty', 'minhhieu_muadi', 'minhhieu_chotdonquatroi', 'minhhieu_vangthat', 'minhhieu_disingapore', 'minhhieu_giauhontao',
     'chiphien_thomsangtrong', 'chiphien_chotdonnha',
     'linda_cotiendulich',
+    'coba_matthem1ty', 'coba_chovangquamy', 'coba_tonbaonhieuty', 'coba_demtiendo', 'coba_tiemngando', 'coba_mandoinhunglua', 'coba_bactyty', 'coba_tiemvangkhongdam', 'coba_bachucngando', 'coba_tiensan', 'coba_choinhagiau', 'coba_ngandodanhdu', 'coba_tra100trieu',
   ],
   broke: [
     'linda_que', 'linda_cuutoibacon', 'linda_banoi',
@@ -150,6 +156,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_saodola', 'phuonghang_thangheo', 'phuonghang_tienrotnuocmat', 'phuonghang_ngheokhongtoi',
     'minhhieu_hettrontien', 'minhhieu_chotdonkhongaimua',
     'linda_khongdieukien', 'linda_sauraycodieukien',
+    'coba_toikholam', 'coba_no50cayvang', 'coba_trieuphukhoqua', 'coba_thualo',
   ],
   gift: [
     'linda_emquaday', 'linda_thaloi',
@@ -160,6 +167,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'kyduyen_loingonngot', 'kyduyen_karen_danong',
     'minhhieu_disingapore', 'minhhieu_nguoitathuong',
     'linda_camonem', 'linda_thatim',
+    'coba_tonbaonhieuty', 'coba_dephomnay', 'coba_muaguilien', 'coba_xaycau', 'coba_chodimaimai', 'coba_lamlanh',
   ],
   sad: [
     'linda_que',
@@ -172,6 +180,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_buonghe', 'minhhieu_khuyroi', 'minhhieu_metkhach',
     'chiphien_thatbainamdo', 'chiphien_chuadukho', 'chiphien_30thangchong',
     'linda_coghettoi', 'linda_chuaduocyeu', 'linda_xinloime', 'linda_sauraycodieukien', 'linda_tuclam',
+    'coba_chetbenmy', 'coba_nghiepnang', 'coba_metmoiqua', 'coba_dungbuon', 'coba_nhucvinh', 'coba_trieuphukhoqua',
   ],
   flop: [
     'linda_que', 'linda_hongnho', 'linda_ecaijztroi', 'linda_airanh',
@@ -184,6 +193,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_chotdonkhongaimua',
     'chiphien_thatbainamdo', 'chiphien_laycaisai', 'chiphien_loiroi',
     'linda_aotuong', 'linda_quentoikhet', 'linda_quenkeo',
+    'coba_nghiepnang', 'coba_thualo',
   ],
   panic: [
     'linda_cuutoibacon', 'linda_meoicuucon', 'linda_banoi',
@@ -194,6 +204,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'kyduyen_amanh', 'kyduyen_nongsau_lanh',
     'minhhieu_soquakhongbiet',
     'chiphien_cuuchi', 'chiphien_bacodoi', 'chiphien_chuadukho',
+    'coba_chetbenmy',
   ],
   plea: [
     'linda_hongnho',
@@ -204,6 +215,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_xinloithathu', 'minhhieu_hetpin',
     'chiphien_cuuchi', 'chiphien_khongmuonon', 'chiphien_loichivo',
     'linda_xinloime',
+    'coba_toikholam', 'coba_quylay',
   ],
   shock: [
     'linda_banoi', 'linda_ecaijztroi', 'linda_dohamcau',
@@ -215,6 +227,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_kicucvay',
     'chiphien_bacodoi', 'chiphien_ghequa', 'chiphien_daoboi',
     'linda_nguocdoi',
+    'coba_thietvayha',
   ],
   danger: [
     'linda_moimocra',
@@ -242,6 +255,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_voduyen', 'minhhieu_saokhongdo', 'minhhieu_divedicha', 'minhhieu_cotiendikhong', 'minhhieu_dungdieuqua', 'minhhieu_dienhoai', 'minhhieu_muanhachucty', 'minhhieu_dexnoiten', 'minhhieu_giauhontao',
     'chiphien_conghenoi', 'chiphien_dongluc', 'chiphien_ditu', 'chiphien_nuoiong', 'chiphien_dungghep',
     'linda_batoi', 'linda_cauhoncauhon', 'linda_botragiumcon', 'linda_lanvaobep', 'linda_tienganh',
+    'coba_conmatconnguoi', 'coba_nguduvay', 'coba_mattienhem', 'coba_nhinphaibiet', 'coba_xuongbien',
   ],
   threat: [
     'linda_namdauquay', 'linda_xuongnuiquay',
@@ -254,6 +268,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_themngando', 'minhhieu_fanmanh', 'minhhieu_taodaymay', 'minhhieu_khongchuikhongngu', 'minhhieu_baikinhte',
     'chiphien_xutoido', 'chiphien_blockbanhbeo',
     'linda_khongthachomay',
+    'coba_ngandodanhdu', 'coba_hoitoi', 'coba_choidi', 'coba_tra100trieu', 'coba_noimau', 'coba_tinhnong', 'coba_khongngan',
   ],
   accuse: [
     'linda_moimocra', 'linda_chodegiatao', 'linda_retienthem',
@@ -280,6 +295,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_xinloithathu', 'minhhieu_noiduakhongchui', 'minhhieu_metkhach', 'minhhieu_dethuongkhong',
     'chiphien_conghenoi', 'chiphien_laycaisai', 'chiphien_bihai', 'chiphien_doithua', 'chiphien_khongnoigi', 'chiphien_loichivo', 'chiphien_dangngo',
     'linda_aicungxau', 'linda_chuatienan', 'linda_khongaithuonghai', 'linda_khongbomieng', 'linda_bochuithe',
+    'coba_thetayninh', 'coba_chuabietchuno', 'coba_chanthatlam', 'coba_chuakiemchuyen', 'coba_taivigian', 'coba_quylay', 'coba_mangtoi',
   ],
   mercy: [
     'linda_thaloi', 'linda_buoitoivuive',
@@ -291,6 +307,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'linda_maccuoi', 'minhhieu_khoe', 'phuonghang_trongcuoc', 'chiphien_xinhdep', 'coba_dethuong', 'kyduyen_vuotquakhokhan',
     'chiphien_chinhkien', 'chiphien_manhme',
     'linda_khongchuiboinua', 'linda_duonghuongthien',
+    'coba_chodimaimai', 'coba_lamlanh',
   ],
   saved: [
     'linda_uongnuocmia', 'linda_maccuoi',
@@ -337,6 +354,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_dienhoai', 'minhhieu_hetpin', 'minhhieu_khuyroi', 'minhhieu_khongchuikhongngu',
     'chiphien_dungghep',
     'linda_botragiumcon',
+    'coba_napthe',
   ],
 };
 
