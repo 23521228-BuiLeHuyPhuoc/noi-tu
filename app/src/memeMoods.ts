@@ -1,4 +1,27 @@
-import type { MemeId, MemePoolKey } from './audioAssets';
+import type { MemeId } from '../../shared/src/memes';
+
+/** Các hành động trong game có kho meme riêng. */
+export type MemePoolKey =
+  | 'welcome'
+  | 'turn_move'
+  | 'correct'
+  | 'wrong'
+  | 'win'
+  | 'lose'
+  | 'money'
+  | 'broke'
+  | 'gift'
+  | 'troll'
+  | 'vote'
+  | 'defense'
+  | 'forgive'
+  | 'eliminated'
+  | 'twist'
+  | 'bomb'
+  | 'bite'
+  | 'shock'
+  | 'gift_receive' | 'help' | 'hurry' | 'relief'
+  | 'chat_hype';
 
 /**
  * Nhãn chi tiết cho từng câu (một câu có thể mang nhiều nhãn). Các nhãn được gom vào

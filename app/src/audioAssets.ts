@@ -1,6 +1,6 @@
 import type { RoomState, VoicePersonaId } from '../../shared/src/types';
 import type { AvataaarsOpts } from './avatars';
-import { buildMemePools } from './memeMoods';
+import { buildMemePools, type MemePoolKey } from './memeMoods';
 import { MEME_LIST, type MemeId, type MemeInfo, type MemePersona } from '../../shared/src/memes';
 export { MEME_LIST, type MemeId, type MemeInfo, type MemePersona } from '../../shared/src/memes';
 
@@ -599,27 +599,7 @@ export const MEME_IDS_BY_PERSONA: Record<MemePersona, readonly MemeId[]> = {
   game_fx: ['tienbip_cainit', 'vn_amongus', 'vn_batngochua', 'vn_fartmic', 'vn_hettien', 'vn_toicongchuyen', 'vn_vineboom', 'vn_vinhbietcu'],
 };
 
-export type MemePoolKey =
-  | 'welcome'
-  | 'turn_move'
-  | 'correct'
-  | 'wrong'
-  | 'win'
-  | 'lose'
-  | 'money'
-  | 'broke'
-  | 'gift'
-  | 'troll'
-  | 'vote'
-  | 'defense'
-  | 'forgive'
-  | 'eliminated'
-  | 'twist'
-  | 'bomb'
-  | 'bite'
-  | 'shock'
-  | 'gift_receive' | 'help' | 'hurry' | 'relief'
-  | 'chat_hype';
+export type { MemePoolKey };
 
 export const ACTION_POOL_META: readonly { key: MemePoolKey; label: string; desc: string }[] = [
   { key: 'welcome', label: 'Vào phòng / Khai cuộc', desc: 'Lời chào khi vào phòng' },
