@@ -1,9 +1,10 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { VoicePersonaId } from '../../../shared/src/types';
 import { VOICE_PERSONA_META } from '../audioAssets';
 import { useStableWindow } from '../hooks';
 import { groupsForVoice } from '../memeBoard';
+import { isMemeEnabled, setMemeEnabled, subscribeAudioSettings } from '../sound';
 import { C, sticker } from '../theme';
 import { T } from '../ui';
 import type { Game } from '../useGame';
@@ -51,17 +52,34 @@ function Lines({ voice, playerId, online, sendMeme, memeReadyAt }: Props & { voi
   </>;
 }
 
+/** Meme tự phát khi làm hành động (mua nhà, đoán sai…) bật hay tắt; meme bấm tay luôn phát. */
+const useAutoMeme = () => useSyncExternalStore(subscribeAudioSettings, isMemeEnabled, isMemeEnabled);
+
+function AutoToggle() {
+  const on = useAutoMeme();
+  const color = on ? C.jadeDeep : C.danger;
+  return <Pressable testID="room-meme-auto" accessibilityRole="switch" accessibilityState={{ checked: on }}
+    accessibilityLabel="Giọng tự phát khi làm hành động" accessibilityHint="Câu bấm tay vẫn phát dù tắt"
+    onPress={() => setMemeEnabled(!on)} style={({ pressed }) => [styles.auto, on ? styles.autoOn : styles.autoOff, pressed && styles.dim]}>
+    <UiIcon name={on ? 'Volume2' : 'VolumeX'} size={14} color={color} />
+    <T numberOfLines={1} style={[styles.autoText, { color }]}>Tự phát khi làm hành động: {on ? 'Bật' : 'Tắt'}</T>
+  </Pressable>;
+}
+
 export const RoomMemeBoard = memo(function RoomMemeBoard(props: Props) {
   const [open, setOpen] = useState(false);
+  const autoOn = useAutoMeme();
   const { width, height } = useStableWindow();
   const right = props.arcade ? Math.min(124, width * 0.32) : 8;
   return <View pointerEvents="box-none" style={[styles.dock, { right }]}>
-    {open && <View testID="room-meme-tray" style={[styles.tray, { width: Math.min(320, width - right - 12), maxHeight: Math.min(300, height * 0.4) }]}>
+    {open && <View testID="room-meme-tray" style={[styles.tray, { width: Math.min(320, width - right - 12), maxHeight: Math.min(330, height * 0.45) }]}>
+      <AutoToggle />
       {props.voice ? <Lines key={props.voice} {...props} voice={props.voice} /> : <T style={styles.label}>Chọn giọng ở sảnh để phát meme.</T>}
     </View>}
     <Pressable testID="room-meme-toggle" accessibilityRole="button" accessibilityLabel={open ? 'Đóng bảng giọng' : 'Mở bảng giọng'} accessibilityState={{ expanded: open }}
       onPress={() => setOpen((previous) => !previous)} style={({ pressed }) => [styles.toggle, open && styles.selected, pressed && styles.dim]}>
       <UiIcon name={open ? 'X' : 'Megaphone'} size={18} color={open ? C.paper : C.ink} />
+      {!autoOn && !open && <View testID="room-meme-auto-off" pointerEvents="none" style={styles.offDot} />}
     </Pressable>
   </View>;
 });
@@ -84,4 +102,9 @@ const styles = StyleSheet.create({
   pill: { maxWidth: '100%', minHeight: 32, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, borderColor: C.borderSubtle },
   dim: { opacity: 0.5 },
   quote: { flexShrink: 1, gap: 4, padding: 4 },
+  auto: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1 },
+  autoOn: { backgroundColor: C.jadeSoft, borderColor: 'rgba(21,128,61,0.35)' },
+  autoOff: { backgroundColor: C.dangerSoft, borderColor: 'rgba(185,28,28,0.3)' },
+  autoText: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
+  offDot: { position: 'absolute', top: 3, right: 3, width: 10, height: 10, borderRadius: 5, backgroundColor: C.danger, borderWidth: 1.5, borderColor: C.paper },
 });
