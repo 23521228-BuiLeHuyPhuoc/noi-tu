@@ -13,6 +13,7 @@ import { Button, IconButton, T, useFeed, useFeedInset } from '../ui';
 import { useKeyboardInset, useStableWindow } from '../hooks';
 import { useLocalTheme, useSmoothMode } from '../smoothMode';
 import { MapBackdrop } from './MapBackdrop';
+import { RoomMemeBoard } from './RoomMemeBoard';
 import { AudioSheet } from './AudioSheet';
 import { Avatar } from './Avatar';
 import { ChatSheet, FunLayer, ThrowSheet, TrollLayer } from './Fun';
@@ -200,7 +201,8 @@ export function Shell({
     : [...room.players];
   for (const p of room.players) if (!players.includes(p)) players.push(p);
 
-  const meIsSpectator = room.players.find((p) => p.id === game.me)?.spectator === true;
+  const myPlayer = room.players.find((player) => player.id === game.me);
+  const meIsSpectator = myPlayer?.spectator === true;
   const isHost = room.hostId === game.me;
   const crowded = room.players.length >= 6;
   const ownedSet = new Set(game.user?.owned ?? []);
@@ -359,13 +361,18 @@ export function Shell({
           </View>
         )}
 
-        {scroll ? (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-            {content}
-          </ScrollView>
-        ) : (
-          <View style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{content}</View>
-        )}
+        <View style={{ flex: 1, minHeight: 0 }}>
+          {scroll ? (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+              {content}
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{content}</View>
+          )}
+          {myPlayer && <RoomMemeBoard key={room.code} playerId={myPlayer.id} voice={myPlayer.voice}
+            online={game.status === 'online'} arcade={room.game?.type === 'boom_online' || room.game?.type === 'croaksquad'}
+            sendMeme={game.sendMeme} memeReadyAt={game.memeReadyAt} />}
+        </View>
 
         {bottom ? (
           <View style={[styles.bottom, tightHeight && styles.bottomTight, { borderTopColor: pal.hairline }]} onLayout={(e) => setFeedInset(e.nativeEvent.layout.height)}>{bottom}</View>

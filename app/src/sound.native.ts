@@ -59,6 +59,7 @@ let bgmPlayer: AudioPlayer | null = null;
 let bgmSub: { remove(): void } | null = null;
 let memePlayer: AudioPlayer | null = null;
 let memeDuckTimer: ReturnType<typeof setTimeout> | null = null;
+let playingAutomaticMeme = false;
 let lastMemePlayedAt = 0;
 const listeners = new Set<() => void>();
 
@@ -139,7 +140,7 @@ export function isMemeEnabled(): boolean {
 export function setMemeEnabled(value: boolean): void {
   memeEnabled = value;
   changedMeme = true;
-  if (!value) stopMeme();
+  if (!value && playingAutomaticMeme) stopMeme();
   void AsyncStorage.setItem(KEY_MEME, value ? '1' : '0').catch(() => {});
   notify();
 }
@@ -260,6 +261,7 @@ function clearMemeDuck(): void {
 }
 
 function releaseMeme(): void {
+  playingAutomaticMeme = false;
   if (memePlayer) {
     memePlayer.remove();
     memePlayer = null;
@@ -273,15 +275,20 @@ export function stopMeme(): void {
 }
 
 export function playMeme(id: MemeId, opts?: MemeOptions): void {
-  if (muted || !memeEnabled || AppState.currentState !== 'active') return;
+  playClip(id, opts, false);
+}
+
+function playClip(id: MemeId, opts: MemeOptions | undefined, automatic: boolean): void {
+  if (muted || AppState.currentState !== 'active') return;
   if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
   const speaker = resolveSpeaker(opts);
   if (speaker.persona && MEME_BY_ID[id].persona !== speaker.persona) return;
   const seq = resetPlayback();
   releaseMeme();
+  playingAutomaticMeme = automatic;
   lastMemePlayedAt = Date.now();
   void ready.then(() => {
-    if (!isCurrentPlayback(seq) || muted || !memeEnabled || AppState.currentState !== 'active') return;
+    if (!isCurrentPlayback(seq) || muted || (automatic && !memeEnabled) || AppState.currentState !== 'active') return;
     const player = createAudioPlayer(MEME_ASSETS[id]);
     memePlayer = player;
     player.volume = 1;
@@ -306,14 +313,14 @@ export function playMeme(id: MemeId, opts?: MemeOptions): void {
 }
 
 function playFromBag(pool: MemePoolKey | 'all' | 'preview', opts?: MemeOptions): void {
-  if (muted || !memeEnabled || AppState.currentState !== 'active') return;
+  if (muted || AppState.currentState !== 'active') return;
   if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
   if (!opts?.force && getActiveMeme()) return;
   const id = drawForSpeaker(pool, resolveSpeaker(opts));
-  if (id) playMeme(id, { ...opts, force: true });
+  if (id) playClip(id, { ...opts, force: true }, pool !== 'preview' && pool !== 'all');
 }
 export function playRandomMeme(opts?: MemeOptions): void { playFromBag('all', opts); }
-export function playMemePool(pool: MemePoolKey, opts?: MemeOptions): void { playFromBag(pool, opts); }
+export function playMemePool(pool: MemePoolKey, opts?: MemeOptions): void { if (memeEnabled) playFromBag(pool, opts); }
 export function playPersonaPreview(persona: VoicePersonaId, speakerId: string | null): void { playFromBag('preview', { persona, speakerId, force: true }); }
 
 

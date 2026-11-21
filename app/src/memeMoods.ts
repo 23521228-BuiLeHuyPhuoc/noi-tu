@@ -77,38 +77,41 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_khoe', 'minhhieu_maccuoi', 'minhhieu_lubu',
     'phuonghang_motminhtao', 'phuonghang_50tuoi', 'phuonghang_kimcuong',
     'chiphien_chitoitiec', 'chiphien_hoahau', 'chiphien_depxuatsac',
-    'coba_muonchoi', 'coba_buoccungchan', 'coba_totote',
+    'coba_muonchoi', 'coba_totote',
     'kyduyen_thigio_giacmo', 'kyduyen_dubanlinh', 'kyduyen_tinchinhminh',
     'phuonghang_emdepkhong',
     'minhhieu_chaomayanh', 'minhhieu_hellomayem', 'minhhieu_xinchaomaycon',
     'linda_batngocacban', 'linda_tinhyeucuatrinh', 'linda_chaomungamthuc',
-    'coba_nuoctuban', 'coba_cogapma',
+    'coba_nuoctuban', 
+    'coba_buoccungchan', 'coba_cogapma', 'coba_bahoangbachua',
   ],
   ready: [
     'linda_xuongnuiquay', 'linda_emquaday', 'linda_toasang', 'linda_level',
     'minhhieu_duongquyen', 'minhhieu_tiendohay', 'minhhieu_camtiendo_dq', 'minhhieu_lubu',
     'phuonghang_motminhtao', 'phuonghang_chuabaogiobochay', 'phuonghang_dunglacham', 'phuonghang_kimcuong',
     'chiphien_chitoitiec', 'chiphien_nhinchidi', 'chiphien_hoahau', 'chiphien_depxuatsac',
-    'coba_buoccungchan', 'coba_muonchoi', 'coba_totote', 'coba_giangho',
+    'coba_muonchoi', 'coba_totote', 
     'kyduyen_dubanlinh', 'kyduyen_tinchinhminh', 'kyduyen_thigio_giacmo',
     'vn_toicongchuyen',
     'phuonghang_khonggikhongthe', 'phuonghang_lieugan', 'phuonghang_lamchucuocchoi', 'phuonghang_choiluon',
     'chiphien_xutoido',
     'linda_daynaucanh',
-    'coba_choidi', 'coba_cahatchovui',
+    'coba_cahatchovui',
+    'coba_buoccungchan', 'coba_choidi',
   ],
   brag: [
     'linda_dangcap', 'linda_toasang', 'linda_level',
     'minhhieu_matphoiphoi', 'minhhieu_tiendohay', 'minhhieu_nganruoido', 'minhhieu_khoe',
     'phuonghang_chanly', 'phuonghang_kimcuong', 'phuonghang_motminhtao', 'phuonghang_thanhcong', 'phuonghang_50tuoi', 'phuonghang_tubitritue',
     'chiphien_depxuatsac', 'chiphien_taividepqua', 'chiphien_xinhdep', 'chiphien_capdoimanh', 'chiphien_bonghong',
-    'coba_futani', 'coba_phenguoigiau', 'coba_saucannha', 'coba_giangho', 'coba_quatbatieu', 'coba_mayimtaotha',
+    'coba_futani', 'coba_phenguoigiau', 'coba_saucannha', 'coba_quatbatieu', 'coba_mayimtaotha',
     'kyduyen_thanhtuu', 'kyduyen_vuotquakhokhan', 'kyduyen_dubanlinh', 'kyduyen_tinchinhminh', 'kyduyen_karen_danong',
     'phuonghang_khonggikhongthe', 'phuonghang_coloiqua', 'phuonghang_emdepkhong', 'phuonghang_tulamdep', 'phuonghang_tientrongnao', 'phuonghang_lieugan', 'phuonghang_hoanhap', 'phuonghang_khonganbam', 'phuonghang_lamchucuocchoi', 'phuonghang_trathu', 'phuonghang_nguoigiau', 'phuonghang_khongquygoi', 'phuonghang_tientuibay', 'phuonghang_noitieng', 'phuonghang_thuongbanthan',
     'minhhieu_matsangsua', 'minhhieu_fanmanh', 'minhhieu_vangthat', 'minhhieu_nguoitathuong', 'minhhieu_dethuongkhong',
     'chiphien_noihay', 'chiphien_thomsangtrong', 'chiphien_amtham', 'chiphien_thichvay', 'chiphien_ngatdungcho', 'chiphien_chinhkien', 'chiphien_thongminh',
     'linda_chuaailuadoi', 'linda_hienhau', 'linda_ngotnam', 'linda_ngonroiday', 'linda_suchutcuaco', 'linda_tienganh', 'linda_cuoixinh',
-    'coba_nuoctuban', 'coba_matthem1ty', 'coba_chauhophu', 'coba_chenkieu', 'coba_dephomnay', 'coba_mandoinhunglua', 'coba_chophulam', 'coba_tiemvangkhongdam', 'coba_ngannguoicoi', 'coba_xaycau', 'coba_bahoangbachua', 'coba_khongngan',
+    'coba_nuoctuban', 'coba_matthem1ty', 'coba_chauhophu', 'coba_chenkieu', 'coba_dephomnay', 'coba_mandoinhunglua', 'coba_chophulam', 'coba_tiemvangkhongdam', 'coba_ngannguoicoi', 
+    'coba_khongngan', 'coba_ngandodanhdu', 'coba_xaycau', 'coba_chovangquamy', 'coba_tiensan', 'coba_bactyty', 'coba_bahoangbachua', 'coba_giangho',
   ],
   laugh: [
     'linda_maccuoi',
@@ -125,11 +128,11 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_lubu', 'minhhieu_khoe',
     'phuonghang_tinhhinh', 'phuonghang_khonhon', 'phuonghang_50tuoi',
     'chiphien_maydien',
-    'coba_buoccungchan',
     'kyduyen_giacmohong', 'kyduyen_nguhaitieng', 'kyduyen_karen_danong',
     'phuonghang_toidadu', 'phuonghang_chuyennhieu', 'phuonghang_thuongbanthan',
     'linda_daynaucanh',
     'coba_vuivelam', 'coba_vuivelucnao', 'coba_cahatchovui',
+    'coba_buoccungchan', 'coba_cogapma', 'coba_lamlanh',
   ],
   rich: [
     'linda_dangcap', 'linda_emquaday', 'linda_toasang',
@@ -143,20 +146,22 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'minhhieu_themngando', 'minhhieu_canvang', 'minhhieu_muanhachucty', 'minhhieu_muadi', 'minhhieu_chotdonquatroi', 'minhhieu_vangthat', 'minhhieu_disingapore', 'minhhieu_giauhontao',
     'chiphien_thomsangtrong', 'chiphien_chotdonnha',
     'linda_cotiendulich',
-    'coba_matthem1ty', 'coba_chovangquamy', 'coba_tonbaonhieuty', 'coba_demtiendo', 'coba_tiemngando', 'coba_mandoinhunglua', 'coba_bactyty', 'coba_tiemvangkhongdam', 'coba_bachucngando', 'coba_tiensan', 'coba_choinhagiau', 'coba_ngandodanhdu', 'coba_tra100trieu',
+    'coba_matthem1ty', 'coba_tonbaonhieuty', 'coba_demtiendo', 'coba_tiemngando', 'coba_mandoinhunglua', 'coba_tiemvangkhongdam', 'coba_choinhagiau', 'coba_tra100trieu',
+    'coba_choidi', 'coba_khongngan', 'coba_ngandodanhdu', 'coba_xaycau', 'coba_muaguilien', 'coba_chovangquamy', 'coba_tiensan', 'coba_bactyty', 'coba_bachucngando',
   ],
   broke: [
     'linda_que', 'linda_cuutoibacon', 'linda_banoi',
     'minhhieu_muonkhoc', 'minhhieu_rotmuocmat', 'minhhieu_hoihan', 'minhhieu_laytienche',
     'phuonghang_luadao', 'phuonghang_tienphuongtien', 'phuonghang_dosup',
     'chiphien_khongbannua_chet', 'chiphien_30ty', 'chiphien_aiepmay',
-    'coba_khongguitien', 'coba_luchongheo', 'coba_giadinhtannat', 'coba_nhinquancanh',
+    'coba_khongguitien', 'coba_giadinhtannat', 
     'kyduyen_tuconsoam', 'kyduyen_amanh', 'kyduyen_khonghoitiec',
     'vn_hettien', 'tienbip_cainit',
     'phuonghang_saodola', 'phuonghang_thangheo', 'phuonghang_tienrotnuocmat', 'phuonghang_ngheokhongtoi',
     'minhhieu_hettrontien', 'minhhieu_chotdonkhongaimua',
     'linda_khongdieukien', 'linda_sauraycodieukien',
     'coba_toikholam', 'coba_no50cayvang', 'coba_trieuphukhoqua', 'coba_thualo',
+    'coba_napthe', 'coba_chuabietchuno', 'coba_luchongheo',
   ],
   gift: [
     'linda_emquaday', 'linda_thaloi',
@@ -167,7 +172,8 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'kyduyen_loingonngot', 'kyduyen_karen_danong',
     'minhhieu_disingapore', 'minhhieu_nguoitathuong',
     'linda_camonem', 'linda_thatim',
-    'coba_tonbaonhieuty', 'coba_dephomnay', 'coba_muaguilien', 'coba_xaycau', 'coba_chodimaimai', 'coba_lamlanh',
+    'coba_tonbaonhieuty', 'coba_dephomnay', 'coba_chodimaimai', 
+    'coba_ngandodanhdu', 'coba_xaycau', 'coba_muaguilien', 'coba_bachucngando', 'coba_lamlanh',
   ],
   sad: [
     'linda_que',
@@ -216,6 +222,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'chiphien_cuuchi', 'chiphien_khongmuonon', 'chiphien_loichivo',
     'linda_xinloime',
     'coba_toikholam', 'coba_quylay',
+    'coba_napthe',
   ],
   shock: [
     'linda_banoi', 'linda_ecaijztroi', 'linda_dohamcau',
@@ -247,7 +254,7 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_connguo_nao', 'phuonghang_khonhon', 'phuonghang_laymayxuithem', 'phuonghang_chanhcho_ngu',
     'phuonghang_haoquang', 'phuonghang_tuongvay',
     'chiphien_kemay', 'chiphien_nhinchidi', 'chiphien_xinhdep', 'chiphien_khonlamkeme', 'chiphien_aiepmay',
-    'coba_maylamenothienha', 'coba_nhinquancanh', 'coba_chitaimaychet', 'coba_phenguoigiau',
+    'coba_maylamenothienha', 'coba_chitaimaychet', 'coba_phenguoigiau',
     'kyduyen_giacmohong', 'kyduyen_karen_danong', 'kyduyen_dubanlinh', 'kyduyen_thanhtuu', 'kyduyen_tinchinhminh',
     'kyduyen_khonghoitiec',
     'vn_fartmic', 'vn_batngochua',
@@ -256,19 +263,21 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'chiphien_conghenoi', 'chiphien_dongluc', 'chiphien_ditu', 'chiphien_nuoiong', 'chiphien_dungghep',
     'linda_batoi', 'linda_cauhoncauhon', 'linda_botragiumcon', 'linda_lanvaobep', 'linda_tienganh',
     'coba_conmatconnguoi', 'coba_nguduvay', 'coba_mattienhem', 'coba_nhinphaibiet', 'coba_xuongbien',
+    'coba_nhinquancanh', 'coba_luchongheo',
   ],
   threat: [
     'linda_namdauquay', 'linda_xuongnuiquay',
     'minhhieu_duongquyen', 'minhhieu_camtiendo_dq',
     'phuonghang_cangchuicangdien', 'phuonghang_taophaimatday', 'phuonghang_dunglacham', 'phuonghang_dosup',
     'chiphien_xetda8cai', 'chiphien_lendonchet',
-    'coba_luocmay', 'coba_giangho', 'coba_chedauchetme', 'coba_quatbatieu', 'coba_ngaychon', 'coba_votungoi',
+    'coba_luocmay', 'coba_chedauchetme', 'coba_quatbatieu', 'coba_ngaychon', 'coba_votungoi',
     'kyduyen_chacchanloai',
     'phuonghang_choiluon',
     'minhhieu_themngando', 'minhhieu_fanmanh', 'minhhieu_taodaymay', 'minhhieu_khongchuikhongngu', 'minhhieu_baikinhte',
     'chiphien_xutoido', 'chiphien_blockbanhbeo',
     'linda_khongthachomay',
-    'coba_ngandodanhdu', 'coba_hoitoi', 'coba_choidi', 'coba_tra100trieu', 'coba_noimau', 'coba_tinhnong', 'coba_khongngan',
+    'coba_hoitoi', 'coba_tra100trieu', 'coba_noimau', 'coba_tinhnong', 
+    'coba_giangho',
   ],
   accuse: [
     'linda_moimocra', 'linda_chodegiatao', 'linda_retienthem',
@@ -276,45 +285,48 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'phuonghang_dungdien', 'phuonghang_luadao', 'phuonghang_chomochui', 'phuonghang_laokhongduoc',
     'phuonghang_voquytday', 'phuonghang_chanhcho_ngu',
     'chiphien_chinhquyenbat', 'chiphien_lendonchet', 'chiphien_xetda8cai',
-    'coba_baxaobala', 'coba_ngaychon', 'coba_votungoi', 'coba_batphelon', 'coba_giangho',
+    'coba_baxaobala', 'coba_ngaychon', 'coba_votungoi', 'coba_batphelon', 
     'kyduyen_chacchanloai', 'kyduyen_khongmakesure', 'kyduyen_giacmohong',
     'vn_toicongchuyen', 'vn_amongus',
     'phuonghang_suthatloira',
     'minhhieu_xammuongiangho', 'minhhieu_xaolao',
     'chiphien_daoboi', 'chiphien_khongtontrong', 'chiphien_nuoiong', 'chiphien_blockbanhbeo',
     'linda_chuahoimaykhai',
+    'coba_giangho',
   ],
   excuse: [
     'linda_hongnho', 'linda_thaloi', 'linda_uongnuocmia',
     'minhhieu_laytienche', 'minhhieu_lubu', 'minhhieu_conquyxao',
     'phuonghang_trongcuoc', 'phuonghang_thayvay', 'phuonghang_chuabaogiobochay', 'phuonghang_tuongvay',
     'chiphien_kholam', 'chiphien_loilam', 'chiphien_ke_trithuc_do',
-    'coba_batphelon', 'coba_giadinhtannat', 'coba_buoccungchan',
+    'coba_batphelon', 'coba_giadinhtannat', 
     'kyduyen_khonghoitiec', 'kyduyen_khongmakesure', 'kyduyen_tinchinhminh', 'kyduyen_dubanlinh', 'kyduyen_thigio_giacmo',
     'phuonghang_chuyennhieu', 'phuonghang_thangheo', 'phuonghang_bagai', 'phuonghang_lietsi',
     'minhhieu_xinloithathu', 'minhhieu_noiduakhongchui', 'minhhieu_metkhach', 'minhhieu_dethuongkhong',
     'chiphien_conghenoi', 'chiphien_laycaisai', 'chiphien_bihai', 'chiphien_doithua', 'chiphien_khongnoigi', 'chiphien_loichivo', 'chiphien_dangngo',
     'linda_aicungxau', 'linda_chuatienan', 'linda_khongaithuonghai', 'linda_khongbomieng', 'linda_bochuithe',
-    'coba_thetayninh', 'coba_chuabietchuno', 'coba_chanthatlam', 'coba_chuakiemchuyen', 'coba_taivigian', 'coba_quylay', 'coba_mangtoi',
+    'coba_thetayninh', 'coba_chanthatlam', 'coba_chuakiemchuyen', 'coba_taivigian', 'coba_quylay', 'coba_mangtoi',
+    'coba_chuabietchuno',
   ],
   mercy: [
     'linda_thaloi', 'linda_buoitoivuive',
     'minhhieu_maccuoi', 'minhhieu_tinhlai',
     'phuonghang_tubitritue', 'phuonghang_tuongvay',
     'chiphien_khonlamkeme', 'chiphien_kemay',
-    'coba_mayimtaotha', 'coba_buoccungchan',
+    'coba_mayimtaotha', 
     'kyduyen_giamapluc', 'kyduyen_khonghoitiec',
     'linda_maccuoi', 'minhhieu_khoe', 'phuonghang_trongcuoc', 'chiphien_xinhdep', 'coba_dethuong', 'kyduyen_vuotquakhokhan',
     'chiphien_chinhkien', 'chiphien_manhme',
     'linda_khongchuiboinua', 'linda_duonghuongthien',
-    'coba_chodimaimai', 'coba_lamlanh',
+    'coba_chodimaimai', 
+    'coba_buoccungchan', 'coba_lamlanh',
   ],
   saved: [
     'linda_uongnuocmia', 'linda_maccuoi',
     'minhhieu_tinhlai', 'minhhieu_laytienche', 'minhhieu_khoe',
     'phuonghang_chuabaogiobochay', 'phuonghang_thayvay',
     'chiphien_xinhdep', 'chiphien_depxuatsac',
-    'coba_dethuong', 'coba_buoccungchan',
+    'coba_dethuong', 
     'kyduyen_giamapluc', 'kyduyen_vuotquakhokhan', 'kyduyen_thanhtuu',
     'phuonghang_khongquygoi', 'phuonghang_tuithan', 'phuonghang_canhcua',
     'chiphien_manhme',
@@ -349,12 +361,11 @@ export const MEME_MOODS: Record<MemeMood, readonly MemeId[]> = {
     'chiphien_maydien', 'chiphien_dingu',
     'coba_chaygiet', 'coba_muonchoi',
     'kyduyen_nguhaitieng', 'kyduyen_thigio_giacmo',
-    'linda_botkhung', 'minhhieu_camtiendo_dq', 'phuonghang_khonhon', 'chiphien_aiepmay', 'coba_giangho', 'kyduyen_chacchanloai',
+    'linda_botkhung', 'minhhieu_camtiendo_dq', 'phuonghang_khonhon', 'chiphien_aiepmay', 'kyduyen_chacchanloai',
     'phuonghang_chiuduockhong',
     'minhhieu_dienhoai', 'minhhieu_hetpin', 'minhhieu_khuyroi', 'minhhieu_khongchuikhongngu',
     'chiphien_dungghep',
     'linda_botragiumcon',
-    'coba_napthe',
   ],
 };
 
@@ -404,8 +415,8 @@ export const POOL_GROUPS: Record<MemePoolKey, readonly MemeGroup[]> = {
 
 /**
  * 2 sắc thái: mỗi câu là VUI hoặc BUỒN/TỨC (theo đa số nhãn; hòa thì tính vui).
- * Hành động hay gặp nào cũng thuộc một trong 2 sắc thái và lấy TOÀN BỘ câu cùng sắc thái của giọng đang nói,
- * nên các hành động hay gặp gộp lại phủ hết kho câu của từng giọng.
+ * Hành động hay gặp nào cũng thuộc một trong 2 sắc thái và chỉ lấy câu cùng sắc thái của giọng đang nói
+ * (xem FREQUENT_POOL_MOODS); các hành động hay gặp gộp lại phủ hết kho câu của từng giọng.
  */
 export type MemeTone = 'vui' | 'buon';
 const SAD_ANGRY_MOODS: readonly MemeMood[] = [
@@ -445,11 +456,24 @@ export const POOL_TONE: Record<MemePoolKey, MemeTone> = {
 
 /**
  * Hành động hay gặp: mua nhà / thu tiền / đặt cược, gõ từ, tới lượt, nhắn tin / chat, đoán đúng / sai,
- * thắng / thua mỗi ván, mất tiền, chọc phá. Lấy toàn bộ câu cùng sắc thái; các hành động hiếm vẫn lọc theo nhóm.
+ * thắng / thua mỗi ván, mất tiền, chọc phá. Mỗi hành động lấy các câu CÙNG SẮC THÁI có ít nhất một nhãn
+ * hợp với nó (vd mất tiền lấy câu than nghèo / buồn / nổi nóng, không lấy câu cà khịa người khác;
+ * chọc phá lấy câu cà khịa / gắt, không lấy câu than khóc). Gộp lại vẫn phủ gần hết kho câu của mỗi giọng.
  */
-export const FREQUENT_POOLS: readonly MemePoolKey[] = [
-  'turn_move', 'chat_hype', 'money', 'correct', 'win', 'wrong', 'lose', 'broke', 'troll',
-];
+export const FREQUENT_POOL_MOODS = {
+  turn_move: ['ready', 'chill', 'greet', 'laugh', 'brag'],
+  chat_hype: ['chill', 'laugh', 'greet', 'ready', 'brag', 'gift', 'mercy', 'saved'],
+  money: ['rich', 'brag', 'gift'],
+  correct: ['brag', 'laugh', 'saved', 'rich', 'greet'],
+  win: ['brag', 'laugh', 'rich', 'saved', 'gift', 'twist'],
+  wrong: ['flop', 'excuse', 'shock', 'sad', 'plea', 'panic'],
+  lose: ['sad', 'flop', 'broke', 'out', 'panic', 'plea', 'threat'],
+  broke: ['broke', 'sad', 'plea', 'panic', 'flop', 'threat'],
+  troll: ['taunt', 'threat', 'accuse', 'danger', 'twist', 'hurry'],
+} as const satisfies Partial<Record<MemePoolKey, readonly MemeMood[]>>;
+
+export const FREQUENT_POOLS = Object.keys(FREQUENT_POOL_MOODS) as (keyof typeof FREQUENT_POOL_MOODS)[];
+const isFrequent = (pool: MemePoolKey): pool is keyof typeof FREQUENT_POOL_MOODS => pool in FREQUENT_POOL_MOODS;
 
 function moodsById(): Map<MemeId, MemeMood[]> {
   const blocked = new Set<MemeId>(PREVIEW_ONLY_MEMES);
@@ -467,13 +491,24 @@ export function memeTones(): Map<MemeId, MemeTone> {
   return new Map([...moodsById()].map(([id, moods]) => [id, toneOfMoods(moods)]));
 }
 
-export function buildMemePools(): Record<MemePoolKey, readonly MemeId[]> {
+const MIN_FREQUENT_LINES = 20;
+
+export function buildMemePools(personaOf: (id: MemeId) => string): Record<MemePoolKey, readonly MemeId[]> {
   const blocked = new Set<MemeId>(PREVIEW_ONLY_MEMES);
-  const tones = memeTones();
+  const moodsOf = moodsById();
   const pools = {} as Record<MemePoolKey, readonly MemeId[]>;
   for (const pool of Object.keys(POOL_GROUPS) as MemePoolKey[]) {
-    if (FREQUENT_POOLS.includes(pool)) {
-      pools[pool] = [...tones].filter(([, tone]) => tone === POOL_TONE[pool]).map(([id]) => id);
+    if (isFrequent(pool)) {
+      const fits: readonly MemeMood[] = FREQUENT_POOL_MOODS[pool];
+      const sameTone = [...moodsOf].filter(([, moods]) => toneOfMoods(moods) === POOL_TONE[pool]);
+      const ids: MemeId[] = [];
+      for (const persona of new Set(sameTone.map(([id]) => personaOf(id)))) {
+        const mine = sameTone.filter(([id]) => personaOf(id) === persona);
+        const fitting = mine.filter(([, moods]) => moods.some((mood) => fits.includes(mood)));
+        // Giọng nào có ≤ 20 câu hợp thì lấy cả túi cùng sắc thái, để hành động hay gặp luôn có > 20 câu xoay vòng.
+        ids.push(...(fitting.length > MIN_FREQUENT_LINES ? fitting : mine).map(([id]) => id));
+      }
+      pools[pool] = ids;
       continue;
     }
     const ids = new Set<MemeId>();

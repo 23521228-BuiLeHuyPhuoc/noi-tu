@@ -31,9 +31,9 @@ let generation = 0;
 let tail: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
 const bags = new Map<string, MemeId[]>();
-const lastPick = new Map<string, MemeId>();
-const playedAt = new Map<MemeId, number>();
-let playCount = 0;
+/** Mấy câu vừa phát của từng giọng, để hai hành động liền nhau không đọc trùng một câu. */
+const recent = new Map<string, MemeId[]>();
+const RECENT = 6;
 
 export function setRoomVoiceContext(room: RoomState | null, meId: string | null) {
   if (roomCode !== (room?.code ?? null)) {
@@ -69,30 +69,21 @@ function shuffled(ids: readonly MemeId[]): MemeId[] {
   return bag;
 }
 /**
- * Túi xáo: mỗi lần phát rút một câu ra khỏi túi; phải phát hết cả túi mới xáo lại túi mới,
- * nên trong một vòng không câu nào lặp lại. Trả null nếu túi không còn câu nào hợp hành động.
+ * Túi xáo riêng cho từng hành động: mỗi lần phát rút một câu ra khỏi túi; phải phát hết cả túi
+ * mới xáo lại túi mới, nên trong một vòng không câu nào lặp lại. Câu vừa phát ở hành động khác
+ * (cùng giọng) được để dành lại sau trong túi chứ không bị bỏ.
  */
-function takeFromBag(key: string, all: readonly MemeId[], allowed: ReadonlySet<MemeId> | null): MemeId | null {
-  if (!all.length) return null;
-  let bag = bags.get(key);
-  if (!bag?.length) {
-    bag = shuffled(all);
-    const last = lastPick.get(key);
-    if (bag.length > 1 && bag[0] === last) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
-    bags.set(key, bag);
-  }
-  const at = allowed ? bag.findIndex((id) => allowed.has(id)) : 0;
-  if (at < 0) return null;
+function takeFromBag(key: string, ids: readonly MemeId[], recentKey = key): MemeId | null {
+  if (!ids.length) return null;
+  const wanted = new Set(ids);
+  let bag = bags.get(key)?.filter((id) => wanted.has(id));
+  if (!bag?.length) bag = shuffled(ids);
+  const played = recent.get(recentKey) ?? [];
+  const avoid = new Set(played.slice(-Math.min(RECENT, Math.floor(ids.length / 2))));
+  const at = Math.max(0, bag.findIndex((id) => !avoid.has(id)));
   const [pick] = bag.splice(at, 1);
-  playedAt.set(pick, ++playCount);
-  lastPick.set(key, pick);
-  return pick;
-}
-function leastRecent(all: readonly MemeId[], allowed: ReadonlySet<MemeId> | null): MemeId | null {
-  const fits = allowed ? all.filter((id) => allowed.has(id)) : all;
-  if (!fits.length) return null;
-  const pick = fits.reduce((a, b) => ((playedAt.get(a) ?? -1) <= (playedAt.get(b) ?? -1) ? a : b));
-  playedAt.set(pick, ++playCount);
+  bags.set(key, bag);
+  recent.set(recentKey, [...played, pick].slice(-RECENT));
   return pick;
 }
 const TONES = memeTones();
@@ -105,23 +96,20 @@ const POOL_SETS = new Map<MemePoolKey, ReadonlySet<MemeId>>(
   (Object.keys(MEME_POOLS) as MemePoolKey[]).map((pool) => [pool, new Set(MEME_POOLS[pool])]),
 );
 /**
- * Mỗi giọng có 2 túi: câu VUI và câu BUỒN/TỨC. Hành động rút từ túi cùng sắc thái
- * (vd mua nhà rút túi vui, mất tiền rút túi buồn/tức); túi đó hết câu hợp mới thử túi kia,
- * rồi mới lấy câu hợp đã phát lâu nhất.
+ * Hành động chỉ rút câu cùng sắc thái (VUI hoặc BUỒN/TỨC) trong kho của hành động đó
+ * (vd mua nhà rút câu vui về tiền / gáy, mất tiền rút câu than nghèo / buồn / nổi nóng).
+ * Giọng nào không có câu cùng sắc thái cho hành động hiếm thì mới lấy câu hợp hành động ở sắc thái kia.
  */
 function drawToned(base: string, all: readonly MemeId[], pool: MemePoolKey): MemeId | null {
-  const allowed = POOL_SETS.get(pool) ?? null;
-  const tone = POOL_TONE[pool];
-  for (const t of [tone, tone === 'vui' ? 'buon' : 'vui'] as const) {
-    const pick = takeFromBag(`${base}:${t}`, all.filter((id) => TONES.get(id) === t), allowed);
-    if (pick) return pick;
-  }
-  return leastRecent(all, allowed);
+  const allowed = POOL_SETS.get(pool);
+  const inPool = allowed ? all.filter((id) => allowed.has(id)) : [...all];
+  const sameTone = inPool.filter((id) => TONES.get(id) === POOL_TONE[pool]);
+  return takeFromBag(`${base}:${pool}`, sameTone.length ? sameTone : inPool, base);
 }
 export function drawMeme(pool: MemePoolKey | 'all' | 'preview', persona?: MemePersona): MemeId | null {
-  if (pool === 'preview' && persona && persona !== 'game_fx') return takeFromBag(`preview:${persona}`, VOICE_PERSONA_META[persona].previewIds, null);
+  if (pool === 'preview' && persona && persona !== 'game_fx') return takeFromBag(`preview:${persona}`, VOICE_PERSONA_META[persona].previewIds);
   if (pool === 'all' || pool === 'preview') {
-    return takeFromBag(`all:${persona ?? '*'}`, persona ? ALL_MEME_IDS.filter((id) => MEME_BY_ID[id].persona === persona) : ALL_MEME_IDS, null);
+    return takeFromBag(`all:${persona ?? '*'}`, persona ? ALL_MEME_IDS.filter((id) => MEME_BY_ID[id].persona === persona) : ALL_MEME_IDS);
   }
   if (!persona) return null;
   return drawToned(`voice:${persona}`, AUTO_BY_PERSONA.get(persona) ?? [], pool);

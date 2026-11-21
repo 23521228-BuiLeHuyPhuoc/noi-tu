@@ -63,6 +63,21 @@ async function roomOf(n: number, gameType?: 'wordchain' | 'wordchain_en' | 'bauc
 }
 
 describe('Server qua Socket.IO', () => {
+  it('meme bấm tay chỉ đến người khác trong cùng phòng, đúng giọng và không gửi dồn', async () => {
+    const { cs: [sender, peer], ids, code } = await roomOf(2);
+    const { cs: [outsider] } = await roomOf(1);
+    const heard: string[][] = [[], [], []];
+    [sender, peer, outsider].forEach((socket, index) => {
+      socket.on('meme:played', (message) => heard[index].push(`${message.code}:${message.playerId}:${message.memeId}`));
+    });
+    await sender.emitWithAck('room:pickVoice', { voice: 'linda' });
+    sender.emit('meme:play', { memeId: 'coba_muonchoi' });
+    sender.emit('meme:play', { memeId: 'linda_chao' });
+    sender.emit('meme:play', { memeId: 'linda_level' });
+    await sender.emitWithAck('room:pickVoice', { voice: null });
+    await until(peer, (state) => !state.players.find((player) => player.id === ids[0])?.voice);
+    expect(heard).toEqual([[], [`${code}:${ids[0]}:linda_chao`], []]);
+  });
   it('Nối từ: chơi trọn một ván tới khi có người thắng, rồi chơi lại', async () => {
     const { cs, ids, code } = await roomOf(3);
     expect(code).toMatch(/^[A-Z2-9]{6}$/);

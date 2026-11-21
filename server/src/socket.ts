@@ -431,6 +431,15 @@ export function attachSocketHandlers(io: IO, manager: RoomManager, auth: Auth, p
       ack({ free, left: key !== null && walletCtx ? walletCtx.quota.left(key) : free });
     });
 
+    socket.on('meme:play', (payload) => {
+      const room = currentRoom();
+      if (!session || !room || activeSocket.get(key(room.code, session.playerId)) !== socket.id) return;
+      const memeId = payload?.memeId;
+      if (room.takeMeme(session.playerId, memeId)) {
+        socket.to(room.code).emit('meme:played', { code: room.code, playerId: session.playerId, memeId });
+      }
+    });
+
     socket.on('chat:send', (p, ack) => {
       const reply = typeof ack === 'function' ? ack : () => {};
       const room = currentRoom();

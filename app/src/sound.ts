@@ -85,6 +85,7 @@ let bgmDuckCount = 0;
 let bgmEl: HTMLAudioElement | null = null;
 let memeEl: HTMLAudioElement | null = null;
 let memeDuckTimer: ReturnType<typeof setTimeout> | null = null;
+let playingAutomaticMeme = false;
 let lastMemePlayedAt = 0;
 const listeners = new Set<() => void>();
 let gestureRetryInstalled = false;
@@ -139,7 +140,7 @@ export function isMemeEnabled(): boolean {
 export function setMemeEnabled(v: boolean): void {
   memeEnabled = v;
   writeStore(KEY_MEME, v ? '1' : '0');
-  if (!v) stopMeme();
+  if (!v && playingAutomaticMeme) stopMeme();
   notify();
 }
 
@@ -279,6 +280,7 @@ function clearMemeDuck(): void {
 }
 
 function releaseMeme(): void {
+  playingAutomaticMeme = false;
   if (memeEl) {
     memeEl.pause();
     memeEl = null;
@@ -292,12 +294,17 @@ export function stopMeme(): void {
 }
 
 export function playMeme(id: MemeId, opts?: MemeOptions): void {
-  if (muted || !memeEnabled || typeof Audio === 'undefined') return;
+  playClip(id, opts, false);
+}
+
+function playClip(id: MemeId, opts: MemeOptions | undefined, automatic: boolean): void {
+  if (muted || typeof Audio === 'undefined') return;
   if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
   const speaker = resolveSpeaker(opts);
   if (speaker.persona && MEME_BY_ID[id].persona !== speaker.persona) return;
   const seq = resetPlayback();
   releaseMeme();
+  playingAutomaticMeme = automatic;
   lastMemePlayedAt = Date.now();
   const uri = resolveAssetUri(MEME_ASSETS[id]);
   if (!uri) return;
@@ -320,14 +327,14 @@ export function playMeme(id: MemeId, opts?: MemeOptions): void {
 }
 
 function playFromBag(pool: MemePoolKey | 'all' | 'preview', opts?: MemeOptions): void {
-  if (muted || !memeEnabled || typeof Audio === 'undefined') return;
+  if (muted || typeof Audio === 'undefined') return;
   if (!opts?.force && Date.now() - lastMemePlayedAt < (opts?.cooldownMs ?? 1350)) return;
   if (!opts?.force && getActiveMeme()) return;
   const id = drawForSpeaker(pool, resolveSpeaker(opts));
-  if (id) playMeme(id, { ...opts, force: true });
+  if (id) playClip(id, { ...opts, force: true }, pool !== 'preview' && pool !== 'all');
 }
 export function playRandomMeme(opts?: MemeOptions): void { playFromBag('all', opts); }
-export function playMemePool(pool: MemePoolKey, opts?: MemeOptions): void { playFromBag(pool, opts); }
+export function playMemePool(pool: MemePoolKey, opts?: MemeOptions): void { if (memeEnabled) playFromBag(pool, opts); }
 export function playPersonaPreview(persona: VoicePersonaId, speakerId: string | null): void { playFromBag('preview', { persona, speakerId, force: true }); }
 
 

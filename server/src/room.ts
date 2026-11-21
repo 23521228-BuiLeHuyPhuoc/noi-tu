@@ -1,3 +1,4 @@
+import { MEME_COOLDOWN_MS, MEME_LIST, type MemeId } from '../../shared/src/memes';
 import { randomUUID } from 'node:crypto';
 import {
   BAUCUA_DEFAULT_ROUNDS, BAUCUA_ROUND_OPTIONS, type BauCuaRounds,
@@ -50,6 +51,8 @@ export interface RoomOptions {
   learnWord?: (word: string, byName: string) => void;
 }
 
+const memeIds = new Set<string>(MEME_LIST.map((line) => line.id));
+
 interface Player {
   id: string;
   name: string;
@@ -77,7 +80,7 @@ interface Player {
 export const ACCOUNT_PREFIX = 'u-';
 const CHAT_KEEP = 40;
 
-type Result<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
+type Result<T = unknown> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
 
 const AVATAR_COUNT = AVATAR_PRESETS.length;
 /** nhân vật mặc định của khách luân phiên 3 kiểu đầu (không tự gán 'LGBT+' cho ai) */
@@ -126,6 +129,7 @@ export class Room {
   readonly screenCooldown = new TargetCooldown();
   /** mỗi người chỉ bị rung/lắc/che màn hình tối đa 3 lần mỗi 15 giây (từ bất kỳ ai) */
   readonly disruptLimiter = new WindowLimiter();
+  private readonly memeCooldown = new TargetCooldown(MEME_COOLDOWN_MS);
   private readonly graceMs: number;
   private readonly rng: Rng;
   /** ngẫu nhiên riêng cho thời gian máy suy nghĩ (không làm lệch dãy ngẫu nhiên của ván) */
@@ -424,6 +428,12 @@ export class Room {
   disrupt(playerId: string, ms: number): number {
     if (this.phase !== 'playing' || !this.engine?.disrupt) return 0;
     return this.engine.disrupt(playerId, ms);
+  }
+
+  takeMeme(playerId: string, memeId: unknown): memeId is MemeId {
+    const player = this.find(playerId);
+    return !!player?.connected && !!player.voice && typeof memeId === 'string'
+      && memeId.startsWith(player.voice + '_') && memeIds.has(memeId) && this.memeCooldown.take(playerId);
   }
 
   /** Tin nhắn trò chuyện: trả về tin đã làm sạch, hoặc null nếu không hợp lệ / bị khóa theo luật ván */

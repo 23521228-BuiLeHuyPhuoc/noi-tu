@@ -8,6 +8,8 @@ import type {
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
 import type { BoomTickPayload } from '../../shared/src/boom';
+import { MEME_COOLDOWN_MS, type MemeId } from '../../shared/src/memes';
+import { playMeme } from './sound';
 import { SERVER_URL } from './config';
 import { storage } from './storage';
 import { authText, errorText, shopText, walletText } from './messages';
@@ -128,6 +130,8 @@ export interface Game {
   checkinClaim(): Promise<WalletResult<{ reward: number; balance: number; streak: number; day: number }>>;
   funQuota(): Promise<{ free: number; left: number } | null>;
   sendChat(text: string): Promise<boolean>;
+  memeReadyAt(): number;
+  sendMeme(memeId: MemeId, speakerId: string): void;
   sendSticker(stickerId: StickerId): Promise<boolean>;
 }
 
@@ -145,6 +149,8 @@ export function useGame(): Game {
   const [photoPersist, setPhotoPersist] = useState(true);
   const socketRef = useRef<GameSocket | null>(null);
   const roomCodeRef = useRef<string | null>(null);
+  const nextMemeAt = useRef(0);
+  const memeReadyAt = useCallback(() => nextMemeAt.current, []);
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
   const croakListeners = useRef(new Set<(p: CroakTickPayload) => void>());
   const boomListeners = useRef(new Set<(p: BoomTickPayload) => void>());
@@ -245,6 +251,9 @@ export function useGame(): Game {
     });
     socket.on('boom:tick', (p) => {
       for (const cb of boomListeners.current) cb(p);
+    });
+    socket.on('meme:played', ({ code, playerId, memeId }) => {
+      if (code === roomCodeRef.current) playMeme(memeId, { force: true, speakerId: playerId });
     });
     socket.on('chat:history', (ms) => setChat(ms));
     // bị chủ phòng mời ra: về trang chủ, không tự vào lại phòng đó nữa
@@ -610,6 +619,15 @@ export function useGame(): Game {
     },
     [call],
   );
+  const sendMeme = useCallback((memeId: MemeId, speakerId: string) => {
+    const socket = socketRef.current;
+    const now = Date.now();
+    if (!socket?.connected || !roomCodeRef.current || now < nextMemeAt.current) return;
+    nextMemeAt.current = now + MEME_COOLDOWN_MS;
+    playMeme(memeId, { force: true, speakerId });
+    socket.emit('meme:play', { memeId });
+  }, []);
+
   const sendSticker = useCallback(
     async (stickerId: StickerId) => {
       const res = await call<{ ok: boolean }>((s) => s.timeout(ACK_TIMEOUT).emitWithAck('chat:send', { kind: 'sticker', stickerId }));
@@ -761,6 +779,8 @@ export function useGame(): Game {
       checkinStatus,
       funQuota,
       sendChat,
+      sendMeme,
+      memeReadyAt,
       sendSticker,
     }),
     [
@@ -809,6 +829,8 @@ export function useGame(): Game {
       checkinStatus,
       funQuota,
       sendChat,
+      sendMeme,
+      memeReadyAt,
       sendSticker,
     ],
   );

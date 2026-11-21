@@ -1,3 +1,4 @@
+import type { MemeId } from './memes';
 import type { TyPhuMovement } from './typhu';
 import type { DiceRollView, ThrowImpulse } from './dice';
 import type { MaSoiView } from './masoi';
@@ -847,7 +848,7 @@ export interface TopupRequest {
 
 export type WalletError = 'need_account' | 'bad_request' | 'too_many' | 'forbidden' | 'not_found' | 'already_handled' | 'insufficient' | 'rate_limited';
 /** ack của lệnh ví / quản trị */
-export type WalletAck<T = {}> = (r: ({ ok: true } & T) | { ok: false; error: WalletError }) => void;
+export type WalletAck<T = unknown> = (r: ({ ok: true } & T) | { ok: false; error: WalletError }) => void;
 export interface WalletInfo { ruby: number; topupCode: string; firstTopupDone: boolean; pending: TopupRequest[] }
 export interface WalletUpdate { ruby: number; delta: number; reason: string }
 
@@ -895,7 +896,7 @@ export type ErrorCode =
   | 'voice_taken'
   | 'bad_request';
 
-export type Ack<T = {}> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
+export type Ack<T = unknown> = ({ ok: true } & T) | { ok: false; error: ErrorCode };
 
 export interface JoinResult {
   code: string;
@@ -943,6 +944,7 @@ export interface ClientToServerEvents {
   'player:profile': (p: { name?: string; avatar?: number }, ack: (r: Ack) => void) => void;
   /** ảnh đại diện của khách: ảnh JPG/PNG/WebP đã thu nhỏ (base64), hoặc remove để bỏ ảnh */
   'player:photo': (p: { data?: string; remove?: boolean }, ack: (r: Ack<{ avatarUrl?: string }> | { ok: false; error: 'avatar_unavailable' | 'invalid_image' | 'rate_limited' | 'not_in_room' }) => void) => void;
+  'meme:play': (p: { memeId: MemeId }) => void;
   'chat:send': (p: ChatSend, ack: (r: { ok: boolean }) => void) => void;
   'auth:register': (p: { email: string; username: string; password: string; displayName: string; avatar?: number }, ack: (r: AuthAck) => void) => void;
   'auth:login': (p: { username: string; password: string }, ack: (r: AuthAck) => void) => void;
@@ -975,6 +977,7 @@ export interface ServerToClientEvents {
   /** đồng bộ vật lý 20Hz nhẹ cho Đặt Bom Tử Chiến (`boom_online`) */
   'boom:tick': (p: BoomTickPayload) => void;
   'fun:event': (e: FunEvent) => void;
+  'meme:played': (p: { code: string; playerId: string; memeId: MemeId }) => void;
   'chat:msg': (m: ChatMsg) => void;
   'chat:history': (ms: ChatMsg[]) => void;
   /** bạn vừa bị chủ phòng mời ra khỏi phòng */

@@ -107,7 +107,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
           style={[styles.toggleChip, snap.memeOn && !snap.muted ? styles.chipActiveGold : styles.chipIdle]}
         >
           <UiIcon name="Megaphone" size={14} color={C.ink} />
-          <T style={[styles.chipTxt, { color: C.ink }]}>Giọng lầy: {snap.memeOn ? 'Bật' : 'Tắt'}</T>
+          <T style={[styles.chipTxt, { color: C.ink }]}>Meme tự phát: {snap.memeOn ? 'Bật' : 'Tắt'}</T>
         </Pressable>
       </View>
 
@@ -188,7 +188,6 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
           <Pressable
             onPress={() => {
               if (snap.muted) setMuted(false);
-              if (!snap.memeOn) setMemeEnabled(true);
               playRandomMeme({ force: true, speakerId: null });
             }}
             style={[styles.volBtn, styles.volBtnOn]}
@@ -223,7 +222,6 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
                 testID={`meme-pad-${m.id}`}
                 onPress={() => {
                   if (snap.muted) setMuted(false);
-                  if (!snap.memeOn) setMemeEnabled(true);
                   playMeme(m.id, { force: true, speakerId: null, persona: m.persona });
                 }}
                 style={({ pressed }) => [
