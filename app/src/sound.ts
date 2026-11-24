@@ -5,14 +5,16 @@ import {
   BGM_PLAYLIST,
   MEME_ASSETS,
   type BgmId,
+  type BgmScene,
   type MemeId,
   type MemePoolKey,
 } from './audioAssets';
 import type { VoicePersonaId } from '../../shared/src/types';
 import { drawForSpeaker, getActiveMeme, isCurrentPlayback, markEnded, markPlaying, resetPlayback, resolveSpeaker, type MemeOptions } from './memePlayback';
 export { getActiveMeme, setActiveSpeakerFallback, setRoomVoiceContext, subscribeActiveMeme, type ActiveMemePlayback } from './memePlayback';
+export type { BgmScene } from './audioAssets';
 
-/** Âm thanh tổng hợp bằng Web Audio + Playlist 6 Nhạc Hát & các giọng meme lầy lội MP3. Tắt/bật được, nhớ trong máy. */
+/** Âm thanh tổng hợp bằng Web Audio + Playlist 7 Nhạc nền & các giọng meme lầy lội MP3. Tắt/bật được, nhớ trong máy. */
 export type Sfx =
   | 'tick' | 'pop' | 'whoosh' | 'splat' | 'win' | 'dice' | 'coin' | 'error' | 'turn' | 'lose'
   | 'reveal' | 'sad' | 'punch' | 'chat' | 'ko' | 'stamp' | 'siren' | 'cash' | 'flip' | 'boom'
@@ -21,6 +23,7 @@ export type Sfx =
 
 const KEY = 'xomlay.muted';
 const KEY_BGM = 'xomlay.bgm';
+const KEY_BGM_GAME = 'xomlay.bgmGame';
 const KEY_MEME = 'xomlay.meme';
 const KEY_BGM_VOL = 'xomlay.bgmVol.v2';
 
@@ -73,10 +76,11 @@ function shuffleCopy<T>(arr: readonly T[], avoidFirst?: T | null): T[] {
 let ctx: AudioContext | null = null;
 let muted = readBool(KEY, false);
 let bgmEnabled = readBool(KEY_BGM, true);
+let gameBgmEnabled = readBool(KEY_BGM_GAME, false);
 let memeEnabled = readBool(KEY_MEME, true);
 let bgmVolume = readNum(KEY_BGM_VOL, 0.8);
 let manualBgmOverride: BgmId | null = null;
-let bgmActive = false;
+let bgmScene: BgmScene = null;
 let currentPlaylistBgmId: BgmId | null = null;
 let bgmQueue: BgmId[] = [];
 let activeBgmId: BgmId | null = null;
@@ -97,6 +101,17 @@ function drawNextPlaylistBgm(): BgmId {
   const next = bgmQueue.shift() ?? BGM_PLAYLIST[0];
   currentPlaylistBgmId = next;
   return next;
+}
+
+function shouldPlayCurrentBgm(): boolean {
+  if (muted) return false;
+  return (bgmScene === 'lobby' && bgmEnabled) || (bgmScene === 'game' && gameBgmEnabled);
+}
+
+function ensurePlaylistTrack(): void {
+  if (!currentPlaylistBgmId && !manualBgmOverride) {
+    drawNextPlaylistBgm();
+  }
 }
 
 function notify(): void {
@@ -133,6 +148,17 @@ export function setBgmEnabled(v: boolean): void {
   notify();
 }
 
+export function isGameBgmEnabled(): boolean {
+  return gameBgmEnabled;
+}
+
+export function setGameBgmEnabled(v: boolean): void {
+  gameBgmEnabled = v;
+  writeStore(KEY_BGM_GAME, v ? '1' : '0');
+  syncBgmPlayback();
+  notify();
+}
+
 export function isMemeEnabled(): boolean {
   return memeEnabled;
 }
@@ -165,12 +191,16 @@ export function setManualBgmOverride(id: BgmId | null): void {
   notify();
 }
 
+export function getBgmScene(): BgmScene {
+  return bgmScene;
+}
+
 export function isBgmActive(): boolean {
-  return bgmActive;
+  return shouldPlayCurrentBgm();
 }
 
 export function getCurrentBgmId(): BgmId | null {
-  if (!bgmActive) return null;
+  if (!shouldPlayCurrentBgm()) return null;
   return manualBgmOverride ?? currentPlaylistBgmId;
 }
 
@@ -206,7 +236,7 @@ function installGestureUnlock(): void {
     gestureRetryInstalled = false;
     window.removeEventListener('pointerdown', retry, true);
     window.removeEventListener('keydown', retry, true);
-    if (bgmEl && !muted && bgmEnabled && getCurrentBgmId()) {
+    if (bgmEl && shouldPlayCurrentBgm() && getCurrentBgmId()) {
       void bgmEl.play().catch(() => {});
     }
   };
@@ -215,9 +245,10 @@ function installGestureUnlock(): void {
 }
 
 function syncBgmPlayback(): void {
+  if (shouldPlayCurrentBgm()) ensurePlaylistTrack();
   if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
   const targetId = getCurrentBgmId();
-  if (muted || !bgmEnabled || !targetId) {
+  if (!shouldPlayCurrentBgm() || !targetId) {
     if (bgmEl) {
       bgmEl.pause();
     }
@@ -231,7 +262,7 @@ function syncBgmPlayback(): void {
     bgmEl = new Audio();
     bgmEl.preload = 'auto';
     bgmEl.onended = () => {
-      if (!manualBgmOverride && bgmActive) {
+      if (!manualBgmOverride && shouldPlayCurrentBgm()) {
         drawNextPlaylistBgm();
         syncBgmPlayback();
         notify();
@@ -250,15 +281,12 @@ function syncBgmPlayback(): void {
   });
 }
 
-export function setBgmActive(active: boolean): void {
-  if (bgmActive === active) {
-    if (active) syncBgmPlayback();
+export function setBgmScene(scene: BgmScene): void {
+  if (bgmScene === scene) {
+    if (shouldPlayCurrentBgm()) syncBgmPlayback();
     return;
   }
-  bgmActive = active;
-  if (active && !currentPlaylistBgmId && !manualBgmOverride) {
-    drawNextPlaylistBgm();
-  }
+  bgmScene = scene;
   syncBgmPlayback();
   notify();
 }

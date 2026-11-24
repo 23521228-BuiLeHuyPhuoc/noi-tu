@@ -12,7 +12,7 @@ import {
   whoIsItBoardSize,
   type WhoIsItView,
 } from '../../shared/src/whoisit';
-import type { GameResult } from '../../shared/src/types';
+import { VOICE_PERSONA_IDS, type GameResult } from '../../shared/src/types';
 import { Dictionary } from '../src/dictionary';
 import { FamilyFeudGame } from '../src/games/familyfeud';
 import { WhoIsItGame } from '../src/games/whoisit';
@@ -56,16 +56,16 @@ describe('Room voice selection', () => {
       if (!host.ok || !guest.ok) throw new Error('join');
       expect(room.configure(host.playerId, 'baucua')).toEqual({ ok: true });
       expect(room.pickVoice(host.playerId, 'invalid')).toEqual({ ok: false, error: 'bad_request' });
-      expect(room.pickVoice(host.playerId, 'kyduyen')).toEqual({ ok: true });
-      expect(room.pickVoice(guest.playerId, 'kyduyen')).toEqual({ ok: false, error: 'voice_taken' });
+      expect(room.pickVoice(host.playerId, 'chiphien')).toEqual({ ok: true });
+      expect(room.pickVoice(guest.playerId, 'chiphien')).toEqual({ ok: false, error: 'voice_taken' });
       expect(room.pickVoice(host.playerId, null)).toEqual({ ok: true });
-      expect(room.pickVoice(guest.playerId, 'kyduyen')).toEqual({ ok: true });
-      for (let index = 0; index < 4; index++) expect(room.addBot(host.playerId).ok).toBe(true);
+      expect(room.pickVoice(guest.playerId, 'chiphien')).toEqual({ ok: true });
+      for (let index = 0; index < VOICE_PERSONA_IDS.length - 2; index++) expect(room.addBot(host.playerId).ok).toBe(true);
       expect(room.start(host.playerId)).toEqual({ ok: true });
       const playing = room.toPublic(host.playerId).players;
-      expect(new Set(playing.map((player) => player.voice)).size).toBe(6);
+      expect(new Set(playing.map((player) => player.voice)).size).toBe(VOICE_PERSONA_IDS.length);
       expect(playing.every((player) => !!player.voice)).toBe(true);
-      expect(playing.find((player) => player.id === guest.playerId)?.voice).toBe('kyduyen');
+      expect(playing.find((player) => player.id === guest.playerId)?.voice).toBe('chiphien');
       expect(room.pickVoice(guest.playerId, null)).toEqual({ ok: false, error: 'room_playing' });
       expect(room.action(host.playerId, { type: 'end' })).toEqual({ ok: true });
       expect(room.restart(host.playerId)).toEqual({ ok: true });

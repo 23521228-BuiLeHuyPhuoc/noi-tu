@@ -13,7 +13,7 @@ const definitions = [
   ['Chửi tục + lầy lội', ['laugh']],
 ] as const satisfies readonly (readonly [string, readonly MemeMood[]])[];
 
-const profanity = /(?:^|[\s.,;:!?…“”"'()/-])(?:đụ|đĩ|lồn|địt|đéo|cặc|cứt|mẹ mày|lũ chó|con chó|chó đẻ)(?=$|[\s.,;:!?…“”"'()/-])/i;
+const profanity = /(?:^|[\s.,;:!?…“”"'()/-])(?:đụ|đĩ|lồn|địt|đéo|cặc|cứt|mẹ mày|má mày|kệ mẹ|chết mẹ|quần què|cái lờ|lũ chó|con chó|chó đẻ)(?=$|[\s.,;:!?…“”"'()/-])/i;
 const groups = definitions.map(([label, moods]) => {
   const ids = new Set<MemeId>(moods.flatMap((mood) => MEME_MOODS[mood]));
   if (label === 'Chửi tục + lầy lội') {

@@ -1,7 +1,7 @@
 # Bundled BGM & Vietnamese Meme Audio Clips
 
-Retrieved & updated: 2026-11-20
-Totals across pack: 6 Singing/Live BGM tracks (rotating playlist) + 99 Voice Memes (105 MP3s total) — Cô Linda / Cẩm Lan Sục (29), Cô Ba Vàng Ngọc (16), Cô Minh Hiếu (15), Cô Phương Hằng (14), Chị Phiến (15), Hỗ trợ Game (10).
+Retrieved & updated: 2026-11-24
+Totals across pack: 7 BGM tracks (rotating playlist) + 411 Voice Memes (418 MP3s total) — Cô Linda / Cẩm Lan Sục (68), Cô Ba Vàng Ngọc (85), Cô Minh Hiếu (62), Cô Phương Hằng (61), Chị Phiến (63), Trần My (64), Hỗ trợ Game (8).
 
 | Local file | Origin URL | Size (KB) |
 |---|---|---:|
@@ -51,10 +51,10 @@ Totals across pack: 6 Singing/Live BGM tracks (rotating playlist) + 99 Voice Mem
 | `memes/vn_vineboom.mp3` | https://www.myinstants.com/media/sounds/vine-boom.mp3 | 20.7 |
 | `memes/vn_amongus.mp3` | https://www.myinstants.com/media/sounds/among-us-role-reveal-sound.mp3 | 97.6 |
 
-## Extended YouTube Cut Pack (6 Singing BGMs & 4 Personas Voice Clips)
+## Extended YouTube Cut Pack (7 BGMs & Personas Voice Clips)
 
-Retrieved & normalized (`loudnorm I=-16`, `64 kbps` MP3): 2026-11-20
-Kept Playlist: 6 Singing/Live BGMs (`bgm_sing_linda_cafe`, `bgm_sing_coba_cailuong`, `bgm_sing_duet_cailuong`, `bgm_sing_phuonghang_t30`, `bgm_sing_phuonghang_bolero`, `bgm_sing_allstars_7rings`); 99 Voice Memes total across 5 personas + game_fx (105 MP3s total).
+Retrieved & normalized (`loudnorm I=-16`, `64 kbps` MP3): 2026-11-24
+Kept Playlist: 7 BGMs (`bgm_sing_linda_cafe`, `bgm_sing_coba_cailuong`, `bgm_sing_duet_cailuong`, `bgm_sing_phuonghang_t30`, `bgm_sing_phuonghang_bolero`, `bgm_sing_allstars_7rings`, `bgm_kpop_bestie_loveoptions`); 411 Voice Memes total across 6 personas + game_fx (418 MP3s total).
 
 | Local file | Origin YouTube URL & Cut Range | Duration | Size (KB) |
 |---|---|---:|---:|
@@ -64,6 +64,7 @@ Kept Playlist: 6 Singing/Live BGMs (`bgm_sing_linda_cafe`, `bgm_sing_coba_cailuo
 | `bgm/bgm_sing_phuonghang_t30.mp3` | https://www.youtube.com/watch?v=2f-k7rYlvsQ [22.0s–115.0s] | 93.00s | 727.2 |
 | `bgm/bgm_sing_phuonghang_bolero.mp3` | https://www.youtube.com/watch?v=Iwusy7C2Ews [55.5s–145.5s] | 90.00s | 703.7 |
 | `bgm/bgm_sing_allstars_7rings.mp3` | https://www.youtube.com/watch?v=p-MDmElrmh4 [42.0s–132.0s] | 90.00s | 703.7 |
+| `bgm/bgm_kpop_bestie_loveoptions.mp3` | https://www.youtube.com/watch?v=NPqtL1dtrlA [28.5s–120.5s] | 92.00s | 719.3 |
 | `memes/minhhieu_duongquyen.mp3` | https://www.youtube.com/watch?v=C_j_WAtaAfU [101.40s–104.35s] | 2.95s | 23.5 |
 | `memes/minhhieu_tiendohay.mp3` | https://www.youtube.com/watch?v=C_j_WAtaAfU [98.55s–101.35s] | 2.80s | 22.5 |
 | `memes/minhhieu_maccuoi.mp3` | https://www.youtube.com/watch?v=0blcekbzg9I [17.05s–21.35s] | 4.30s | 34.1 |
@@ -323,3 +324,74 @@ Retrieved & normalized (`loudnorm I=-16`, `64 kbps` mono MP3): 2026-11-20. Mỗi
 | `memes/coba_xuongbien.mp3` | https://www.youtube.com/watch?v=R0tvQngjLwY [753.01s–759.89s] | 6.88s | 54.4 |
 | `memes/coba_cahatchovui.mp3` | https://www.youtube.com/watch?v=R0tvQngjLwY [1527.39s–1531.30s] | 3.91s | 31.2 |
 | `memes/coba_lamlanh.mp3` | https://www.youtube.com/watch?v=R0tvQngjLwY [1569.55s–1575.45s] | 5.90s | 46.7 |
+
+## Trần My Voice Pack (64 clips)
+
+Cắt từ YouTube, chuẩn hóa `loudnorm I=-16`, MP3 64 kbps mono, kiểm lời bằng faster-whisper medium (2026-11-24).
+
+| Local file | Origin YouTube URL & Cut Range | Duration | Size (KB) |
+|---|---|---:|---:|
+| `memes/tranmy_gomqua.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [35.5s–37.46s] | 1.96s | 16.1 |
+| `memes/tranmy_condien.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [102.93s–104.87s] | 1.94s | 15.8 |
+| `memes/tranmy_locmayluon.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [125.32s–126.75s] | 1.43s | 11.8 |
+| `memes/tranmy_midien.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [241.5s–246.6s] | 5.1s | 40.5 |
+| `memes/tranmy_ghequa.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [295.33s–298.77s] | 3.44s | 27.5 |
+| `memes/tranmy_taoquamet.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [567.51s–572.4s] | 4.89s | 38.9 |
+| `memes/tranmy_duroinha.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [605.19s–607.79s] | 2.6s | 20.9 |
+| `memes/tranmy_soma.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [611.46s–615.93s] | 4.47s | 35.6 |
+| `memes/tranmy_baikhacdi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [639.8s–647.32s] | 7.52s | 59.3 |
+| `memes/tranmy_depdi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [780.46s–783.24s] | 2.78s | 22.4 |
+| `memes/tranmy_5diem.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [899.21s–901.75s] | 2.54s | 20.5 |
+| `memes/tranmy_tuout.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [901.69s–906.24s] | 4.55s | 36.3 |
+| `memes/tranmy_hatdanghoang.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [923.8s–925.83s] | 2.03s | 16.5 |
+| `memes/tranmy_bietloi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [975.39s–980.07s] | 4.68s | 37.3 |
+| `memes/tranmy_khongtinduoc.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [996.13s–999.98s] | 3.85s | 30.7 |
+| `memes/tranmy_canhcao.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1015.7s–1017.31s] | 1.61s | 13.2 |
+| `memes/tranmy_ranhhaygi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1017.31s–1021.93s] | 4.62s | 36.7 |
+| `memes/tranmy_moithisinh.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1976.57s–1979.94s] | 3.37s | 27.1 |
+| `memes/tranmy_thatim.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [470.57s–475.64s] | 5.07s | 40.3 |
+| `memes/tranmy_tatfilter.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [271.74s–278.92s] | 7.18s | 56.7 |
+| `memes/tranmy_deothay.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1697.99s–1703.85s] | 5.86s | 46.5 |
+| `memes/tranmy_lovoem.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [927.92s–932.2s] | 4.28s | 34 |
+| `memes/tranmy_tuyetvoi.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [752.18s–755.2s] | 3.02s | 24.2 |
+| `memes/tranmy_khongphainha.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [1714.74s–1718.27s] | 3.53s | 28.3 |
+| `memes/tranmy_mamay.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [854.02s–857.5s] | 3.48s | 27.9 |
+| `memes/tranmy_quyttien.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [778.59s–785.12s] | 6.53s | 51.6 |
+| `memes/tranmy_chucmungem.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [1676.18s–1677.21s] | 1.03s | 8.7 |
+| `memes/tranmy_votay.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [1563.84s–1566.73s] | 2.89s | 23.2 |
+| `memes/tranmy_dungroi.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [388.32s–393.1s] | 4.78s | 37.9 |
+| `memes/tranmy_quanque.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1026.83s–1033.2s] | 6.37s | 50.3 |
+| `memes/tranmy_nhucau.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1049.89s–1053.06s] | 3.17s | 25.4 |
+| `memes/tranmy_sochimyoi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1078.26s–1083.65s] | 5.39s | 42.8 |
+| `memes/tranmy_taheo.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1158.82s–1161.87s] | 3.05s | 24.4 |
+| `memes/tranmy_khongranh.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1217.3s–1221.48s] | 4.18s | 33.4 |
+| `memes/tranmy_thandong.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1250.2s–1254.33s] | 4.13s | 33 |
+| `memes/tranmy_haradi.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1280.83s–1287.4s] | 6.57s | 52 |
+| `memes/tranmy_mupruprup.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1358.17s–1365.81s] | 7.64s | 60.3 |
+| `memes/tranmy_kemetao.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1545.09s–1547.57s] | 2.48s | 19.9 |
+| `memes/tranmy_quayvongvong.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1590.52s–1595.16s] | 4.64s | 36.9 |
+| `memes/tranmy_songsoso.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1612.11s–1617.15s] | 5.04s | 39.9 |
+| `memes/tranmy_maydienha.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1628.29s–1636.18s] | 7.89s | 62.4 |
+| `memes/tranmy_cuucuu.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1648.03s–1652.75s] | 4.72s | 37.5 |
+| `memes/tranmy_emmetqua.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1862.47s–1868.51s] | 6.04s | 47.9 |
+| `memes/tranmy_vangma.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [1909.76s–1916.62s] | 6.86s | 54.2 |
+| `memes/tranmy_daduvay.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2020.06s–2027.86s] | 7.8s | 61.6 |
+| `memes/tranmy_taocoten.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2071.88s–2076.82s] | 4.94s | 39.3 |
+| `memes/tranmy_khongthichdau.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2131.19s–2134.63s] | 3.44s | 27.5 |
+| `memes/tranmy_khungdeso.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2146.23s–2152.86s] | 6.63s | 52.4 |
+| `memes/tranmy_danganko.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2223.13s–2226.64s] | 3.51s | 28.1 |
+| `memes/tranmy_hatchuan.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2382.25s–2388.88s] | 6.63s | 52.4 |
+| `memes/tranmy_toilatranmy.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2392.13s–2394.8s] | 2.67s | 21.6 |
+| `memes/tranmy_nhieunhanvat.mp3` | https://www.youtube.com/watch?v=Bng8TAkBb5Q [2419.63s–2425.36s] | 5.73s | 45.4 |
+| `memes/tranmy_hoiconcho.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [197.85s–201.43s] | 3.58s | 28.7 |
+| `memes/tranmy_mapgiongmamay.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [210.2s–214.29s] | 4.09s | 32.6 |
+| `memes/tranmy_khongthichchi.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [707.69s–710.45s] | 2.76s | 22.2 |
+| `memes/tranmy_hettien.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [763.18s–765.94s] | 2.76s | 22.2 |
+| `memes/tranmy_ngonqua.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [759.43s–763.27s] | 3.84s | 30.5 |
+| `memes/tranmy_hetchuot.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [855.32s–860.34s] | 5.02s | 39.9 |
+| `memes/tranmy_dethuongghe.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [954.85s–958.06s] | 3.21s | 25.6 |
+| `memes/tranmy_chetmeroi.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [1263.98s–1270.27s] | 6.29s | 49.7 |
+| `memes/tranmy_toitinhgi.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [1598.78s–1601.34s] | 2.56s | 20.5 |
+| `memes/tranmy_hoimamay.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [1958.63s–1962.44s] | 3.81s | 30.3 |
+| `memes/tranmy_nguthiet.mp3` | https://www.youtube.com/watch?v=u2YnOzCSIYw [2370.08s–2373.56s] | 3.48s | 27.9 |
+| `memes/tranmy_doandungroi.mp3` | https://www.youtube.com/watch?v=xD819cn-pDk [364.83s–371.7s] | 6.87s | 54.2 |

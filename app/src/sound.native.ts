@@ -7,6 +7,7 @@ import {
   BGM_PLAYLIST,
   MEME_ASSETS,
   type BgmId,
+  type BgmScene,
   type MemeId,
   type MemePoolKey,
 } from './audioAssets';
@@ -14,11 +15,13 @@ import type { VoicePersonaId } from '../../shared/src/types';
 import { drawForSpeaker, getActiveMeme, isCurrentPlayback, markEnded, markPlaying, resetPlayback, resolveSpeaker, type MemeOptions } from './memePlayback';
 import { nativeSounds } from './nativeSounds';
 export { getActiveMeme, setActiveSpeakerFallback, setRoomVoiceContext, subscribeActiveMeme, type ActiveMemePlayback } from './memePlayback';
+export type { BgmScene } from './audioAssets';
 
 export type Sfx = keyof typeof nativeSounds;
 
 const KEY = 'xomlay.muted';
 const KEY_BGM = 'xomlay.bgm';
+const KEY_BGM_GAME = 'xomlay.bgmGame';
 const KEY_MEME = 'xomlay.meme';
 const KEY_BGM_VOL = 'xomlay.bgmVol.v2';
 
@@ -40,15 +43,17 @@ function shuffleCopy<T>(arr: readonly T[], avoidFirst?: T | null): T[] {
 
 let muted = false;
 let bgmEnabled = true;
+let gameBgmEnabled = false;
 let memeEnabled = true;
 let bgmVolume = 0.8;
 let changedMuted = false;
 let changedBgm = false;
+let changedBgmGame = false;
 let changedMeme = false;
 let changedVol = false;
 
 let manualBgmOverride: BgmId | null = null;
-let bgmActive = false;
+let bgmScene: BgmScene = null;
 let currentPlaylistBgmId: BgmId | null = null;
 let bgmQueue: BgmId[] = [];
 let loadedBgmId: BgmId | null = null;
@@ -76,11 +81,23 @@ function drawNextPlaylistBgm(): BgmId {
   return next;
 }
 
-void AsyncStorage.multiGet([KEY, KEY_BGM, KEY_MEME, KEY_BGM_VOL])
+function shouldPlayCurrentBgm(): boolean {
+  if (muted) return false;
+  return (bgmScene === 'lobby' && bgmEnabled) || (bgmScene === 'game' && gameBgmEnabled);
+}
+
+function ensurePlaylistTrack(): void {
+  if (!currentPlaylistBgmId && !manualBgmOverride) {
+    drawNextPlaylistBgm();
+  }
+}
+
+void AsyncStorage.multiGet([KEY, KEY_BGM, KEY_BGM_GAME, KEY_MEME, KEY_BGM_VOL])
   .then((pairs) => {
     for (const [k, val] of pairs) {
       if (k === KEY && !changedMuted && val !== null) muted = val === '1';
       if (k === KEY_BGM && !changedBgm && val !== null) bgmEnabled = val === '1';
+      if (k === KEY_BGM_GAME && !changedBgmGame && val !== null) gameBgmEnabled = val === '1';
       if (k === KEY_MEME && !changedMeme && val !== null) memeEnabled = val === '1';
       if (k === KEY_BGM_VOL && !changedVol && val !== null) {
         const n = Number(val);
@@ -133,6 +150,18 @@ export function setBgmEnabled(value: boolean): void {
   notify();
 }
 
+export function isGameBgmEnabled(): boolean {
+  return gameBgmEnabled;
+}
+
+export function setGameBgmEnabled(value: boolean): void {
+  gameBgmEnabled = value;
+  changedBgmGame = true;
+  syncBgmPlayback();
+  void AsyncStorage.setItem(KEY_BGM_GAME, value ? '1' : '0').catch(() => {});
+  notify();
+}
+
 export function isMemeEnabled(): boolean {
   return memeEnabled;
 }
@@ -167,12 +196,16 @@ export function setManualBgmOverride(id: BgmId | null): void {
   notify();
 }
 
+export function getBgmScene(): BgmScene {
+  return bgmScene;
+}
+
 export function isBgmActive(): boolean {
-  return bgmActive;
+  return shouldPlayCurrentBgm();
 }
 
 export function getCurrentBgmId(): BgmId | null {
-  if (!bgmActive) return null;
+  if (!shouldPlayCurrentBgm()) return null;
   return manualBgmOverride ?? currentPlaylistBgmId;
 }
 
@@ -187,15 +220,16 @@ function applyBgmVolume(): void {
 }
 
 function syncBgmPlayback(): void {
+  if (shouldPlayCurrentBgm()) ensurePlaylistTrack();
   const targetId = getCurrentBgmId();
-  if (muted || !bgmEnabled || !targetId || AppState.currentState !== 'active') {
+  if (!shouldPlayCurrentBgm() || !targetId || AppState.currentState !== 'active') {
     if (bgmPlayer) bgmPlayer.pause();
     return;
   }
 
   void ready
     .then(() => {
-      if (muted || !bgmEnabled || AppState.currentState !== 'active') return;
+      if (!shouldPlayCurrentBgm() || AppState.currentState !== 'active') return;
       const desired = getCurrentBgmId();
       if (!desired) return;
       const shouldLoop = manualBgmOverride !== null;
@@ -206,9 +240,7 @@ function syncBgmPlayback(): void {
           if (
             status.didJustFinish &&
             !manualBgmOverride &&
-            bgmActive &&
-            !muted &&
-            bgmEnabled &&
+            shouldPlayCurrentBgm() &&
             AppState.currentState === 'active'
           ) {
             drawNextPlaylistBgm();
@@ -231,15 +263,12 @@ function syncBgmPlayback(): void {
     .catch(() => {});
 }
 
-export function setBgmActive(active: boolean): void {
-  if (bgmActive === active) {
-    if (active) syncBgmPlayback();
+export function setBgmScene(scene: BgmScene): void {
+  if (bgmScene === scene) {
+    if (shouldPlayCurrentBgm()) syncBgmPlayback();
     return;
   }
-  bgmActive = active;
-  if (active && !currentPlaylistBgmId && !manualBgmOverride) {
-    drawNextPlaylistBgm();
-  }
+  bgmScene = scene;
   syncBgmPlayback();
   notify();
 }

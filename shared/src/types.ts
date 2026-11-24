@@ -299,14 +299,14 @@ export interface PublicPlayer {
 
 export type TeamId = 'red' | 'blue';
 
-export type VoicePersonaId = 'phuonghang' | 'linda' | 'minhhieu' | 'coba' | 'chiphien' | 'kyduyen';
+export type VoicePersonaId = 'phuonghang' | 'linda' | 'minhhieu' | 'coba' | 'chiphien' | 'tranmy';
 export const VOICE_PERSONA_IDS: readonly VoicePersonaId[] = [
   'phuonghang',
   'linda',
   'minhhieu',
   'coba',
   'chiphien',
-  'kyduyen',
+  'tranmy',
 ];
 
 export interface RankEntry {

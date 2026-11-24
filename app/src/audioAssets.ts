@@ -10,7 +10,8 @@ export type BgmId =
   | 'bgm_sing_duet_cailuong'
   | 'bgm_sing_phuonghang_t30'
   | 'bgm_sing_phuonghang_bolero'
-  | 'bgm_sing_allstars_7rings';
+  | 'bgm_sing_allstars_7rings'
+  | 'bgm_kpop_bestie_loveoptions';
 
 export const BGM_ASSETS: Record<BgmId, number> = {
   bgm_sing_linda_cafe: require('../assets/audio/bgm/bgm_sing_linda_cafe.mp3'),
@@ -19,6 +20,7 @@ export const BGM_ASSETS: Record<BgmId, number> = {
   bgm_sing_phuonghang_t30: require('../assets/audio/bgm/bgm_sing_phuonghang_t30.mp3'),
   bgm_sing_phuonghang_bolero: require('../assets/audio/bgm/bgm_sing_phuonghang_bolero.mp3'),
   bgm_sing_allstars_7rings: require('../assets/audio/bgm/bgm_sing_allstars_7rings.mp3'),
+  bgm_kpop_bestie_loveoptions: require('../assets/audio/bgm/bgm_kpop_bestie_loveoptions.mp3'),
 };
 
 export const MEME_ASSETS: Record<MemeId, number> = {
@@ -366,23 +368,71 @@ export const MEME_ASSETS: Record<MemeId, number> = {
   coba_xuongbien: require('../assets/audio/memes/coba_xuongbien.mp3'),
   coba_cahatchovui: require('../assets/audio/memes/coba_cahatchovui.mp3'),
   coba_lamlanh: require('../assets/audio/memes/coba_lamlanh.mp3'),
-  // Hoa hậu Kỳ Duyên (16)
-  kyduyen_amanh: require('../assets/audio/memes/kyduyen_amanh.mp3'),
-  kyduyen_chacchanloai: require('../assets/audio/memes/kyduyen_chacchanloai.mp3'),
-  kyduyen_dubanlinh: require('../assets/audio/memes/kyduyen_dubanlinh.mp3'),
-  kyduyen_giacmohong: require('../assets/audio/memes/kyduyen_giacmohong.mp3'),
-  kyduyen_giamapluc: require('../assets/audio/memes/kyduyen_giamapluc.mp3'),
-  kyduyen_karen_danong: require('../assets/audio/memes/kyduyen_karen_danong.mp3'),
-  kyduyen_khonghoitiec: require('../assets/audio/memes/kyduyen_khonghoitiec.mp3'),
-  kyduyen_khongmakesure: require('../assets/audio/memes/kyduyen_khongmakesure.mp3'),
-  kyduyen_loingonngot: require('../assets/audio/memes/kyduyen_loingonngot.mp3'),
-  kyduyen_nguhaitieng: require('../assets/audio/memes/kyduyen_nguhaitieng.mp3'),
-  kyduyen_nongsau_lanh: require('../assets/audio/memes/kyduyen_nongsau_lanh.mp3'),
-  kyduyen_thanhtuu: require('../assets/audio/memes/kyduyen_thanhtuu.mp3'),
-  kyduyen_thigio_giacmo: require('../assets/audio/memes/kyduyen_thigio_giacmo.mp3'),
-  kyduyen_tinchinhminh: require('../assets/audio/memes/kyduyen_tinchinhminh.mp3'),
-  kyduyen_tuconsoam: require('../assets/audio/memes/kyduyen_tuconsoam.mp3'),
-  kyduyen_vuotquakhokhan: require('../assets/audio/memes/kyduyen_vuotquakhokhan.mp3'),
+  // Trần My (64)
+  tranmy_gomqua: require('../assets/audio/memes/tranmy_gomqua.mp3'),
+  tranmy_condien: require('../assets/audio/memes/tranmy_condien.mp3'),
+  tranmy_locmayluon: require('../assets/audio/memes/tranmy_locmayluon.mp3'),
+  tranmy_midien: require('../assets/audio/memes/tranmy_midien.mp3'),
+  tranmy_ghequa: require('../assets/audio/memes/tranmy_ghequa.mp3'),
+  tranmy_taoquamet: require('../assets/audio/memes/tranmy_taoquamet.mp3'),
+  tranmy_duroinha: require('../assets/audio/memes/tranmy_duroinha.mp3'),
+  tranmy_soma: require('../assets/audio/memes/tranmy_soma.mp3'),
+  tranmy_baikhacdi: require('../assets/audio/memes/tranmy_baikhacdi.mp3'),
+  tranmy_depdi: require('../assets/audio/memes/tranmy_depdi.mp3'),
+  tranmy_5diem: require('../assets/audio/memes/tranmy_5diem.mp3'),
+  tranmy_tuout: require('../assets/audio/memes/tranmy_tuout.mp3'),
+  tranmy_hatdanghoang: require('../assets/audio/memes/tranmy_hatdanghoang.mp3'),
+  tranmy_bietloi: require('../assets/audio/memes/tranmy_bietloi.mp3'),
+  tranmy_khongtinduoc: require('../assets/audio/memes/tranmy_khongtinduoc.mp3'),
+  tranmy_canhcao: require('../assets/audio/memes/tranmy_canhcao.mp3'),
+  tranmy_ranhhaygi: require('../assets/audio/memes/tranmy_ranhhaygi.mp3'),
+  tranmy_moithisinh: require('../assets/audio/memes/tranmy_moithisinh.mp3'),
+  tranmy_thatim: require('../assets/audio/memes/tranmy_thatim.mp3'),
+  tranmy_tatfilter: require('../assets/audio/memes/tranmy_tatfilter.mp3'),
+  tranmy_deothay: require('../assets/audio/memes/tranmy_deothay.mp3'),
+  tranmy_lovoem: require('../assets/audio/memes/tranmy_lovoem.mp3'),
+  tranmy_tuyetvoi: require('../assets/audio/memes/tranmy_tuyetvoi.mp3'),
+  tranmy_khongphainha: require('../assets/audio/memes/tranmy_khongphainha.mp3'),
+  tranmy_mamay: require('../assets/audio/memes/tranmy_mamay.mp3'),
+  tranmy_quyttien: require('../assets/audio/memes/tranmy_quyttien.mp3'),
+  tranmy_chucmungem: require('../assets/audio/memes/tranmy_chucmungem.mp3'),
+  tranmy_votay: require('../assets/audio/memes/tranmy_votay.mp3'),
+  tranmy_dungroi: require('../assets/audio/memes/tranmy_dungroi.mp3'),
+  tranmy_quanque: require('../assets/audio/memes/tranmy_quanque.mp3'),
+  tranmy_nhucau: require('../assets/audio/memes/tranmy_nhucau.mp3'),
+  tranmy_sochimyoi: require('../assets/audio/memes/tranmy_sochimyoi.mp3'),
+  tranmy_taheo: require('../assets/audio/memes/tranmy_taheo.mp3'),
+  tranmy_khongranh: require('../assets/audio/memes/tranmy_khongranh.mp3'),
+  tranmy_thandong: require('../assets/audio/memes/tranmy_thandong.mp3'),
+  tranmy_haradi: require('../assets/audio/memes/tranmy_haradi.mp3'),
+  tranmy_mupruprup: require('../assets/audio/memes/tranmy_mupruprup.mp3'),
+  tranmy_kemetao: require('../assets/audio/memes/tranmy_kemetao.mp3'),
+  tranmy_quayvongvong: require('../assets/audio/memes/tranmy_quayvongvong.mp3'),
+  tranmy_songsoso: require('../assets/audio/memes/tranmy_songsoso.mp3'),
+  tranmy_maydienha: require('../assets/audio/memes/tranmy_maydienha.mp3'),
+  tranmy_cuucuu: require('../assets/audio/memes/tranmy_cuucuu.mp3'),
+  tranmy_emmetqua: require('../assets/audio/memes/tranmy_emmetqua.mp3'),
+  tranmy_vangma: require('../assets/audio/memes/tranmy_vangma.mp3'),
+  tranmy_daduvay: require('../assets/audio/memes/tranmy_daduvay.mp3'),
+  tranmy_taocoten: require('../assets/audio/memes/tranmy_taocoten.mp3'),
+  tranmy_khongthichdau: require('../assets/audio/memes/tranmy_khongthichdau.mp3'),
+  tranmy_khungdeso: require('../assets/audio/memes/tranmy_khungdeso.mp3'),
+  tranmy_danganko: require('../assets/audio/memes/tranmy_danganko.mp3'),
+  tranmy_hatchuan: require('../assets/audio/memes/tranmy_hatchuan.mp3'),
+  tranmy_toilatranmy: require('../assets/audio/memes/tranmy_toilatranmy.mp3'),
+  tranmy_nhieunhanvat: require('../assets/audio/memes/tranmy_nhieunhanvat.mp3'),
+  tranmy_hoiconcho: require('../assets/audio/memes/tranmy_hoiconcho.mp3'),
+  tranmy_mapgiongmamay: require('../assets/audio/memes/tranmy_mapgiongmamay.mp3'),
+  tranmy_khongthichchi: require('../assets/audio/memes/tranmy_khongthichchi.mp3'),
+  tranmy_hettien: require('../assets/audio/memes/tranmy_hettien.mp3'),
+  tranmy_ngonqua: require('../assets/audio/memes/tranmy_ngonqua.mp3'),
+  tranmy_hetchuot: require('../assets/audio/memes/tranmy_hetchuot.mp3'),
+  tranmy_dethuongghe: require('../assets/audio/memes/tranmy_dethuongghe.mp3'),
+  tranmy_chetmeroi: require('../assets/audio/memes/tranmy_chetmeroi.mp3'),
+  tranmy_toitinhgi: require('../assets/audio/memes/tranmy_toitinhgi.mp3'),
+  tranmy_hoimamay: require('../assets/audio/memes/tranmy_hoimamay.mp3'),
+  tranmy_nguthiet: require('../assets/audio/memes/tranmy_nguthiet.mp3'),
+  tranmy_doandungroi: require('../assets/audio/memes/tranmy_doandungroi.mp3'),
   // Hỗ trợ Game (8)
   tienbip_cainit: require('../assets/audio/memes/tienbip_cainit.mp3'),
   vn_amongus: require('../assets/audio/memes/vn_amongus.mp3'),
@@ -437,6 +487,12 @@ export const BGM_LIST: readonly BgmInfo[] = [
     name: 'All-Stars Xóm Lầy: 7 Rings Miếng Đất (Mashup)',
     duration: '90.0s',
     vibe: 'Đại hội võ lâm hội tụ Cô Minh Hiếu, Phương Hằng, Cô Ba & Linda',
+  },
+  {
+    id: 'bgm_kpop_bestie_loveoptions',
+    name: 'BESTie: Love Options (K-pop)',
+    duration: '92.0s',
+    vibe: 'K-pop sôi động, điệp khúc "뚜루" bắt tai cho cả phòng nhún',
   },
 ];
 
@@ -555,25 +611,25 @@ export const VOICE_PERSONA_META: Record<VoicePersonaId, VoicePersonaMeta> = {
     },
     previewIds: ['chiphien_aiepmay', 'chiphien_30ty', 'chiphien_hoahauphukhoa'],
   },
-  kyduyen: {
-    id: 'kyduyen',
-    name: 'Hoa hậu Kỳ Duyên',
-    shortName: 'Kỳ Duyên',
-    tagline: 'Miss Universe chinh chiến cực gắt, đủ bản lĩnh handle hết',
+  tranmy: {
+    id: 'tranmy',
+    name: 'Trần My',
+    shortName: 'Trần My',
+    tagline: 'Thánh block TikTok, lóc liền tay không cần lý do',
     accent: '#0284C7',
     badgeBg: '#F0F9FF',
     avatarOpts: {
-      top: ['straight01'],
+      top: ['bigHair'],
       hairColor: ['2c1b18'],
       skinColor: ['ffdbb4'],
-      eyes: ['default'],
-      eyebrows: ['defaultNatural'],
-      mouth: ['twinkle'],
+      eyes: ['eyeRoll'],
+      eyebrows: ['angry'],
+      mouth: ['disbelief'],
       accessoriesProbability: 0,
-      clothing: ['blazerAndSweater'],
+      clothing: ['hoodie'],
       clothesColor: ['0284c7'],
     },
-    previewIds: ['kyduyen_karen_danong', 'kyduyen_chacchanloai', 'kyduyen_amanh'],
+    previewIds: ['tranmy_locmayluon', 'tranmy_mapgiongmamay', 'tranmy_chetmeroi'],
   },
 };
 
@@ -595,7 +651,7 @@ export const MEME_IDS_BY_PERSONA: Record<MemePersona, readonly MemeId[]> = {
   phuonghang: ['phuonghang_50tuoi', 'phuonghang_cangchuicangdien', 'phuonghang_chanhcho_ngu', 'phuonghang_chanly', 'phuonghang_chomochui', 'phuonghang_chuabaogiobochay', 'phuonghang_connguo_nao', 'phuonghang_dosup', 'phuonghang_dungdien', 'phuonghang_dunglacham', 'phuonghang_haoquang', 'phuonghang_khonhon', 'phuonghang_kimcuong', 'phuonghang_laokhongduoc', 'phuonghang_laymayxuithem', 'phuonghang_luadao', 'phuonghang_motminhtao', 'phuonghang_ngongang', 'phuonghang_nguyhiem', 'phuonghang_quantutrathu', 'phuonghang_taophaimatday', 'phuonghang_thanhcong', 'phuonghang_thayvay', 'phuonghang_tienphuongtien', 'phuonghang_tinhhinh', 'phuonghang_trongcuoc', 'phuonghang_tubitritue', 'phuonghang_tuongvay', 'phuonghang_voquytday', 'phuonghang_khonggikhongthe', 'phuonghang_coloiqua', 'phuonghang_emdepkhong', 'phuonghang_tulamdep', 'phuonghang_tientrongnao', 'phuonghang_lieugan', 'phuonghang_hoanhap', 'phuonghang_khonganbam', 'phuonghang_toidadu', 'phuonghang_lamchucuocchoi', 'phuonghang_suthatloira', 'phuonghang_saodola', 'phuonghang_chuyennhieu', 'phuonghang_trathu', 'phuonghang_nomoney', 'phuonghang_chiuduockhong', 'phuonghang_bominhde', 'phuonghang_thangheo', 'phuonghang_khongbietlamsao', 'phuonghang_nguoigiau', 'phuonghang_khongquygoi', 'phuonghang_tienrotnuocmat', 'phuonghang_emtonthuong', 'phuonghang_choiluon', 'phuonghang_bagai', 'phuonghang_tuithan', 'phuonghang_tientuibay', 'phuonghang_noitieng', 'phuonghang_ngheokhongtoi', 'phuonghang_canhcua', 'phuonghang_thuongbanthan', 'phuonghang_lietsi'],
   chiphien: ['chiphien_30ty', 'chiphien_aiepmay', 'chiphien_bonghong', 'chiphien_capdoimanh', 'chiphien_chinhquyenbat', 'chiphien_chitoitiec', 'chiphien_depxuatsac', 'chiphien_dingu', 'chiphien_hoahau', 'chiphien_hoahauphukhoa', 'chiphien_ke_trithuc_do', 'chiphien_kemay', 'chiphien_kholam', 'chiphien_khongbannua_chet', 'chiphien_khongvon', 'chiphien_khonlamkeme', 'chiphien_lendonchet', 'chiphien_loilam', 'chiphien_maydien', 'chiphien_metlamroi', 'chiphien_miengdat', 'chiphien_nhinchidi', 'chiphien_odaumaxai', 'chiphien_sochongboss', 'chiphien_taisancuachi', 'chiphien_taividepqua', 'chiphien_villa', 'chiphien_xetda8cai', 'chiphien_xinhdep', 'chiphien_conghenoi', 'chiphien_noihay', 'chiphien_dongluc', 'chiphien_thomsangtrong', 'chiphien_thatbainamdo', 'chiphien_laycaisai', 'chiphien_cuuchi', 'chiphien_bihai', 'chiphien_bacodoi', 'chiphien_chuadukho', 'chiphien_khongmuonon', 'chiphien_chotdonnha', 'chiphien_ghequa', 'chiphien_daoboi', 'chiphien_giaubaonam', 'chiphien_conbado', 'chiphien_amtham', 'chiphien_thichvay', 'chiphien_ngatdungcho', 'chiphien_chinhkien', 'chiphien_30thangchong', 'chiphien_loiroi', 'chiphien_ditu', 'chiphien_doithua', 'chiphien_xutoido', 'chiphien_khongnoigi', 'chiphien_loichivo', 'chiphien_khongtontrong', 'chiphien_nuoiong', 'chiphien_manhme', 'chiphien_blockbanhbeo', 'chiphien_dungghep', 'chiphien_thongminh', 'chiphien_dangngo'],
   coba: ['coba_banchetroi', 'coba_batphelon', 'coba_baxaobala', 'coba_bebe', 'coba_buoccungchan', 'coba_chaygiet', 'coba_chedauchetme', 'coba_chitaimaychet', 'coba_damnha', 'coba_dethuong', 'coba_futani', 'coba_giadinhtannat', 'coba_giangho', 'coba_khongguitien', 'coba_luchongheo', 'coba_luocmay', 'coba_mayimtaotha', 'coba_maylamenothienha', 'coba_minhhieu_chui', 'coba_muonchoi', 'coba_ngaychon', 'coba_nhinquancanh', 'coba_phenguoigiau', 'coba_quatbatieu', 'coba_saucannha', 'coba_thuamaythuan', 'coba_totote', 'coba_trinhphen', 'coba_votungoi', 'coba_nuoctuban', 'coba_matthem1ty', 'coba_chauhophu', 'coba_chovangquamy', 'coba_chenkieu', 'coba_tonbaonhieuty', 'coba_demtiendo', 'coba_tiemngando', 'coba_vuivelam', 'coba_dephomnay', 'coba_mandoinhunglua', 'coba_muaguilien', 'coba_cogapma', 'coba_chophulam', 'coba_bactyty', 'coba_vuivelucnao', 'coba_tiemvangkhongdam', 'coba_ngannguoicoi', 'coba_bachucngando', 'coba_xaycau', 'coba_tiensan', 'coba_chodimaimai', 'coba_choinhagiau', 'coba_bahoangbachua', 'coba_ngandodanhdu', 'coba_toikholam', 'coba_chetbenmy', 'coba_thetayninh', 'coba_chuabietchuno', 'coba_chanthatlam', 'coba_nghiepnang', 'coba_metmoiqua', 'coba_thietvayha', 'coba_chuakiemchuyen', 'coba_dungbuon', 'coba_nhucvinh', 'coba_no50cayvang', 'coba_trieuphukhoqua', 'coba_thualo', 'coba_taivigian', 'coba_quylay', 'coba_mangtoi', 'coba_conmatconnguoi', 'coba_nguduvay', 'coba_hoitoi', 'coba_choidi', 'coba_tra100trieu', 'coba_mattienhem', 'coba_nhinphaibiet', 'coba_noimau', 'coba_tinhnong', 'coba_khongngan', 'coba_napthe', 'coba_xuongbien', 'coba_cahatchovui', 'coba_lamlanh'],
-  kyduyen: ['kyduyen_amanh', 'kyduyen_chacchanloai', 'kyduyen_dubanlinh', 'kyduyen_giacmohong', 'kyduyen_giamapluc', 'kyduyen_karen_danong', 'kyduyen_khonghoitiec', 'kyduyen_khongmakesure', 'kyduyen_loingonngot', 'kyduyen_nguhaitieng', 'kyduyen_nongsau_lanh', 'kyduyen_thanhtuu', 'kyduyen_thigio_giacmo', 'kyduyen_tinchinhminh', 'kyduyen_tuconsoam', 'kyduyen_vuotquakhokhan'],
+  tranmy: ['tranmy_gomqua', 'tranmy_condien', 'tranmy_locmayluon', 'tranmy_midien', 'tranmy_ghequa', 'tranmy_taoquamet', 'tranmy_duroinha', 'tranmy_soma', 'tranmy_baikhacdi', 'tranmy_depdi', 'tranmy_5diem', 'tranmy_tuout', 'tranmy_hatdanghoang', 'tranmy_bietloi', 'tranmy_khongtinduoc', 'tranmy_canhcao', 'tranmy_ranhhaygi', 'tranmy_moithisinh', 'tranmy_thatim', 'tranmy_tatfilter', 'tranmy_deothay', 'tranmy_lovoem', 'tranmy_tuyetvoi', 'tranmy_khongphainha', 'tranmy_mamay', 'tranmy_quyttien', 'tranmy_chucmungem', 'tranmy_votay', 'tranmy_dungroi', 'tranmy_quanque', 'tranmy_nhucau', 'tranmy_sochimyoi', 'tranmy_taheo', 'tranmy_khongranh', 'tranmy_thandong', 'tranmy_haradi', 'tranmy_mupruprup', 'tranmy_kemetao', 'tranmy_quayvongvong', 'tranmy_songsoso', 'tranmy_maydienha', 'tranmy_cuucuu', 'tranmy_emmetqua', 'tranmy_vangma', 'tranmy_daduvay', 'tranmy_taocoten', 'tranmy_khongthichdau', 'tranmy_khungdeso', 'tranmy_danganko', 'tranmy_hatchuan', 'tranmy_toilatranmy', 'tranmy_nhieunhanvat', 'tranmy_hoiconcho', 'tranmy_mapgiongmamay', 'tranmy_khongthichchi', 'tranmy_hettien', 'tranmy_ngonqua', 'tranmy_hetchuot', 'tranmy_dethuongghe', 'tranmy_chetmeroi', 'tranmy_toitinhgi', 'tranmy_hoimamay', 'tranmy_nguthiet', 'tranmy_doandungroi'],
   game_fx: ['tienbip_cainit', 'vn_amongus', 'vn_batngochua', 'vn_fartmic', 'vn_hettien', 'vn_toicongchuyen', 'vn_vineboom', 'vn_vinhbietcu'],
 };
 
@@ -630,10 +686,13 @@ export const ACTION_POOL_META: readonly { key: MemePoolKey; label: string; desc:
 // Câu tự phát trong ván lấy từ các nhóm tương đồng (memeMoods.ts); bảng nghe thử vẫn có toàn bộ kho.
 export const MEME_POOLS: Record<MemePoolKey, readonly MemeId[]> = buildMemePools((id) => MEME_BY_ID[id].persona);
 
-/** Toàn bộ 165 ID meme đã kiểm định sạch giọng để phát xoay vòng không lặp. */
+/** Toàn bộ 411 ID meme đã kiểm định sạch giọng để phát xoay vòng không lặp. */
 export const ALL_MEME_IDS: readonly MemeId[] = MEME_LIST.map((m) => m.id);
 
-/** Nhạc nền xoay vòng 6 bài chỉ phát khi đang ở phòng chờ (lobby), tắt khi vào ván chơi. */
-export function shouldPlayBgm(room: RoomState | null): boolean {
-  return room?.phase === 'lobby';
+export type BgmScene = 'lobby' | 'game' | null;
+
+/** Cảnh nhạc nền theo trạng thái phòng: phòng chờ, trong ván, hoặc ngoài phòng. */
+export function bgmSceneOf(room: RoomState | null): BgmScene {
+  if (!room) return null;
+  return room.phase === 'lobby' ? 'lobby' : 'game';
 }

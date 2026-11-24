@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { BGM_LIST, MEME_LIST, type BgmId, type MemePersona } from '../audioAssets';
+import { BGM_LIST, MEME_LIST, type BgmId, type BgmScene, type MemePersona } from '../audioAssets';
 import {
   getActiveMeme,
   subscribeActiveMeme,
+  getBgmScene,
   getBgmVolume,
   getCurrentBgmId,
   getManualBgmOverride,
   isBgmActive,
   isBgmEnabled,
+  isGameBgmEnabled,
   isMemeEnabled,
   isMuted,
   nextBgmTrack,
@@ -16,6 +18,7 @@ import {
   playRandomMeme,
   setBgmEnabled,
   setBgmVolume,
+  setGameBgmEnabled,
   setManualBgmOverride,
   setMemeEnabled,
   setMuted,
@@ -32,7 +35,7 @@ const PERSONA_TABS: readonly { key: MemePersona; label: string }[] = [
   { key: 'phuonghang', label: 'Cô Phương Hằng' },
   { key: 'chiphien', label: 'Chị Phiến' },
   { key: 'coba', label: 'Cô Ba Vàng Ngọc' },
-  { key: 'kyduyen', label: 'Hoa hậu Kỳ Duyên' },
+  { key: 'tranmy', label: 'Trần My' },
   { key: 'game_fx', label: 'Hỗ trợ Game' },
 ];
 
@@ -44,8 +47,10 @@ const VOL_PRESETS: readonly { label: string; value: number }[] = [
 
 interface Snapshot {
   muted: boolean;
+  bgmScene: BgmScene;
   bgmActive: boolean;
   bgmOn: boolean;
+  gameBgmOn: boolean;
   memeOn: boolean;
   bgmVol: number;
   manualBgm: BgmId | null;
@@ -55,8 +60,10 @@ interface Snapshot {
 function readSnapshot(): Snapshot {
   return {
     muted: isMuted(),
+    bgmScene: getBgmScene(),
     bgmActive: isBgmActive(),
     bgmOn: isBgmEnabled(),
+    gameBgmOn: isGameBgmEnabled(),
     memeOn: isMemeEnabled(),
     bgmVol: getBgmVolume(),
     manualBgm: getManualBgmOverride(),
@@ -77,6 +84,20 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
   useEffect(() => subscribeAudioSettings(() => setSnap(readSnapshot())), []);
 
   const visibleMemes = MEME_LIST.filter((m) => m.persona === tab);
+  const enableCurrentSceneBgm = () => {
+    if (snap.bgmScene === 'game') {
+      if (!snap.gameBgmOn) setGameBgmEnabled(true);
+    } else if (!snap.bgmOn) {
+      setBgmEnabled(true);
+    }
+  };
+  const idleBgmNote = snap.muted
+    ? 'Đang tắt tiếng'
+    : snap.bgmScene === 'game'
+      ? 'Nhạc trong ván đang tắt'
+      : snap.bgmScene === 'lobby'
+        ? 'Nhạc phòng chờ đang tắt'
+        : 'Nhạc phát khi vào phòng';
 
   return (
     <Sheet title="Nhạc nền & Bảng Lầy Lội" onClose={onClose}>
@@ -102,6 +123,15 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
         </Pressable>
 
         <Pressable
+          testID="audio-toggle-bgm-game"
+          onPress={() => setGameBgmEnabled(!snap.gameBgmOn)}
+          style={[styles.toggleChip, snap.gameBgmOn && !snap.muted ? styles.chipActiveGold : styles.chipIdle]}
+        >
+          <UiIcon name="Music" size={14} color={C.ink} />
+          <T style={[styles.chipTxt, { color: C.ink }]}>Nhạc trong ván: {snap.gameBgmOn ? 'Bật' : 'Tắt'}</T>
+        </Pressable>
+
+        <Pressable
           testID="audio-toggle-meme"
           onPress={() => setMemeEnabled(!snap.memeOn)}
           style={[styles.toggleChip, snap.memeOn && !snap.muted ? styles.chipActiveGold : styles.chipIdle]}
@@ -113,7 +143,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
 
       <View style={styles.sectionBox}>
         <View style={styles.sectionHeader}>
-          <T style={styles.sectionTitle}>Nhạc nền phòng chờ</T>
+          <T style={styles.sectionTitle}>Nhạc nền</T>
           <View style={styles.volRow}>
             {VOL_PRESETS.map((p) => {
               const selected = Math.abs(snap.bgmVol - p.value) < 0.04;
@@ -133,14 +163,14 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
         <T style={styles.subLabel}>
           {snap.bgmActive ? (
             <>
-              {snap.manualBgm ? 'Đang phát cố định 1 bài:' : 'Đang xoay vòng 6 bài:'}{' '}
+              {snap.manualBgm ? 'Đang phát cố định 1 bài:' : `Đang xoay vòng ${BGM_LIST.length} bài:`}{' '}
               <T style={{ fontWeight: '600', color: C.ink }}>
                 {BGM_LIST.find((b) => b.id === snap.activeBgm)?.name ?? 'Chưa phát'}
               </T>
             </>
           ) : (
             <>
-              Chỉ phát ở phòng chờ (tự tắt khi vào game)
+              {idleBgmNote}
               {snap.manualBgm
                 ? ` · Đã chọn: ${BGM_LIST.find((b) => b.id === snap.manualBgm)?.name ?? ''}`
                 : ''}
@@ -153,11 +183,11 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
             onPress={() => setManualBgmOverride(null)}
             style={[styles.bgmChip, snap.manualBgm === null && styles.bgmChipOn]}
           >
-            <T style={[styles.bgmChipTxt, snap.manualBgm === null && styles.bgmChipTxtOn]}>Xoay vòng 6 bài</T>
+            <T style={[styles.bgmChipTxt, snap.manualBgm === null && styles.bgmChipTxtOn]}>Xoay vòng {BGM_LIST.length} bài</T>
           </Pressable>
           <Pressable
             onPress={() => {
-              if (!snap.bgmOn) setBgmEnabled(true);
+              enableCurrentSceneBgm();
               nextBgmTrack();
             }}
             style={styles.bgmChip}
@@ -170,7 +200,7 @@ export function AudioSheet({ onClose }: { onClose: () => void }) {
               <Pressable
                 key={b.id}
                 onPress={() => {
-                  if (!snap.bgmOn) setBgmEnabled(true);
+                  enableCurrentSceneBgm();
                   setManualBgmOverride(b.id);
                 }}
                 style={[styles.bgmChip, on && styles.bgmChipOn]}

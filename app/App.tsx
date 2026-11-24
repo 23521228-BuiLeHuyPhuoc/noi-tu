@@ -21,9 +21,9 @@ import { C } from './src/theme';
 import { FeedProvider, T } from './src/ui';
 import { KeyboardFrame } from './src/components/KeyboardFrame';
 import { UiIcon } from './src/components/Icons';
-import { shouldPlayBgm } from './src/audioAssets';
+import { bgmSceneOf } from './src/audioAssets';
 import { MemeSpeakerFocus } from './src/components/MemeSpeakerFocus';
-import { playMemePool, setBgmActive, setRoomVoiceContext, stopMeme } from './src/sound';
+import { playMemePool, setBgmScene, setRoomVoiceContext, stopMeme } from './src/sound';
 
 // Tách chunk (code-splitting) cho toàn bộ 15 màn chơi để giảm dung lượng JS khởi động trên di động!
 const WordChainScreen = lazy(() =>
@@ -91,11 +91,11 @@ export default function App() {
 
   useLayoutEffect(() => { setRoomVoiceContext(room, game.me); }, [room, game.me]);
   useLayoutEffect(() => () => { stopMeme(); setRoomVoiceContext(null, null); }, [room?.code]);
-  const bgmOn = shouldPlayBgm(room);
+  const bgmScene = bgmSceneOf(room);
   useEffect(() => {
-    setBgmActive(bgmOn);
-  }, [bgmOn]);
-  useEffect(() => () => setBgmActive(false), []);
+    setBgmScene(bgmScene);
+  }, [bgmScene]);
+  useEffect(() => () => setBgmScene(null), []);
 
   const prevRoomPhaseRef = useRef<{ inRoom: boolean; phase: string | null }>({ inRoom: false, phase: null });
   useEffect(() => {
