@@ -1,33 +1,39 @@
 /**
  * Server Engine: Đoán Ai Đây? — Who Is It? HopKids (`who_is_it`, 2–12 người chia 2 đội Đỏ/Xanh).
  * - Tôn trọng chọn đội từ phòng chờ (ai bấm sớm vào trước).
- * - Số nhân vật co giãn theo số người: 24 -> 30 -> 36 -> 42 -> 48 (tới 54 ở chế độ Bảng lớn).
- * - Kênh thảo luận riêng của từng đội & đồng bộ `oppFlipped` để theo dõi bảng đối thủ mà không lộ thẻ bí mật (`perPlayerView = true`).
+ * - Số nhân vật co giãn theo số người: 30 -> 36 -> 42 -> 48 -> 54 thẻ, sinh mới mỗi ván theo 1 trong 7 bộ nét vẽ.
+ * - Nhịp đấu rõ ràng: pick_secret -> turn_beat (giới thiệu lượt) -> ask -> (answer_free) -> reveal -> review -> turn_beat...
+ * - Tự động úp ngay các thẻ không khớp khi hỏi câu đặc điểm (không bao giờ mất lượt úp).
+ * - Kênh thảo luận riêng của từng đội & đồng bộ `oppFlipped` không lộ thẻ bí mật (`perPlayerView = true`).
  */
 import {
+  generateWhoIsItBoard,
   matchWhoIsItTrait,
-  selectWhoIsItBoard,
-  WHO_IS_IT_CHARACTER_MAP,
+  pickWhoIsItArtPack,
   WHO_IS_IT_MAX_LIVES,
   WHO_IS_IT_TRAIT_MAP,
-  WHO_IS_IT_TRAITS,
   whoIsItBoardSize,
+  whoIsItTraitsForPack,
+  type WhoIsItArtPackId,
   type WhoIsItCharacter,
   type WhoIsItDifficulty,
   type WhoIsItPhase,
   type WhoIsItQA,
   type WhoIsItTeam,
   type WhoIsItTeamMsg,
+  type WhoIsItTraitDef,
   type WhoIsItView,
 } from '../../../shared/src/whoisit';
 import type { ActionResult, GameAction, RankEntry } from '../../../shared/src/types';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const PICK_SECRET_MS = 22_000;
+const TURN_BEAT_MS = 3_400;
 const ASK_MS = 40_000;
 const ANSWER_FREE_MS = 25_000;
-const REVIEW_MS = 16_000;
-const TURN_BEAT_MS = 2_800;
+const REVEAL_MS = 5_200;
+const REVIEW_TRAIT_MS = 9_000;
+const REVIEW_FREE_MS = 18_000;
 
 type WhoIsItSettingsCompat = { whoIsItDifficulty?: WhoIsItDifficulty };
 
@@ -40,13 +46,21 @@ export class WhoIsItGame implements GameEngine {
   private order: string[] = [];
   private names = new Map<string, string>();
   private teams: Record<WhoIsItTeam, string[]> = { red: [], blue: [] };
+
+  private artPack: WhoIsItArtPackId = 'avataaars';
+  private availableTraits: WhoIsItTraitDef[] = [];
+  private availableTraitKeys: string[] = [];
+  private availableTraitKeySet = new Set<string>();
   private board: WhoIsItCharacter[] = [];
+  private boardMap = new Map<string, WhoIsItCharacter>();
   private boardIds = new Set<string>();
 
   private secrets: Partial<Record<WhoIsItTeam, string>> = {};
   private secretReady: Record<WhoIsItTeam, boolean> = { red: false, blue: false };
   private flipped: Record<WhoIsItTeam, Set<string>> = { red: new Set(), blue: new Set() };
   private lastFlippedIds: string[] = [];
+  private lastFlippedTeam: WhoIsItTeam | null = null;
+  private turnNote: 'timeout' | null = null;
   private lives: Record<WhoIsItTeam, number> = { red: WHO_IS_IT_MAX_LIVES, blue: WHO_IS_IT_MAX_LIVES };
   private askedTraits: Record<WhoIsItTeam, Set<string>> = { red: new Set(), blue: new Set() };
 
@@ -63,7 +77,6 @@ export class WhoIsItGame implements GameEngine {
   private history: WhoIsItQA[] = [];
   private lastQA: WhoIsItQA | null = null;
   private pendingQuestion: { id: number; askedByTeam: WhoIsItTeam; askedById: string; askedByName: string; text: string } | null = null;
-  private autoFlippedThisReview = false;
 
   private chatSeq = 0;
   private teamChat: Record<WhoIsItTeam, WhoIsItTeamMsg[]> = { red: [], blue: [] };
@@ -118,8 +131,14 @@ export class WhoIsItGame implements GameEngine {
       this.teams[target].push(p.id);
     }
 
+    this.artPack = pickWhoIsItArtPack(this.ctx.rng);
+    this.availableTraits = whoIsItTraitsForPack(this.artPack);
+    this.availableTraitKeys = this.availableTraits.map((t) => t.key);
+    this.availableTraitKeySet = new Set(this.availableTraitKeys);
+
     const boardSize = whoIsItBoardSize(players.length, this.difficulty);
-    this.board = selectWhoIsItBoard(boardSize, this.ctx.rng);
+    this.board = generateWhoIsItBoard(boardSize, this.artPack, this.ctx.rng);
+    this.boardMap = new Map(this.board.map((c) => [c.id, c]));
     this.boardIds = new Set(this.board.map((c) => c.id));
 
     this.phase = 'pick_secret';
@@ -143,9 +162,33 @@ export class WhoIsItGame implements GameEngine {
       this.secrets.blue = this.board[idx].id;
       this.secretReady.blue = true;
     }
-    this.turnTeam = this.ctx.rng() < 0.5 ? 'red' : 'blue';
-    this.enterAskPhase();
-    this.ctx.changed();
+    const firstTeam: WhoIsItTeam = this.ctx.rng() < 0.5 ? 'red' : 'blue';
+    this.enterTurnBeat(firstTeam);
+    if (!this.finished) this.ctx.changed();
+  }
+
+  private enterTurnBeat(nextTeam: WhoIsItTeam, note: 'timeout' | null = null): void {
+    if (this.finished) return;
+    if (this.teams.red.length === 0 || this.teams.blue.length === 0) {
+      const winner = this.teams.red.length > 0 ? 'red' : 'blue';
+      this.finishWithWinner(winner, 'Đối thủ đã rời phòng!');
+      return;
+    }
+    this.phase = 'turn_beat';
+    this.turnTeam = nextTeam;
+    this.turnNote = note;
+    this.pendingQuestion = null;
+    this.lastFlippedIds = [];
+    this.lastFlippedTeam = null;
+    this.activePlayerId = this.pickTeamMember(nextTeam, this.turnCursor[nextTeam]++);
+    const ms = this.scaleMs(TURN_BEAT_MS);
+    this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
+    this.phaseEndsAt = Date.now() + ms;
+    this.timer.set(ms, () => {
+      if (this.finished || this.phase !== 'turn_beat') return;
+      this.enterAskPhase();
+      if (!this.finished) this.ctx.changed();
+    });
   }
 
   private enterAskPhase(): void {
@@ -158,45 +201,47 @@ export class WhoIsItGame implements GameEngine {
     this.phase = 'ask';
     this.roundCount += 1;
     this.pendingQuestion = null;
-    this.autoFlippedThisReview = false;
-    this.lastFlippedIds = [];
-    this.activePlayerId = this.pickTeamMember(this.turnTeam, this.turnCursor[this.turnTeam]++);
+    this.turnNote = null;
+    const stillValid =
+      this.activePlayerId !== null &&
+      this.teams[this.turnTeam].includes(this.activePlayerId) &&
+      this.ctx.isConnected(this.activePlayerId);
+    if (!stillValid) {
+      this.activePlayerId = this.pickTeamMember(this.turnTeam, this.turnCursor[this.turnTeam]++);
+    }
     const ms = this.scaleMs(ASK_MS);
     this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
     this.phaseEndsAt = Date.now() + ms;
     this.timer.set(ms, () => {
       if (this.finished || this.phase !== 'ask') return;
-      this.enterTurnBeat(this.otherTeam(this.turnTeam));
-      this.ctx.changed();
+      this.enterTurnBeat(this.otherTeam(this.turnTeam), 'timeout');
+      if (!this.finished) this.ctx.changed();
     });
   }
 
-  private enterReviewPhase(): void {
+  private enterRevealPhase(onDone: () => void): void {
+    if (this.finished) return;
+    this.phase = 'reveal';
+    const ms = this.scaleMs(REVEAL_MS);
+    this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
+    this.phaseEndsAt = Date.now() + ms;
+    this.timer.set(ms, () => {
+      if (this.finished || this.phase !== 'reveal') return;
+      onDone();
+      if (!this.finished) this.ctx.changed();
+    });
+  }
+
+  private enterReviewPhase(baseMs: number): void {
     if (this.finished) return;
     this.phase = 'review';
-    this.autoFlippedThisReview = false;
-    const ms = this.scaleMs(REVIEW_MS);
+    const ms = this.scaleMs(baseMs);
     this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
     this.phaseEndsAt = Date.now() + ms;
     this.timer.set(ms, () => {
       if (this.finished || this.phase !== 'review') return;
       this.enterTurnBeat(this.otherTeam(this.turnTeam));
-      this.ctx.changed();
-    });
-  }
-
-  private enterTurnBeat(nextTeam: WhoIsItTeam): void {
-    if (this.finished) return;
-    this.phase = 'turn_beat';
-    this.activePlayerId = null;
-    const ms = this.scaleMs(TURN_BEAT_MS);
-    this.phaseSeconds = Math.max(1, Math.round(ms / 1000));
-    this.phaseEndsAt = Date.now() + ms;
-    this.timer.set(ms, () => {
-      if (this.finished) return;
-      this.turnTeam = nextTeam;
-      this.enterAskPhase();
-      this.ctx.changed();
+      if (!this.finished) this.ctx.changed();
     });
   }
 
@@ -236,10 +281,10 @@ export class WhoIsItGame implements GameEngine {
       this.secretReady[team] = true;
       if (this.secretReady.red && this.secretReady.blue) {
         this.timer.clear();
-        this.turnTeam = this.ctx.rng() < 0.5 ? 'red' : 'blue';
-        this.enterAskPhase();
+        const firstTeam: WhoIsItTeam = this.ctx.rng() < 0.5 ? 'red' : 'blue';
+        this.enterTurnBeat(firstTeam);
       }
-      this.ctx.changed();
+      if (!this.finished) this.ctx.changed();
       return { ok: true };
     }
 
@@ -261,6 +306,8 @@ export class WhoIsItGame implements GameEngine {
       this.timer.clear();
       const pq = this.pendingQuestion;
       this.pendingQuestion = null;
+      this.lastFlippedIds = [];
+      this.lastFlippedTeam = null;
       this.recordQA({
         team: pq.askedByTeam,
         askedById: pq.askedById,
@@ -269,29 +316,7 @@ export class WhoIsItGame implements GameEngine {
         answer: !!action.yes,
         kind: 'free',
       });
-      this.enterReviewPhase();
-      this.ctx.changed();
-      return { ok: true };
-    }
-
-    if (action.type === 'wi_auto_flip') {
-      if (this.phase !== 'review' || team !== this.turnTeam) {
-        return { ok: false, reason: 'not_your_turn' };
-      }
-      if (!this.lastQA || this.lastQA.kind !== 'trait' || !this.lastQA.traitKey || this.lastQA.answer === null) {
-        return { ok: false, reason: 'bad_action' };
-      }
-      const key = this.lastQA.traitKey;
-      const expected = this.lastQA.answer;
-      const newlyFlipped: string[] = [];
-      for (const ch of this.board) {
-        if (matchWhoIsItTrait(ch, key) !== expected && !this.flipped[team].has(ch.id)) {
-          this.flipped[team].add(ch.id);
-          newlyFlipped.push(ch.id);
-        }
-      }
-      this.lastFlippedIds = newlyFlipped;
-      this.autoFlippedThisReview = true;
+      this.enterRevealPhase(() => this.enterReviewPhase(REVIEW_FREE_MS));
       this.ctx.changed();
       return { ok: true };
     }
@@ -302,7 +327,7 @@ export class WhoIsItGame implements GameEngine {
       }
       this.timer.clear();
       this.enterTurnBeat(this.otherTeam(this.turnTeam));
-      this.ctx.changed();
+      if (!this.finished) this.ctx.changed();
       return { ok: true };
     }
 
@@ -314,11 +339,14 @@ export class WhoIsItGame implements GameEngine {
     const pName = this.names.get(playerId) ?? 'Người chơi';
 
     if (action.type === 'wi_ask_trait') {
+      if (!this.availableTraitKeySet.has(action.traitKey)) return { ok: false, reason: 'bad_action' };
+      if (this.askedTraits[team].has(action.traitKey)) return { ok: false, reason: 'bad_action' };
       const def = WHO_IS_IT_TRAIT_MAP.get(action.traitKey);
       if (!def) return { ok: false, reason: 'bad_action' };
       const oppSecret = this.secrets[this.otherTeam(team)];
-      const oppChar = oppSecret ? WHO_IS_IT_CHARACTER_MAP.get(oppSecret) : undefined;
+      const oppChar = oppSecret ? this.boardMap.get(oppSecret) : undefined;
       if (!oppChar) return { ok: false, reason: 'bad_action' };
+
       this.timer.clear();
       const ans = def.match(oppChar);
       this.askedTraits[team].add(def.key);
@@ -331,7 +359,19 @@ export class WhoIsItGame implements GameEngine {
         answer: ans,
         kind: 'trait',
       });
-      this.enterReviewPhase();
+
+      // Tự động úp ngay toàn bộ thẻ không khớp trên bảng của đội vừa hỏi
+      const newlyFlipped: string[] = [];
+      for (const ch of this.board) {
+        if (matchWhoIsItTrait(ch, def.key) !== ans && !this.flipped[team].has(ch.id)) {
+          this.flipped[team].add(ch.id);
+          newlyFlipped.push(ch.id);
+        }
+      }
+      this.lastFlippedIds = newlyFlipped;
+      this.lastFlippedTeam = team;
+
+      this.enterRevealPhase(() => this.enterReviewPhase(REVIEW_TRAIT_MS));
       this.ctx.changed();
       return { ok: true };
     }
@@ -355,6 +395,8 @@ export class WhoIsItGame implements GameEngine {
         if (this.finished || this.phase !== 'answer_free' || !this.pendingQuestion) return;
         const pq = this.pendingQuestion;
         this.pendingQuestion = null;
+        this.lastFlippedIds = [];
+        this.lastFlippedTeam = null;
         this.recordQA({
           team: pq.askedByTeam,
           askedById: pq.askedById,
@@ -363,15 +405,15 @@ export class WhoIsItGame implements GameEngine {
           answer: false,
           kind: 'free',
         });
-        this.enterReviewPhase();
-        this.ctx.changed();
+        this.enterRevealPhase(() => this.enterReviewPhase(REVIEW_FREE_MS));
+        if (!this.finished) this.ctx.changed();
       });
       this.ctx.changed();
       return { ok: true };
     }
 
     if (action.type === 'wi_guess') {
-      const target = this.board.find((c) => c.id === action.characterId);
+      const target = this.boardMap.get(action.characterId);
       if (!target) return { ok: false, reason: 'bad_action' };
       this.timer.clear();
       const oppTeam = this.otherTeam(team);
@@ -381,23 +423,32 @@ export class WhoIsItGame implements GameEngine {
         askedById: playerId,
         askedByName: pName,
         question: `Chốt đoán: ${target.name}!`,
+        characterId: target.id,
         answer: isCorrect,
         kind: 'guess',
       });
       if (isCorrect) {
-        this.finishWithWinner(team, `🎯 ${pName} đoán trúng phóc "${target.name}"!`);
+        this.lastFlippedIds = [];
+        this.lastFlippedTeam = null;
+        this.enterRevealPhase(() => {
+          this.finishWithWinner(team, `🎯 ${pName} đoán trúng phóc "${target.name}"!`);
+        });
         this.ctx.changed();
         return { ok: true };
       }
       this.lives[team] = Math.max(0, this.lives[team] - 1);
       this.flipped[team].add(target.id);
       this.lastFlippedIds = [target.id];
+      this.lastFlippedTeam = team;
       if (this.lives[team] <= 0) {
-        this.finishWithWinner(oppTeam, `💥 Đội ${team === 'red' ? 'Đỏ' : 'Xanh'} đoán trật hết ${WHO_IS_IT_MAX_LIVES} mạng!`);
-        this.ctx.changed();
-        return { ok: true };
+        this.enterRevealPhase(() => {
+          this.finishWithWinner(oppTeam, `💥 Đội ${team === 'red' ? 'Đỏ' : 'Xanh'} đoán trật hết ${WHO_IS_IT_MAX_LIVES} mạng!`);
+        });
+      } else {
+        this.enterRevealPhase(() => {
+          this.enterTurnBeat(oppTeam);
+        });
       }
-      this.enterTurnBeat(oppTeam);
       this.ctx.changed();
       return { ok: true };
     }
@@ -406,7 +457,7 @@ export class WhoIsItGame implements GameEngine {
   }
 
   botAction(playerId: string): GameAction | null {
-    if (this.finished || this.phase === 'turn_beat') return null;
+    if (this.finished || this.phase === 'turn_beat' || this.phase === 'reveal') return null;
     const team = this.teamOf(playerId);
     if (!team) return null;
 
@@ -418,7 +469,7 @@ export class WhoIsItGame implements GameEngine {
     if (this.phase === 'answer_free' && team !== this.turnTeam && this.pendingQuestion) {
       if (playerId !== this.teams[team][0]) return null;
       const mySecret = this.secrets[team];
-      const ch = mySecret ? WHO_IS_IT_CHARACTER_MAP.get(mySecret) : undefined;
+      const ch = mySecret ? this.boardMap.get(mySecret) : undefined;
       const q = this.pendingQuestion.text.toLowerCase();
       let ans = this.ctx.rng() < 0.5;
       if (ch) {
@@ -432,9 +483,6 @@ export class WhoIsItGame implements GameEngine {
     }
 
     if (this.phase === 'review' && team === this.turnTeam && playerId === this.activePlayerId) {
-      if (this.lastQA?.kind === 'trait' && !this.autoFlippedThisReview) {
-        return { type: 'wi_auto_flip' };
-      }
       return { type: 'wi_end_review' };
     }
 
@@ -451,7 +499,7 @@ export class WhoIsItGame implements GameEngine {
       let bestKey: string | null = null;
       let bestDiff = Infinity;
       const target = cands.length / 2;
-      for (const tr of WHO_IS_IT_TRAITS) {
+      for (const tr of this.availableTraits) {
         if (this.askedTraits[team].has(tr.key)) continue;
         const yesCount = cands.filter(tr.match).length;
         if (yesCount === 0 || yesCount === cands.length) continue;
@@ -478,7 +526,7 @@ export class WhoIsItGame implements GameEngine {
       this.finishWithWinner(winner, 'Đối thủ đã rời phòng!');
       return;
     }
-    if (this.activePlayerId === playerId && this.phase === 'ask') {
+    if (this.activePlayerId === playerId && (this.phase === 'ask' || this.phase === 'turn_beat')) {
       this.activePlayerId = this.pickTeamMember(this.turnTeam, this.turnCursor[this.turnTeam]++);
     }
   }
@@ -487,8 +535,8 @@ export class WhoIsItGame implements GameEngine {
     if (this.finished) return;
     this.finished = true;
     this.timer.clear();
-    const redSecretName = (this.secrets.red && WHO_IS_IT_CHARACTER_MAP.get(this.secrets.red)?.name) ?? '?';
-    const blueSecretName = (this.secrets.blue && WHO_IS_IT_CHARACTER_MAP.get(this.secrets.blue)?.name) ?? '?';
+    const redSecretName = (this.secrets.red && this.boardMap.get(this.secrets.red)?.name) ?? '?';
+    const blueSecretName = (this.secrets.blue && this.boardMap.get(this.secrets.blue)?.name) ?? '?';
     const winnerIds = [...this.teams[winnerTeam]];
     const headline = `${headlinePrefix} · Đội ${winnerTeam === 'red' ? 'Đỏ' : 'Xanh'} thắng! (Đỏ: ${redSecretName} | Xanh: ${blueSecretName})`;
 
@@ -527,6 +575,8 @@ export class WhoIsItGame implements GameEngine {
       phase: this.phase,
       phaseEndsAt: this.phaseEndsAt,
       phaseSeconds: this.phaseSeconds,
+      artPack: this.artPack,
+      traitKeys: [...this.availableTraitKeys],
       boardSize: this.board.length,
       characters: this.board,
       teams: { red: [...this.teams.red], blue: [...this.teams.blue] },
@@ -535,6 +585,8 @@ export class WhoIsItGame implements GameEngine {
       myFlipped,
       oppFlipped,
       lastFlippedIds: [...this.lastFlippedIds],
+      lastFlippedTeam: this.lastFlippedTeam,
+      turnNote: this.turnNote,
       secretReady: { ...this.secretReady },
       remainingCounts: {
         red: Math.max(0, this.board.length - this.flipped.red.size),

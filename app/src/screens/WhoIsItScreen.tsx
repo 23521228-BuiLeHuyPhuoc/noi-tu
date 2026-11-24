@@ -1,10 +1,14 @@
 import { Image } from '../components/Image';
-import { memo, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import {
+  WHO_IS_IT_ART_PACKS,
+  WHO_IS_IT_TRAIT_MAP,
   WHO_IS_IT_TRAITS,
   whoIsItGridDims,
+  type WhoIsItArtPackId,
   type WhoIsItCharacter,
+  type WhoIsItTeam,
   type WhoIsItTraitGroup,
   type WhoIsItView,
 } from '../../../shared/src/whoisit';
@@ -20,6 +24,11 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { CountdownBar } from '../components/TimerBar';
 import { UiIcon } from '../components/Icons';
+import { WhoIsItPopups } from '../components/WhoIsItPopups';
+
+const USE_NATIVE = Platform.OS !== 'web';
+const TEAM_RED = '#EF4444';
+const TEAM_BLUE = '#3B82F6';
 
 const TRAIT_GROUPS: { key: WhoIsItTraitGroup; label: string }[] = [
   { key: 'toc_mu', label: 'Tóc/Mũ' },
@@ -35,8 +44,17 @@ const QUICK_WI_CHATS = [
   'Từ từ hãy đoán, hỏi thêm!',
 ];
 
+const EXPRESSION_LABELS: Record<WhoIsItCharacter['expression'], string> = {
+  happy: 'Cười tươi',
+  sad: 'Mặt buồn',
+  angry: 'Cau mày',
+  surprised: 'Bất ngờ',
+  cheeky: 'Nháy/lè lưỡi',
+};
+
 const CharacterCell = memo(function CharacterCell({
   ch,
+  artPack,
   flipped,
   isSecret,
   guessMode,
@@ -47,6 +65,7 @@ const CharacterCell = memo(function CharacterCell({
   onLongPress,
 }: {
   ch: WhoIsItCharacter;
+  artPack: WhoIsItArtPackId;
   flipped: boolean;
   isSecret: boolean;
   guessMode: boolean;
@@ -56,52 +75,71 @@ const CharacterCell = memo(function CharacterCell({
   onPress: (c: WhoIsItCharacter) => void;
   onLongPress: (c: WhoIsItCharacter) => void;
 }) {
-  const uri = whoIsItPortraitUri(ch);
+  const uri = whoIsItPortraitUri(ch, artPack);
+  const [flipPulse] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    if (!justFlipped) {
+      flipPulse.setValue(1);
+      return;
+    }
+    const anim = Animated.sequence([
+      Animated.timing(flipPulse, { toValue: 1.09, duration: 150, useNativeDriver: USE_NATIVE }),
+      Animated.timing(flipPulse, { toValue: 0.94, duration: 140, useNativeDriver: USE_NATIVE }),
+      Animated.timing(flipPulse, { toValue: 1.05, duration: 130, useNativeDriver: USE_NATIVE }),
+      Animated.timing(flipPulse, { toValue: 1, duration: 140, useNativeDriver: USE_NATIVE }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [justFlipped, flipPulse]);
+
   return (
-    <Pressable
-      testID={`wi-card-${ch.id}`}
-      onPress={() => onPress(ch)}
-      onLongPress={() => onLongPress(ch)}
-      style={({ pressed }) => [
-        styles.cell,
-        oppView && styles.cellOppBoard,
-        flipped && styles.cellFlipped,
-        justFlipped && styles.cellJustFlipped,
-        isSecret && styles.cellSecret,
-        guessMode && !flipped && !oppView && styles.cellGuessReady,
-        pressed && { opacity: 0.78 },
-      ]}
-    >
-      <View style={styles.cellImgWrap}>
-        <Image
-          source={{ uri }}
-          style={[styles.cellImg, flipped && styles.cellImgFlipped]}
-          resizeMode="contain"
-        />
-        {flipped && (
-          <View pointerEvents="none" style={styles.flippedMask}>
-            <T style={[styles.flippedX, dense && { fontSize: 15 }]}>✕</T>
-          </View>
-        )}
-        {isSecret && (
-          <View pointerEvents="none" style={styles.secretStar}>
-            <T style={styles.secretStarTxt}>★</T>
-          </View>
-        )}
-      </View>
-      <View style={[styles.cellNameBox, oppView && styles.cellNameBoxOpp, flipped && styles.cellNameBoxFlipped]}>
-        <T
-          numberOfLines={1}
-          style={[
-            styles.cellName,
-            dense && styles.cellNameDense,
-            flipped && styles.cellNameFlipped,
-          ]}
-        >
-          {ch.name}
-        </T>
-      </View>
-    </Pressable>
+    <Animated.View style={[styles.cellOuter, { transform: [{ scale: flipPulse }] }]}>
+      <Pressable
+        testID={`wi-card-${ch.id}`}
+        onPress={() => onPress(ch)}
+        onLongPress={() => onLongPress(ch)}
+        style={({ pressed }) => [
+          styles.cell,
+          oppView && styles.cellOppBoard,
+          flipped && styles.cellFlipped,
+          justFlipped && styles.cellJustFlipped,
+          isSecret && styles.cellSecret,
+          guessMode && !flipped && !oppView && styles.cellGuessReady,
+          pressed && { opacity: 0.78 },
+        ]}
+      >
+        <View style={styles.cellImgWrap}>
+          <Image
+            source={{ uri }}
+            style={[styles.cellImg, flipped && styles.cellImgFlipped]}
+            resizeMode="contain"
+          />
+          {flipped && (
+            <View pointerEvents="none" style={[styles.flippedMask, justFlipped && styles.flippedMaskFresh]}>
+              <T style={[styles.flippedX, dense && { fontSize: 15 }]}>✕</T>
+            </View>
+          )}
+          {isSecret && (
+            <View pointerEvents="none" style={styles.secretStar}>
+              <T style={styles.secretStarTxt}>★</T>
+            </View>
+          )}
+        </View>
+        <View style={[styles.cellNameBox, oppView && styles.cellNameBoxOpp, flipped && styles.cellNameBoxFlipped]}>
+          <T
+            numberOfLines={1}
+            style={[
+              styles.cellName,
+              dense && styles.cellNameDense,
+              flipped && styles.cellNameFlipped,
+            ]}
+          >
+            {ch.name}
+          </T>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 });
 
@@ -131,12 +169,20 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
   const [busy, setBusy] = useState(false);
 
   const isMyTeamTurn = view.myTeam !== null && view.myTeam === view.turnTeam;
+  const isMeAsking = view.activePlayerId !== null && view.activePlayerId === game.me;
   const needsMySecret = view.phase === 'pick_secret' && view.myTeam !== null && !view.secretReady[view.myTeam];
-  const needsFreeAnswer = view.phase === 'answer_free' && view.pendingQuestion !== null && view.myTeam !== null && view.myTeam !== view.turnTeam;
+  const needsFreeAnswer =
+    view.phase === 'answer_free' &&
+    view.pendingQuestion !== null &&
+    view.myTeam !== null &&
+    view.myTeam !== view.turnTeam;
 
-  // Tự động chuyển sang nhìn bảng ĐỐI PHƯƠNG khi tới lượt họ hỏi/úp thẻ, và chuyển về bảng MÌNH khi tới lượt mình!
+  // Tự động chuyển sang nhìn bảng ĐỐI PHƯƠNG khi tới lượt họ, và chuyển về bảng MÌNH khi tới lượt mình
   const autoSide: 'mine' | 'opp' =
-    view.phase !== 'pick_secret' && view.myTeam !== null && !isMyTeamTurn && (view.phase === 'ask' || view.phase === 'review' || view.phase === 'turn_beat')
+    view.phase !== 'pick_secret' &&
+    view.myTeam !== null &&
+    !isMyTeamTurn &&
+    (view.phase === 'ask' || view.phase === 'reveal' || view.phase === 'review' || view.phase === 'turn_beat')
       ? 'opp'
       : 'mine';
   const turnKey = `${view.roundCount}:${view.turnTeam}:${view.phase === 'pick_secret' ? 'p' : 'g'}`;
@@ -153,6 +199,19 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const activeFlippedSet = boardSide === 'opp' ? oppFlippedSet : myFlippedSet;
 
+  const availableTraitKeySet = useMemo(() => new Set(view.traitKeys), [view.traitKeys]);
+  const availableTraits = useMemo(
+    () => WHO_IS_IT_TRAITS.filter((t) => availableTraitKeySet.has(t.key)),
+    [availableTraitKeySet],
+  );
+  const visibleTraitGroups = useMemo(
+    () => TRAIT_GROUPS.filter((g) => availableTraits.some((t) => t.group === g.key)),
+    [availableTraits],
+  );
+  const activeTraitTab: WhoIsItTraitGroup = visibleTraitGroups.some((g) => g.key === traitTab)
+    ? traitTab
+    : (visibleTraitGroups[0]?.key ?? 'toc_mu');
+
   const askedTraitSet = useMemo(
     () => new Set(view.history.filter((h) => h.team === view.myTeam && h.traitKey).map((h) => h.traitKey!)),
     [view.history, view.myTeam],
@@ -162,19 +221,43 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     [view.characters, view.mySecretId],
   );
 
-  // Đếm trước số thẻ còn mở khớp từng đặc điểm trên bảng đội mình (giúp chọn câu hỏi chia đôi thông minh!)
+  // Đếm trước số thẻ còn mở khớp từng đặc điểm khả dụng trên bảng đội mình
   const openTraitCounts = useMemo(() => {
     const remaining = view.characters.filter((c) => !myFlippedSet.has(c.id));
     const map = new Map<string, number>();
-    for (const tr of WHO_IS_IT_TRAITS) {
+    for (const tr of availableTraits) {
       map.set(tr.key, remaining.filter(tr.match).length);
     }
     return map;
-  }, [view.characters, myFlippedSet]);
+  }, [view.characters, myFlippedSet, availableTraits]);
+
+  // Gợi ý câu hỏi chia đôi bảng tốt nhất (⭐)
+  const bestTraitKey = useMemo(() => {
+    const openCount = view.characters.length - myFlippedSet.size;
+    if (openCount <= 1) return null;
+    const target = openCount / 2;
+    let bestKey: string | null = null;
+    let bestDiff = Infinity;
+    for (const tr of availableTraits) {
+      if (askedTraitSet.has(tr.key)) continue;
+      const cnt = openTraitCounts.get(tr.key) ?? 0;
+      if (cnt <= 0 || cnt >= openCount) continue;
+      const diff = Math.abs(cnt - target);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestKey = tr.key;
+      }
+    }
+    return bestKey;
+  }, [availableTraits, askedTraitSet, openTraitCounts, view.characters.length, myFlippedSet.size]);
+
+  const bestTraitGroup = bestTraitKey ? (WHO_IS_IT_TRAIT_MAP.get(bestTraitKey)?.group ?? null) : null;
 
   useOnChange(view.phase, (ph) => {
     if (ph === 'ask' && view.roundCount === 1) {
       playMemePool('shock', { speakerId: view.activePlayerId, cooldownMs: 1200 });
+      play('turn', { speakerId: view.activePlayerId });
+    } else if (ph === 'turn_beat') {
       play('turn', { speakerId: view.activePlayerId });
     } else if (ph === 'answer_free') {
       playMemePool('vote', { speakerId: view.activePlayerId, cooldownMs: 1200 });
@@ -187,7 +270,7 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     if (!id || !view.lastQA) return;
     if (view.lastQA.kind === 'guess') {
       playMemePool(view.lastQA.answer ? 'win' : 'wrong', { speakerId: view.lastQA.askedById, cooldownMs: 800 });
-      play(view.lastQA.answer ? 'stamp' : 'error', { speakerId: view.lastQA.askedById });
+      play('reveal', { speakerId: view.lastQA.askedById });
     } else {
       playMemePool(view.lastQA.answer ? 'correct' : 'twist', { speakerId: view.lastQA.askedById, cooldownMs: 1100 });
       play('pop', { speakerId: view.lastQA.askedById });
@@ -276,9 +359,20 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
 
   const activeName = view.activePlayerId ? (view.names[view.activePlayerId] ?? 'Đồng đội') : '';
   const turnTeamName = view.turnTeam === 'red' ? 'Đỏ' : 'Xanh';
+  const turnTeamDot = view.turnTeam === 'red' ? '🔴' : '🔵';
+  const turnTeamColor = view.turnTeam === 'red' ? TEAM_RED : TEAM_BLUE;
   const myTeamCount = view.myTeam ? view.remainingCounts[view.myTeam] : view.boardSize;
-  const oppTeam = view.myTeam === 'red' ? 'blue' : view.myTeam === 'blue' ? 'red' : null;
+  const oppTeam: WhoIsItTeam | null = view.myTeam === 'red' ? 'blue' : view.myTeam === 'blue' ? 'red' : null;
   const oppTeamCount = oppTeam ? view.remainingCounts[oppTeam] : view.boardSize;
+  const artPackMeta = WHO_IS_IT_ART_PACKS[view.artPack];
+
+  const displayedTeam: WhoIsItTeam | null = boardSide === 'opp' ? oppTeam : view.myTeam;
+  const showFlipHighlight =
+    view.phase === 'review' &&
+    view.lastFlippedTeam !== null &&
+    displayedTeam === view.lastFlippedTeam;
+
+  const recentHistory = useMemo(() => view.history.slice(-3).reverse(), [view.history]);
 
   const statusBanner = (() => {
     if (unreadTeam > 0 && lastTeamMsg) {
@@ -289,27 +383,63 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
         ? '🕵️ Chạm 1 khuôn mặt hoặc bấm Chọn nhanh làm thẻ mật!'
         : 'Đã giữ bí mật! Đang chờ đội kia chọn xong…';
     }
+    if (view.phase === 'turn_beat') {
+      return isMeAsking
+        ? `${turnTeamDot} Tới lượt BẠN hỏi!`
+        : `${turnTeamDot} Tới lượt Đội ${turnTeamName}${activeName ? ` — ${activeName} hỏi` : ''}`;
+    }
     if (view.phase === 'answer_free') {
       return needsFreeAnswer
         ? '❓ Đối thủ đang hỏi tự do — bấm CÓ hoặc KHÔNG!'
         : `Đang chờ Đội ${view.turnTeam === 'red' ? 'Xanh' : 'Đỏ'} trả lời…`;
     }
-    if (view.phase === 'review' || view.phase === 'turn_beat') {
+    if (view.phase === 'reveal') {
+      return `${turnTeamDot} Đang mở đáp án lượt Đội ${turnTeamName}…`;
+    }
+    if (view.phase === 'review') {
       const qa = view.lastQA;
+      if (isMyTeamTurn && qa?.kind === 'free') {
+        return '✏️ Câu tự gõ — Chạm để úp thẻ không khớp rồi bấm Xong lượt!';
+      }
       const ansText = qa?.answer === true ? 'CÓ ✅' : qa?.answer === false ? 'KHÔNG ❌' : '';
-      const prefix = boardSide === 'opp' ? `👀 Bảng ${turnTeamName}: ` : '';
-      return qa ? `${prefix}${qa.team === 'red' ? 'Đỏ' : 'Xanh'}: "${qa.question}" → ${ansText}` : 'Đang xem kết quả úp thẻ…';
+      return qa
+        ? `${qa.team === 'red' ? '🔴' : '🔵'} ${qa.askedByName}: "${qa.question}" → ${ansText}`
+        : `${turnTeamDot} Đang xem bảng sau lượt hỏi…`;
     }
     if (guessMode) {
       return '🎯 CHẾ ĐỘ ĐOÁN: Chạm thẳng khuôn mặt bạn muốn chốt!';
     }
-    if (boardSide === 'opp' && oppTeam) {
-      return `👀 Bảng ĐỐI PHƯƠNG (${oppTeam === 'red' ? 'Đỏ' : 'Xanh'} còn ${oppTeamCount}/${view.boardSize} thẻ)`;
+    if (isMeAsking) {
+      return `${turnTeamDot} Tới lượt BẠN hỏi! Chọn đặc điểm bên dưới`;
     }
-    return isMyTeamTurn
-      ? `🔥 Lượt Đội BẠN (${activeName || 'Cả đội'}): Chọn câu hỏi ngay bên dưới!`
-      : `⏳ Lượt Đội ${turnTeamName} (${activeName}) — đang soi bảng đối thủ`;
+    return `${turnTeamDot} Lượt Đội ${turnTeamName}${activeName ? ` — ${activeName} đang hỏi` : ''}`;
   })();
+
+  const zoomTagsFor = (ch: WhoIsItCharacter): string[] => {
+    const tags: string[] = [ch.gender === 'male' ? 'Nam' : 'Nữ'];
+    if (availableTraitKeySet.has('hat_any') && ch.hat !== 'none') {
+      tags.push(ch.hat === 'cap' ? 'Mũ có vành' : ch.hat === 'beanie' ? 'Mũ len' : 'Khăn/Turban');
+    }
+    if (ch.glasses === 'eyepatch' && availableTraitKeySet.has('eyepatch')) {
+      tags.push('Bịt mắt');
+    } else if ((ch.glasses === 'clear' || ch.glasses === 'sunglasses') && availableTraitKeySet.has('glasses_any')) {
+      tags.push(ch.glasses === 'sunglasses' ? 'Kính râm' : 'Kính cận');
+    }
+    if (availableTraitKeySet.has('facial_any') && ch.facialHair !== 'none') {
+      tags.push(ch.facialHair === 'beard' ? 'Râu cằm' : 'Ria mép');
+    }
+    if (availableTraitKeySet.has(`exp_${ch.expression}`)) {
+      tags.push(EXPRESSION_LABELS[ch.expression]);
+    }
+    if (ch.clothing === 'hoodie' && availableTraitKeySet.has('cloth_hoodie')) tags.push('Áo hoodie');
+    if (ch.clothing === 'blazer' && availableTraitKeySet.has('cloth_blazer')) tags.push('Áo vest');
+    if (ch.earrings && availableTraitKeySet.has('earrings')) tags.push('Bông tai');
+    if (ch.blush && availableTraitKeySet.has('blush')) tags.push('Má hồng');
+    if (ch.freckles && availableTraitKeySet.has('freckles')) tags.push('Tàn nhang');
+    if (ch.scar && availableTraitKeySet.has('scar')) tags.push('Vết sẹo');
+    if (ch.bow && availableTraitKeySet.has('bow')) tags.push('Nơ cài');
+    return tags;
+  };
 
   const bottomDock = (() => {
     if (view.phase === 'pick_secret') {
@@ -343,43 +473,38 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
     }
 
     if (view.phase === 'review' && isMyTeamTurn) {
+      const isFreeReview = view.lastQA?.kind === 'free';
+      const flippedCount = view.lastFlippedTeam === view.myTeam ? view.lastFlippedIds.length : 0;
       return (
         <View style={styles.dockRow}>
-          {view.lastQA?.kind === 'trait' && (
-            <Button
-              testID="wi-auto-flip"
-              title="⚡ Úp tự động"
-              variant="gold"
-              small
-              disabled={busy}
-              style={{ flex: 1 }}
-              onPress={async () => {
-                setBoardSide('mine');
-                if (await actSafe({ type: 'wi_auto_flip' })) play('sparkle', { speakerId: game.me });
-              }}
-            />
-          )}
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <T numberOfLines={1} style={[styles.reviewHintTxt, isFreeReview && styles.reviewHintFree]}>
+              {isFreeReview
+                ? 'Chạm để úp thẻ không khớp'
+                : `Đã tự úp ${flippedCount} thẻ · còn ${myTeamCount}`}
+            </T>
+          </View>
           <Button
             testID="wi-end-review"
             title="Xong lượt ⏭"
             variant="ink"
             small
             disabled={busy}
-            style={{ flex: 1 }}
             onPress={() => actSafe({ type: 'wi_end_review' })}
           />
         </View>
       );
     }
 
-    // DOCK CÂU HỎI NỘI TUYẾN (vừa nhìn toàn bộ khuôn mặt ở trên, vừa bấm hỏi trực tiếp bên dưới — 0 che popup!)
+    // DOCK CÂU HỎI NỘI TUYẾN (chỉ hiện các đặc điểm & nhóm khả dụng của gói nét vẽ)
     if (view.phase === 'ask' && isMyTeamTurn) {
       return (
         <View style={styles.inlineAskDock}>
           <View style={styles.inlineTopTabs}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.miniTabRow}>
-              {TRAIT_GROUPS.map((g) => {
-                const active = !freeAskMode && traitTab === g.key;
+              {visibleTraitGroups.map((g) => {
+                const active = !freeAskMode && activeTraitTab === g.key;
+                const hasBest = bestTraitGroup === g.key;
                 return (
                   <Pressable
                     key={g.key}
@@ -389,7 +514,9 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
                     }}
                     style={[styles.miniTabPill, active && styles.miniTabActive]}
                   >
-                    <T style={[styles.miniTabTxt, active && { color: '#FFFFFF' }]}>{g.label}</T>
+                    <T style={[styles.miniTabTxt, active && { color: '#FFFFFF' }]}>
+                      {hasBest ? '⭐ ' : ''}{g.label}
+                    </T>
                   </Pressable>
                 );
               })}
@@ -440,27 +567,33 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.traitChipStrip}>
-              {WHO_IS_IT_TRAITS.filter((t) => t.group === traitTab).map((t) => {
-                const used = askedTraitSet.has(t.key);
-                const count = openTraitCounts.get(t.key) ?? 0;
-                return (
-                  <Pressable
-                    key={t.key}
-                    testID={`wi-trait-${t.key}`}
-                    disabled={busy}
-                    onPress={() => handleAskTrait(t.key)}
-                    style={({ pressed }) => [
-                      styles.inlineTraitBtn,
-                      used && styles.inlineTraitUsed,
-                      pressed && { opacity: 0.72 },
-                    ]}
-                  >
-                    <T style={[styles.inlineTraitTxt, used && { color: C.muted }]}>
-                      {used ? '✓ ' : ''}{t.shortLabel} ({count})
-                    </T>
-                  </Pressable>
-                );
-              })}
+              {availableTraits
+                .filter((t) => t.group === activeTraitTab)
+                .map((t) => {
+                  const used = askedTraitSet.has(t.key);
+                  const isBest = !used && t.key === bestTraitKey;
+                  const count = openTraitCounts.get(t.key) ?? 0;
+                  return (
+                    <Pressable
+                      key={t.key}
+                      testID={`wi-trait-${t.key}`}
+                      disabled={busy || used}
+                      onPress={() => handleAskTrait(t.key)}
+                      style={({ pressed }) => [
+                        styles.inlineTraitBtn,
+                        isBest && styles.inlineTraitBest,
+                        used && styles.inlineTraitUsed,
+                        pressed && !used && { opacity: 0.72 },
+                      ]}
+                    >
+                      <T style={[styles.inlineTraitTxt, isBest && styles.inlineTraitBestTxt, used && { color: C.muted }]}>
+                        {used ? '✓ ' : isBest ? '⭐ ' : ''}
+                        {t.shortLabel} ({count})
+                        {isBest ? ' · gợi ý' : ''}
+                      </T>
+                    </Pressable>
+                  );
+                })}
             </ScrollView>
           )}
         </View>
@@ -477,6 +610,23 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
       </View>
     );
   })();
+
+  const activeFrameGlow =
+    view.phase !== 'pick_secret'
+      ? Platform.OS === 'web'
+        ? ({
+            borderColor: turnTeamColor,
+            boxShadow: `0 0 0 2px ${turnTeamColor}44, 0 0 18px ${turnTeamColor}40`,
+          } as object)
+        : {
+            borderColor: turnTeamColor,
+            shadowColor: turnTeamColor,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.45,
+            shadowRadius: 10,
+            elevation: 6,
+          }
+      : undefined;
 
   return (
     <Shell
@@ -546,7 +696,11 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
           >
             {mySecretChar ? (
               <>
-                <Image source={{ uri: whoIsItPortraitUri(mySecretChar) }} style={styles.secretMiniImg} resizeMode="contain" />
+                <Image
+                  source={{ uri: whoIsItPortraitUri(mySecretChar, view.artPack) }}
+                  style={styles.secretMiniImg}
+                  resizeMode="contain"
+                />
                 <T numberOfLines={1} style={styles.secretMiniTxt}>{mySecretChar.name}</T>
               </>
             ) : (
@@ -559,40 +713,81 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
           </Pressable>
         </View>
 
-        {/* 2. Dải trạng thái / Chat đội / Câu hỏi vừa hỏi */}
+        {/* 2. Dải báo lượt luôn rõ ràng theo màu đội */}
         <Pressable
           onPress={() => (unreadTeam > 0 && view.myTeam ? setChatOpen(true) : view.history.length > 0 && setHistoryOpen(true))}
           style={[
             styles.statusStrip,
-            isMyTeamTurn && view.phase === 'ask' && styles.statusMyTurn,
-            boardSide === 'opp' && styles.statusOppView,
+            view.phase !== 'pick_secret' && {
+              borderColor: turnTeamColor,
+              backgroundColor: view.turnTeam === 'red' ? '#FEF2F2' : '#EFF6FF',
+            },
+            isMeAsking && view.phase === 'ask' && styles.statusMyTurn,
             guessMode && styles.statusGuessMode,
           ]}
         >
           <T numberOfLines={1} style={styles.statusTxt}>{statusBanner}</T>
         </Pressable>
 
-        {/* 3. Lưới nhân vật co giãn flex:1 vừa khít 1 màn hình (24..54 thẻ, 0 scroll) */}
-        <View style={styles.grid}>
-          {boardRows.map((rowItems, rIdx) => (
-            <View key={rIdx} style={styles.gridRow}>
-              {rowItems.map((ch) => (
-                <CharacterCell
-                  key={ch.id}
-                  ch={ch}
-                  flipped={activeFlippedSet.has(ch.id)}
-                  isSecret={view.mySecretId === ch.id}
-                  guessMode={guessMode}
-                  justFlipped={boardSide === 'mine' && lastFlippedSet.has(ch.id)}
-                  oppView={boardSide === 'opp'}
-                  dense={dense}
-                  onPress={handleCardPress}
-                  onLongPress={setZoomChar}
-                />
-              ))}
-            </View>
-          ))}
+        {/* 3. Thanh tóm tắt 3 câu hỏi gần nhất của cả 2 đội (chạm mở Lịch sử) */}
+        {recentHistory.length > 0 && (
+          <Pressable testID="wi-qa-ticker" onPress={() => setHistoryOpen(true)} style={styles.tickerRow}>
+            {recentHistory.map((qa) => {
+              const shortQ = qa.traitKey ? (WHO_IS_IT_TRAIT_MAP.get(qa.traitKey)?.shortLabel ?? qa.question) : qa.question;
+              return (
+                <View key={qa.id} style={styles.tickerItem}>
+                  <View style={[styles.tickerDot, { backgroundColor: qa.team === 'red' ? TEAM_RED : TEAM_BLUE }]} />
+                  <T numberOfLines={1} style={styles.tickerTxt}>{shortQ}</T>
+                  <T style={styles.tickerAns}>{qa.answer === true ? '✅' : qa.answer === false ? '❌' : '?'}</T>
+                </View>
+              );
+            })}
+          </Pressable>
+        )}
+
+        {/* 4. Lưới nhân vật co giãn flex:1 có viền phát sáng theo màu đội đang tới lượt */}
+        <View style={[styles.gridFrame, activeFrameGlow]}>
+          <View style={styles.grid}>
+            {boardRows.map((rowItems, rIdx) => (
+              <View key={rIdx} style={styles.gridRow}>
+                {rowItems.map((ch) => (
+                  <CharacterCell
+                    key={ch.id}
+                    ch={ch}
+                    artPack={view.artPack}
+                    flipped={activeFlippedSet.has(ch.id)}
+                    isSecret={view.mySecretId === ch.id}
+                    guessMode={guessMode}
+                    justFlipped={showFlipHighlight && lastFlippedSet.has(ch.id)}
+                    oppView={boardSide === 'opp'}
+                    dense={dense}
+                    onPress={handleCardPress}
+                    onLongPress={setZoomChar}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
         </View>
+
+        {/* 5. Dòng ghi công nét vẽ gọn nhẹ (đáp ứng giấy phép CC BY) */}
+        <Pressable onPress={() => setHistoryOpen(true)}>
+          <T numberOfLines={1} style={[styles.creditLine, { color: pal.muted }]}>
+            Nét vẽ: {artPackMeta.label} — {artPackMeta.author} · {artPackMeta.license}
+          </T>
+        </Pressable>
+
+        {/* Popup hào quang cho turn_beat / answer_free / reveal */}
+        <WhoIsItPopups
+          view={view}
+          me={game.me}
+          clockOffset={game.clockOffset}
+          busy={busy}
+          mySecretChar={mySecretChar}
+          onAnswerFree={(yes) => {
+            void actSafe({ type: 'wi_answer_free', yes });
+          }}
+        />
       </View>
 
       {/* Sheet Kênh Thảo Luận Riêng Của Đội */}
@@ -653,18 +848,16 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
         <Modal transparent visible animationType="fade" onRequestClose={() => setZoomChar(null)}>
           <View style={styles.modalBackdrop}>
             <View style={styles.zoomCard}>
-              <Image source={{ uri: whoIsItPortraitUri(zoomChar) }} style={styles.zoomImg} resizeMode="contain" />
+              <Image
+                source={{ uri: whoIsItPortraitUri(zoomChar, view.artPack) }}
+                style={styles.zoomImg}
+                resizeMode="contain"
+              />
               <T style={styles.zoomName}>{zoomChar.name}</T>
               <View style={styles.zoomTags}>
-                <T style={styles.zoomTag}>{zoomChar.gender === 'male' ? 'Nam' : 'Nữ'}</T>
-                {zoomChar.hat !== 'none' && <T style={styles.zoomTag}>Có mũ/khăn</T>}
-                {zoomChar.glasses !== 'none' && <T style={styles.zoomTag}>{zoomChar.glasses === 'eyepatch' ? 'Bịt mắt' : 'Đeo kính'}</T>}
-                {zoomChar.facialHair !== 'none' && <T style={styles.zoomTag}>Có râu/ria</T>}
-                {zoomChar.earrings && <T style={styles.zoomTag}>Bông tai</T>}
-                {zoomChar.blush && <T style={styles.zoomTag}>Má hồng</T>}
-                {zoomChar.freckles && <T style={styles.zoomTag}>Tàn nhang</T>}
-                {zoomChar.scar && <T style={styles.zoomTag}>Vết sẹo</T>}
-                {zoomChar.bow && <T style={styles.zoomTag}>Nơ cài</T>}
+                {zoomTagsFor(zoomChar).map((tag) => (
+                  <T key={tag} style={styles.zoomTag}>{tag}</T>
+                ))}
               </View>
               <View style={styles.zoomBtns}>
                 {view.phase !== 'pick_secret' && view.myTeam !== null && boardSide === 'mine' && (
@@ -696,52 +889,17 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
         </Modal>
       )}
 
-      {/* Modal trả lời câu hỏi tự do của đội bạn */}
-      {needsFreeAnswer && view.pendingQuestion && (
-        <Modal transparent visible animationType="fade">
-          <View style={styles.modalBackdrop}>
-            <View style={styles.zoomCard}>
-              <T style={styles.freeBadge}>CÂU HỎI TỪ ĐỘI {view.pendingQuestion.askedByTeam === 'red' ? 'ĐỎ' : 'XANH'}</T>
-              {mySecretChar && (
-                <View style={styles.answerSecretRow}>
-                  <Image source={{ uri: whoIsItPortraitUri(mySecretChar) }} style={styles.answerSecretImg} resizeMode="contain" />
-                  <View style={{ flex: 1 }}>
-                    <T style={{ fontSize: 11, color: C.muted, fontWeight: '700' }}>Thẻ bí mật của đội bạn:</T>
-                    <T style={{ fontSize: 16, fontWeight: '900', color: C.ink }}>{mySecretChar.name}</T>
-                  </View>
-                </View>
-              )}
-              <T style={styles.freeQText}>“{view.pendingQuestion.text}”</T>
-              <View style={styles.zoomBtns}>
-                <Button
-                  testID="wi-answer-yes"
-                  title="✅ CÓ"
-                  variant="jade"
-                  style={{ flex: 1 }}
-                  disabled={busy}
-                  onPress={() => actSafe({ type: 'wi_answer_free', yes: true })}
-                />
-                <Button
-                  testID="wi-answer-no"
-                  title="❌ KHÔNG"
-                  variant="danger"
-                  style={{ flex: 1 }}
-                  disabled={busy}
-                  onPress={() => actSafe({ type: 'wi_answer_free', yes: false })}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
       {/* Modal xem lại Thẻ Bí Mật của đội mình */}
       {peekOpen && mySecretChar && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setPeekOpen(false)}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPeekOpen(false)}>
             <View style={styles.zoomCard}>
               <T style={styles.freeBadge}>THẺ BÍ MẬT CỦA ĐỘI {view.myTeam === 'red' ? 'ĐỎ' : 'XANH'}</T>
-              <Image source={{ uri: whoIsItPortraitUri(mySecretChar) }} style={styles.zoomImg} resizeMode="contain" />
+              <Image
+                source={{ uri: whoIsItPortraitUri(mySecretChar, view.artPack) }}
+                style={styles.zoomImg}
+                resizeMode="contain"
+              />
               <T style={styles.zoomName}>{mySecretChar.name}</T>
               <T style={{ fontSize: 12.5, color: C.secondary, textAlign: 'center' }}>
                 Đối thủ phải đoán đúng nhân vật này để thắng!
@@ -787,6 +945,12 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
                 </View>
               ))
             )}
+
+            <View style={styles.sheetCreditBox}>
+              <T style={styles.sheetCreditTxt}>
+                Nét vẽ: {artPackMeta.label} — {artPackMeta.author} · {artPackMeta.license}
+              </T>
+            </View>
           </View>
         </Sheet>
       )}
@@ -795,7 +959,7 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, minHeight: 0, gap: 4 },
+  container: { flex: 1, minHeight: 0, gap: 4, position: 'relative' },
   hudBar: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sideTogglePill: {
     flexDirection: 'row',
@@ -851,11 +1015,40 @@ const styles = StyleSheet.create({
     paddingVertical: 3.5,
   },
   statusMyTurn: { backgroundColor: '#FEF3C7', borderColor: '#D97706' },
-  statusOppView: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
   statusGuessMode: { backgroundColor: '#DCFCE7', borderColor: C.jade },
   statusTxt: { fontSize: 11.5, fontWeight: '800', color: C.ink, textAlign: 'center' },
+  tickerRow: {
+    flexDirection: 'row',
+    gap: 4,
+    alignItems: 'center',
+  },
+  tickerItem: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: C.borderSubtle,
+    paddingHorizontal: 5,
+    paddingVertical: 2.5,
+  },
+  tickerDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  tickerTxt: { flex: 1, minWidth: 0, fontSize: 10, fontWeight: '700', color: C.ink },
+  tickerAns: { fontSize: 10, flexShrink: 0 },
+  gridFrame: {
+    flex: 1,
+    minHeight: 0,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    padding: 2,
+  },
   grid: { flex: 1, minHeight: 0, gap: 3.5 },
   gridRow: { flex: 1, minHeight: 0, flexDirection: 'row', gap: 3.5 },
+  cellOuter: { flex: 1, minWidth: 0, minHeight: 0 },
   cell: {
     flex: 1,
     minWidth: 0,
@@ -870,9 +1063,9 @@ const styles = StyleSheet.create({
   cellFlipped: {
     backgroundColor: '#E2E8F0',
     borderColor: '#94A3B8',
-    opacity: 0.42,
+    opacity: 0.44,
   },
-  cellJustFlipped: { borderColor: '#DC2626', borderWidth: 2 },
+  cellJustFlipped: { borderColor: '#F59E0B', borderWidth: 2.5, opacity: 0.88 },
   cellSecret: {
     borderColor: '#D97706',
     borderWidth: 2.5,
@@ -893,6 +1086,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.16)',
+  },
+  flippedMaskFresh: {
+    backgroundColor: 'rgba(245, 158, 11, 0.24)',
   },
   flippedX: { fontSize: 20, fontWeight: '900', color: '#DC2626' },
   secretStar: {
@@ -918,6 +1114,12 @@ const styles = StyleSheet.create({
   cellName: { fontSize: 10, fontWeight: '800', color: '#FFFFFF' },
   cellNameDense: { fontSize: 8.5, lineHeight: 10 },
   cellNameFlipped: { textDecorationLine: 'line-through', color: '#E2E8F0' },
+  creditLine: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    opacity: 0.8,
+  },
   inlineAskDock: { gap: 5 },
   inlineTopTabs: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   miniTabRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
@@ -950,9 +1152,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  inlineTraitBest: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#D97706',
+    borderWidth: 2,
+  },
   inlineTraitUsed: { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
   inlineTraitTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
-  dockRow: { flexDirection: 'row', gap: 8 },
+  inlineTraitBestTxt: { color: '#92400E' },
+  dockRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  reviewHintTxt: { fontSize: 12, fontWeight: '800', color: C.secondary },
+  reviewHintFree: { color: '#B45309' },
   waitDock: { minHeight: 34, justifyContent: 'center', alignItems: 'center' },
   waitTxt: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   freeAskRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1022,19 +1232,6 @@ const styles = StyleSheet.create({
   },
   zoomBtns: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
   freeBadge: { fontSize: 11, fontWeight: '900', color: '#B45309', letterSpacing: 0.4 },
-  answerSecretRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#D97706',
-    padding: 8,
-    alignSelf: 'stretch',
-  },
-  answerSecretImg: { width: 52, height: 52 },
-  freeQText: { fontSize: 16, fontWeight: '800', color: C.ink, textAlign: 'center', paddingVertical: 6 },
   sheetTeamRow: { flexDirection: 'row', gap: 8 },
   sheetTeamBox: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 9, gap: 3 },
   sheetMember: { fontSize: 12.5, fontWeight: '600', color: C.ink },
@@ -1050,4 +1247,16 @@ const styles = StyleSheet.create({
     borderColor: C.borderSubtle,
   },
   histDot: { width: 8, height: 8, borderRadius: 4 },
+  sheetCreditBox: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: C.borderSubtle,
+  },
+  sheetCreditTxt: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: C.muted,
+    textAlign: 'center',
+  },
 });

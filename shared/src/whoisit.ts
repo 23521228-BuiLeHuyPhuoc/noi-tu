@@ -1,16 +1,28 @@
 /**
- * Kiểu dữ liệu, kho 100 nhân vật (tương thích DiceBear Avataaars + lớp phủ chi tiết),
- * 34 câu hỏi đặc điểm trực quan & hàm chia lưới co giãn cho game Đoán Ai Đây? (Who Is It? HopKids).
+ * Kiểu dữ liệu, 7 bộ nét vẽ đa nguồn, bộ sinh nhân vật theo seed,
+ * 35 câu hỏi đặc điểm trực quan & hàm chia lưới co giãn cho game Đoán Ai Đây? (Who Is It? HopKids).
+ * Pure TypeScript — không import từ app/ hay bất kỳ package npm nào.
  */
 
 export type WhoIsItTeam = 'red' | 'blue';
-export type WhoIsItPhase = 'pick_secret' | 'ask' | 'answer_free' | 'review' | 'turn_beat';
+export type WhoIsItPhase = 'pick_secret' | 'turn_beat' | 'ask' | 'answer_free' | 'reveal' | 'review';
 export type WhoIsItDifficulty = 'auto' | 'large';
 export type WhoIsItTraitGroup = 'toc_mu' | 'mat_kinh' | 'rau_ct' | 'ao_khac';
+export type WhoIsItArtPackId =
+  | 'avataaars'
+  | 'personas'
+  | 'micah'
+  | 'openPeeps'
+  | 'toonHead'
+  | 'bigSmile'
+  | 'niceAvatar';
+export type WhoIsItExpression = 'happy' | 'sad' | 'angry' | 'surprised' | 'cheeky';
 
 export interface WhoIsItCharacter {
   id: string;
   name: string;
+  seed: string;
+  bg: string;
   gender: 'male' | 'female';
   hairStyle: 'short' | 'long' | 'curly' | 'bald' | 'covered';
   hairColor: 'black' | 'brown' | 'blonde' | 'red' | 'silver' | 'pink' | 'none';
@@ -18,7 +30,7 @@ export interface WhoIsItCharacter {
   glasses: 'none' | 'clear' | 'sunglasses' | 'eyepatch';
   facialHair: 'none' | 'mustache' | 'beard';
   skin: 'light' | 'tan' | 'dark';
-  expression: 'happy' | 'surprised' | 'angry' | 'cheeky';
+  expression: WhoIsItExpression;
   clothing: 'hoodie' | 'blazer' | 'overall' | 'tshirt';
   clothesColor: 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'dark' | 'white';
   earrings: boolean;
@@ -26,24 +38,223 @@ export interface WhoIsItCharacter {
   freckles: boolean;
   scar: boolean;
   bow: boolean;
-  /** Tham số render DiceBear Avataaars chuẩn xác 1:1 với các đặc điểm trên */
-  visual: {
-    top: string;
-    bald?: boolean;
-    hairColor: string;
-    hatColor?: string;
-    skinColor: string;
-    accessories?: string;
-    facialHair?: string;
-    facialHairColor?: string;
-    eyes: string;
-    eyebrows: string;
-    mouth: string;
-    clothing: string;
-    clothesColor: string;
-    bgColor: string;
-  };
 }
+
+export interface WhoIsItArtCaps {
+  hairStyle: WhoIsItCharacter['hairStyle'][];
+  maleHairStyles?: WhoIsItCharacter['hairStyle'][];
+  femaleHairStyles?: WhoIsItCharacter['hairStyle'][];
+  hairColor: boolean;
+  hat: WhoIsItCharacter['hat'][];
+  glasses: WhoIsItCharacter['glasses'][];
+  facialHair: WhoIsItCharacter['facialHair'][];
+  expression: WhoIsItExpression[];
+  clothing: WhoIsItCharacter['clothing'][];
+  clothesColor: boolean;
+  skin: boolean;
+  earrings: boolean;
+  blush: boolean;
+  freckles: boolean;
+  scar: boolean;
+  bow: boolean;
+}
+
+export interface WhoIsItArtPack {
+  id: WhoIsItArtPackId;
+  label: string;
+  author: string;
+  license: string;
+  sourceUrl: string;
+  repoUrl: string;
+  caps: WhoIsItArtCaps;
+}
+
+export const WHO_IS_IT_ART_PACKS: Record<WhoIsItArtPackId, WhoIsItArtPack> = {
+  avataaars: {
+    id: 'avataaars',
+    label: 'Hoạt hình Avataaars',
+    author: 'Pablo Stanley',
+    license: 'Free for personal and commercial use',
+    sourceUrl: 'https://avataaars.com/',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'curly', 'bald', 'covered'],
+      hairColor: true,
+      hat: ['none', 'cap', 'beanie', 'turban'],
+      glasses: ['none', 'clear', 'sunglasses', 'eyepatch'],
+      facialHair: ['none', 'mustache', 'beard'],
+      expression: ['happy', 'sad', 'angry', 'surprised', 'cheeky'],
+      clothing: ['hoodie', 'blazer', 'overall', 'tshirt'],
+      clothesColor: true,
+      skin: true,
+      earrings: true,
+      blush: true,
+      freckles: true,
+      scar: true,
+      bow: true,
+    },
+  },
+  personas: {
+    id: 'personas',
+    label: 'Nhân vật Personas',
+    author: 'Draftbit',
+    license: 'CC BY 4.0',
+    sourceUrl: 'https://personas.draftbit.com/',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'curly', 'bald', 'covered'],
+      hairColor: true,
+      hat: ['none', 'cap', 'beanie'],
+      glasses: ['none', 'clear', 'sunglasses'],
+      facialHair: ['none', 'mustache', 'beard'],
+      expression: ['happy', 'sad', 'surprised', 'cheeky'],
+      clothing: [],
+      clothesColor: true,
+      skin: true,
+      earrings: false,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+  micah: {
+    id: 'micah',
+    label: 'Nét vẽ Micah',
+    author: 'Micah Lanier',
+    license: 'CC BY 4.0',
+    sourceUrl: 'https://www.figma.com/community/file/829741575478342595',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'bald', 'covered'],
+      maleHairStyles: ['short', 'bald', 'covered'],
+      femaleHairStyles: ['short', 'long', 'covered'],
+      hairColor: true,
+      hat: ['none', 'turban'],
+      glasses: ['none', 'clear'],
+      facialHair: ['none', 'beard'],
+      expression: ['happy', 'sad', 'surprised', 'cheeky'],
+      clothing: [],
+      clothesColor: true,
+      skin: true,
+      earrings: true,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+  openPeeps: {
+    id: 'openPeeps',
+    label: 'Phác họa Open Peeps',
+    author: 'Pablo Stanley',
+    license: 'CC0 1.0',
+    sourceUrl: 'https://www.openpeeps.com/',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'curly', 'bald', 'covered'],
+      hairColor: false,
+      hat: ['none', 'beanie', 'turban'],
+      glasses: ['none', 'clear', 'sunglasses', 'eyepatch'],
+      facialHair: ['none', 'mustache', 'beard'],
+      expression: ['happy', 'sad', 'angry', 'surprised', 'cheeky'],
+      clothing: [],
+      clothesColor: true,
+      skin: true,
+      earrings: false,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+  toonHead: {
+    id: 'toonHead',
+    label: 'Hoạt hình ToonHead',
+    author: 'Johan Melin',
+    license: 'CC BY 4.0',
+    sourceUrl: 'https://www.figma.com/community/file/1589627891082866389',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'bald'],
+      maleHairStyles: ['short', 'bald'],
+      femaleHairStyles: ['short', 'long'],
+      hairColor: true,
+      hat: ['none'],
+      glasses: ['none'],
+      facialHair: ['none', 'mustache', 'beard'],
+      expression: ['happy', 'sad', 'angry', 'surprised', 'cheeky'],
+      clothing: [],
+      clothesColor: true,
+      skin: true,
+      earrings: false,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+  bigSmile: {
+    id: 'bigSmile',
+    label: 'Biểu cảm Big Smile',
+    author: 'Ashley Seo',
+    license: 'CC BY 4.0',
+    sourceUrl: 'https://www.figma.com/community/file/881358461963645496',
+    repoUrl: 'https://github.com/dicebear/dicebear',
+    caps: {
+      hairStyle: ['short', 'long', 'curly'],
+      hairColor: true,
+      hat: ['none'],
+      glasses: ['none', 'clear', 'sunglasses'],
+      facialHair: ['none'],
+      expression: ['happy', 'sad', 'angry', 'cheeky'],
+      clothing: [],
+      clothesColor: false,
+      skin: true,
+      earrings: false,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+  niceAvatar: {
+    id: 'niceAvatar',
+    label: 'Tối giản Nice Avatar',
+    author: 'Chill Lab',
+    license: 'MIT',
+    sourceUrl: 'https://github.com/dapi-labs/react-nice-avatar',
+    repoUrl: 'https://github.com/dapi-labs/react-nice-avatar',
+    caps: {
+      hairStyle: ['short', 'long', 'bald', 'covered'],
+      maleHairStyles: ['short', 'bald', 'covered'],
+      femaleHairStyles: ['short', 'long', 'covered'],
+      hairColor: true,
+      hat: ['none', 'beanie', 'turban'],
+      glasses: ['none', 'clear', 'sunglasses'],
+      facialHair: ['none'],
+      expression: ['happy'],
+      clothing: ['hoodie', 'tshirt'],
+      clothesColor: true,
+      skin: true,
+      earrings: false,
+      blush: false,
+      freckles: false,
+      scar: false,
+      bow: false,
+    },
+  },
+};
+
+export const WHO_IS_IT_ART_PACK_IDS: WhoIsItArtPackId[] = [
+  'avataaars',
+  'personas',
+  'micah',
+  'openPeeps',
+  'toonHead',
+  'bigSmile',
+  'niceAvatar',
+];
 
 export interface WhoIsItTraitDef {
   key: string;
@@ -60,6 +271,7 @@ export interface WhoIsItQA {
   askedByName: string;
   question: string;
   traitKey?: string;
+  characterId?: string;
   answer: boolean | null;
   kind: 'trait' | 'free' | 'guess';
   at: number;
@@ -78,6 +290,8 @@ export interface WhoIsItView {
   phase: WhoIsItPhase;
   phaseEndsAt: number | null;
   phaseSeconds: number;
+  artPack: WhoIsItArtPackId;
+  traitKeys: string[];
   boardSize: number;
   characters: WhoIsItCharacter[];
   teams: Record<WhoIsItTeam, string[]>;
@@ -90,6 +304,10 @@ export interface WhoIsItView {
   oppFlipped: string[];
   /** Các thẻ vừa được úp ở lượt gần nhất để làm nổi bật nhẹ */
   lastFlippedIds: string[];
+  /** Đội vừa úp các thẻ trong `lastFlippedIds` */
+  lastFlippedTeam: WhoIsItTeam | null;
+  /** Ghi chú chuyển lượt (ví dụ đội trước hết giờ) */
+  turnNote: 'timeout' | null;
   secretReady: Record<WhoIsItTeam, boolean>;
   remainingCounts: Record<WhoIsItTeam, number>;
   lives: Record<WhoIsItTeam, number>;
@@ -109,22 +327,20 @@ export type WhoIsItAction =
   | { type: 'wi_ask_free'; question: string }
   | { type: 'wi_answer_free'; yes: boolean }
   | { type: 'wi_toggle_flip'; characterId: string }
-  | { type: 'wi_auto_flip' }
   | { type: 'wi_end_review' }
   | { type: 'wi_guess'; characterId: string }
   | { type: 'wi_team_chat'; text: string };
 
 export const WHO_IS_IT_MAX_LIVES = 2;
 
-export function whoIsItBoardSize(playerCount: number, mode: WhoIsItDifficulty = 'auto'): 24 | 30 | 36 | 42 | 48 | 54 {
-  const base: 24 | 30 | 36 | 42 | 48 =
-    playerCount <= 3 ? 24
-      : playerCount <= 5 ? 30
-        : playerCount <= 7 ? 36
-          : playerCount <= 9 ? 42
-            : 48;
+export function whoIsItBoardSize(playerCount: number, mode: WhoIsItDifficulty = 'auto'): 30 | 36 | 42 | 48 | 54 {
+  const base: 30 | 36 | 42 | 48 | 54 =
+    playerCount <= 3 ? 30
+      : playerCount <= 5 ? 36
+        : playerCount <= 7 ? 42
+          : playerCount <= 9 ? 48
+            : 54;
   if (mode !== 'large') return base;
-  if (base === 24) return 30;
   if (base === 30) return 36;
   if (base === 36) return 42;
   if (base === 42) return 48;
@@ -143,7 +359,7 @@ export function whoIsItGridDims(boardSize: number, compactPortrait: boolean): { 
   }
 }
 
-const HAIR_HEX = {
+export const HAIR_HEX = {
   black: '2c1b18',
   brown: '724133',
   blonde: 'e6c15a',
@@ -153,13 +369,13 @@ const HAIR_HEX = {
   none: '2c1b18',
 } as const;
 
-const SKIN_HEX = {
+export const SKIN_HEX = {
   light: 'ffdbb4',
   tan: 'd08b5b',
   dark: '614335',
 } as const;
 
-const CLOTHES_HEX = {
+export const CLOTHES_HEX = {
   red: 'e03131',
   blue: '2563eb',
   green: '16a34a',
@@ -169,217 +385,36 @@ const CLOTHES_HEX = {
   white: 'f1f5f9',
 } as const;
 
-const BG_CYCLE = [
+export const BG_CYCLE = [
   'dbeafe', 'fef3c7', 'fce7f3', 'dcfce7', 'ede9fe', 'ffedd5', 'e0f2fe', 'fae8ff', 'ecfccb', 'ffe4e6',
 ] as const;
 
-interface RawCharSeed {
-  name: string;
-  gender: WhoIsItCharacter['gender'];
-  hairStyle: WhoIsItCharacter['hairStyle'];
-  top: string;
-  bald?: boolean;
-  hairColor: WhoIsItCharacter['hairColor'];
-  hat: WhoIsItCharacter['hat'];
-  hatColor?: string;
-  glasses: WhoIsItCharacter['glasses'];
-  acc?: string;
-  facialHair: WhoIsItCharacter['facialHair'];
-  fh?: string;
-  skin: WhoIsItCharacter['skin'];
-  expression: WhoIsItCharacter['expression'];
-  clothing: WhoIsItCharacter['clothing'];
-  clothesTop: string;
-  clothesColor: WhoIsItCharacter['clothesColor'];
-  earrings: boolean;
-  blush: boolean;
-  freckles: boolean;
-  scar?: boolean;
-  bow?: boolean;
-}
+const MALE_NAMES = [
+  'An', 'Bách', 'Bảo', 'Bắc', 'Bình', 'Cao', 'Cảnh', 'Chánh', 'Chiến', 'Chính',
+  'Chương', 'Công', 'Cường', 'Danh', 'Diễn', 'Doanh', 'Dũng', 'Duy', 'Dương', 'Đạt',
+  'Đăng', 'Đạo', 'Đỉnh', 'Đông', 'Đức', 'Gia', 'Giáp', 'Hải', 'Hào', 'Hậu',
+  'Hiển', 'Hiệp', 'Hiếu', 'Hoàng', 'Hợp', 'Hùng', 'Huy', 'Khải', 'Khang', 'Khánh',
+  'Khiêm', 'Khoa', 'Khôi', 'Khương', 'Kiên', 'Kiệt', 'Kỳ', 'Lâm', 'Lộc', 'Lợi',
+  'Long', 'Luân', 'Lực', 'Mạnh', 'Minh', 'Nam', 'Nghĩa', 'Nguyên', 'Nhân', 'Nhật',
+  'Ninh', 'Phát', 'Phi', 'Phong', 'Phú', 'Phúc', 'Phước', 'Quân', 'Quang', 'Quốc',
+  'Quý', 'Sang', 'Sáng', 'Siêu', 'Sinh', 'Sơn', 'Tài', 'Tân', 'Tấn', 'Thạch',
+  'Thái', 'Thắng', 'Thành', 'Thiên', 'Thiện', 'Thịnh', 'Thuận', 'Tiến', 'Tín', 'Toàn',
+  'Trí', 'Triết', 'Trọng', 'Trung', 'Trường', 'Tuấn', 'Tùng', 'Tuyên', 'Văn', 'Vĩ',
+  'Việt', 'Vinh', 'Vũ', 'Vương',
+] as const;
 
-function exprVisual(exp: WhoIsItCharacter['expression'], idx: number): { eyes: string; eyebrows: string; mouth: string } {
-  switch (exp) {
-    case 'happy':
-      return {
-        eyes: idx % 2 === 0 ? 'happy' : 'default',
-        eyebrows: idx % 3 === 0 ? 'raisedExcitedNatural' : 'defaultNatural',
-        mouth: idx % 2 === 0 ? 'smile' : 'twinkle',
-      };
-    case 'surprised':
-      return {
-        eyes: 'surprised',
-        eyebrows: 'raisedExcitedNatural',
-        mouth: idx % 2 === 0 ? 'screamOpen' : 'disbelief',
-      };
-    case 'angry':
-      return {
-        eyes: 'squint',
-        eyebrows: idx % 2 === 0 ? 'angryNatural' : 'frownNatural',
-        mouth: idx % 2 === 0 ? 'serious' : 'grimace',
-      };
-    case 'cheeky':
-      return {
-        eyes: idx % 2 === 0 ? 'wink' : 'winkWacky',
-        eyebrows: 'upDownNatural',
-        mouth: 'tongue',
-      };
-  }
-}
-
-const RAW_CHARACTERS: RawCharSeed[] = [
-  // 01-12
-  { name: 'An', gender: 'male', hairStyle: 'short', top: 'shortFlat', hairColor: 'black', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'red', earrings: false, blush: false, freckles: false },
-  { name: 'Bảo', gender: 'male', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: 'e03131', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'tan', expression: 'cheeky', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'blue', earrings: true, blush: false, freckles: false },
-  { name: 'Dũng', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardMajestic', skin: 'dark', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'dark', earrings: false, blush: false, freckles: false, scar: true },
-  { name: 'Hào', gender: 'male', hairStyle: 'curly', top: 'shortCurly', hairColor: 'brown', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'beard', fh: 'beardMedium', skin: 'tan', expression: 'happy', clothing: 'overall', clothesTop: 'overall', clothesColor: 'yellow', earrings: true, blush: false, freckles: true, scar: true },
-  { name: 'Khang', gender: 'male', hairStyle: 'short', top: 'theCaesar', hairColor: 'blonde', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'green', earrings: false, blush: true, freckles: true },
-  { name: 'Long', gender: 'male', hairStyle: 'covered', top: 'winterHat03', hairColor: 'none', hat: 'beanie', hatColor: '2563eb', glasses: 'clear', acc: 'round', facialHair: 'beard', fh: 'beardLight', skin: 'light', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'white', earrings: false, blush: false, freckles: false },
-  { name: 'Minh', gender: 'male', hairStyle: 'short', top: 'shortWaved', hairColor: 'silver', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'light', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'blue', earrings: false, blush: false, freckles: false },
-  { name: 'Nam', gender: 'male', hairStyle: 'curly', top: 'fro', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Nhân', gender: 'male', hairStyle: 'bald', top: 'shortRound', bald: true, hairColor: 'none', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'tan', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'yellow', earrings: false, blush: true, freckles: false },
-  { name: 'Phát', gender: 'male', hairStyle: 'short', top: 'shavedSides', hairColor: 'red', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'beard', fh: 'beardMedium', skin: 'light', expression: 'cheeky', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'dark', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Phong', gender: 'male', hairStyle: 'long', top: 'dreads01', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'dark', expression: 'happy', clothing: 'overall', clothesTop: 'overall', clothesColor: 'green', earrings: false, blush: false, freckles: false },
-  { name: 'Phúc', gender: 'male', hairStyle: 'covered', top: 'turban', hairColor: 'none', hat: 'turban', hatColor: '16a34a', glasses: 'none', facialHair: 'beard', fh: 'beardMajestic', skin: 'tan', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'white', earrings: false, blush: false, freckles: false },
-
-  // 13-24
-  { name: 'Cúc', gender: 'female', hairStyle: 'long', top: 'longButNotTooLong', hairColor: 'black', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'red', earrings: true, blush: true, freckles: false, bow: true },
-  { name: 'Giang', gender: 'female', hairStyle: 'short', top: 'bob', hairColor: 'blonde', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Hương', gender: 'female', hairStyle: 'curly', top: 'curly', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'overall', clothesTop: 'overall', clothesColor: 'blue', earrings: false, blush: true, freckles: true, bow: true },
-  { name: 'Lan', gender: 'female', hairStyle: 'long', top: 'straight01', hairColor: 'pink', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'white', earrings: true, blush: true, freckles: false, bow: true },
-  { name: 'Linh', gender: 'female', hairStyle: 'covered', top: 'winterHat02', hairColor: 'none', hat: 'beanie', hatColor: 'e03131', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'green', earrings: false, blush: true, freckles: true },
-  { name: 'Mai', gender: 'female', hairStyle: 'short', top: 'miaWallace', hairColor: 'red', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'tshirt', clothesTop: 'shirtScoopNeck', clothesColor: 'yellow', earrings: true, blush: false, freckles: false },
-  { name: 'My', gender: 'female', hairStyle: 'curly', top: 'bigHair', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'red', earrings: true, blush: false, freckles: false },
-  { name: 'Nga', gender: 'female', hairStyle: 'covered', top: 'hijab', hairColor: 'none', hat: 'turban', hatColor: '9333ea', glasses: 'clear', acc: 'prescription02', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'white', earrings: false, blush: true, freckles: false },
-  { name: 'Ngọc', gender: 'female', hairStyle: 'long', top: 'bun', hairColor: 'silver', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'dark', earrings: true, blush: false, freckles: false },
-  { name: 'Nhi', gender: 'female', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: 'eab308', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'tan', expression: 'cheeky', clothing: 'overall', clothesTop: 'overall', clothesColor: 'red', earrings: false, blush: false, freckles: true, scar: true },
-  { name: 'Nhung', gender: 'female', hairStyle: 'long', top: 'curvy', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'surprised', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'yellow', earrings: true, blush: true, freckles: false },
-  { name: 'Phương', gender: 'female', hairStyle: 'curly', top: 'froBand', hairColor: 'pink', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'blue', earrings: false, blush: true, freckles: false, bow: true },
-
-  // 25-42
-  { name: 'Quân', gender: 'male', hairStyle: 'short', top: 'shortRound', hairColor: 'brown', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'red', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Quang', gender: 'male', hairStyle: 'curly', top: 'frizzle', hairColor: 'blonde', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'light', expression: 'surprised', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'green', earrings: false, blush: false, freckles: true },
-  { name: 'Quyên', gender: 'female', hairStyle: 'short', top: 'bob', hairColor: 'black', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Quỳnh', gender: 'female', hairStyle: 'long', top: 'straight02', hairColor: 'red', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'dark', earrings: true, blush: false, freckles: true },
-  { name: 'Sơn', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'light', expression: 'cheeky', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'yellow', earrings: false, blush: false, freckles: false },
-  { name: 'Tâm', gender: 'female', hairStyle: 'covered', top: 'winterHat04', hairColor: 'none', hat: 'beanie', hatColor: '16a34a', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'overall', clothesTop: 'overall', clothesColor: 'purple', earrings: true, blush: true, freckles: false },
-  { name: 'Tân', gender: 'male', hairStyle: 'short', top: 'theCaesarAndSidePart', hairColor: 'black', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardLight', skin: 'tan', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'blue', earrings: false, blush: false, freckles: false },
-  { name: 'Thảo', gender: 'female', hairStyle: 'long', top: 'longButNotTooLong', hairColor: 'blonde', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'green', earrings: false, blush: true, freckles: true, bow: true },
-  { name: 'Thắng', gender: 'male', hairStyle: 'curly', top: 'shortCurly', hairColor: 'silver', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'overall', clothesTop: 'overall', clothesColor: 'red', earrings: false, blush: false, freckles: false },
-  { name: 'Thành', gender: 'male', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: '2563eb', glasses: 'none', facialHair: 'beard', fh: 'beardMedium', skin: 'light', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'dark', earrings: false, blush: false, freckles: false, scar: true },
-  { name: 'Thư', gender: 'female', hairStyle: 'curly', top: 'curly', hairColor: 'red', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'white', earrings: true, blush: true, freckles: true },
-  { name: 'Tiến', gender: 'male', hairStyle: 'long', top: 'dreads', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'yellow', earrings: true, blush: false, freckles: false },
-  { name: 'Toàn', gender: 'male', hairStyle: 'short', top: 'shortWaved', hairColor: 'pink', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'purple', earrings: true, blush: true, freckles: false },
-  { name: 'Trang', gender: 'female', hairStyle: 'short', top: 'miaWallace', hairColor: 'silver', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'red', earrings: true, blush: false, freckles: false },
-  { name: 'Trí', gender: 'male', hairStyle: 'covered', top: 'winterHat02', hairColor: 'none', hat: 'beanie', hatColor: '9333ea', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'blue', earrings: false, blush: false, freckles: false },
-  { name: 'Trọng', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'none', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'green', earrings: false, blush: true, freckles: false },
-  { name: 'Trúc', gender: 'female', hairStyle: 'covered', top: 'hijab', hairColor: 'none', hat: 'turban', hatColor: 'e03131', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'yellow', earrings: false, blush: true, freckles: false },
-  { name: 'Tú', gender: 'female', hairStyle: 'long', top: 'bun', hairColor: 'pink', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'dark', earrings: true, blush: false, freckles: false, scar: true },
-
-  // 43-60
-  { name: 'Tuấn', gender: 'male', hairStyle: 'short', top: 'shortFlat', hairColor: 'red', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'beard', fh: 'beardLight', skin: 'tan', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'purple', earrings: false, blush: false, freckles: true },
-  { name: 'Tùng', gender: 'male', hairStyle: 'curly', top: 'fro', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardMajestic', skin: 'dark', expression: 'surprised', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'white', earrings: true, blush: false, freckles: false },
-  { name: 'Tuyền', gender: 'female', hairStyle: 'short', top: 'bob', hairColor: 'brown', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'tan', expression: 'surprised', clothing: 'overall', clothesTop: 'overall', clothesColor: 'green', earrings: false, blush: true, freckles: false, bow: true },
-  { name: 'Uyên', gender: 'female', hairStyle: 'long', top: 'curvy', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtScoopNeck', clothesColor: 'blue', earrings: true, blush: false, freckles: true },
-  { name: 'Vân', gender: 'female', hairStyle: 'curly', top: 'bigHair', hairColor: 'blonde', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'cheeky', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'yellow', earrings: true, blush: false, freckles: false },
-  { name: 'Việt', gender: 'male', hairStyle: 'covered', top: 'turban', hairColor: 'none', hat: 'turban', hatColor: '2563eb', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'overall', clothesTop: 'overall', clothesColor: 'dark', earrings: false, blush: false, freckles: false },
-  { name: 'Vinh', gender: 'male', hairStyle: 'short', top: 'shavedSides', hairColor: 'blonde', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'green', earrings: true, blush: false, freckles: false },
-  { name: 'Vũ', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'beard', fh: 'beardMedium', skin: 'tan', expression: 'angry', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'red', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Vy', gender: 'female', hairStyle: 'long', top: 'straight01', hairColor: 'silver', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'red', earrings: false, blush: true, freckles: true },
-  { name: 'Xuân', gender: 'female', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: '16a34a', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'blue', earrings: true, blush: true, freckles: false },
-  { name: 'Yến', gender: 'female', hairStyle: 'short', top: 'miaWallace', hairColor: 'pink', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'cheeky', clothing: 'overall', clothesTop: 'overall', clothesColor: 'white', earrings: true, blush: false, freckles: false, bow: true },
-  { name: 'Ánh', gender: 'female', hairStyle: 'long', top: 'straight02', hairColor: 'brown', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'green', earrings: false, blush: true, freckles: false },
-  { name: 'Đạt', gender: 'male', hairStyle: 'covered', top: 'winterHat03', hairColor: 'none', hat: 'beanie', hatColor: 'eab308', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'dark', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'purple', earrings: false, blush: false, freckles: false },
-  { name: 'Thịnh', gender: 'male', hairStyle: 'curly', top: 'frizzle', hairColor: 'black', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardLight', skin: 'light', expression: 'cheeky', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'red', earrings: false, blush: true, freckles: false },
-  { name: 'Thiên', gender: 'male', hairStyle: 'long', top: 'dreads02', hairColor: 'silver', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'dark', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'white', earrings: true, blush: false, freckles: false },
-  { name: 'Thương', gender: 'female', hairStyle: 'covered', top: 'winterHat04', hairColor: 'none', hat: 'beanie', hatColor: '9333ea', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'dark', earrings: true, blush: false, freckles: true },
-  { name: 'Kiệt', gender: 'male', hairStyle: 'short', top: 'theCaesar', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'tan', expression: 'angry', clothing: 'overall', clothesTop: 'overall', clothesColor: 'blue', earrings: false, blush: false, freckles: true, scar: true },
-  { name: 'Châu', gender: 'female', hairStyle: 'curly', top: 'froBand', hairColor: 'red', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'yellow', earrings: false, blush: false, freckles: false },
-
-  // 61-100: +40 nhân vật mới siêu đa dạng (sẹo, nơ, mũ, kính, râu, màu da, tóc màu độc đáo)
-  { name: 'Bình', gender: 'male', hairStyle: 'short', top: 'shortFlat', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'beard', fh: 'beardMedium', skin: 'dark', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'green', earrings: false, blush: false, freckles: false, scar: true },
-  { name: 'Cảnh', gender: 'male', hairStyle: 'bald', top: 'shortRound', bald: true, hairColor: 'none', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'beard', fh: 'beardMajestic', skin: 'tan', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'blue', earrings: true, blush: false, freckles: false },
-  { name: 'Chi', gender: 'female', hairStyle: 'long', top: 'straight02', hairColor: 'black', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'red', earrings: false, blush: true, freckles: true, bow: true },
-  { name: 'Công', gender: 'male', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: '9333ea', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'overall', clothesTop: 'overall', clothesColor: 'white', earrings: true, blush: false, freckles: false },
-  { name: 'Cường', gender: 'male', hairStyle: 'curly', top: 'shortCurly', hairColor: 'red', hat: 'none', glasses: 'none', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'tan', expression: 'angry', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'dark', earrings: false, blush: false, freckles: true, scar: true },
-  { name: 'Duy', gender: 'male', hairStyle: 'short', top: 'theCaesarAndSidePart', hairColor: 'blonde', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'yellow', earrings: false, blush: false, freckles: false },
-  { name: 'Duyên', gender: 'female', hairStyle: 'curly', top: 'curly', hairColor: 'silver', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'purple', earrings: true, blush: true, freckles: false },
-  { name: 'Đào', gender: 'female', hairStyle: 'short', top: 'bob', hairColor: 'pink', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'red', earrings: false, blush: true, freckles: true, bow: true },
-  { name: 'Đức', gender: 'male', hairStyle: 'long', top: 'dreads01', hairColor: 'brown', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'dark', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Giáp', gender: 'male', hairStyle: 'covered', top: 'winterHat02', hairColor: 'none', hat: 'beanie', hatColor: 'e03131', glasses: 'none', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'tan', expression: 'surprised', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'green', earrings: false, blush: true, freckles: false },
-  { name: 'Hà', gender: 'female', hairStyle: 'covered', top: 'hijab', hairColor: 'none', hat: 'turban', hatColor: '2563eb', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtScoopNeck', clothesColor: 'yellow', earrings: true, blush: false, freckles: false },
-  { name: 'Hải', gender: 'male', hairStyle: 'short', top: 'shavedSides', hairColor: 'silver', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardLight', skin: 'light', expression: 'cheeky', clothing: 'overall', clothesTop: 'overall', clothesColor: 'red', earrings: true, blush: false, freckles: false },
-  { name: 'Hân', gender: 'female', hairStyle: 'long', top: 'bun', hairColor: 'black', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'none', skin: 'tan', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'purple', earrings: true, blush: false, freckles: true },
-  { name: 'Hằng', gender: 'female', hairStyle: 'curly', top: 'bigHair', hairColor: 'brown', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'none', skin: 'light', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'white', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Hiếu', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'dark', expression: 'cheeky', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'blue', earrings: true, blush: false, freckles: false },
-  { name: 'Hòa', gender: 'female', hairStyle: 'covered', top: 'winterHat03', hairColor: 'none', hat: 'beanie', hatColor: 'eab308', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'overall', clothesTop: 'overall', clothesColor: 'green', earrings: false, blush: true, freckles: false },
-  { name: 'Hoàng', gender: 'male', hairStyle: 'curly', top: 'fro', hairColor: 'blonde', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'beard', fh: 'beardMedium', skin: 'light', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'red', earrings: false, blush: false, freckles: false },
-  { name: 'Hùng', gender: 'male', hairStyle: 'short', top: 'shortRound', hairColor: 'red', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'surprised', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'white', earrings: false, blush: true, freckles: true },
-  { name: 'Huy', gender: 'male', hairStyle: 'covered', top: 'turban', hairColor: 'none', hat: 'turban', hatColor: 'eab308', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'light', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'blue', earrings: true, blush: false, freckles: false, scar: true },
-  { name: 'Huyền', gender: 'female', hairStyle: 'short', top: 'miaWallace', hairColor: 'black', hat: 'none', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'green', earrings: true, blush: false, freckles: false },
-  { name: 'Khánh', gender: 'male', hairStyle: 'long', top: 'dreads', hairColor: 'blonde', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'beard', fh: 'beardMajestic', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Khoa', gender: 'male', hairStyle: 'short', top: 'shortWaved', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'beard', fh: 'beardLight', skin: 'light', expression: 'cheeky', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'red', earrings: false, blush: false, freckles: true },
-  { name: 'Kiên', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'overall', clothesTop: 'overall', clothesColor: 'dark', earrings: false, blush: false, freckles: true, scar: true },
-  { name: 'Lâm', gender: 'male', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: '16a34a', glasses: 'none', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'yellow', earrings: false, blush: true, freckles: false },
-  { name: 'Lộc', gender: 'male', hairStyle: 'curly', top: 'frizzle', hairColor: 'red', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'none', skin: 'tan', expression: 'cheeky', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'white', earrings: true, blush: true, freckles: false },
-  { name: 'Lợi', gender: 'male', hairStyle: 'short', top: 'theCaesar', hairColor: 'silver', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'blue', earrings: true, blush: false, freckles: false },
-  { name: 'Luân', gender: 'male', hairStyle: 'long', top: 'dreads02', hairColor: 'pink', hat: 'none', glasses: 'none', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'light', expression: 'surprised', clothing: 'tshirt', clothesTop: 'shirtScoopNeck', clothesColor: 'dark', earrings: true, blush: false, freckles: false },
-  { name: 'Ly', gender: 'female', hairStyle: 'long', top: 'curvy', hairColor: 'blonde', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'dark', expression: 'cheeky', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'yellow', earrings: false, blush: true, freckles: false, bow: true },
-  { name: 'Mạnh', gender: 'male', hairStyle: 'covered', top: 'winterHat04', hairColor: 'none', hat: 'beanie', hatColor: '2563eb', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'beard', fh: 'beardMedium', skin: 'light', expression: 'angry', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'green', earrings: false, blush: false, freckles: false, scar: true },
-  { name: 'Nghĩa', gender: 'male', hairStyle: 'curly', top: 'shortCurly', hairColor: 'black', hat: 'none', glasses: 'eyepatch', acc: 'eyepatch', facialHair: 'mustache', fh: 'moustacheFancy', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'collarAndSweater', clothesColor: 'red', earrings: false, blush: false, freckles: false, scar: true },
-  { name: 'Ngân', gender: 'female', hairStyle: 'short', top: 'bob', hairColor: 'silver', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtCrewNeck', clothesColor: 'white', earrings: true, blush: true, freckles: true, bow: true },
-  { name: 'Nguyên', gender: 'male', hairStyle: 'short', top: 'shortFlat', hairColor: 'pink', hat: 'none', glasses: 'clear', acc: 'prescription02', facialHair: 'none', skin: 'dark', expression: 'happy', clothing: 'blazer', clothesTop: 'blazerAndShirt', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Oanh', gender: 'female', hairStyle: 'covered', top: 'hat', hairColor: 'none', hat: 'cap', hatColor: 'e03131', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'dark', earrings: true, blush: false, freckles: true },
-  { name: 'Phi', gender: 'male', hairStyle: 'curly', top: 'froBand', hairColor: 'brown', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'surprised', clothing: 'overall', clothesTop: 'overall', clothesColor: 'green', earrings: false, blush: true, freckles: false },
-  { name: 'Sáng', gender: 'male', hairStyle: 'covered', top: 'turban', hairColor: 'none', hat: 'turban', hatColor: '9333ea', glasses: 'sunglasses', acc: 'sunglasses', facialHair: 'beard', fh: 'beardLight', skin: 'tan', expression: 'happy', clothing: 'tshirt', clothesTop: 'shirtVNeck', clothesColor: 'yellow', earrings: false, blush: false, freckles: false },
-  { name: 'Siêu', gender: 'male', hairStyle: 'bald', top: 'shortFlat', bald: true, hairColor: 'none', hat: 'none', glasses: 'clear', acc: 'round', facialHair: 'mustache', fh: 'moustacheMagnum', skin: 'dark', expression: 'happy', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'purple', earrings: true, blush: false, freckles: false },
-  { name: 'Thái', gender: 'male', hairStyle: 'long', top: 'dreads01', hairColor: 'red', hat: 'none', glasses: 'none', facialHair: 'none', skin: 'light', expression: 'happy', clothing: 'tshirt', clothesTop: 'graphicShirt', clothesColor: 'blue', earrings: false, blush: true, freckles: true },
-  { name: 'Thiện', gender: 'male', hairStyle: 'short', top: 'theCaesarAndSidePart', hairColor: 'brown', hat: 'none', glasses: 'sunglasses', acc: 'wayfarers', facialHair: 'none', skin: 'light', expression: 'cheeky', clothing: 'blazer', clothesTop: 'blazerAndSweater', clothesColor: 'white', earrings: true, blush: false, freckles: false },
-  { name: 'Thủy', gender: 'female', hairStyle: 'curly', top: 'curly', hairColor: 'black', hat: 'none', glasses: 'clear', acc: 'prescription01', facialHair: 'none', skin: 'dark', expression: 'surprised', clothing: 'overall', clothesTop: 'overall', clothesColor: 'red', earrings: true, blush: true, freckles: false, bow: true },
-  { name: 'Tín', gender: 'male', hairStyle: 'covered', top: 'winterHat02', hairColor: 'none', hat: 'beanie', hatColor: '16a34a', glasses: 'none', facialHair: 'none', skin: 'tan', expression: 'angry', clothing: 'hoodie', clothesTop: 'hoodie', clothesColor: 'white', earrings: false, blush: false, freckles: true, scar: true },
-];
-
-export const WHO_IS_IT_CHARACTERS: WhoIsItCharacter[] = RAW_CHARACTERS.map((s, idx) => {
-  const exp = exprVisual(s.expression, idx);
-  return {
-    id: `wi_${String(idx + 1).padStart(3, '0')}`,
-    name: s.name,
-    gender: s.gender,
-    hairStyle: s.hairStyle,
-    hairColor: s.hairColor,
-    hat: s.hat,
-    glasses: s.glasses,
-    facialHair: s.facialHair,
-    skin: s.skin,
-    expression: s.expression,
-    clothing: s.clothing,
-    clothesColor: s.clothesColor,
-    earrings: s.earrings,
-    blush: s.blush,
-    freckles: s.freckles,
-    scar: s.scar ?? false,
-    bow: s.bow ?? false,
-    visual: {
-      top: s.top,
-      ...(s.bald ? { bald: true } : {}),
-      hairColor: HAIR_HEX[s.hairColor],
-      ...(s.hatColor ? { hatColor: s.hatColor } : {}),
-      skinColor: SKIN_HEX[s.skin],
-      ...(s.acc ? { accessories: s.acc } : {}),
-      ...(s.fh ? { facialHair: s.fh, facialHairColor: s.hairColor !== 'none' ? HAIR_HEX[s.hairColor] : '2c1b18' } : {}),
-      eyes: exp.eyes,
-      eyebrows: exp.eyebrows,
-      mouth: exp.mouth,
-      clothing: s.clothesTop,
-      clothesColor: CLOTHES_HEX[s.clothesColor],
-      bgColor: BG_CYCLE[idx % BG_CYCLE.length],
-    },
-  };
-});
-
-export const WHO_IS_IT_CHARACTER_MAP = new Map<string, WhoIsItCharacter>(
-  WHO_IS_IT_CHARACTERS.map((c) => [c.id, c]),
-);
+const FEMALE_NAMES = [
+  'Ái', 'Ánh', 'Ân', 'Băng', 'Bích', 'Cẩm', 'Châu', 'Chi', 'Cúc', 'Diễm',
+  'Diệu', 'Dung', 'Duyên', 'Đào', 'Đoan', 'Giang', 'Hà', 'Hạ', 'Hân', 'Hằng',
+  'Hạnh', 'Hiền', 'Hòa', 'Hoài', 'Hồng', 'Huệ', 'Hương', 'Huyền', 'Khuê', 'Khuyên',
+  'Kiều', 'Kim', 'Lam', 'Lan', 'Lệ', 'Liễu', 'Linh', 'Loan', 'Lụa', 'Ly',
+  'Mai', 'Mây', 'Mến', 'Mơ', 'My', 'Mỹ', 'Na', 'Nga', 'Ngân', 'Ngọc',
+  'Nguyệt', 'Nhã', 'Nhàn', 'Nhi', 'Nhiên', 'Nhung', 'Nương', 'Oanh', 'Phương', 'Phượng',
+  'Phụng', 'Quế', 'Quyên', 'Quỳnh', 'Sa', 'Sen', 'Sương', 'Tâm', 'Thắm', 'Thanh',
+  'Thảo', 'Thi', 'Thoa', 'Thư', 'Thương', 'Thúy', 'Thùy', 'Thủy', 'Tiên', 'Tố',
+  'Trà', 'Trâm', 'Trân', 'Trang', 'Trinh', 'Trúc', 'Tú', 'Tươi', 'Tuyền', 'Tuyết',
+  'Uyên', 'Vân', 'Vy', 'Xuân', 'Ý', 'Yến',
+] as const;
 
 export const WHO_IS_IT_TRAITS: WhoIsItTraitDef[] = [
   // Tóc & Mũ (10)
@@ -387,19 +422,20 @@ export const WHO_IS_IT_TRAITS: WhoIsItTraitDef[] = [
   { key: 'gender_female', group: 'toc_mu', label: 'Là Nữ?', shortLabel: 'Nữ', match: (c) => c.gender === 'female' },
   { key: 'hat_any', group: 'toc_mu', label: 'Đang đội mũ / khăn?', shortLabel: 'Đội mũ/khăn', match: (c) => c.hat !== 'none' },
   { key: 'hat_beanie', group: 'toc_mu', label: 'Đội mũ len?', shortLabel: 'Mũ len', match: (c) => c.hat === 'beanie' },
-  { key: 'hat_cap', group: 'toc_mu', label: 'Đội mũ lưỡi trai?', shortLabel: 'Mũ lưỡi trai', match: (c) => c.hat === 'cap' },
+  { key: 'hat_cap', group: 'toc_mu', label: 'Đội mũ có vành?', shortLabel: 'Mũ có vành', match: (c) => c.hat === 'cap' },
   { key: 'hair_bald', group: 'toc_mu', label: 'Đầu trọc?', shortLabel: 'Trọc đầu', match: (c) => c.hairStyle === 'bald' },
   { key: 'hair_long', group: 'toc_mu', label: 'Tóc dài / búi?', shortLabel: 'Tóc dài', match: (c) => c.hairStyle === 'long' },
   { key: 'hair_short', group: 'toc_mu', label: 'Tóc ngắn?', shortLabel: 'Tóc ngắn', match: (c) => c.hairStyle === 'short' },
   { key: 'hair_curly', group: 'toc_mu', label: 'Tóc xoăn / xù?', shortLabel: 'Tóc xoăn/xù', match: (c) => c.hairStyle === 'curly' },
   { key: 'hair_dark', group: 'toc_mu', label: 'Tóc đen hoặc nâu?', shortLabel: 'Tóc đen/nâu', match: (c) => c.hairColor === 'black' || c.hairColor === 'brown' },
 
-  // Mắt & Kính (8)
+  // Mắt & Kính (9)
   { key: 'glasses_any', group: 'mat_kinh', label: 'Đeo kính (cận/râm)?', shortLabel: 'Đeo kính', match: (c) => c.glasses === 'clear' || c.glasses === 'sunglasses' },
   { key: 'glasses_sun', group: 'mat_kinh', label: 'Đeo kính râm?', shortLabel: 'Kính râm', match: (c) => c.glasses === 'sunglasses' },
   { key: 'glasses_clear', group: 'mat_kinh', label: 'Đeo kính gọng trong?', shortLabel: 'Kính cận', match: (c) => c.glasses === 'clear' },
   { key: 'eyepatch', group: 'mat_kinh', label: 'Đeo bịt mắt?', shortLabel: 'Bịt mắt', match: (c) => c.glasses === 'eyepatch' },
   { key: 'exp_happy', group: 'mat_kinh', label: 'Đang cười tươi?', shortLabel: 'Cười tươi', match: (c) => c.expression === 'happy' },
+  { key: 'exp_sad', group: 'mat_kinh', label: 'Mặt buồn?', shortLabel: 'Mặt buồn', match: (c) => c.expression === 'sad' },
   { key: 'exp_angry', group: 'mat_kinh', label: 'Mặt cau có?', shortLabel: 'Cau mày', match: (c) => c.expression === 'angry' },
   { key: 'exp_surprised', group: 'mat_kinh', label: 'Mặt bất ngờ?', shortLabel: 'Bất ngờ', match: (c) => c.expression === 'surprised' },
   { key: 'exp_cheeky', group: 'mat_kinh', label: 'Nháy mắt / lè lưỡi?', shortLabel: 'Nháy/lè lưỡi', match: (c) => c.expression === 'cheeky' },
@@ -433,12 +469,381 @@ export function matchWhoIsItTrait(c: WhoIsItCharacter, traitKey: string): boolea
   return WHO_IS_IT_TRAIT_MAP.get(traitKey)?.match(c) ?? false;
 }
 
-export function selectWhoIsItBoard(boardSize: number, rng: () => number = Math.random): WhoIsItCharacter[] {
-  const n = Math.min(WHO_IS_IT_CHARACTERS.length, Math.max(12, boardSize));
-  const pool = [...WHO_IS_IT_CHARACTERS];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+function isTraitAvailableForCaps(key: string, caps: WhoIsItArtCaps): boolean {
+  const hasVisibleHair = caps.hairStyle.some((h) => h !== 'bald' && h !== 'covered');
+  switch (key) {
+    case 'gender_male':
+    case 'gender_female':
+      return true;
+    case 'hat_any':
+      return caps.hat.includes('none') && caps.hat.some((h) => h !== 'none');
+    case 'hat_beanie':
+      return caps.hat.includes('beanie');
+    case 'hat_cap':
+      return caps.hat.includes('cap');
+    case 'hair_bald':
+      return caps.hairStyle.includes('bald') && caps.hairStyle.length >= 2;
+    case 'hair_long':
+      return caps.hairStyle.includes('long') && caps.hairStyle.length >= 2;
+    case 'hair_short':
+      return caps.hairStyle.includes('short') && caps.hairStyle.length >= 2;
+    case 'hair_curly':
+      return caps.hairStyle.includes('curly') && caps.hairStyle.length >= 2;
+    case 'hair_dark':
+    case 'hair_bright':
+      return caps.hairColor && hasVisibleHair;
+    case 'glasses_any':
+      return caps.glasses.includes('none') && (caps.glasses.includes('clear') || caps.glasses.includes('sunglasses'));
+    case 'glasses_sun':
+      return caps.glasses.includes('sunglasses');
+    case 'glasses_clear':
+      return caps.glasses.includes('clear');
+    case 'eyepatch':
+      return caps.glasses.includes('eyepatch');
+    case 'exp_happy':
+      return caps.expression.length >= 2 && caps.expression.includes('happy');
+    case 'exp_sad':
+      return caps.expression.length >= 2 && caps.expression.includes('sad');
+    case 'exp_angry':
+      return caps.expression.length >= 2 && caps.expression.includes('angry');
+    case 'exp_surprised':
+      return caps.expression.length >= 2 && caps.expression.includes('surprised');
+    case 'exp_cheeky':
+      return caps.expression.length >= 2 && caps.expression.includes('cheeky');
+    case 'facial_any':
+      return caps.facialHair.includes('none') && caps.facialHair.some((f) => f !== 'none');
+    case 'facial_beard':
+      return caps.facialHair.includes('beard');
+    case 'facial_mustache':
+      return caps.facialHair.includes('mustache');
+    case 'earrings':
+      return caps.earrings;
+    case 'blush':
+      return caps.blush;
+    case 'freckles':
+      return caps.freckles;
+    case 'scar':
+      return caps.scar;
+    case 'bow':
+      return caps.bow;
+    case 'skin_light':
+    case 'skin_dark':
+      return caps.skin;
+    case 'cloth_hoodie':
+      return caps.clothing.length >= 2 && caps.clothing.includes('hoodie');
+    case 'cloth_blazer':
+      return caps.clothing.length >= 2 && caps.clothing.includes('blazer');
+    case 'cloth_warm':
+    case 'cloth_cool':
+    case 'cloth_mono':
+      return caps.clothesColor;
+    default:
+      return false;
   }
-  return pool.slice(0, n).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+}
+
+export function whoIsItTraitsForPack(pack: WhoIsItArtPackId): WhoIsItTraitDef[] {
+  const caps = WHO_IS_IT_ART_PACKS[pack].caps;
+  return WHO_IS_IT_TRAITS.filter((t) => isTraitAvailableForCaps(t.key, caps));
+}
+
+export function pickWhoIsItArtPack(rng: () => number = Math.random): WhoIsItArtPackId {
+  const idx = Math.floor(rng() * WHO_IS_IT_ART_PACK_IDS.length) % WHO_IS_IT_ART_PACK_IDS.length;
+  return WHO_IS_IT_ART_PACK_IDS[Math.max(0, idx)];
+}
+
+/**
+ * Tạo bộ PRNG nội bộ (mulberry32) từ rng đầu vào để đảm bảo phân phối tốt
+ * ngay cả khi test truyền hàm rng hằng số (vd `() => 0.1`).
+ */
+function createBoardRng(rng: () => number): () => number {
+  const s1 = Math.floor(rng() * 0x1_0000_0000) >>> 0;
+  const s2 = Math.floor(rng() * 0x1_0000_0000) >>> 0;
+  let state = (s1 ^ Math.imul(s2 ^ 0x9e3779b9, 0x85ebca6b) ^ 0x6d2b79f5) >>> 0;
+  if (state === 0) state = 0x12345678;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleInPlace<T>(arr: T[], r: () => number): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function pickWeighted<T>(items: readonly { value: T; weight: number }[], r: () => number): T {
+  let total = 0;
+  for (const it of items) total += it.weight;
+  let pick = r() * total;
+  for (const it of items) {
+    pick -= it.weight;
+    if (pick <= 0) return it.value;
+  }
+  return items[items.length - 1].value;
+}
+
+const DARK_HAIR_COLORS: readonly { value: WhoIsItCharacter['hairColor']; weight: number }[] = [
+  { value: 'black', weight: 55 },
+  { value: 'brown', weight: 45 },
+];
+
+const BRIGHT_HAIR_COLORS: readonly { value: WhoIsItCharacter['hairColor']; weight: number }[] = [
+  { value: 'blonde', weight: 32 },
+  { value: 'red', weight: 26 },
+  { value: 'silver', weight: 22 },
+  { value: 'pink', weight: 20 },
+];
+
+function sampleCharacter(
+  name: string,
+  gender: 'male' | 'female',
+  pack: WhoIsItArtPackId,
+  caps: WhoIsItArtCaps,
+  bg: string,
+  r: () => number,
+): Omit<WhoIsItCharacter, 'id'> {
+  const genderHairStyles =
+    gender === 'male'
+      ? (caps.maleHairStyles ?? caps.hairStyle)
+      : (caps.femaleHairStyles ?? caps.hairStyle);
+  const nonNoneHats = caps.hat.filter((h) => h !== 'none');
+  const canHaveHat = nonNoneHats.length > 0 && genderHairStyles.includes('covered');
+  let hat: WhoIsItCharacter['hat'] = 'none';
+  if (canHaveHat) {
+    const hatChance = nonNoneHats.length >= 3 ? 0.27 : nonNoneHats.length === 2 ? 0.24 : 0.20;
+    if (r() < hatChance) {
+      if (nonNoneHats.length >= 3) {
+        hat = pickWeighted(
+          nonNoneHats.map((h) => ({ value: h, weight: h === 'turban' ? 24 : 38 })),
+          r,
+        );
+      } else {
+        hat = nonNoneHats[Math.floor(r() * nonNoneHats.length)];
+      }
+    }
+  }
+
+  let hairStyle: WhoIsItCharacter['hairStyle'];
+  let hairColor: WhoIsItCharacter['hairColor'];
+  if (hat !== 'none') {
+    hairStyle = 'covered';
+    hairColor = 'none';
+  } else {
+    const uncovered = genderHairStyles.filter((h) => h !== 'covered' && !(gender === 'female' && h === 'bald'));
+    const hairWeights: { value: WhoIsItCharacter['hairStyle']; weight: number }[] = uncovered.map((h) => {
+      switch (h) {
+        case 'bald':
+          return { value: h, weight: gender === 'male' ? 32 : 0 };
+        case 'long':
+          return { value: h, weight: gender === 'female' ? 54 : 14 };
+        case 'curly':
+          return { value: h, weight: 26 };
+        case 'short':
+        default:
+          return { value: h, weight: gender === 'male' ? 46 : 32 };
+      }
+    });
+    hairStyle = hairWeights.length > 0 ? pickWeighted(hairWeights, r) : 'short';
+    if (hairStyle === 'bald' || !caps.hairColor) {
+      hairColor = 'none';
+    } else {
+      hairColor = r() < 0.56 ? pickWeighted(DARK_HAIR_COLORS, r) : pickWeighted(BRIGHT_HAIR_COLORS, r);
+    }
+  }
+
+  const nonNoneGlasses = caps.glasses.filter((g) => g !== 'none');
+  let glasses: WhoIsItCharacter['glasses'] = 'none';
+  if (nonNoneGlasses.length > 0) {
+    const glassesChance = nonNoneGlasses.length >= 3 ? 0.48 : nonNoneGlasses.length === 2 ? 0.45 : 0.40;
+    if (r() < glassesChance) {
+      const gWeights = nonNoneGlasses.map((g) => ({
+        value: g,
+        weight: g === 'clear' ? 40 : g === 'sunglasses' ? 33 : 27,
+      }));
+      glasses = pickWeighted(gWeights, r);
+    }
+  }
+
+  const nonNoneFacial = caps.facialHair.filter((f) => f !== 'none');
+  let facialHair: WhoIsItCharacter['facialHair'] = 'none';
+  if (gender === 'male' && nonNoneFacial.length > 0) {
+    const fhChance = nonNoneFacial.length >= 2 ? 0.56 : 0.48;
+    if (r() < fhChance) {
+      const fWeights = nonNoneFacial.map((f) => ({
+        value: f,
+        weight: f === 'beard' ? 52 : 48,
+      }));
+      facialHair = pickWeighted(fWeights, r);
+    }
+  }
+
+  const skin: WhoIsItCharacter['skin'] = caps.skin
+    ? pickWeighted(
+        [
+          { value: 'light', weight: 40 },
+          { value: 'tan', weight: 30 },
+          { value: 'dark', weight: 30 },
+        ],
+        r,
+      )
+    : 'light';
+
+  const expression: WhoIsItExpression =
+    caps.expression.length > 0
+      ? caps.expression[Math.floor(r() * caps.expression.length)]
+      : 'happy';
+
+  let clothing: WhoIsItCharacter['clothing'] = 'tshirt';
+  if (caps.clothing.length === 1) {
+    clothing = caps.clothing[0];
+  } else if (caps.clothing.length >= 2) {
+    const cWeights = caps.clothing.map((cl) => ({
+      value: cl,
+      weight: cl === 'hoodie' ? 26 : cl === 'blazer' ? 26 : cl === 'overall' ? 18 : 30,
+    }));
+    clothing = pickWeighted(cWeights, r);
+  }
+
+  let clothesColor: WhoIsItCharacter['clothesColor'] = 'blue';
+  if (caps.clothesColor) {
+    const bucket = r();
+    if (bucket < 0.32) {
+      clothesColor = r() < 0.5 ? 'red' : 'yellow';
+    } else if (bucket < 0.74) {
+      const cool: WhoIsItCharacter['clothesColor'][] = ['blue', 'green', 'purple'];
+      clothesColor = cool[Math.floor(r() * cool.length)];
+    } else {
+      clothesColor = r() < 0.5 ? 'dark' : 'white';
+    }
+  }
+
+  const earrings = caps.earrings ? r() < (gender === 'female' ? 0.50 : 0.22) : false;
+  const blush = caps.blush ? r() < (gender === 'female' ? 0.48 : 0.16) : false;
+  const freckles = caps.freckles ? r() < 0.28 : false;
+  const scar = caps.scar ? r() < 0.24 : false;
+  const bow = caps.bow && gender === 'female' && hat === 'none' ? r() < 0.40 : false;
+
+  const seedNum = Math.floor(r() * 0x1_0000_0000).toString(36);
+  const seedNum2 = Math.floor(r() * 0x1_0000_0000).toString(36);
+
+  return {
+    name,
+    seed: `${pack}_${seedNum}_${seedNum2}`,
+    bg,
+    gender,
+    hairStyle,
+    hairColor,
+    hat,
+    glasses,
+    facialHair,
+    skin,
+    expression,
+    clothing,
+    clothesColor,
+    earrings,
+    blush,
+    freckles,
+    scar,
+    bow,
+  };
+}
+
+function answerVector(c: Omit<WhoIsItCharacter, 'id'>, traits: WhoIsItTraitDef[]): string {
+  const full = c as WhoIsItCharacter;
+  let out = '';
+  for (const t of traits) out += t.match(full) ? '1' : '0';
+  return out;
+}
+
+export function generateWhoIsItBoard(
+  size: number,
+  pack: WhoIsItArtPackId,
+  rng: () => number = Math.random,
+): WhoIsItCharacter[] {
+  const n = Math.max(6, Math.min(size, MALE_NAMES.length + FEMALE_NAMES.length));
+  const caps = WHO_IS_IT_ART_PACKS[pack].caps;
+  const availTraits = whoIsItTraitsForPack(pack);
+  const r = createBoardRng(rng);
+  const maxAttempts = 60;
+
+  let bestChars: Omit<WhoIsItCharacter, 'id'>[] | null = null;
+  let bestPenalty = Infinity;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const maleCount = Math.floor(n / 2);
+    const femaleCount = n - maleCount;
+    const genders: ('male' | 'female')[] = [
+      ...Array<'male'>(maleCount).fill('male'),
+      ...Array<'female'>(femaleCount).fill('female'),
+    ];
+    shuffleInPlace(genders, r);
+
+    const malePool = shuffleInPlace([...MALE_NAMES], r);
+    const femalePool = shuffleInPlace([...FEMALE_NAMES], r);
+    let mIdx = 0;
+    let fIdx = 0;
+    const bgOffset = Math.floor(r() * BG_CYCLE.length);
+
+    const chars: Omit<WhoIsItCharacter, 'id'>[] = [];
+    const seenVectors = new Set<string>();
+    let duplicateVectors = 0;
+
+    for (let i = 0; i < n; i++) {
+      const gender = genders[i];
+      const name = gender === 'male' ? malePool[mIdx++] : femalePool[fIdx++];
+      const bg = BG_CYCLE[(i + bgOffset) % BG_CYCLE.length];
+
+      let chosen: Omit<WhoIsItCharacter, 'id'> | null = null;
+      let chosenVec = '';
+      for (let retry = 0; retry < 50; retry++) {
+        const cand = sampleCharacter(name, gender, pack, caps, bg, r);
+        const vec = answerVector(cand, availTraits);
+        if (!seenVectors.has(vec)) {
+          chosen = cand;
+          chosenVec = vec;
+          break;
+        }
+        chosen = cand;
+        chosenVec = vec;
+      }
+      if (seenVectors.has(chosenVec)) duplicateVectors++;
+      seenVectors.add(chosenVec);
+      chars.push(chosen!);
+    }
+
+    let traitViolations = 0;
+    let deficit = 0;
+    for (const tr of availTraits) {
+      let hits = 0;
+      for (const ch of chars) {
+        if (tr.match(ch as WhoIsItCharacter)) hits++;
+      }
+      if (hits < 2) {
+        traitViolations++;
+        deficit += 2 - hits;
+      } else if (hits > n - 2) {
+        traitViolations++;
+        deficit += hits - (n - 2);
+      }
+    }
+
+    const penalty = duplicateVectors * 1000 + traitViolations * 10 + deficit;
+    if (penalty < bestPenalty) {
+      bestPenalty = penalty;
+      bestChars = chars;
+    }
+    if (penalty === 0) break;
+  }
+
+  const sorted = (bestChars ?? []).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  return sorted.map((c, idx) => ({
+    id: `wi_${String(idx + 1).padStart(2, '0')}`,
+    ...c,
+  }));
 }

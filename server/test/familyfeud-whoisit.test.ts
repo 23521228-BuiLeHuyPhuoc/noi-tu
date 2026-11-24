@@ -7,9 +7,13 @@ import {
   type FamilyFeudView,
 } from '../../shared/src/familyfeud';
 import {
-  WHO_IS_IT_CHARACTERS,
+  generateWhoIsItBoard,
+  matchWhoIsItTrait,
+  WHO_IS_IT_ART_PACK_IDS,
+  WHO_IS_IT_ART_PACKS,
   WHO_IS_IT_TRAITS,
   whoIsItBoardSize,
+  whoIsItTraitsForPack,
   type WhoIsItView,
 } from '../../shared/src/whoisit';
 import { VOICE_PERSONA_IDS, type GameResult } from '../../shared/src/types';
@@ -248,42 +252,195 @@ describe('Who Is It? HopKids (Đoán Ai Đây?)', () => {
     vi.useRealTimers();
   });
 
-  it('đủ 100 nhân vật riêng biệt, 34 đặc điểm cân đối & bảng tự tăng tới 48–54 thẻ', () => {
-    expect(WHO_IS_IT_CHARACTERS).toHaveLength(100);
-    expect(new Set(WHO_IS_IT_CHARACTERS.map((c) => c.id)).size).toBe(100);
-    expect(new Set(WHO_IS_IT_CHARACTERS.map((c) => c.name)).size).toBe(100);
+  it('tự úp thẻ theo câu hỏi mới nhất dù không bấm úp, không mất lượt úp', () => {
+    vi.useFakeTimers();
+    const { ctx } = makeCtx(() => 0.15, { whoIsItDifficulty: 'auto' }, 2000);
+    const game = new WhoIsItGame(ctx);
+    game.start(makePlayers(2, true));
 
-    const traitSigs = WHO_IS_IT_CHARACTERS.map((c) =>
-      JSON.stringify([
-        c.gender, c.hairStyle, c.hairColor, c.hat, c.glasses, c.facialHair,
-        c.skin, c.expression, c.clothing, c.clothesColor, c.earrings, c.blush, c.freckles, c.scar, c.bow,
+    const v0 = game.view('p0');
+    const redSecret = v0.characters[0].id;
+    const blueSecret = v0.characters[1].id;
+    expect(game.action('p0', { type: 'wi_pick_secret', characterId: redSecret })).toEqual({ ok: true });
+    expect(game.action('p1', { type: 'wi_pick_secret', characterId: blueSecret })).toEqual({ ok: true });
+
+    const stepUntil = (pred: () => boolean, maxSteps = 400) => {
+      for (let i = 0; i < maxSteps && !pred(); i++) {
+        vi.advanceTimersByTime(100);
+      }
+      expect(pred()).toBe(true);
+    };
+
+    // Chờ tới pha ask đầu tiên
+    stepUntil(() => game.view('p0').phase === 'ask');
+
+    const firstTeam = game.view('p0').turnTeam;
+    const askPid = firstTeam === 'red' ? 'p0' : 'p1';
+    const oppPid = firstTeam === 'red' ? 'p1' : 'p0';
+    const oppTeam = firstTeam === 'red' ? 'blue' : 'red';
+    const board = game.view(askPid).characters;
+
+    const availKeys = (): string[] => {
+      const v = game.view(askPid) as WhoIsItView & { traitKeys?: string[] };
+      return v.traitKeys ?? WHO_IS_IT_TRAITS.map((t) => t.key);
+    };
+
+    const trait1 = availKeys().find((k) => {
+      const hits = board.filter((c) => matchWhoIsItTrait(c, k)).length;
+      return hits > 0 && hits < board.length;
+    })!;
+    expect(trait1).toBeTruthy();
+
+    // Hỏi câu 1, KHÔNG gửi hành động úp thẻ nào, chờ hết review để tự qua lượt
+    expect(game.action(askPid, { type: 'wi_ask_trait', traitKey: trait1 })).toEqual({ ok: true });
+    const qa1 = game.view(askPid).lastQA!;
+    expect(qa1.traitKey).toBe(trait1);
+    expect(typeof qa1.answer).toBe('boolean');
+
+    stepUntil(() => game.view(askPid).turnTeam === oppTeam && game.view(askPid).phase === 'ask');
+
+    const expected1 = board
+      .filter((c) => matchWhoIsItTrait(c, trait1) !== qa1.answer)
+      .map((c) => c.id)
+      .sort();
+    expect(expected1.length).toBeGreaterThan(0);
+    expect([...game.view(askPid).myFlipped].sort()).toEqual(expected1);
+    expect([...game.view(oppPid).oppFlipped].sort()).toEqual(expected1);
+
+    // Chơi lượt đội kia để quay lại lượt đội đầu tiên
+    expect(game.action(oppPid, { type: 'wi_ask_trait', traitKey: trait1 })).toEqual({ ok: true });
+    stepUntil(() => game.view(oppPid).phase === 'review');
+    expect(game.action(oppPid, { type: 'wi_end_review' })).toEqual({ ok: true });
+    stepUntil(() => game.view(askPid).turnTeam === firstTeam && game.view(askPid).phase === 'ask');
+
+    // Hỏi câu 2 (khác câu 1), kết thúc review bằng wi_end_review mà không úp thủ công
+    const trait2 = availKeys().find((k) => {
+      if (k === trait1) return false;
+      const open = board.filter((c) => !game.view(askPid).myFlipped.includes(c.id));
+      const hits = open.filter((c) => matchWhoIsItTrait(c, k)).length;
+      return hits > 0 && hits < open.length;
+    })!;
+    expect(trait2).toBeTruthy();
+
+    expect(game.action(askPid, { type: 'wi_ask_trait', traitKey: trait2 })).toEqual({ ok: true });
+    const qa2 = game.view(askPid).lastQA!;
+    stepUntil(() => game.view(askPid).phase === 'review');
+    expect(game.action(askPid, { type: 'wi_end_review' })).toEqual({ ok: true });
+
+    const expected2 = Array.from(
+      new Set([
+        ...expected1,
+        ...board.filter((c) => matchWhoIsItTrait(c, trait2) !== qa2.answer).map((c) => c.id),
       ]),
-    );
-    expect(new Set(traitSigs).size).toBe(100);
+    ).sort();
+    const myFlippedAfter2 = game.view(askPid).myFlipped;
+    expect(new Set(myFlippedAfter2).size).toBe(myFlippedAfter2.length);
+    expect([...myFlippedAfter2].sort()).toEqual(expected2);
+    expect([...game.view(oppPid).oppFlipped].sort()).toEqual(expected2);
 
-    for (const tr of WHO_IS_IT_TRAITS) {
-      const hits = WHO_IS_IT_CHARACTERS.filter(tr.match).length;
-      expect(hits, `${tr.key}`).toBeGreaterThan(4);
-      expect(hits, `${tr.key}`).toBeLessThan(96);
+    // Đoán sai phải úp thẻ đoán sai và mất 1 mạng
+    stepUntil(() => game.view(oppPid).turnTeam === oppTeam && game.view(oppPid).phase === 'ask');
+    const askSecret = firstTeam === 'red' ? redSecret : blueSecret;
+    const wrongCard = board.find((c) => c.id !== askSecret && !game.view(oppPid).myFlipped.includes(c.id))!;
+    const livesBefore = game.view(oppPid).lives[oppTeam];
+    expect(game.action(oppPid, { type: 'wi_guess', characterId: wrongCard.id })).toEqual({ ok: true });
+    expect(game.view(oppPid).myFlipped).toContain(wrongCard.id);
+    expect(game.view(oppPid).lives[oppTeam]).toBe(livesBefore - 1);
+
+    game.dispose();
+  });
+
+  it('bộ sinh nhân vật tạo bảng hợp lệ, duy nhất & cân đối trên đủ 7 gói nét vẽ và kích cỡ 30–54 thẻ', () => {
+    const mulberry32 = (seed: number) => {
+      let a = seed >>> 0;
+      return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    };
+
+    expect(WHO_IS_IT_ART_PACK_IDS).toHaveLength(7);
+    expect(WHO_IS_IT_TRAITS.some((t) => t.key === 'exp_sad')).toBe(true);
+
+    const sizes = [30, 36, 42, 48, 54] as const;
+    const seeds = [101, 2026, 99991];
+
+    for (const pack of WHO_IS_IT_ART_PACK_IDS) {
+      const caps = WHO_IS_IT_ART_PACKS[pack].caps;
+      const traits = whoIsItTraitsForPack(pack);
+      expect(traits.length, `${pack} phải có đặc điểm`).toBeGreaterThanOrEqual(10);
+
+      for (const size of sizes) {
+        for (const seed of seeds) {
+          const board = generateWhoIsItBoard(size, pack, mulberry32(seed));
+          expect(board).toHaveLength(size);
+          expect(new Set(board.map((c) => c.id)).size, `${pack}/${size}/${seed} unique id`).toBe(size);
+          expect(new Set(board.map((c) => c.name)).size, `${pack}/${size}/${seed} unique name`).toBe(size);
+
+          const vectors = board.map((c) => traits.map((t) => (t.match(c) ? '1' : '0')).join(''));
+          expect(new Set(vectors).size, `${pack}/${size}/${seed} unique vectors`).toBe(size);
+
+          for (const c of board) {
+            expect(caps.hairStyle, `${pack} hairStyle`).toContain(c.hairStyle);
+            expect(caps.hat, `${pack} hat`).toContain(c.hat);
+            expect(caps.glasses, `${pack} glasses`).toContain(c.glasses);
+            expect(caps.facialHair, `${pack} facialHair`).toContain(c.facialHair);
+            expect(caps.expression, `${pack} expression`).toContain(c.expression);
+            if (caps.clothing.length > 0) {
+              expect(caps.clothing, `${pack} clothing`).toContain(c.clothing);
+            }
+            if (!caps.earrings) expect(c.earrings).toBe(false);
+            if (!caps.blush) expect(c.blush).toBe(false);
+            if (!caps.freckles) expect(c.freckles).toBe(false);
+            if (!caps.scar) expect(c.scar).toBe(false);
+            if (!caps.bow) expect(c.bow).toBe(false);
+
+            if (c.gender === 'female') {
+              expect(c.facialHair).toBe('none');
+              expect(c.hairStyle).not.toBe('bald');
+              if (caps.femaleHairStyles) expect(caps.femaleHairStyles, `${pack} femaleHairStyles`).toContain(c.hairStyle);
+            } else if (caps.maleHairStyles) {
+              expect(caps.maleHairStyles, `${pack} maleHairStyles`).toContain(c.hairStyle);
+            }
+            if (c.hairStyle === 'covered' || c.hairStyle === 'bald' || !caps.hairColor) {
+              expect(c.hairColor).toBe('none');
+            }
+            if (c.bow) {
+              expect(c.gender).toBe('female');
+              expect(c.hat).toBe('none');
+            }
+          }
+
+          for (const tr of traits) {
+            const hits = board.filter(tr.match).length;
+            expect(hits, `${pack}/${size}/${seed} ${tr.key}`).toBeGreaterThanOrEqual(2);
+            expect(hits, `${pack}/${size}/${seed} ${tr.key}`).toBeLessThanOrEqual(size - 2);
+          }
+        }
+      }
     }
 
-    expect(whoIsItBoardSize(2, 'auto')).toBe(24);
-    expect(whoIsItBoardSize(4, 'auto')).toBe(30);
-    expect(whoIsItBoardSize(6, 'auto')).toBe(36);
-    expect(whoIsItBoardSize(8, 'auto')).toBe(42);
-    expect(whoIsItBoardSize(10, 'auto')).toBe(48);
+    expect(whoIsItBoardSize(2, 'auto')).toBe(30);
+    expect(whoIsItBoardSize(4, 'auto')).toBe(36);
+    expect(whoIsItBoardSize(6, 'auto')).toBe(42);
+    expect(whoIsItBoardSize(8, 'auto')).toBe(48);
+    expect(whoIsItBoardSize(10, 'auto')).toBe(54);
     expect(whoIsItBoardSize(10, 'large')).toBe(54);
   });
 
-  it('bảo mật bí mật & chat riêng đội, đồng bộ oppFlipped khi soi bảng đối thủ & có nhịp turn_beat', () => {
+  it('bảo mật bí mật & chat riêng đội, nhịp reveal -> review -> turn_beat giữ đúng người hỏi kế tiếp & từ chối đặc điểm không thuộc gói vẽ', () => {
     vi.useFakeTimers();
-    const { ctx, getResult } = makeCtx(() => 0.1, { whoIsItDifficulty: 'auto' }, 3000);
+    // rng = 0.8 => pickWhoIsItArtPack chọn 'bigSmile' (không có mũ, râu, áo hoodie...)
+    const { ctx, getResult } = makeCtx(() => 0.8, { whoIsItDifficulty: 'auto' }, 3000);
     const game = new WhoIsItGame(ctx);
     game.start(makePlayers(4, true));
 
     const vRed0 = game.view('p0');
-    expect(vRed0.boardSize).toBe(30);
+    expect(vRed0.boardSize).toBe(36);
     expect(vRed0.phase).toBe('pick_secret');
+    expect(vRed0.artPack).toBe('bigSmile');
 
     // Thảo luận đội riêng tư
     expect(game.action('p0', { type: 'wi_team_chat', text: 'Bí mật chọn người đội mũ!' })).toEqual({ ok: true });
@@ -297,43 +454,101 @@ describe('Who Is It? HopKids (Đoán Ai Đây?)', () => {
     expect(game.view('p1').mySecretId).toBeNull();
     expect(game.action('p1', { type: 'wi_pick_secret', characterId: bluePick })).toEqual({ ok: true });
 
-    const askingView = game.view(game.view('p0').turnTeam === 'red' ? 'p0' : 'p1');
-    const askPid = askingView.myTeam === 'red' ? 'p0' : 'p1';
-    const watchPid = askingView.myTeam === 'red' ? 'p1' : 'p0';
-    const otherSecretChar = askingView.characters.find((c) => c.id === (askingView.myTeam === 'red' ? bluePick : redPick))!;
+    // Vừa chọn xong bí mật -> vào turn_beat giới thiệu lượt đầu tiên (đã có sẵn turnTeam & activePlayerId)
+    const firstBeat = game.view('p0');
+    expect(firstBeat.phase).toBe('turn_beat');
+    expect(firstBeat.activePlayerId).not.toBeNull();
+    const firstTeam = firstBeat.turnTeam;
+    const firstAsker = firstBeat.activePlayerId!;
 
-    expect(game.action(askPid, { type: 'wi_ask_trait', traitKey: 'gender_male' })).toEqual({ ok: true });
-    expect(game.action(askPid, { type: 'wi_auto_flip' })).toEqual({ ok: true });
+    vi.advanceTimersByTime(500);
+    const firstAsk = game.view(firstAsker);
+    expect(firstAsk.phase).toBe('ask');
+    expect(firstAsk.turnTeam).toBe(firstTeam);
+    expect(firstAsk.activePlayerId).toBe(firstAsker);
+
+    const oppPid = firstTeam === 'red' ? 'p1' : 'p0';
+    const otherSecretChar = firstAsk.characters.find((c) => c.id === (firstTeam === 'red' ? bluePick : redPick))!;
+
+    // Từ chối trait không thuộc gói bigSmile (vd hat_cap, facial_beard, cloth_hoodie)
+    const unavailableKey = WHO_IS_IT_TRAITS.find((t) => !firstAsk.traitKeys.includes(t.key))!.key;
+    expect(game.action(firstAsker, { type: 'wi_ask_trait', traitKey: unavailableKey })).toEqual({
+      ok: false,
+      reason: 'bad_action',
+    });
+
+    // Hỏi trait hợp lệ -> vào reveal ngay, thẻ đã được tự động úp
+    expect(game.action(firstAsker, { type: 'wi_ask_trait', traitKey: 'gender_male' })).toEqual({ ok: true });
+    const afterAsk = game.view(firstAsker);
+    expect(afterAsk.phase).toBe('reveal');
+    expect(afterAsk.myFlipped.length).toBeGreaterThan(0);
+    expect(afterAsk.lastFlippedIds.length).toBe(afterAsk.myFlipped.length);
+    expect(afterAsk.lastFlippedTeam).toBe(firstTeam);
 
     // Bên đối phương nhìn được danh sách oppFlipped mà KHÔNG biết secret của đội hỏi!
-    const afterAuto = game.view(askPid);
-    const oppPerspective = game.view(watchPid);
-    expect(afterAuto.myFlipped.length).toBeGreaterThan(0);
-    expect(oppPerspective.oppFlipped).toEqual(afterAuto.myFlipped);
+    const oppPerspective = game.view(oppPid);
+    expect(oppPerspective.oppFlipped).toEqual(afterAsk.myFlipped);
     expect(oppPerspective.mySecretId).toBe(otherSecretChar.id);
 
-    // Kết thúc review -> vào turn_beat -> hết timer mới chuyển sang ask cho đội kia
-    expect(game.action(askPid, { type: 'wi_end_review' })).toEqual({ ok: true });
-    expect(game.view(askPid).phase).toBe('turn_beat');
-    vi.advanceTimersByTime(3200);
-    expect(game.view(watchPid).phase).toBe('ask');
+    // Hết reveal -> vào review -> bấm wi_end_review -> vào turn_beat với đội & người hỏi kế tiếp đã chốt sẵn
+    vi.advanceTimersByTime(600);
+    expect(game.view(firstAsker).phase).toBe('review');
+    expect(game.action(firstAsker, { type: 'wi_end_review' })).toEqual({ ok: true });
 
-    const nextPid = watchPid;
-    const nextTarget = game.view(watchPid).myTeam === 'red' ? bluePick : redPick;
-    expect(game.action(nextPid, { type: 'wi_guess', characterId: nextTarget })).toEqual({ ok: true });
+    const nextBeat = game.view(oppPid);
+    const expectedNextTeam = firstTeam === 'red' ? 'blue' : 'red';
+    expect(nextBeat.phase).toBe('turn_beat');
+    expect(nextBeat.turnTeam).toBe(expectedNextTeam);
+    expect(nextBeat.activePlayerId).not.toBeNull();
+    const nextAsker = nextBeat.activePlayerId!;
+
+    // Hết turn_beat -> vào ask với ĐÚNG người hỏi đã thông báo trong turn_beat
+    vi.advanceTimersByTime(500);
+    const nextAsk = game.view(nextAsker);
+    expect(nextAsk.phase).toBe('ask');
+    expect(nextAsk.turnTeam).toBe(expectedNextTeam);
+    expect(nextAsk.activePlayerId).toBe(nextAsker);
+
+    // Đội đang hỏi hết giờ -> chuyển turn_beat sang đội kia với turnNote = 'timeout'
+    vi.advanceTimersByTime(2800);
+    const timeoutBeat = game.view(firstAsker);
+    expect(timeoutBeat.phase).toBe('turn_beat');
+    expect(timeoutBeat.turnTeam).toBe(firstTeam);
+    expect(timeoutBeat.turnNote).toBe('timeout');
+
+    vi.advanceTimersByTime(300);
+    const secondTurnView = game.view(firstAsker);
+    expect(secondTurnView.phase).toBe('ask');
+    expect(secondTurnView.turnNote).toBeNull();
+    const secondAsker = secondTurnView.activePlayerId!;
+
+    // Không cho phép cùng 1 đội hỏi lại đặc điểm đã hỏi
+    expect(game.action(secondAsker, { type: 'wi_ask_trait', traitKey: 'gender_male' })).toEqual({
+      ok: false,
+      reason: 'bad_action',
+    });
+
+    // Chốt đoán đúng -> qua pha reveal rồi mới kết thúc ván (kèm characterId trên lastQA)
+    const targetForFirstTeam = firstTeam === 'red' ? bluePick : redPick;
+    expect(game.action(secondAsker, { type: 'wi_guess', characterId: targetForFirstTeam })).toEqual({ ok: true });
+    expect(game.view(secondAsker).phase).toBe('reveal');
+    expect(game.view(secondAsker).lastQA?.characterId).toBe(targetForFirstTeam);
+    expect(getResult()).toBeNull();
+    vi.advanceTimersByTime(600);
     expect(getResult()).not.toBeNull();
+    game.dispose();
   });
 
-  it('tích hợp bot chơi đủ ván Who Is It ở các quy mô 2, 6, 10 người (24 -> 36 -> 48 thẻ)', async () => {
+  it('tích hợp bot chơi đủ ván Who Is It ở các quy mô 2, 6, 10 người (30 -> 42 -> 54 thẻ)', async () => {
     vi.useFakeTimers();
-    for (const [n, expectedBoard] of [[2, 24], [6, 36], [10, 48]] as const) {
+    for (const [n, expectedBoard] of [[2, 30], [6, 42], [10, 54]] as const) {
       const { ctx, getResult } = makeCtx(() => Math.random(), { whoIsItDifficulty: 'auto' }, 2500);
       const game = new WhoIsItGame(ctx);
       const pls = makePlayers(n);
       game.start(pls);
       expect(game.view('p0').boardSize).toBe(expectedBoard);
 
-      for (let step = 0; step < 300 && !getResult(); step++) {
+      for (let step = 0; step < 400 && !getResult(); step++) {
         for (const p of pls) {
           const act = game.botAction(p.id);
           if (act) game.action(p.id, act);
@@ -353,7 +568,7 @@ describe('Who Is It? HopKids (Đoán Ai Đây?)', () => {
     for (let i = 0; i < 5; i++) room.addBot(host.playerId);
     expect(room.start(host.playerId)).toEqual({ ok: true });
     const vStart = room.toPublic(host.playerId).game as WhoIsItView;
-    expect(vStart.boardSize).toBe(36);
+    expect(vStart.boardSize).toBe(42);
     room.removePlayer(host.playerId);
 
     const t0 = Date.now();
