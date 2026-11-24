@@ -24,7 +24,6 @@ import { Shell } from '../components/Shell';
 import { Sheet } from '../components/Sheet';
 import { CountdownBar } from '../components/TimerBar';
 import { UiIcon } from '../components/Icons';
-import { WhoIsItPopups } from '../components/WhoIsItPopups';
 
 const USE_NATIVE = Platform.OS !== 'web';
 const TEAM_RED = '#EF4444';
@@ -393,18 +392,28 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
         ? '❓ Đối thủ đang hỏi tự do — bấm CÓ hoặc KHÔNG!'
         : `Đang chờ Đội ${view.turnTeam === 'red' ? 'Xanh' : 'Đỏ'} trả lời…`;
     }
+    const formatQAResult = (qa: NonNullable<WhoIsItView['lastQA']>) => {
+      const qaDot = qa.team === 'red' ? '🔴' : '🔵';
+      if (qa.kind === 'guess') {
+        const target =
+          (qa.characterId ? view.characters.find((c) => c.id === qa.characterId)?.name : undefined) ?? qa.question;
+        const resText = qa.answer === true ? 'TRÚNG 🎯' : qa.answer === false ? 'TRẬT ❌' : '';
+        return `${qaDot} ${qa.askedByName} chốt đoán ${target} → ${resText}`;
+      }
+      const ansText = qa.answer === true ? 'CÓ ✅' : qa.answer === false ? 'KHÔNG ❌' : '';
+      return `${qaDot} ${qa.askedByName}: "${qa.question}" → ${ansText}`;
+    };
     if (view.phase === 'reveal') {
-      return `${turnTeamDot} Đang mở đáp án lượt Đội ${turnTeamName}…`;
+      return view.lastQA
+        ? formatQAResult(view.lastQA)
+        : `${turnTeamDot} Đang mở đáp án lượt Đội ${turnTeamName}…`;
     }
     if (view.phase === 'review') {
       const qa = view.lastQA;
       if (isMyTeamTurn && qa?.kind === 'free') {
         return '✏️ Câu tự gõ — Chạm để úp thẻ không khớp rồi bấm Xong lượt!';
       }
-      const ansText = qa?.answer === true ? 'CÓ ✅' : qa?.answer === false ? 'KHÔNG ❌' : '';
-      return qa
-        ? `${qa.team === 'red' ? '🔴' : '🔵'} ${qa.askedByName}: "${qa.question}" → ${ansText}`
-        : `${turnTeamDot} Đang xem bảng sau lượt hỏi…`;
+      return qa ? formatQAResult(qa) : `${turnTeamDot} Đang xem bảng sau lượt hỏi…`;
     }
     if (guessMode) {
       return '🎯 CHẾ ĐỘ ĐOÁN: Chạm thẳng khuôn mặt bạn muốn chốt!';
@@ -468,6 +477,45 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
       ) : (
         <View style={styles.waitDock}>
           <T style={[styles.waitTxt, { color: pal.muted }]}>Đã giữ bí mật! Chờ đội bạn kia…</T>
+        </View>
+      );
+    }
+
+    if (needsFreeAnswer && view.pendingQuestion) {
+      return (
+        <View style={styles.freeAnswerDock}>
+          <View style={styles.freeAnswerHeader}>
+            {mySecretChar && (
+              <Image
+                source={{ uri: whoIsItPortraitUri(mySecretChar, view.artPack) }}
+                style={styles.freeAnswerPortrait}
+                resizeMode="contain"
+              />
+            )}
+            <T numberOfLines={2} style={styles.freeAnswerQ}>
+              “{view.pendingQuestion.text}”
+            </T>
+          </View>
+          <View style={styles.dockRow}>
+            <Button
+              testID="wi-answer-yes"
+              title="✅ CÓ"
+              variant="jade"
+              small
+              style={{ flex: 1 }}
+              disabled={busy}
+              onPress={() => actSafe({ type: 'wi_answer_free', yes: true })}
+            />
+            <Button
+              testID="wi-answer-no"
+              title="❌ KHÔNG"
+              variant="danger"
+              small
+              style={{ flex: 1 }}
+              disabled={busy}
+              onPress={() => actSafe({ type: 'wi_answer_free', yes: false })}
+            />
+          </View>
         </View>
       );
     }
@@ -776,18 +824,6 @@ export function WhoIsItScreen({ game, room }: { game: Game; room: RoomState }) {
             Nét vẽ: {artPackMeta.label} — {artPackMeta.author} · {artPackMeta.license}
           </T>
         </Pressable>
-
-        {/* Popup hào quang cho turn_beat / answer_free / reveal */}
-        <WhoIsItPopups
-          view={view}
-          me={game.me}
-          clockOffset={game.clockOffset}
-          busy={busy}
-          mySecretChar={mySecretChar}
-          onAnswerFree={(yes) => {
-            void actSafe({ type: 'wi_answer_free', yes });
-          }}
-        />
       </View>
 
       {/* Sheet Kênh Thảo Luận Riêng Của Đội */}
@@ -1161,6 +1197,34 @@ const styles = StyleSheet.create({
   inlineTraitTxt: { fontSize: 12, fontWeight: '800', color: C.ink },
   inlineTraitBestTxt: { color: '#92400E' },
   dockRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  freeAnswerDock: { gap: 6 },
+  freeAnswerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#D97706',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  freeAnswerPortrait: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#D97706',
+  },
+  freeAnswerQ: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: '800',
+    color: C.ink,
+    lineHeight: 17,
+  },
   reviewHintTxt: { fontSize: 12, fontWeight: '800', color: C.secondary },
   reviewHintFree: { color: '#B45309' },
   waitDock: { minHeight: 34, justifyContent: 'center', alignItems: 'center' },
