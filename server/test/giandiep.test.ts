@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mentionsWord } from '../../shared/src/fuzzyGuess';
 import {
   countWordChars,
   GIAN_DIEP_WORDS,
+  gianDiepPairKey,
   matchGianDiepGuess,
   type GianDiepView,
 } from '../../shared/src/giandiep';
@@ -41,16 +43,25 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     vi.useRealTimers();
   });
 
-  it('có ít nhất 300 cặp từ tiếng Việt phân loại rõ ràng và không trùng nhau', () => {
-    expect(GIAN_DIEP_WORDS.length).toBeGreaterThanOrEqual(300);
+  it('có ít nhất 600 cặp từ tiếng Việt, không từ nào lặp lại, gợi ý của máy không lộ từ', () => {
+    expect(GIAN_DIEP_WORDS.length).toBeGreaterThanOrEqual(600);
+    const seenPairs = new Set<string>();
     const seenWords = new Set<string>();
     for (const pair of GIAN_DIEP_WORDS) {
       expect(pair.wordA).not.toBe(pair.wordB);
       expect(pair.cluesA.length).toBeGreaterThanOrEqual(2);
       expect(pair.cluesB.length).toBeGreaterThanOrEqual(2);
-      const pairKey = [pair.wordA.toLowerCase(), pair.wordB.toLowerCase()].sort().join('|');
-      expect(seenWords.has(pairKey)).toBe(false);
-      seenWords.add(pairKey);
+      const pairKey = gianDiepPairKey(pair);
+      expect(seenPairs.has(pairKey)).toBe(false);
+      seenPairs.add(pairKey);
+      for (const w of [pair.wordA, pair.wordB]) {
+        expect(w.includes('/'), w).toBe(false);
+        const k = w.normalize('NFC').toLowerCase();
+        expect(seenWords.has(k), `từ lặp: ${w}`).toBe(false);
+        seenWords.add(k);
+      }
+      for (const c of pair.cluesA) expect(mentionsWord(c, pair.wordA), `${pair.wordA}: ${c}`).toBe(false);
+      for (const c of pair.cluesB) expect(mentionsWord(c, pair.wordB), `${pair.wordB}: ${c}`).toBe(false);
     }
   });
 
@@ -230,8 +241,8 @@ describe('Ai Là Gián Điệp 2.0 (Biện Minh, Phán Quyết, Lật Mở Từ 
     room.dispose();
   }, 15000);
 
-  it('matchGianDiepGuess khớp từ khóa cốt lõi và chặn tiền tố loại từ / từ phe đối phương trên toàn bộ 160 cặp từ', () => {
-    // 1. Toàn bộ 160 cặp từ: khớp đúng chính nó, KHÔNG khớp nhầm sang từ còn lại, KHÔNG khớp từ loại bare
+  it('matchGianDiepGuess khớp từ khóa cốt lõi và chặn tiền tố loại từ / từ phe đối phương trên toàn bộ ngân hàng', () => {
+    // 1. Toàn bộ cặp từ: khớp đúng chính nó, KHÔNG khớp nhầm sang từ còn lại, KHÔNG khớp từ loại bare
     const bareClassifiers = ['con', 'chim', 'quả', 'bánh', 'nước', 'máy', 'xe', 'đàn', 'mạng'];
     for (const pair of GIAN_DIEP_WORDS) {
       expect(matchGianDiepGuess(pair.wordA, pair.wordA, pair.wordB)).toBe(true);

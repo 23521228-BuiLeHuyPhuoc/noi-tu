@@ -37,6 +37,11 @@ export interface EngineContext {
   rollDice?: (impulse: ThrowImpulse, rng: Rng) => { dice: [number, number]; frames: number[]; ms: number; fps: number };
   /** cả phòng vừa duyệt một từ mới: thêm vào từ điển và lưu lại */
   learnWord: (word: string, byName: string) => void;
+  /**
+   * bốc một khóa chưa dùng của bộ `pool` (vd cặp từ Gián điệp đã chơi thì tạm ngưng), trả về chỉ số trong `keys`;
+   * server nhớ qua các ván và qua lần khởi động lại. Thiếu (test) thì game tự bốc.
+   */
+  drawFresh?: (pool: string, keys: readonly string[]) => number;
 }
 
 export interface GameEngine {

@@ -49,6 +49,8 @@ export interface RoomOptions {
   onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null; winnerIds?: string[] }) => void;
   /** cả phòng duyệt một từ mới */
   learnWord?: (word: string, byName: string) => void;
+  /** bốc khóa chưa dùng (cặp từ Gián điệp…) — nhớ chung toàn server, xem FreshDeck */
+  drawFresh?: (pool: string, keys: readonly string[]) => number;
 }
 
 const memeIds = new Set<string>(MEME_LIST.map((line) => line.id));
@@ -840,6 +842,7 @@ export class Room {
       },
       finish: (result: GameResult) => this.finish(result),
       learnWord: (word: string, byName: string) => this.opts.learnWord?.(word, byName),
+      drawFresh: this.opts.drawFresh,
       emitCroakTick: (payload: CroakTickPayload) => this.opts.onCroakTick?.(this, payload),
       emitBoomTick: (payload: BoomTickPayload) => this.opts.onBoomTick?.(this, payload),
       playerColor: (id: string) => this.find(id)?.character.color ?? 0,

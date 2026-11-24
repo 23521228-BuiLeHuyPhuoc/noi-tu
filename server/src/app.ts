@@ -13,6 +13,8 @@ import { MemoryStore, MongoStore, type Store } from './store';
 import { MongoWalletStore, type WalletStore } from './walletStore';
 import { WalletEvents } from './wallet';
 import { FunQuota } from './shop';
+import { FreshDeck } from './freshDeck';
+import { GIAN_DIEP_DECK } from '../../shared/src/giandiep';
 
 /** ví Ruby theo nơi lưu tài khoản: MongoDB thì dùng chung kết nối, bộ nhớ thì dùng chung bảng người dùng */
 function walletFor(store: Store): WalletStore {
@@ -56,6 +58,9 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   const logErr = (what: string) => (e: unknown) => console.error(what, e);
 
   const auth = new Auth(store, mailer);
+  // cặp từ Gián điệp đã chơi: tạm ngưng tới khi chơi hết ngân hàng, nhớ qua lần khởi động lại (MongoDB)
+  const freshDeck = new FreshDeck(store, logErr('usedKeys'));
+  freshDeck.load(GIAN_DIEP_DECK).catch(logErr('usedKeys'));
   const app = express();
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -143,6 +148,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         const w = dict.add(word) ?? dict.en?.add(word) ?? null;
         if (w) store.addWord(w, byName).catch(logErr('addWord'));
       },
+      drawFresh: opts.room?.drawFresh ?? ((pool, keys) => freshDeck.draw(pool, keys)),
       onCroakTick: (room, payload) => {
         // có sự kiện âm thanh/cột mốc thì gửi tin cậy; tick vật lý thuần thì dùng volatile chống dồn hàng đợi khi mạng yếu
         if (payload.events.length > 0) io.to(room.code).emit('croak:tick', payload);

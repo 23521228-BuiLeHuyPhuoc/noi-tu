@@ -88,6 +88,10 @@ export interface Store {
   /** lưu từ được cả phòng duyệt; trả về false nếu đã có */
   addWord(word: string, by: string): Promise<boolean>;
   listWords(): Promise<string[]>;
+  /** khóa đã dùng của một bộ bốc thăm (vd cặp từ Gián điệp đã chơi) để không lặp lại — xem FreshDeck */
+  listUsedKeys(pool: string): Promise<string[]>;
+  addUsedKey(pool: string, key: string): Promise<void>;
+  clearUsedKeys(pool: string): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -114,6 +118,7 @@ export class MemoryStore implements Store {
   private users = new Map<string, UserRecord>();
   private sessions = new Map<string, string>();
   private words = new Set<string>();
+  private usedKeys = new Map<string, Set<string>>();
   private resets = new Map<string, ResetRecord>();
   private resetSends = new Map<string, Date[]>();
   private walletStore?: MemoryWalletStore;
@@ -273,6 +278,20 @@ export class MemoryStore implements Store {
   async listWords() {
     return [...this.words];
   }
+  async listUsedKeys(pool: string) {
+    return [...(this.usedKeys.get(pool) ?? [])];
+  }
+  async addUsedKey(pool: string, key: string) {
+    let set = this.usedKeys.get(pool);
+    if (!set) {
+      set = new Set();
+      this.usedKeys.set(pool, set);
+    }
+    set.add(key);
+  }
+  async clearUsedKeys(pool: string) {
+    this.usedKeys.delete(pool);
+  }
   async close() {}
 }
 
@@ -331,6 +350,7 @@ export class MongoStore implements Store {
     private readonly resets: Collection<ResetRecord>,
     private readonly resetSends: Collection<{ userId: string; sentAt: Date[] }>,
     private readonly db: Db,
+    private readonly usedKeys: Collection<{ pool: string; key: string; at: Date }>,
   ) {}
 
   /** cơ sở dữ liệu đang dùng (để ví Ruby dùng chung kết nối) */
@@ -342,7 +362,7 @@ export class MongoStore implements Store {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 10_000, appName: 'xom-lay' });
     await client.connect();
     const db: Db = client.db(dbName);
-    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'), db.collection('password_reset_sends'), db);
+    const store = new MongoStore(client, db.collection('users'), db.collection('sessions'), db.collection('words'), db.collection('password_resets'), db.collection('password_reset_sends'), db, db.collection('used_keys'));
     await Promise.all([
       store.users.createIndex({ username: 1 }, { unique: true }),
       store.users.createIndex({ email: 1 }, { unique: true, sparse: true }),
@@ -353,6 +373,7 @@ export class MongoStore implements Store {
       // phiên đăng nhập tự hết hạn sau 180 ngày
       store.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }),
       store.words.createIndex({ word: 1 }, { unique: true }),
+      store.usedKeys.createIndex({ pool: 1, key: 1 }, { unique: true }),
     ]);
     return store;
   }
@@ -539,6 +560,15 @@ export class MongoStore implements Store {
   }
   async listWords() {
     return (await this.words.find({}, { projection: { word: 1 } }).toArray()).map((w) => w.word);
+  }
+  async listUsedKeys(pool: string) {
+    return (await this.usedKeys.find({ pool }, { projection: { key: 1 } }).toArray()).map((d) => d.key);
+  }
+  async addUsedKey(pool: string, key: string) {
+    await this.usedKeys.updateOne({ pool, key }, { $setOnInsert: { pool, key, at: new Date() } }, { upsert: true });
+  }
+  async clearUsedKeys(pool: string) {
+    await this.usedKeys.deleteMany({ pool });
   }
   async close() {
     await this.client.close();

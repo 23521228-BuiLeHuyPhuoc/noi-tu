@@ -1,7 +1,9 @@
 import {
   countWordChars,
+  GIAN_DIEP_DECK,
   GIAN_DIEP_ROLE_META,
   GIAN_DIEP_WORDS,
+  gianDiepPairKey,
   matchGianDiepGuess,
   MR_WHITE_GENERIC_CLUES,
   type GianDiepClue,
@@ -12,7 +14,9 @@ import {
   type GianDiepView,
   type GianDiepWordPair,
 } from '../../../shared/src/giandiep';
+import { mentionsWord } from '../../../shared/src/fuzzyGuess';
 import type { ActionResult, GameAction } from '../../../shared/src/types';
+import { FreshDeck } from '../freshDeck';
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const DEFAULT_SEC: Record<GianDiepPhase, number> = {
@@ -43,32 +47,9 @@ const BOT_CHAT_LINES = [
   'Mình thấy có 1 người dùng từ hơi lạ so với chủ đề nè.',
 ];
 
-function stripAccents(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-}
-
-function normPhrase(s: string): string {
-  return s.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
-}
-
-let livePairBag: number[] = [];
-let lastLivePairIdx = -1;
-
-function drawLivePairIndex(): number {
-  if (livePairBag.length === 0) {
-    livePairBag = Array.from({ length: GIAN_DIEP_WORDS.length }, (_, i) => i);
-    for (let i = livePairBag.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [livePairBag[i], livePairBag[j]] = [livePairBag[j], livePairBag[i]];
-    }
-    if (livePairBag.length > 1 && livePairBag[0] === lastLivePairIdx) {
-      [livePairBag[0], livePairBag[1]] = [livePairBag[1], livePairBag[0]];
-    }
-  }
-  const idx = livePairBag.shift() ?? 0;
-  lastLivePairIdx = idx;
-  return idx;
-}
+const PAIR_KEYS = GIAN_DIEP_WORDS.map(gianDiepPairKey);
+/** khi phòng không được server cấp bộ bốc thăm chung (chạy riêng lẻ) thì vẫn không lặp trong tiến trình này */
+const processDeck = new FreshDeck();
 
 export class GianDiepGame implements GameEngine {
   readonly perPlayerView = true;
@@ -191,11 +172,12 @@ export class GianDiepGame implements GameEngine {
       this.alive.add(p.id);
     }
 
-    const pairIdx =
-      this.ctx.rng === Math.random
-        ? drawLivePairIndex()
-        : Math.floor(this.ctx.rng() * GIAN_DIEP_WORDS.length) % GIAN_DIEP_WORDS.length;
-    this.pair = GIAN_DIEP_WORDS[pairIdx];
+    // cặp từ đã chơi thì tạm ngưng tới khi chơi hết cả ngân hàng (nhớ chung toàn server, qua cả lần khởi động lại)
+    let pairIdx: number;
+    if (this.ctx.drawFresh) pairIdx = this.ctx.drawFresh(GIAN_DIEP_DECK, PAIR_KEYS);
+    else if (this.ctx.rng === Math.random) pairIdx = processDeck.draw(GIAN_DIEP_DECK, PAIR_KEYS);
+    else pairIdx = Math.floor(this.ctx.rng() * GIAN_DIEP_WORDS.length) % GIAN_DIEP_WORDS.length;
+    this.pair = GIAN_DIEP_WORDS[pairIdx] ?? GIAN_DIEP_WORDS[0];
     const flip = this.ctx.rng() < 0.5;
     this.danWord = flip ? this.pair.wordB : this.pair.wordA;
     this.spyWord = flip ? this.pair.wordA : this.pair.wordB;
@@ -640,20 +622,9 @@ export class GianDiepGame implements GameEngine {
     });
   }
 
+  /** chặn lộ từ: so theo nguyên tiếng, có xét dấu (xem mentionsWord) */
   private containsSecretWord(text: string, secret: string | null | undefined): boolean {
-    if (!secret) return false;
-    const cleanText = normPhrase(text);
-    const cleanSecret = normPhrase(secret);
-    if (!cleanSecret) return false;
-    if (cleanText.includes(cleanSecret)) return true;
-    const strippedText = stripAccents(cleanText);
-    const strippedSecret = stripAccents(cleanSecret);
-    if (strippedText.includes(strippedSecret)) return true;
-    if (cleanSecret.includes(' ')) {
-      const noSpaceSecret = strippedSecret.replace(/\s+/g, '');
-      if (noSpaceSecret.length >= 3 && strippedText.replace(/\s+/g, '').includes(noSpaceSecret)) return true;
-    }
-    return false;
+    return !!secret && mentionsWord(text, secret);
   }
 
   private checkPhaseAdvance(): boolean {
@@ -757,7 +728,8 @@ export class GianDiepGame implements GameEngine {
       if ((this.phase !== 'mrwhite_guess' && this.phase !== 'spy_guess') || this.mrWhiteId !== playerId || this.mrWhiteGuessed) {
         return { ok: false, reason: 'not_your_turn' };
       }
-      const guess = action.word.normalize('NFC').replace(/\s+/g, ' ').trim();
+      if (typeof action.word !== 'string') return { ok: false, reason: 'bad_action' };
+      const guess = action.word.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 60);
       if (!guess) return { ok: false, reason: 'bad_action' };
       this.mrWhiteGuessed = true;
       this.clearTimers();
