@@ -1,9 +1,17 @@
 /**
- * Popup nổi có hào quang (Halo) cho game Đoán Ai Đây? (`who_is_it`):
- * - `turn_beat`: thông báo tới lượt đội nào & ai hỏi (kèm cảnh báo nếu đội trước hết giờ).
- * - `answer_free`: hiện câu hỏi tự do kèm chân dung thẻ bí mật + 2 nút CÓ / KHÔNG cho đội trả lời.
- * - `reveal`: hoạt ảnh 2 nhịp — hiện câu hỏi (~1.2s) rồi đóng dấu CÓ ✅ / KHÔNG ❌ hoặc TRÚNG PHÓC / TRẬT.
- * Chạm vùng mờ bên ngoài sẽ thu gọn popup cục bộ (không bao giờ chặn thao tác trả lời).
+ * Popup nổi có hào quang (Halo) cho game Đoán Ai Đây? (`who_is_it`), chia 2 chế độ để không che bảng lâu:
+ *
+ * A. CẦN THIẾT (thẻ lớn có hào quang + nền mờ nhẹ `rgba(15, 23, 42, 0.38)`):
+ * - `answer_free` cho đội phải trả lời (`needsFreeAnswer`): giữ suốt pha để bấm CÓ / KHÔNG;
+ *   là trường hợp duy nhất cho phép chạm nền mờ để thu gọn và hiện nút mở lại.
+ * - `turn_beat` khi tới lượt đội của người xem: giữ suốt pha (~1.8s).
+ * - `reveal` (mọi người): hiện câu hỏi 500ms rồi đóng dấu CÓ ✅ / KHÔNG ❌ hoặc TRÚNG PHÓC / TRẬT,
+ *   sau đó tự mờ đi ~1.2s để người chơi nhìn rõ bảng thẻ vừa úp.
+ *
+ * B. LƯỚT NHANH — FLASH (thẻ nhỏ ~70% chiều rộng, viền phát sáng, không nền mờ, `pointerEvents="none"`,
+ *    đặt phía trên bảng, tự mờ sau ~1s, không có nút mở lại):
+ * - `turn_beat` cho lượt đối thủ hoặc khán giả.
+ * - `answer_free` cho đội vừa hỏi hoặc khán giả (đang chờ đối thủ trả lời).
  */
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -22,6 +30,12 @@ const TEAM_RED = '#EF4444';
 const TEAM_BLUE = '#3B82F6';
 const RESULT_YES = '#16A34A';
 const RESULT_NO = '#DC2626';
+
+const CARD_FADE_IN_MS = 150;
+const CARD_FADE_OUT_MS = 150;
+const REVEAL_STAMP_MS = 500;
+const REVEAL_POST_STAMP_MS = 1200;
+const FLASH_VISIBLE_MS = 1000;
 
 const RAY_ANGLES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 
@@ -160,6 +174,21 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
     (view.phase === 'answer_free' && view.pendingQuestion !== null) ||
     (view.phase === 'reveal' && view.lastQA !== null);
 
+  const needsFreeAnswer =
+    view.phase === 'answer_free' &&
+    view.pendingQuestion !== null &&
+    view.myTeam !== null &&
+    view.myTeam !== view.pendingQuestion.askedByTeam;
+
+  const isMyTeamTurn =
+    view.phase === 'turn_beat' &&
+    view.myTeam !== null &&
+    view.myTeam === view.turnTeam;
+
+  const isFlash =
+    (view.phase === 'turn_beat' && !isMyTeamTurn) ||
+    (view.phase === 'answer_free' && view.pendingQuestion !== null && !needsFreeAnswer);
+
   const pendingId = view.pendingQuestion?.id ?? 0;
   const lastQaId = view.lastQA?.id ?? 0;
   const lastQaAnswer = view.lastQA?.answer ?? null;
@@ -179,22 +208,33 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
   }, [view.phase, view.roundCount, view.turnTeam, view.activePlayerId, view.turnNote, pendingId, lastQaId]);
 
   const [dismissedKey, setDismissedKey] = useState<string>('');
-  const [stampedKey, setStampedKey] = useState<string>('');
+  const [stampedQaId, setStampedQaId] = useState<number>(0);
+  const [autoHiddenKey, setAutoHiddenKey] = useState<string>('');
 
   const [cardScale] = useState(() => new Animated.Value(0.84));
   const [cardOpacity] = useState(() => new Animated.Value(0));
+  const [fadeOutOpacity] = useState(() => new Animated.Value(1));
   const [stampScale] = useState(() => new Animated.Value(1.55));
   const [stampOpacity] = useState(() => new Animated.Value(0));
 
-  const isMinimized = Boolean(popupKey) && dismissedKey === popupKey;
-  const isStamped = view.phase === 'reveal' && Boolean(popupKey) && stampedKey === popupKey;
+  const canMinimize = needsFreeAnswer;
+  const isMinimized = canMinimize && Boolean(popupKey) && dismissedKey === popupKey;
+  const isAutoHidden = Boolean(popupKey) && autoHiddenKey === popupKey;
+  const isStamped = view.phase === 'reveal' && lastQaId > 0 && stampedQaId === lastQaId;
+
+  const autoHideDelayMs = isFlash
+    ? FLASH_VISIBLE_MS
+    : view.phase === 'reveal' && lastQaId > 0
+      ? REVEAL_STAMP_MS + REVEAL_POST_STAMP_MS
+      : 0;
 
   // Hiệu ứng nảy vào mỗi khi mở popup mới
   useEffect(() => {
-    if (!isPopupPhase || !popupKey || isMinimized) return;
-    cardScale.setValue(0.84);
+    if (!isPopupPhase || !popupKey || isMinimized || isAutoHidden) return;
+    fadeOutOpacity.setValue(1);
+    cardScale.setValue(isFlash ? 0.92 : 0.84);
     cardOpacity.setValue(0);
-    Animated.parallel([
+    const anim = Animated.parallel([
       Animated.spring(cardScale, {
         toValue: 1,
         friction: 6.5,
@@ -203,51 +243,80 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
       }),
       Animated.timing(cardOpacity, {
         toValue: 1,
-        duration: 210,
+        duration: CARD_FADE_IN_MS,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE,
       }),
-    ]).start();
-  }, [isPopupPhase, popupKey, isMinimized, cardScale, cardOpacity]);
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [isPopupPhase, popupKey, isMinimized, isAutoHidden, isFlash, cardScale, cardOpacity, fadeOutOpacity]);
 
-  // Nhịp 2 của pha `reveal`: sau 1.2s đóng dấu đáp án + âm thanh (đúng 1 lần cho mỗi reveal)
+  // Nhịp 2 của pha `reveal`: sau 500ms đóng dấu đáp án + âm thanh (đúng 1 lần cho mỗi `lastQA.id`)
   useEffect(() => {
-    if (view.phase !== 'reveal' || !lastQaId || !popupKey || stampedKey === popupKey) return;
+    if (view.phase !== 'reveal' || !lastQaId || stampedQaId === lastQaId) return;
     const timer = setTimeout(() => {
-      setStampedKey(popupKey);
+      setStampedQaId(lastQaId);
       play(lastQaAnswer ? 'stamp' : 'error', { speakerId: lastQaAskedById });
-    }, 1200);
+    }, REVEAL_STAMP_MS);
     return () => clearTimeout(timer);
-  }, [view.phase, lastQaId, lastQaAnswer, lastQaAskedById, popupKey, stampedKey]);
+  }, [view.phase, lastQaId, lastQaAnswer, lastQaAskedById, stampedQaId]);
 
   useEffect(() => {
     if (!isStamped) return;
     stampScale.setValue(1.65);
     stampOpacity.setValue(0);
-    Animated.parallel([
+    const anim = Animated.parallel([
       Animated.spring(stampScale, {
         toValue: 1,
-        friction: 5.5,
-        tension: 120,
+        friction: 6,
+        tension: 160,
         useNativeDriver: USE_NATIVE,
       }),
       Animated.timing(stampOpacity, {
         toValue: 1,
-        duration: 180,
+        duration: 150,
         useNativeDriver: USE_NATIVE,
       }),
-    ]).start();
+    ]);
+    anim.start();
+    return () => anim.stop();
   }, [isStamped, stampScale, stampOpacity]);
 
-  if (!isPopupPhase) return null;
+  // Tự mờ & ẩn cho Flash (~1s) và Reveal (~1.2s sau khi đóng dấu), gắn theo `popupKey` để broadcast lại không reset timer
+  useEffect(() => {
+    if (!isPopupPhase || !popupKey || !autoHideDelayMs) return;
+    let cancelled = false;
+    let fadeAnim: Animated.CompositeAnimation | null = null;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const needsFreeAnswer =
-    view.phase === 'answer_free' &&
-    view.pendingQuestion !== null &&
-    view.myTeam !== null &&
-    view.myTeam !== view.pendingQuestion.askedByTeam;
+    const hideTimer = setTimeout(() => {
+      if (cancelled) return;
+      fadeAnim = Animated.timing(fadeOutOpacity, {
+        toValue: 0,
+        duration: CARD_FADE_OUT_MS,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: USE_NATIVE,
+      });
+      fadeAnim.start(() => {
+        if (!cancelled) setAutoHiddenKey(popupKey);
+      });
+      fallbackTimer = setTimeout(() => {
+        if (!cancelled) setAutoHiddenKey(popupKey);
+      }, CARD_FADE_OUT_MS + 80);
+    }, autoHideDelayMs);
 
-  // Khi thu gọn: hiện nút nhỏ phía trên để mở lại (đặc biệt để không bao giờ chặn trả lời câu tự do)
+    return () => {
+      cancelled = true;
+      clearTimeout(hideTimer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fadeAnim?.stop();
+    };
+  }, [isPopupPhase, popupKey, autoHideDelayMs, fadeOutOpacity]);
+
+  if (!isPopupPhase || isAutoHidden) return null;
+
+  // Chỉ giữ nút thu gọn / mở lại cho đội đang phải bấm CÓ / KHÔNG ở pha `answer_free`
   if (isMinimized) {
     return (
       <View pointerEvents="box-none" style={styles.minimizedAnchor}>
@@ -256,22 +325,12 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
           onPress={() => setDismissedKey('')}
           style={({ pressed }) => [
             styles.minimizedPill,
-            needsFreeAnswer && styles.minimizedPillUrgent,
+            styles.minimizedPillUrgent,
             pressed && { opacity: 0.82 },
           ]}
         >
-          <UiIcon
-            name={needsFreeAnswer ? 'HelpCircle' : 'Sparkles'}
-            size={14}
-            color="#FFFFFF"
-          />
-          <T style={styles.minimizedTxt}>
-            {needsFreeAnswer
-              ? `Trả lời câu hỏi (${sec}s) · Bấm mở`
-              : view.phase === 'reveal'
-                ? 'Xem lại đáp án'
-                : `Xem thông báo lượt (${sec}s)`}
-          </T>
+          <UiIcon name="HelpCircle" size={14} color="#FFFFFF" />
+          <T style={styles.minimizedTxt}>Trả lời câu hỏi ({sec}s) · Bấm mở</T>
         </Pressable>
       </View>
     );
@@ -473,14 +532,107 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
     return null;
   };
 
+  const renderFlashContent = () => {
+    if (view.phase === 'turn_beat') {
+      const askerName = view.activePlayerId ? (view.names[view.activePlayerId] ?? 'Đồng đội') : 'Cả đội';
+      const prevTeam = view.turnTeam === 'red' ? 'Đội Xanh' : 'Đội Đỏ';
+
+      return (
+        <View style={styles.flashBody}>
+          <View style={[styles.flashBadge, { backgroundColor: accentColor }]}>
+            <T style={styles.flashBadgeTxt}>ĐỐI THỦ HỎI</T>
+          </View>
+          <T style={[styles.flashHeadline, { color: accentColor }]}>
+            TỚI LƯỢT ĐỘI {teamLabel(view.turnTeam).toUpperCase()}
+          </T>
+          <T style={styles.flashAsker}>{askerName} hỏi</T>
+          {view.turnNote === 'timeout' && (
+            <View style={styles.flashTimeoutBox}>
+              <T style={styles.flashTimeoutTxt}>⏰ {prevTeam} hết giờ, mất lượt</T>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    if (view.phase === 'answer_free' && view.pendingQuestion) {
+      const pq = view.pendingQuestion;
+      const askerTeamLabel = teamLabel(pq.askedByTeam);
+      const ansTeamLabel = teamLabel(pq.askedByTeam === 'red' ? 'blue' : 'red');
+      const askerName = view.activePlayerId
+        ? (view.names[view.activePlayerId] ?? `Đội ${askerTeamLabel}`)
+        : `Đội ${askerTeamLabel}`;
+
+      return (
+        <View style={styles.flashBody}>
+          <View style={[styles.flashBadge, { backgroundColor: accentColor }]}>
+            <T style={styles.flashBadgeTxt}>CÂU HỎI TỰ DO</T>
+          </View>
+          <T style={styles.flashAskerLine}>
+            {askerName} (Đội {askerTeamLabel}) hỏi:
+          </T>
+          <T numberOfLines={2} style={styles.flashQuote}>
+            “{pq.text}”
+          </T>
+          <T style={styles.flashWaitTxt}>Đang chờ Đội {ansTeamLabel} trả lời…</T>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  if (isFlash) {
+    const flashCardWidth = Math.min(276, Math.max(210, Math.round(cardWidth * 0.72)));
+
+    return (
+      <Animated.View
+        testID={`wi-popup-${view.phase}`}
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.flashRoot, { opacity: fadeOutOpacity }]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flashCard,
+            {
+              width: flashCardWidth,
+              borderColor: accentColor,
+              opacity: cardOpacity,
+              transform: [{ scale: cardScale }],
+            },
+            Platform.OS === 'web'
+              ? ({ boxShadow: `0 8px 24px rgba(15, 23, 42, 0.22), 0 0 18px ${accentColor}66` } as object)
+              : {
+                  shadowColor: accentColor,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.36,
+                  shadowRadius: 12,
+                  elevation: 8,
+                },
+          ]}
+        >
+          {renderFlashContent()}
+        </Animated.View>
+      </Animated.View>
+    );
+  }
+
   return (
-    <View testID={`wi-popup-${view.phase}`} style={[StyleSheet.absoluteFill, styles.overlayRoot]}>
-      <Pressable
-        testID="wi-popup-backdrop"
-        accessibilityLabel="Thu gọn thông báo"
-        onPress={() => setDismissedKey(popupKey)}
-        style={[StyleSheet.absoluteFill, styles.dimBackdrop]}
-      />
+    <Animated.View
+      testID={`wi-popup-${view.phase}`}
+      style={[StyleSheet.absoluteFill, styles.overlayRoot, { opacity: fadeOutOpacity }]}
+    >
+      {canMinimize ? (
+        <Pressable
+          testID="wi-popup-backdrop"
+          accessibilityLabel="Thu gọn thông báo"
+          onPress={() => setDismissedKey(popupKey)}
+          style={[StyleSheet.absoluteFill, styles.dimBackdrop]}
+        />
+      ) : (
+        <View testID="wi-popup-backdrop" style={[StyleSheet.absoluteFill, styles.dimBackdrop]} />
+      )}
 
       <View pointerEvents="box-none" style={styles.centerStage}>
         <Halo color={accentColor} size={haloSize} boost={haloBoost} />
@@ -506,10 +658,10 @@ export const WhoIsItPopups = memo(function WhoIsItPopups({
           ]}
         >
           {renderContent()}
-          <T style={styles.dismissHint}>Chạm vùng mờ bên ngoài để thu gọn</T>
+          {canMinimize && <T style={styles.dismissHint}>Chạm vùng mờ bên ngoài để thu gọn</T>}
         </Animated.View>
       </View>
-    </View>
+    </Animated.View>
   );
 });
 
@@ -520,7 +672,84 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dimBackdrop: {
-    backgroundColor: 'rgba(15, 23, 42, 0.56)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+  },
+  flashRoot: {
+    zIndex: 40,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 14,
+  },
+  flashCard: {
+    backgroundColor: 'rgba(255, 253, 248, 0.96)',
+    borderRadius: 16,
+    borderWidth: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  flashBody: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    gap: 4,
+  },
+  flashBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+  },
+  flashBadgeTxt: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
+  flashHeadline: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  flashAsker: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: C.ink,
+    textAlign: 'center',
+  },
+  flashAskerLine: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: C.secondary,
+    textAlign: 'center',
+  },
+  flashQuote: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: C.ink,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  flashWaitTxt: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: C.secondary,
+    textAlign: 'center',
+    marginTop: 1,
+  },
+  flashTimeoutBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 2,
+  },
+  flashTimeoutTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B91C1C',
+    textAlign: 'center',
   },
   centerStage: {
     alignItems: 'center',

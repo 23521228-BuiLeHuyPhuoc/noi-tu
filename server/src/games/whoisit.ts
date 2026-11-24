@@ -28,10 +28,10 @@ import type { ActionResult, GameAction, RankEntry } from '../../../shared/src/ty
 import { Timer, type EngineContext, type EnginePlayer, type GameEngine } from './engine';
 
 const PICK_SECRET_MS = 22_000;
-const TURN_BEAT_MS = 3_400;
+const TURN_BEAT_MS = 1_800;
 const ASK_MS = 40_000;
 const ANSWER_FREE_MS = 25_000;
-const REVEAL_MS = 5_200;
+const REVEAL_MS = 2_800;
 const REVIEW_TRAIT_MS = 9_000;
 const REVIEW_FREE_MS = 18_000;
 

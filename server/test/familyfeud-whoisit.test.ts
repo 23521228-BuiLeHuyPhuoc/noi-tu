@@ -510,7 +510,7 @@ describe('Who Is It? HopKids (Đoán Ai Đây?)', () => {
     expect(nextAsk.activePlayerId).toBe(nextAsker);
 
     // Đội đang hỏi hết giờ -> chuyển turn_beat sang đội kia với turnNote = 'timeout'
-    vi.advanceTimersByTime(2800);
+    vi.advanceTimersByTime(2700);
     const timeoutBeat = game.view(firstAsker);
     expect(timeoutBeat.phase).toBe('turn_beat');
     expect(timeoutBeat.turnTeam).toBe(firstTeam);
