@@ -377,7 +377,6 @@ export function ThoiTrangWardrobe({
                   : tab === 'acc'
                     ? accs.some((a) => a.id === item.id)
                     : curEquipped?.id === item.id;
-              const matchesTheme = item.tags.some((t) => themeTagSet.has(t));
               return (
                 <Pressable
                   key={item.id}
@@ -388,9 +387,6 @@ export function ThoiTrangWardrobe({
                 >
                   <ThoiTrangIconSprite iconKey={`${tab}:${item.id}`} manifest={manifest} />
                   <T numberOfLines={2} style={[styles.cardTxt, mobile && styles.cardTxtMobile]}>{item.name}</T>
-                  {matchesTheme && (
-                    <View style={styles.sparkBadge}><T style={styles.sparkTxt}>✨</T></View>
-                  )}
                   {active && (
                     <View style={styles.checkBadge}><T style={styles.checkTxt}>✓</T></View>
                   )}
@@ -621,18 +617,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkTxt: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
-  sparkBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sparkTxt: { fontSize: 10 },
   controlsFooter: { gap: 7, paddingTop: 2 },
   controlsFooterMobile: { gap: 4, paddingTop: 1 },
 });
