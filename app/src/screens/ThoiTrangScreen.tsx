@@ -18,6 +18,7 @@ import {
   CATALOG,
   DEFAULT_FACE,
   FACE_OPTS,
+  MEME_PRINTS,
   PALETTES,
   PATTERNS,
   cloneOutfit,
@@ -56,12 +57,16 @@ function buildRandomV4Outfit(): ThoiTrangOutfit {
   };
   const eq = (cat: 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses' | 'acc') => {
     const m = pickForBody(CATALOG[cat]);
-    const keepSig = Math.random() < 0.55;
+    const keepSig = Math.random() < 0.6;
+    const memeTxt = (cat === 'top' || cat === 'dress') && Math.random() < 0.22
+      ? pick(MEME_PRINTS.slice(1))[0]
+      : undefined;
     return {
       id: m.id,
       c: keepSig ? m.c : pick(PALETTES.fashion),
       c2: keepSig ? m.c2 : pick(PALETTES.fashion),
       p: keepSig && m.p ? m.p : (m.pat && Math.random() < 0.35 ? pick(PATTERNS)[0] : 'plain' as const),
+      ...(memeTxt ? { txt: memeTxt } : {}),
     };
   };
   const h = pickForBody(CATALOG.hair);
@@ -150,6 +155,7 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
   );
 
   const [tab, setTab] = useState<ThoiTrangWardrobeTab>('top');
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [skippedKey, setSkippedKey] = useState<string | null>(null);
   const skipped = skippedKey === view.theme.id;
 
@@ -378,8 +384,8 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
             <RoomMiniTools />
           </View>
 
-          {/* Live room portrait strip (top-right row on desktop, right vertical stack on mobile) */}
-          {otherPlayers.length > 0 && (
+          {/* Live room portrait strip (top-right row on desktop, right vertical stack on mobile when sheet compact) */}
+          {otherPlayers.length > 0 && (!mobile || !mobileExpanded) && (
             <View
               testID="tt-room-strip"
               style={[styles.playersWrap, mobile ? styles.playersMobile : styles.playersDesktop]}
@@ -408,6 +414,29 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
             </View>
           )}
 
+          {/* Mobile left floating Undo / Random stack (symmetrical with right roommate bubbles, hidden while sheet expanded) */}
+          {mobile && !mobileExpanded && !isSpectator && (
+            <View style={styles.mobileLeftTools}>
+              <Pressable
+                testID="tt-undo"
+                accessibilityRole="button"
+                disabled={activeUndo.length === 0}
+                onPress={handleUndo}
+                style={[styles.roundBtn, styles.roundBtnMobile, activeUndo.length === 0 && styles.btnDim]}
+              >
+                <T style={styles.roundBtnTxt}>↶</T>
+              </Pressable>
+              <Pressable
+                testID="tt-random"
+                accessibilityRole="button"
+                onPress={() => handleOutfitChange(buildRandomV4Outfit())}
+                style={[styles.roundBtn, styles.roundBtnMobile]}
+              >
+                <T style={styles.roundBtnTxt}>🎲</T>
+              </Pressable>
+            </View>
+          )}
+
           {/* Desktop left category rail */}
           {!mobile && (
             <View style={styles.railAnchor}>
@@ -415,8 +444,14 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
             </View>
           )}
 
-          {/* Closet panel (right glass panel desktop / bottom 46% sheet mobile) */}
-          <View style={mobile ? styles.closetMobileAnchor : styles.closetDesktopAnchor}>
+          {/* Closet panel (right glass panel desktop / spacious 55%..78% sheet mobile) */}
+          <View
+            style={
+              mobile
+                ? [styles.closetMobileAnchor, mobileExpanded && styles.closetMobileExpanded]
+                : styles.closetDesktopAnchor
+            }
+          >
             <ThoiTrangWardrobe
               outfit={activeDraft}
               tab={tab}
@@ -427,15 +462,46 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
             />
           </View>
 
-          {/* Bottom center Undo / Random / ✨ Xong! dock */}
-          {!isSpectator && (
-            <View style={[styles.dock, mobile ? styles.dockMobile : styles.dockDesktop]}>
+          {/* Mobile Expand/Collapse + Xong! bar anchored cleanly at left/right edges above sheet (never hides shoes!) */}
+          {mobile && (
+            <View
+              pointerEvents="box-none"
+              style={[styles.mobileSheetBar, mobileExpanded && styles.mobileSheetBarExpanded]}
+            >
+              <Pressable
+                testID="tt-mobile-expand"
+                accessibilityRole="button"
+                onPress={() => setMobileExpanded((v) => !v)}
+                style={styles.expandBtn}
+              >
+                <T style={styles.expandBtnTxt}>
+                  {mobileExpanded ? '⬇️ Xem người' : '⬆️ Mở rộng tủ'}
+                </T>
+              </Pressable>
+              {!isSpectator && (
+                <Pressable
+                  testID="tt-ready-btn"
+                  accessibilityRole="button"
+                  onPress={handleToggleReady}
+                  style={[styles.doneBtn, styles.doneBtnMobile, myReady && styles.doneBtnReady]}
+                >
+                  <T style={[styles.doneBtnTxt, styles.doneBtnTxtMobile]}>
+                    {myReady ? '✓ Đã xong!' : '✨ Xong!'}
+                  </T>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {/* Desktop Bottom center Undo / Random / ✨ Xong! dock */}
+          {!mobile && !isSpectator && (
+            <View style={[styles.dock, styles.dockDesktop]}>
               <Pressable
                 testID="tt-undo"
                 accessibilityRole="button"
                 disabled={activeUndo.length === 0}
                 onPress={handleUndo}
-                style={[styles.roundBtn, mobile && styles.roundBtnMobile, activeUndo.length === 0 && styles.btnDim]}
+                style={[styles.roundBtn, activeUndo.length === 0 && styles.btnDim]}
               >
                 <T style={styles.roundBtnTxt}>↶</T>
               </Pressable>
@@ -443,7 +509,7 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
                 testID="tt-random"
                 accessibilityRole="button"
                 onPress={() => handleOutfitChange(buildRandomV4Outfit())}
-                style={[styles.roundBtn, mobile && styles.roundBtnMobile]}
+                style={styles.roundBtn}
               >
                 <T style={styles.roundBtnTxt}>🎲</T>
               </Pressable>
@@ -451,9 +517,9 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
                 testID="tt-ready-btn"
                 accessibilityRole="button"
                 onPress={handleToggleReady}
-                style={[styles.doneBtn, mobile && styles.doneBtnMobile, myReady && styles.doneBtnReady]}
+                style={[styles.doneBtn, myReady && styles.doneBtnReady]}
               >
-                <T style={[styles.doneBtnTxt, mobile && styles.doneBtnTxtMobile]}>
+                <T style={styles.doneBtnTxt}>
                   {myReady ? '✓ Đã xong!' : '✨ Xong!'}
                 </T>
               </Pressable>
@@ -546,11 +612,34 @@ const styles = StyleSheet.create({
   },
   playerOkTxt: { fontSize: 10, fontWeight: '800', color: '#ffffff' },
   railAnchor: { position: 'absolute', left: 14, top: 14, bottom: 14, justifyContent: 'center', zIndex: 4 },
+  mobileLeftTools: { position: 'absolute', top: 66, left: 8, gap: 6, zIndex: 4 },
   closetDesktopAnchor: { position: 'absolute', right: 16, top: 76, bottom: 14, width: 392, zIndex: 4 },
-  closetMobileAnchor: { position: 'absolute', left: 6, right: 6, bottom: 0, height: '48%', zIndex: 4 },
+  closetMobileAnchor: { position: 'absolute', left: 4, right: 4, bottom: 0, height: '55%', zIndex: 4 },
+  closetMobileExpanded: { height: '78%' },
+  mobileSheetBar: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: '56%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 5,
+  },
+  mobileSheetBarExpanded: { bottom: '79%' },
+  expandBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 13,
+    borderRadius: 999,
+    backgroundColor: V4.glass,
+    shadowColor: '#a05a96',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  expandBtnTxt: { fontSize: 12.5, fontWeight: '800', color: V4.ink },
   dock: { position: 'absolute', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, zIndex: 4 },
   dockDesktop: { bottom: 20, left: 96, right: 420 },
-  dockMobile: { bottom: '49.5%', left: 0, right: 0 },
   roundBtn: {
     width: 48,
     height: 48,

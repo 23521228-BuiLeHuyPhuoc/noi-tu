@@ -29,7 +29,14 @@ import type {
   ThoiTrangWardrobeTab,
 } from './thoitrang';
 import { EXTRA_ACC_SUB, EXTRA_ARCHETYPES } from './thoitrang-catalog-archetypes';
-import { buildExpandedCatalogItems } from './thoitrang-catalog-expanded';
+import {
+  MEME_PRINTS,
+  MEME_PRINT_MAP,
+  UNIQUE_ACC_SUB_V2,
+  UNIQUE_ARCHETYPES_V2,
+} from './thoitrang-catalog-expanded';
+
+export { MEME_PRINTS, MEME_PRINT_MAP };
 
 export const PALETTES: Readonly<Record<ThoiTrangPaletteKey, readonly string[]>> = {
   fashion: [
@@ -354,37 +361,25 @@ const CORE_CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatal
   ],
 };
 
-/** Tất cả hình khối 3D nguyên bản (~440 món) — mỗi món có 1 ô icon 3D riêng trong atlas WebP. */
+/** Tất cả ~648 hình khối 3D ĐỘC NHẤT — KHÔNG trùng hình dạng, KHÔNG bản sao chỉ đổi màu! */
 export const ARCHETYPE_CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
-  hair: [...CORE_CATALOG.hair, ...EXTRA_ARCHETYPES.hair],
-  top: [...CORE_CATALOG.top, ...EXTRA_ARCHETYPES.top],
-  outer: [...CORE_CATALOG.outer, ...EXTRA_ARCHETYPES.outer],
-  bottom: [...CORE_CATALOG.bottom, ...EXTRA_ARCHETYPES.bottom],
-  dress: [...CORE_CATALOG.dress, ...EXTRA_ARCHETYPES.dress],
-  shoes: [...CORE_CATALOG.shoes, ...EXTRA_ARCHETYPES.shoes],
-  hat: [...CORE_CATALOG.hat, ...EXTRA_ARCHETYPES.hat],
-  glasses: [...CORE_CATALOG.glasses, ...EXTRA_ARCHETYPES.glasses],
-  acc: [...CORE_CATALOG.acc, ...EXTRA_ARCHETYPES.acc],
+  hair: [...CORE_CATALOG.hair, ...EXTRA_ARCHETYPES.hair, ...UNIQUE_ARCHETYPES_V2.hair],
+  top: [...CORE_CATALOG.top, ...EXTRA_ARCHETYPES.top, ...UNIQUE_ARCHETYPES_V2.top],
+  outer: [...CORE_CATALOG.outer, ...EXTRA_ARCHETYPES.outer, ...UNIQUE_ARCHETYPES_V2.outer],
+  bottom: [...CORE_CATALOG.bottom, ...EXTRA_ARCHETYPES.bottom, ...UNIQUE_ARCHETYPES_V2.bottom],
+  dress: [...CORE_CATALOG.dress, ...EXTRA_ARCHETYPES.dress, ...UNIQUE_ARCHETYPES_V2.dress],
+  shoes: [...CORE_CATALOG.shoes, ...EXTRA_ARCHETYPES.shoes, ...UNIQUE_ARCHETYPES_V2.shoes],
+  hat: [...CORE_CATALOG.hat, ...EXTRA_ARCHETYPES.hat, ...UNIQUE_ARCHETYPES_V2.hat],
+  glasses: [...CORE_CATALOG.glasses, ...EXTRA_ARCHETYPES.glasses, ...UNIQUE_ARCHETYPES_V2.glasses],
+  acc: [...CORE_CATALOG.acc, ...EXTRA_ARCHETYPES.acc, ...UNIQUE_ARCHETYPES_V2.acc],
 };
-
-const EXPANDED = buildExpandedCatalogItems(ARCHETYPE_CATALOG, BASE_ACC_SUB);
 
 export const ACC_SUB: Readonly<Record<string, ThoiTrangAccSubSlot>> = {
   ...BASE_ACC_SUB,
-  ...EXPANDED.extraAccSub,
+  ...UNIQUE_ACC_SUB_V2,
 };
 
-export const CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
-  hair: [...ARCHETYPE_CATALOG.hair, ...EXPANDED.items.hair],
-  top: [...ARCHETYPE_CATALOG.top, ...EXPANDED.items.top],
-  outer: [...ARCHETYPE_CATALOG.outer, ...EXPANDED.items.outer],
-  bottom: [...ARCHETYPE_CATALOG.bottom, ...EXPANDED.items.bottom],
-  dress: [...ARCHETYPE_CATALOG.dress, ...EXPANDED.items.dress],
-  shoes: [...ARCHETYPE_CATALOG.shoes, ...EXPANDED.items.shoes],
-  hat: [...ARCHETYPE_CATALOG.hat, ...EXPANDED.items.hat],
-  glasses: [...ARCHETYPE_CATALOG.glasses, ...EXPANDED.items.glasses],
-  acc: [...ARCHETYPE_CATALOG.acc, ...EXPANDED.items.acc],
-};
+export const CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = ARCHETYPE_CATALOG;
 
 const ITEM_MAP = new Map<string, ThoiTrangCatalogItem>();
 for (const [cat, items] of Object.entries(CATALOG)) {
@@ -476,6 +471,12 @@ function sanitizeBody(raw: unknown): ThoiTrangBodyType {
   return BASE_OUTFIT.body;
 }
 
+const MEME_PRINT_SLOTS = new Set<ThoiTrangPrimarySlotId>(['top', 'outer', 'dress']);
+const pickMemeTxt = (raw: unknown, slot: ThoiTrangPrimarySlotId): string | undefined => {
+  if (!MEME_PRINT_SLOTS.has(slot) || typeof raw !== 'string') return undefined;
+  return MEME_PRINT_MAP[raw] ? raw : undefined;
+};
+
 export function validateOutfit(raw: unknown): { outfit: ThoiTrangOutfit; warnings: string[] } {
   const warnings: string[] = [];
   const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -519,11 +520,13 @@ export function validateOutfit(raw: unknown): { outfit: ThoiTrangOutfit; warning
     const obj = rs as Record<string, unknown>;
     const item = typeof obj.id === 'string' ? getItem(s.id, obj.id) : undefined;
     if (!item) { warnings.push(`invalid:${s.id}`); continue; }
+    const txt = pickMemeTxt(obj.txt, s.id);
     slots[s.id] = {
       id: item.id,
       c: pickHex(obj.c, item.cPal, item.c),
       c2: pickHex(obj.c2, item.c2Pal ?? 'fashion', item.c2),
       p: pickPat(obj.p, item.pat, item.p),
+      ...(txt ? { txt } : {}),
     };
   }
   if (slots.dress) {
@@ -596,7 +599,7 @@ export function outfitHash(outfit: ThoiTrangOutfit): string {
   const clean = validateOutfit(outfit).outfit;
   const slotStr = SLOTS.map((s) => {
     const eq = clean.slots[s.id];
-    return eq ? `${s.id}:${eq.id}:${eq.c}:${eq.c2}:${eq.p}` : '';
+    return eq ? `${s.id}:${eq.id}:${eq.c}:${eq.c2}:${eq.p}${eq.txt ? ':' + eq.txt : ''}` : '';
   }).filter(Boolean).join('|');
   const accStr = [...clean.acc].sort((a, b) => a.id.localeCompare(b.id))
     .map((a) => `${a.id}:${a.c}:${a.c2}:${a.p}`).join(',');
@@ -617,6 +620,7 @@ export function countVariants(): {
   let total = 0;
   for (const [cat, items] of Object.entries(CATALOG) as [ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]][]) {
     let catTotal = 0;
+    const printMult = (cat === 'top' || cat === 'outer' || cat === 'dress') ? MEME_PRINTS.length : 1;
     for (const item of items) {
       if (item.excluded) continue;
       baseItems += 1;
@@ -626,7 +630,7 @@ export function countVariants(): {
       } else {
         const c2 = item.c2Pal ? PALETTES[item.c2Pal].length : 1;
         const pCount = item.pat ? PATTERNS.length : 1;
-        catTotal += c1 * c2 * pCount;
+        catTotal += c1 * c2 * pCount * printMult;
       }
     }
     byCategory[cat] = catTotal;

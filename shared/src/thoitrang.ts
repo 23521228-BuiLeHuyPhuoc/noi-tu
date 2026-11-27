@@ -252,6 +252,8 @@ export interface ThoiTrangEquippedItem {
   c: string;
   c2: string;
   p: ThoiTrangPatternId;
+  /** ID câu chữ Meme in trực tiếp lên 3D (chỉ áp dụng cho top / outer / dress, bỏ qua nếu 'none' hoặc undefined) */
+  txt?: string;
 }
 
 export interface ThoiTrangOutfit {

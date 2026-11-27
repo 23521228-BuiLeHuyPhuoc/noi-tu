@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ThoiTrangOutfit, ThoiTrangPoseId } from '../../../shared/src/thoitrang';
-import { BASE_OUTFIT, getItem, validateOutfit } from '../../../shared/src/thoitrang-catalog';
+import { BASE_OUTFIT, MEME_PRINT_MAP, getItem, validateOutfit } from '../../../shared/src/thoitrang-catalog';
 import { Doll, animate, toon } from './doll.js';
 
 export type ThoiTrangStageMode = 'wardrobe' | 'runway';
@@ -70,10 +70,22 @@ function makeGradientTex(top: string, bot: string): THREE.CanvasTexture {
   return t;
 }
 
-function withV3d(cat: 'hair' | 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses' | 'acc', eq: { id: string } | undefined | null) {
+function withV3d(
+  cat: 'hair' | 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses' | 'acc',
+  eq: { id: string; txt?: string } | undefined | null,
+) {
   if (!eq) return null;
   const meta = getItem(cat, eq.id);
-  return meta?.v3d ? { ...eq, v3d: meta.v3d } : eq;
+  const printText = eq.txt ? MEME_PRINT_MAP[eq.txt] : undefined;
+  if (!meta?.v3d && !printText) return eq;
+  return {
+    ...eq,
+    v3d: {
+      base: meta?.v3d?.base ?? eq.id,
+      ...(meta?.v3d ?? {}),
+      ...(printText ? { print: printText } : {}),
+    },
+  };
 }
 
 export function toV4Outfit(raw: ThoiTrangOutfit): Record<string, unknown> {
@@ -220,7 +232,7 @@ export function createThoiTrangEngine(
     camera.aspect = width / Math.max(1, height);
     if (mode === 'wardrobe' && viewOffsetMode === 'auto') {
       if (width <= 760) {
-        camera.setViewOffset(width, height, 0, Math.round(height * 0.2), width, height);
+        camera.setViewOffset(width, height, 0, Math.round(height * 0.255), width, height);
         camera.fov = 30;
       } else {
         camera.setViewOffset(width, height, Math.min(160, Math.round(width * 0.125)), 0, width, height);
@@ -263,7 +275,7 @@ export function createThoiTrangEngine(
       doll.root.position.z = 0;
       doll.root.rotation.y = rotY;
       animate(doll, 'idle', t);
-      const baseDist = viewOffsetMode === 'auto' ? (width <= 760 ? 7.6 : 5.5) : 5.2;
+      const baseDist = viewOffsetMode === 'auto' ? (width <= 760 ? 8.15 : 5.5) : 5.2;
       camera.position.set(0, 0.98, Math.max(2.6, Math.min(9.5, baseDist + zoomOffset)));
       camera.lookAt(0, 0.84, 0);
     } else {

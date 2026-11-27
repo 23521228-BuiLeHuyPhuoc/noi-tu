@@ -21,6 +21,7 @@ import {
   BASE_OUTFIT,
   CATALOG,
   DEFAULT_FACE,
+  MEME_PRINTS,
   PALETTES,
   PATTERNS,
   cloneOutfit,
@@ -105,13 +106,15 @@ describe('thoitrang shared constants & helpers', () => {
   });
 });
 
-describe('thoitrang v5 expanded catalog & outfit validation', () => {
-  it('exposes >= 3,000 curated items, >= 430 bespoke 3D archetypes, >= 50M variants, valid palettes/patterns/subSlots, and balanced menswear/womenswear/lay_loi', () => {
+describe('thoitrang v6 unique-shape catalog & outfit validation', () => {
+  it('exposes >= 640 100% unique 3D archetypes (zero recolor clones), 48 meme prints, >= 200M honest variants, valid palettes/patterns/subSlots, and balanced menswear/womenswear/lay_loi', () => {
     const stats = countVariants();
     const archetypeCount = Object.values(ARCHETYPE_CATALOG).reduce((s, list) => s + list.length, 0);
-    expect(archetypeCount).toBeGreaterThanOrEqual(430);
-    expect(stats.baseItems).toBeGreaterThanOrEqual(3000);
-    expect(stats.total).toBeGreaterThanOrEqual(50_000_000);
+    expect(archetypeCount).toBeGreaterThanOrEqual(640);
+    // Strict invariant: EVERY item in CATALOG is a unique 3D shape (ZERO recolor duplicates!)
+    expect(stats.baseItems).toBe(archetypeCount);
+    expect(stats.total).toBeGreaterThanOrEqual(200_000_000);
+    expect(MEME_PRINTS.length).toBeGreaterThanOrEqual(49);
     expect(stats.bodyTypes).toBe(6);
     expect(stats.expressions).toBe(14);
 
@@ -136,6 +139,8 @@ describe('thoitrang v5 expanded catalog & outfit validation', () => {
         expect(item.id.length, `${cat} id`).toBeGreaterThan(0);
         expect(seenIds.has(item.id), `duplicate id ${cat}:${item.id}`).toBe(false);
         seenIds.add(item.id);
+        expect(item.iconKey, `${cat}:${item.id} must not reuse another iconKey`).toBeUndefined();
+        expect(item.v3d, `${cat}:${item.id} must be a standalone unique 3D archetype`).toBeUndefined();
         expect(item.name.length, `${cat}:${item.id} name`).toBeGreaterThan(0);
         expect(item.tags.length, `${cat}:${item.id} tags`).toBeGreaterThanOrEqual(3);
         for (const tag of item.tags) expect(validTagSet.has(tag), `${cat}:${item.id}:${tag}`).toBe(true);
@@ -153,9 +158,16 @@ describe('thoitrang v5 expanded catalog & outfit validation', () => {
       }
     }
 
-    expect(maleCount).toBeGreaterThanOrEqual(250);
-    expect(femaleCount).toBeGreaterThanOrEqual(250);
-    expect(layCount).toBeGreaterThanOrEqual(400);
+    expect(maleCount).toBeGreaterThanOrEqual(75);
+    expect(femaleCount).toBeGreaterThanOrEqual(35);
+    expect(layCount).toBeGreaterThanOrEqual(160);
+
+    // Meme slogan customizer validation + outfitHash sensitivity
+    const withTxt = setSlot(cloneOutfit(BASE_OUTFIT), 'top', { id: 'tee', c: '#ffffff', c2: '#15121b', p: 'plain', txt: 'flexing' });
+    expect(withTxt.slots.top?.txt).toBe('flexing');
+    expect(outfitHash(withTxt)).not.toBe(outfitHash(BASE_OUTFIT));
+    const badTxt = setSlot(cloneOutfit(BASE_OUTFIT), 'top', { id: 'tee', c: '#ffffff', c2: '#15121b', p: 'plain', txt: 'invalid_meme_id' });
+    expect(badTxt.slots.top?.txt).toBeUndefined();
   });
 
   it('sanitizes fields, enforces dress/top+bottom exclusivity, outer layering, acc sub-slots, and outfitHash', () => {

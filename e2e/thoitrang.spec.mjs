@@ -148,11 +148,11 @@ async function run() {
     attachErrorCollectors(desktop, 'desktop', errors);
     attachErrorCollectors(mobile, 'mobile', errors);
 
-    // 1. Verify v5 icon manifest & webp asset served cleanly
+    // 1. Verify v6 unique-shape icon manifest & webp asset served cleanly
     const iconJsonRes = await desktop.request.get(`${WEB_URL}/thoitrang/icons.json`);
     if (!iconJsonRes.ok()) throw new Error(`icons.json failed: ${iconJsonRes.status()}`);
     const manifest = await iconJsonRes.json();
-    if (manifest.count < 500) throw new Error(`Expected >= 500 v5 icons, got ${manifest.count}`);
+    if (manifest.count < 700) throw new Error(`Expected >= 700 v6 unique 3D icons, got ${manifest.count}`);
     const iconWebpRes = await desktop.request.get(`${WEB_URL}/thoitrang/icons.webp`);
     if (!iconWebpRes.ok()) throw new Error(`icons.webp failed: ${iconWebpRes.status()}`);
 
@@ -197,9 +197,13 @@ async function run() {
     await desktop.getByTestId('tt-item-outer-cardigan').click();
     await desktop.getByTestId('tt-tab-top').click();
 
-    // Mobile dresses up with dress + hat + returns to top tab
+    // Mobile dresses up with spacious v6 sheet: equip avocado_suit, toggle expand, test Color/Meme panel!
     await mobile.getByTestId('tt-tab-dress').click();
-    await mobile.getByTestId('tt-item-dress-ballgown').click();
+    await mobile.getByTestId('tt-mobile-search-btn').click();
+    await mobile.getByTestId('tt-search').fill('qua bo');
+    await mobile.getByTestId('tt-item-dress-avocado_suit').waitFor({ state: 'visible', timeout: 5_000 });
+    await mobile.getByTestId('tt-item-dress-avocado_suit').click();
+    await mobile.getByTestId('tt-search').fill('');
     await mobile.getByTestId('tt-tab-top').click();
     await desktop.waitForTimeout(1500); // allow live room portraits to render
 
@@ -208,24 +212,36 @@ async function run() {
     await desktop.screenshot({ path: path.join(SHOT_DIR, 'ingame-desktop-dressing.png') });
     await mobile.screenshot({ path: path.join(SHOT_DIR, 'ingame-mobile-dressing.png') });
 
+    // Capture mobile expanded drawer + mobile Style/Color/Meme tab!
+    await mobile.getByTestId('tt-mobile-expand').click();
+    await mobile.waitForTimeout(200);
+    await assertNoOverflow(mobile, 'mobile-dressing-expanded');
+    await mobile.screenshot({ path: path.join(SHOT_DIR, 'ingame-mobile-expanded.png') });
+    await mobile.getByTestId('tt-mobile-mode-style').click();
+    await mobile.waitForTimeout(200);
+    await mobile.screenshot({ path: path.join(SHOT_DIR, 'ingame-mobile-style.png') });
+    await mobile.getByTestId('tt-mobile-mode-items').click();
+    await mobile.getByTestId('tt-mobile-expand').click();
+
     // Capture desktop Face tab + expression change
     await desktop.getByTestId('tt-tab-face').click();
     await desktop.getByTestId('tt-face-expr-wink').click();
     await desktop.waitForTimeout(450);
     await desktop.screenshot({ path: path.join(SHOT_DIR, 'ingame-desktop-face.png') });
 
-    // Verify theme-match filter & badge are COMPLETELY REMOVED, and neutral search + type filters work!
+    // Verify theme-match filter & badge are COMPLETELY REMOVED, neutral filters + meme print customizer work!
     await desktop.getByTestId('tt-tab-top').click();
     if (await desktop.locator('[data-testid="tt-filter-match"]').count()) {
       throw new Error('Forbidden theme-match filter (tt-filter-match) is still present!');
     }
+    await desktop.getByTestId('tt-meme-flexing').click();
     await desktop.getByTestId('tt-sub-nam').click();
     await desktop.waitForTimeout(150);
     await desktop.getByTestId('tt-sub-lay').click();
     await desktop.waitForTimeout(150);
     await desktop.getByTestId('tt-sub-all').click();
 
-    // Test accent-insensitive Vietnamese search & equip a new Xóm Lầy 3D item
+    // Test accent-insensitive Vietnamese search & equip brand-new unique 3D sculptures!
     await desktop.getByTestId('tt-tab-shoes').click();
     await desktop.getByTestId('tt-search').fill('dep to ong');
     await desktop.getByTestId('tt-item-shoes-dep_to_ong').waitFor({ state: 'visible', timeout: 5_000 });
@@ -233,9 +249,9 @@ async function run() {
     await desktop.getByTestId('tt-search').fill('');
 
     await desktop.getByTestId('tt-tab-hat').click();
-    await desktop.getByTestId('tt-search').fill('noi com');
-    await desktop.getByTestId('tt-item-hat-rice_cooker_hat').waitFor({ state: 'visible', timeout: 5_000 });
-    await desktop.getByTestId('tt-item-hat-rice_cooker_hat').click();
+    await desktop.getByTestId('tt-search').fill('sau rieng');
+    await desktop.getByTestId('tt-item-hat-durian_helmet').waitFor({ state: 'visible', timeout: 5_000 });
+    await desktop.getByTestId('tt-item-hat-durian_helmet').click();
     await desktop.getByTestId('tt-search').fill('');
 
     // 5. Both humans click Xong! -> 5s shorten -> Runway

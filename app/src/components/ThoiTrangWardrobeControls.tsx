@@ -175,6 +175,7 @@ export function SwatchRow({
   onSelect,
   testIDPrefix,
   compact = false,
+  touchLarge = false,
 }: {
   label: string;
   colors: readonly string[];
@@ -182,6 +183,7 @@ export function SwatchRow({
   onSelect: (hex: string) => void;
   testIDPrefix: string;
   compact?: boolean;
+  touchLarge?: boolean;
 }) {
   const cur = value?.toLowerCase();
   const dots = colors.map((hex, i) => {
@@ -194,7 +196,8 @@ export function SwatchRow({
         onPress={() => onSelect(hex)}
         style={[
           styles.swatch,
-          compact && styles.swatchCompact,
+          compact && !touchLarge && styles.swatchCompact,
+          touchLarge && styles.swatchLarge,
           { backgroundColor: hex },
           active && styles.swatchOn,
         ]}
@@ -204,12 +207,12 @@ export function SwatchRow({
   return (
     <View style={styles.rowBlock}>
       <T style={styles.rowLabel}>{label}</T>
-      {compact ? (
+      {compact && !touchLarge ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.swRowScroll}>
           {dots}
         </ScrollView>
       ) : (
-        <View style={styles.swWrap}>{dots}</View>
+        <View style={[styles.swWrap, touchLarge && styles.swWrapLarge]}>{dots}</View>
       )}
     </View>
   );
@@ -221,32 +224,39 @@ export function HorizontalChipRow({
   value,
   onSelect,
   testIDPrefix,
+  wrap = false,
 }: {
   label: string;
   options: readonly (readonly [string, string])[];
   value: string;
   onSelect: (id: string) => void;
   testIDPrefix: string;
+  wrap?: boolean;
 }) {
+  const chips = options.map(([id, name]) => {
+    const active = value === id;
+    return (
+      <Pressable
+        key={id}
+        testID={`${testIDPrefix}-${id}`}
+        accessibilityRole="button"
+        onPress={() => onSelect(id)}
+        style={[styles.chip, wrap && styles.chipTouch, active && styles.chipOn]}
+      >
+        <T style={[styles.chipTxt, active && styles.chipTxtOn]}>{name}</T>
+      </Pressable>
+    );
+  });
   return (
     <View style={styles.rowBlock}>
       <T style={styles.rowLabel}>{label}</T>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hChips}>
-        {options.map(([id, name]) => {
-          const active = value === id;
-          return (
-            <Pressable
-              key={id}
-              testID={`${testIDPrefix}-${id}`}
-              accessibilityRole="button"
-              onPress={() => onSelect(id)}
-              style={[styles.chip, active && styles.chipOn]}
-            >
-              <T style={[styles.chipTxt, active && styles.chipTxtOn]}>{name}</T>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {wrap ? (
+        <View style={styles.wrapChips}>{chips}</View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hChips}>
+          {chips}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -427,6 +437,7 @@ const styles = StyleSheet.create({
   rowBlock: { gap: 4 },
   rowLabel: { fontSize: 10.5, fontWeight: '800', color: V4.ink2, letterSpacing: 0.6 },
   swWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  swWrapLarge: { gap: 8 },
   swRowScroll: { flexDirection: 'row', gap: 6, paddingVertical: 2, paddingHorizontal: 1 },
   swatch: {
     width: 21,
@@ -436,13 +447,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(59,42,63,0.14)',
   },
   swatchCompact: { width: 20, height: 20 },
+  swatchLarge: { width: 28, height: 28 },
   swatchOn: {
     borderWidth: 2.5,
     borderColor: V4.pink,
     transform: [{ scale: 1.12 }],
   },
   hChips: { flexDirection: 'row', gap: 5, paddingBottom: 2 },
-  wrapChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  wrapChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,6 +464,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: V4.soft,
   },
+  chipTouch: { paddingVertical: 7, paddingHorizontal: 12 },
   chipWithIcon: { paddingVertical: 3, paddingLeft: 4, paddingRight: 10 },
   chipOn: { backgroundColor: V4.pink },
   chipTxt: { fontSize: 11.5, fontWeight: '600', color: V4.ink },

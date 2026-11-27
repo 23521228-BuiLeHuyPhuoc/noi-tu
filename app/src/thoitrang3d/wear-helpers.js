@@ -8,9 +8,9 @@ import { applyTorsoContour } from './body.js';
 export const M = (it, opts) => toon(it.c, it.p || 'plain', it.c2 || '#ffffff', opts);
 export const A = (it, opts) => toon(it.c2 || '#ffffff', 'plain', '#ffffff', opts);
 
-export const SHORT_TOPS = new Set(['crop', 'crop_top', 'tube_top', 'idol_crop', 'ao_yem', 'crop_hoodie', 'hanbok_jeogori', 'bare_chest_towel', 'dad_beer_belly']);
+export const SHORT_TOPS = new Set(['crop', 'crop_top', 'tube_top', 'idol_crop', 'ao_yem', 'crop_hoodie', 'hanbok_jeogori', 'bare_chest_towel', 'dad_beer_belly', 'bolero_shrug', 'sumo_mawashi_top']);
 
-const SLEEVELESS_OUTER = new Set(['royal_cape', 'vampire_cape', 'tarp_cape', 'puffer_vest', 'shawl_stole', 'peacock_blanket', 'fishing_vest_dad']);
+const SLEEVELESS_OUTER = new Set(['royal_cape', 'vampire_cape', 'tarp_cape', 'puffer_vest', 'shawl_stole', 'peacock_blanket', 'fishing_vest_dad', 'angel_feather_cape', 'poncho_fringe', 'fur_stole_wrap', 'astronaut_jet_rig', 'quilt_blanket_wrap', 'bedsheet_toga', 'shower_curtain_cape', 'umbrella_cloak', 'leaf_bush_ghillie']);
 
 export function topCovers(d) {
   const t = d.outfit && d.outfit.top;

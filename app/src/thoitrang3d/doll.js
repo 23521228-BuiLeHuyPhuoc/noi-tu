@@ -26,13 +26,17 @@ import {
   MENSWEAR_DRESS, MENSWEAR_SHOES, MENSWEAR_HATS, MENSWEAR_CLOSED_HATS,
   MENSWEAR_ACC, MENSWEAR_ACC_SUB, MENSWEAR_HELD_KINDS,
 } from './wear-menswear-extra.js';
+import { HAIR_V2, TOP_V2, OUTER_V2, BOTTOM_V2, DRESS_V2 } from './wear-unique-v2-body.js';
+import {
+  SHOES_V2, HATS_V2, CLOSED_HATS_V2, GLASSES_V2, ACC_V2, ACC_SUB_V2, HELD_KINDS_V2,
+} from './wear-unique-v2-gear.js';
 import { applyVisualSpec } from './wear-parametric.js';
 import { CATALOG, CATALOG_META, getMeta } from './catalog.js';
 import { POSES, animate } from './poses.js';
 
-export const CLOSED_HATS = new Set([...CLOSED_HATS_BASE, ...CLOSED_HATS_EXTRA, ...MENSWEAR_CLOSED_HATS]);
-export const ACC_SUB = { ...ACC_SUB_BASE, ...ACC_SUB_EXTRA, ...MENSWEAR_ACC_SUB };
-export const HELD_KINDS = { ...HELD_KINDS_BASE, ...HELD_KINDS_EXTRA, ...MENSWEAR_HELD_KINDS };
+export const CLOSED_HATS = new Set([...CLOSED_HATS_BASE, ...CLOSED_HATS_EXTRA, ...MENSWEAR_CLOSED_HATS, ...CLOSED_HATS_V2]);
+export const ACC_SUB = { ...ACC_SUB_BASE, ...ACC_SUB_EXTRA, ...MENSWEAR_ACC_SUB, ...ACC_SUB_V2 };
+export const HELD_KINDS = { ...HELD_KINDS_BASE, ...HELD_KINDS_EXTRA, ...MENSWEAR_HELD_KINDS, ...HELD_KINDS_V2 };
 
 export {
   SKINS, EYECOL, LIPCOL, SHADOWCOL, PALETTE, HAIRCOL, PATTERNS,
@@ -41,15 +45,15 @@ export {
 };
 
 export const BUILD = {
-  hair: { ...HAIR_BASE, ...HAIR_BUILD_EXTRA, ...MENSWEAR_HAIR },
-  bottom: { ...BOTTOM_BASE, ...BOTTOM_BUILD_EXTRA, ...MENSWEAR_BOTTOM },
-  top: { ...TOP_BASE, ...TOP_BUILD_EXTRA, ...MENSWEAR_TOP },
-  dress: { ...DRESS_BASE, ...DRESS_BUILD_EXTRA, ...MENSWEAR_DRESS },
-  outer: { ...OUTER_BASE, ...OUTER_BUILD_EXTRA, ...MENSWEAR_OUTER },
-  shoes: { ...SHOE_BASE, ...SHOE_BUILD_EXTRA, ...MENSWEAR_SHOES },
-  hat: { ...HAT_BASE, ...HAT_BUILD_EXTRA, ...MENSWEAR_HATS },
-  glasses: { ...GLASSES_BASE, ...GLASSES_BUILD_EXTRA },
-  acc: { ...ACC_BASE, ...ACC_BUILD_EXTRA, ...MENSWEAR_ACC },
+  hair: { ...HAIR_BASE, ...HAIR_BUILD_EXTRA, ...MENSWEAR_HAIR, ...HAIR_V2 },
+  bottom: { ...BOTTOM_BASE, ...BOTTOM_BUILD_EXTRA, ...MENSWEAR_BOTTOM, ...BOTTOM_V2 },
+  top: { ...TOP_BASE, ...TOP_BUILD_EXTRA, ...MENSWEAR_TOP, ...TOP_V2 },
+  dress: { ...DRESS_BASE, ...DRESS_BUILD_EXTRA, ...MENSWEAR_DRESS, ...DRESS_V2 },
+  outer: { ...OUTER_BASE, ...OUTER_BUILD_EXTRA, ...MENSWEAR_OUTER, ...OUTER_V2 },
+  shoes: { ...SHOE_BASE, ...SHOE_BUILD_EXTRA, ...MENSWEAR_SHOES, ...SHOES_V2 },
+  hat: { ...HAT_BASE, ...HAT_BUILD_EXTRA, ...MENSWEAR_HATS, ...HATS_V2 },
+  glasses: { ...GLASSES_BASE, ...GLASSES_BUILD_EXTRA, ...GLASSES_V2 },
+  acc: { ...ACC_BASE, ...ACC_BUILD_EXTRA, ...MENSWEAR_ACC, ...ACC_V2 },
 };
 
 const SLOT_ORDER = ['hair', 'bottom', 'top', 'dress', 'outer', 'shoes', 'hat', 'glasses', 'acc'];

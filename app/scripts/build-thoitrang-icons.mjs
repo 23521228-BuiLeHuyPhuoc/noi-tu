@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(__dirname, '..');
 const ROOT_DIR = path.resolve(APP_DIR, '..');
 const OUT_DIR = path.join(APP_DIR, 'public', 'thoitrang');
-const MAX_WEBP_BYTES = 1350 * 1024;
+const MAX_WEBP_BYTES = 1450 * 1024;
 
 const req = createRequire(import.meta.url);
 const { chromium } = req(path.resolve(ROOT_DIR, 'e2e', 'node_modules', 'playwright-core'));
@@ -178,8 +178,10 @@ async function main() {
       throw new Error(`Missing 3D builders for archetypes:\n${result.missingBuilders.join(', ')}`);
     }
 
-    // Verify 100% of items across the entire expanded CATALOG resolve to a baked icon tile!
+    // Verify 100% of items across CATALOG have their own UNIQUE baked 3D icon (zero duplicate/shared icons!)
     const missingIcons = [];
+    const usedIcons = new Set();
+    const dupIcons = [];
     let catalogCount = 0;
     for (const [slot, items] of Object.entries(CATALOG)) {
       for (const item of items) {
@@ -187,11 +189,18 @@ async function main() {
         const iconKey = item.iconKey || `${slot}:${item.id}`;
         if (!result.items[iconKey]) {
           missingIcons.push(`${slot}:${item.id} -> ${iconKey}`);
+        } else if (usedIcons.has(iconKey)) {
+          dupIcons.push(`${slot}:${item.id} shares ${iconKey}`);
+        } else {
+          usedIcons.add(iconKey);
         }
       }
     }
     if (missingIcons.length > 0) {
       throw new Error(`Missing icon tiles for ${missingIcons.length} catalog items (sample): ${missingIcons.slice(0, 15).join(', ')}`);
+    }
+    if (dupIcons.length > 0) {
+      throw new Error(`Duplicate/shared icons detected (${dupIcons.length}): ${dupIcons.slice(0, 15).join(', ')}`);
     }
 
     const base64 = result.webpDataUrl.slice(result.webpDataUrl.indexOf(',') + 1);
