@@ -130,6 +130,7 @@ describe('Phase 27 & 28 — Danh mục 15 Game (Cũ → Mới) & Avatar Lầy L�
       'uno_mercy',
       'family_feud',
       'who_is_it',
+      'thoitrang',
     ]);
     expect('tinh_mat' in GAME_INFO).toBe(false);
     expect('den_do' in GAME_INFO).toBe(false);

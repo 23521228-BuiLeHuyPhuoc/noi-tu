@@ -559,7 +559,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         if (toR) add({ kind: 'float', emoji: '🌀', at: toR });
         playMemePool('troll', { speakerId: e.from, cooldownMs: 1600 });
         play('spin', { speakerId: e.from });
-        if (toMe) {
+        if (toMe && !e.soft) {
           vibrate([120, 60, 180, 60, 140]);
           shake('spin');
         }
@@ -571,7 +571,7 @@ export function FunLayer({ game, players, chat }: { game: Game; players: PublicP
         if (toR) add({ kind: 'float', emoji: '🌋', at: toR });
         playMemePool('bomb', { speakerId: e.from, cooldownMs: 1600 });
         play('quake', { speakerId: e.from });
-        if (toMe) {
+        if (toMe && !e.soft) {
           vibrate([180, 50, 220, 50, 180]);
           shake('quake');
         }
@@ -835,7 +835,7 @@ export function TrollLayer({ game, players }: { game: Game; players: PublicPlaye
         }
       } else {
         feed(quip.blackout(from, toMe ? 'bạn' : nameOf(e.to)), toMe ? 'bad' : 'fun');
-        if (toMe) {
+        if (toMe && !e.soft) {
           play('blackout', { speakerId: e.from });
           vibrate([100, 50, 220]);
           setItems((xs) => [...xs.filter((x) => x.kind !== 'blackout'), { id: ++seq.current, kind: 'blackout' }]);

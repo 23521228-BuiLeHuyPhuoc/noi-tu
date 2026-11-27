@@ -1126,7 +1126,7 @@ describe('Game 14 — Đầm Lầy Quái Chiêu (Croak Squad Co-op 2D Physics & 
 describe('Hệ Thống Phú Hào 146 Vật Phẩm, 15 Map & 15 Game Configs (165 cases)', () => {
   it('đủ 17 trò chơi trong GAME_INFO, 28 kỹ năng Ruby, 15 siêu quà & 15 Map chuẩn xác', () => {
     const allTypes = Object.keys(GAME_INFO) as GameType[];
-    expect(allTypes).toHaveLength(17);
+    expect(allTypes).toHaveLength(18);
     expect(SKILL_IDS).toHaveLength(28);
     expect(GIFT_IDS).toHaveLength(15);
     expect(ROOM_THEMES).toHaveLength(15);

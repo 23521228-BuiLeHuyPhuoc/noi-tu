@@ -74,6 +74,9 @@ const FamilyFeudScreen = lazy(() =>
 const WhoIsItScreen = lazy(() =>
   import('./src/screens/WhoIsItScreen').then((m) => ({ default: m.WhoIsItScreen })),
 );
+const ThoiTrangScreen = lazy(() =>
+  import('./src/screens/ThoiTrangScreen').then((m) => ({ default: m.ThoiTrangScreen })),
+);
 
 const Screen = Platform.OS === 'web' ? View : SafeAreaView;
 
@@ -127,6 +130,7 @@ export default function App() {
   else if (room.game?.type === 'croaksquad') body = <CroakSquadScreen game={game} room={room} />;
   else if (room.game?.type === 'family_feud') body = <FamilyFeudScreen game={game} room={room} />;
   else if (room.game?.type === 'who_is_it') body = <WhoIsItScreen game={game} room={room} />;
+  else if (room.game?.type === 'thoitrang') body = <ThoiTrangScreen game={game} room={room} />;
   else if (room.game?.type === 'wordchain' || room.game?.type === 'wordchain_en') body = <WordChainScreen game={game} room={room} />;
   else body = <HomeScreen game={game} />;
 

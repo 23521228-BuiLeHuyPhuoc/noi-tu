@@ -119,8 +119,8 @@ export function IconButton({ icon, iconNode, label, onPress, style, testID }: {
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, sticker(2), style]}>{children}</View>;
+export function Card({ children, style, testID }: { children: ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
+  return <View testID={testID} style={[styles.card, sticker(2), style]}>{children}</View>;
 }
 
 // ---------- Dòng thông báo nổi (sự kiện trong game) ----------

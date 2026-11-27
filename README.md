@@ -1,6 +1,6 @@
 # Xóm Lầy
 
-Đại tiệc game party & co-op đa người chơi ngay trên trình duyệt điện thoại & máy tính: **15 trò chơi** hỗ trợ tới **12 người / phòng**, giao diện **Mobile-First 4 Fragment** siêu mượt (chống lag GPU & chống bôi đen label cảm ứng), mời bằng link hoặc mã 6 ký tự:
+Đại tiệc game party & co-op đa người chơi ngay trên trình duyệt điện thoại & máy tính: **18 trò chơi** hỗ trợ tới **12 người / phòng**, giao diện **Mobile-First 4 Fragment** siêu mượt (chống lag GPU & chống bôi đen label cảm ứng), mời bằng link hoặc mã 6 ký tự:
 - 🔤 **Nối từ** & 🇬🇧 **Nối từ Anh** (1–8 người — 4 cấp độ khó tới *Địa Ngục 4s*, luật *Danh từ / Động từ / Tính từ / Cấm lặp chữ đầu* & Combo Streak)
 - 🦀 **Bầu cua** (1–12 người — Chế độ *Lộc Trời ×2/×3 & Bão Tam Hoa*, đặt nhanh *Đặt lại / Gấp x2 / Tất tay*)
 - 🏦 **Cờ tỷ phú** (2–6 người — Icon *Nhà tù / Vào tù* chuẩn Game-Icons/Fluent 3D, **ô Sân Bay hiện sẵn thành phố bay tới trước khi dẫm**, kèm chế độ *Lễ Hội x2, Hũ Độc Đắc & Mua Đứt 160%*)
@@ -15,6 +15,9 @@
 - 🐊 **Khám Răng Cá Sấu 3D** (2–12 người — Nguyên **Đầu & Hàm Cá Sấu Chúa 3D** há rộng 16 răng nanh trắng hếu, nhấn trúng Răng Đau là hàm trên sập mạnh `"PHẬP!!"`)
 - 💣 **Đặt Bom Tử Chiến — Bản Vòng Bo (Boom Online Battle Royale)** (2–12 người — Phá thùng nhặt Giày Tăng Tốc, Tăng Tầm Nước, Găng Tay Ném Bom qua tường, Giày Đá Bom; **Nhốt Bóng Nước** cứu/chích nổ `"BỤP!"`, **Vòng Bo Gạch Tử Thần sau 45s** & **🛸 Đĩa Bay Phục Thù**!)
 - 🃏 **UNO Tàn Nhẫn (UNO Show ’Em No Mercy)** (2–12 người — Cộng dồn không đáy `+2/+4/+6/+10`, **Luật Nổ Bài 25 lá CHÁY BÀI loại trực tiếp**, **Số 7 Cướp Trắng Bài**, **Số 0 Xoay Bài Cả Bàn**, *Xả Cùng Màu* & *Bỏ Lượt Tất Cả*!)
+- 🎤 **Đấu Trường Khảo Sát (Family Feud)** (2–12 người — 260+ câu khảo sát lầy lội chia 2 đội Đỏ vs Xanh đoán sát nghĩa & cướp điểm)
+- 🕵️‍♀️ **Đoán Mặt Bí Ẩn (Who Is It)** (2–12 người — Chia 2 đội, 30–54 nhân vật, hỏi đặc điểm loại trừ tìm thẻ mật)
+- 👗 **Sàn Diễn Xóm Lầy (`thoitrang`)** (2–12 người — Phối đồ 3D theo **640+ chủ đề**, tủ đồ v4 **11 danh mục** với **6 dáng người, 14 biểu cảm & 167 món đồ** lưới icon 3D, xem preview chân dung trực tiếp cả phòng, sải bước catwalk với **11 tư thế tạo dáng** tự đổi biểu cảm, chấm sao nửa bước `1,0–5,0★` cùng **🤖 Giám khảo Máy**!)
 
 **Chơi ngay: <https://noi-tu-web.onrender.com>**
 
@@ -23,20 +26,20 @@
   - **473 biểu tượng Fluent Emoji 3D Shaded** đa tầng rực rỡ đóng gói tĩnh + hiệu ứng rung chấn `csshake` + lớp phủ **Holographic Prismatic Foil** 7 màu.
   - **15 Map / Chủ đề màu phòng** (5 miễn phí + 10 Map động Ruby: Tết Cổ Truyền, Hoa Anh Đào, Chợ Đêm, Sàn Disco Bất Ổn, Đầm Lầy Quái Chiêu, Sòng Bài Hoàng Gia, Thủy Cung Thần Long, Ma Trận Hacker, Cung Điện Ngân Hà, Điện Hoàng Kim Tỷ Phú).
   - **146 vật phẩm Shop Ruby + Sân Khấu Xem Thử Ghim Đỉnh (`ShopPreviewDock`)**: cuộn xuống tận cuối danh sách bấm Mua / Trang bị / Xem thử vẫn thấy ngay diện mạo mới trên đỉnh màn hình mà không cần cuộn ngược lên; gồm **8 ô trang bị VIP** (`frame`, `nameFx`, `aura`, `entrance`, `pet`, `title`, `chatBubble`, `roomTheme`), **Cấp bậc VIP Phú Hào 1→6** (*Chí Tôn Vũ Trụ*), **28 tuyệt kỹ chọc trả Ruby** và **15 Siêu Quà Đại Gia** (tới *Ngai Vàng Vô Cực 10.000 💎*).
-  - **Tối ưu chống lag phòng 12 người & Mobile Touch Hygiene**: Code-splitting `React.lazy` tách chunk 15 màn chơi, gỡ bỏ `drop-shadow` FBO nặng trên hàng trăm SVG icon, `content-visibility: auto` cho danh sách 146 món Shop, chống bôi đen chữ khi nhấn giữ nút cảm ứng (`user-select: none; -webkit-touch-callout: none`) và chế độ **⚡ Siêu mượt**.
+  - **Tối ưu chống lag phòng 12 người & Mobile Touch Hygiene**: Code-splitting `React.lazy` tách chunk 18 màn chơi (tách riêng bundle `three` chỉ tải khi vào **Sàn Diễn Xóm Lầy**), gỡ bỏ `drop-shadow` FBO nặng trên hàng trăm SVG icon, `content-visibility: auto` cho danh sách 146 món Shop, chống bôi đen chữ khi nhấn giữ nút cảm ứng (`user-select: none; -webkit-touch-callout: none`) và chế độ **⚡ Siêu mượt**.
 - Cài như app: Android (Chrome) → menu ⋮ → **Thêm vào màn hình chính**. iPhone (Safari) → nút Chia sẻ → **Thêm vào MH chính**.
 
 ```
 noi-tu/
-  shared/   kiểu dữ liệu, từ vựng, vật lý 2D Croak Squad & Boom Online, UNO No Mercy, Đố Vui CNTT, Cá Sấu, Lô Tô, Caro, Ma Sói, Gián Điệp, Map & Shop VIP
-  server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho cả 15 game + bộ kiểm thử tự động toàn diện
-    src/games/   wordchain, baucua, typhu, masoi, giandiep, vedoan, bomtu, dovui, loto, caro, croaksquad, casau, boom, unomercy
-  app/      giao diện React Native Web (Expo) — 4-Fragment Mobile UI, Fluent Emoji 3D, Game-Icons, DiceBear Meme Avatars, Lucide, CSShake, Holofoil Shaders
-  e2e/      test trình duyệt thật (Playwright đa khung hình Mobile + Landscape + Desktop & kiểm tra hình ảnh 15 game)
-  docs/     tài liệu thiết kế & nghiên cứu các phase (00–37)
+  shared/   kiểu dữ liệu, từ vựng, vật lý 2D Croak Squad & Boom Online, UNO No Mercy, Đố Vui CNTT, Cá Sấu, Lô Tô, Caro, Ma Sói, Gián Điệp, Family Feud, Who Is It, Sàn Diễn 3D v4 (danh mục 167 món + 640 chủ đề + Giám khảo Máy), Map & Shop VIP
+  server/   Node.js + Socket.IO, trọng tài & bảo mật perPlayerView cho cả 18 game + bộ kiểm thử tự động toàn diện
+    src/games/   wordchain, baucua, typhu, masoi, giandiep, vedoan, bomtu, dovui, loto, caro, croaksquad, casau, boom, unomercy, familyfeud, whoisit, thoitrang
+  app/      giao diện React Native Web (Expo) — 4-Fragment Mobile UI, engine 3D Three.js (`src/thoitrang3d/`), Fluent Emoji 3D, Game-Icons, DiceBear Meme Avatars, Lucide, CSShake, Holofoil Shaders
+  e2e/      test trình duyệt thật (Playwright đa khung hình Mobile + Landscape + Desktop & kiểm tra hình ảnh 18 game)
+  docs/     tài liệu thiết kế & nghiên cứu các phase (00–37) & superpowers specs
 ```
 
-## Tóm tắt 15 trò chơi (Sắp xếp Cũ → Mới)
+## Tóm tắt 18 trò chơi (Sắp xếp Cũ → Mới)
 
 1. **Nối từ (`wordchain`, 1–8 người)**: Kho ~114.900 từ tiếng Việt, 4 mức độ khó (`Dễ 40s`, `Chuẩn 30s`, `Khó 15s→6s`, `Địa Ngục 8s→4s`) và luật từ loại (`Danh từ`, `Động từ`, `Tính từ`, `Cấm lặp chữ đầu`).
 2. **Nối từ Anh (`wordchain_en`, 1–8 người)**: Kho 210.987 từ tiếng Anh, dịch ngược bộ gõ Telex/VNI, giải nghĩa tiếng Việt + IPA, hỗ trợ đầy đủ 4 độ khó & luật từ loại.
@@ -47,12 +50,15 @@ noi-tu/
 7. **Vẽ & Đoán (`ve_doan`, 2–12 người)**: Bảng vẽ vector đa màu sắc mượt mà, gợi ý chữ cái dần theo thời gian, AI Họa Sĩ Máy vẽ từng nét trực quan trên **55+ chủ đề minh họa đa sắc**.
 8. **Bom Chữ (`bom_tu`, 2–12 người)**: Quả bom hẹn giờ chuyền tay đòi từ 2 chữ hợp lệ chứa âm tiết bom; mất hết 3 tim là bị loại.
 9. **Đấu Trường Đố Vui CNTT & Tiếng Anh IT (`do_vui`, 1–12 người)**: 252 câu hỏi phỏng vấn thực chiến `Intern (16s)` / `Fresher (22s)` / `Junior (30s)` qua 7 chủ đề (`OOP đa ngôn ngữ`, `DSA`, `JS/TS`, `NodeJS/Backend`, `React/RN Mobile`, `System/Sec`, `Tiếng Anh IT B1–C1`), cân bằng độ dài 4 phương án và xáo trộn vị trí ngẫu nhiên.
-10. **Lô Tô Hội Chợ (`loto`, 2–12 người)**: Phát vé 3×9 chuẩn xác `1..90`, lồng cầu 3D rao 90 câu vè dân gian vui nhộn, tự động báo *"Đợi!"* khi có người chạm 4/5 số trên hàng và khóa phạt 2 lượt gọi nếu hô *"KINH!"* sai.
+10. **Lô Tô Hội Chợ (`loto`, 2–12 người)**: Phát vé 3×9 chuẩn xác `1..90`, lồng cầu 3D rao 90 câu vè dân gian vui nhộn, tự động báo *"Đợi!"* khi có người chạm 4/5 số trên hàng và khóa phạt 2 lượt gọi nếu hô *"KINH!"* hụt.
 11. **Cờ Caro Đại Chiến (`caro`, 2–4 người)**: Bàn cờ tự mở rộng theo số phe (`2p = 15×15`, `3p = 22×22`, `4p = 28×28`, hoặc `Siêu Đại Chiến 32×32`), tùy chọn luật *"Chặn 2 đầu"*, nút *Tâm cờ* + Zoom trên điện thoại.
 12. **Đầm Lầy Quái Chiêu 3.0 (`croaksquad`, 2–6 người, hỗ trợ cả AI Đồng Đội Máy)**: Tự động xoay ngang toàn màn hình `<canvas>` HiDPI `60fps`, hòa giải chuyển động mềm mượt trên di động, phóng lưỡi nuốt & bắn đồng đội vượt 3 màn đầm lầy.
 13. **Khám Răng Cá Sấu 3D (`ca_sau`, 2–12 người)**: Sân khấu Đầu & Hàm Cá Sấu Chúa 3D há rộng 16 chiếc răng nanh trắng ngà cong tự nhiên; nhấn trúng Răng Đau là nguyên hàm trên sập mạnh `"PHẬP!!"` cực kỳ hồi hộp!
 14. **Đặt Bom Tử Chiến — Bản Vòng Bo (`boom_online`, 2–12 người)**: Mê cung Boom Online xoay ngang `60fps` với 5 vật phẩm huyền thoại (👟 Giày Tăng Tốc, 💧 Tăng Tầm Nước, 💣 Thêm Bom, 🥊 Găng Tay Ném Bom qua tường, 🥾 Giày Đá Bom + 📌 Kim Tự Cứu), **Nhốt Bóng Nước 4,5s** (đồng đội cứu / đối thủ tông `"BỤP!"`), **Vòng Bo Gạch Tử Thần sau 45s** và **🛸 Đĩa Bay Phục Thù** ngoài biên!
 15. **UNO Tàn Nhẫn — Show ’Em No Mercy (`uno_mercy`, 2–12 người)**: Bộ bài hủy diệt tình bạn với **Cộng Dồn Không Đáy (`+2, +4, +6, +10`)**, **Luật Nổ Bài (`>= 25` lá trên tay là CHÁY BÀI loại trực tiếp!)**, **Số 7 Tráo Bài Cướp Trắng**, **Số 0 Xoay Bài Cả Bàn**, *Xả Cùng Màu*, *Bỏ Lượt Tất Cả* và *Vòng Quay Màu Tử Thần*!
+16. **Đấu Trường Khảo Sát — Family Feud (`family_feud`, 2–12 người)**: 260+ câu khảo sát chia 2 đội Đỏ vs Xanh, đối đầu giành lượt, 3 dấu X cướp điểm và vòng Chung Kết.
+17. **Đoán Mặt Bí Ẩn — Who Is It (`who_is_it`, 2–12 người)**: Chia 2 đội với 30–54 nhân vật khác biệt, hỏi đáp đặc điểm loại trừ để lật đúng thẻ nhân vật bí mật của đối thủ.
+18. **Sàn Diễn Xóm Lầy (`thoitrang`, 2–12 người)**: Tự tay phối đồ 3D theo **640+ chủ đề** (16 nhóm chủ đề, thời gian mặc đồ tùy chọn `120–420s`, mặc định `240s`). Tủ đồ v4 **11 danh mục** (Cơ thể 6 dáng + chiều cao, Khuôn mặt 6 mục + 14 biểu cảm, Tóc 2-tone, Áo, Khoác, Quần/Váy, Đầm/Bộ, Giày, Mũ, Kính, Phụ kiện đa ô — tổng **167 món** / **982.324 biến thể**) hiển thị lưới icon mannequin mờ dựng trực tiếp từ engine 3D (hỗ trợ tìm kiếm, lọc *Hợp chủ đề*, màu chính/phụ, 15 họa tiết, hoàn tác, ngẫu nhiên), xem chân dung trực tiếp của cả phòng, sải bước **Catwalk** bấm **11 tư thế tạo dáng** (tự đổi biểu cảm, không xoay tròn), khán giả chấm sao nửa bước `1,0–5,0★` + cổ vũ, và **🤖 Giám khảo Máy** công bố điểm kín cùng 1 dòng nhận xét tiếng Việt trên bục vinh quang.
 
 ---
 
@@ -119,7 +125,7 @@ Trong Environment Group **noi-tu-server-env** trên Render đặt:
 | `SMTP_PASS` | **Mật khẩu ứng dụng** Gmail 16 ký tự (Google Account → Bảo mật → Xác minh 2 bước → Mật khẩu ứng dụng), không phải mật khẩu Gmail |
 | `SMTP_FROM_NAME` | Tên người gửi, mặc định `Xóm Lầy` (tùy chọn) |
 
-**Không** ghi các giá trị này vào code hay repo. Thiếu biến thì nút Quên mật khẩu báo "Server chưa bật gửi mail", phần còn lại vẫn chạy (`/health` → `"mail": false`).
+**Không** ghi các giá trị này vào code hay file trong repo. Thiếu biến thì nút Quên mật khẩu báo "Server chưa bật gửi mail", phần còn lại vẫn chạy (`/health` → `"mail": false`).
 Mã hết hạn sau 10 phút, sai tối đa 5 lần, mỗi tài khoản tối đa 5 thư/giờ (cách nhau 60 giây). Đặt lại mật khẩu thì mọi máy khác bị đăng xuất.
 `MAIL_DEBUG=1` chỉ dùng khi chạy thử trên máy (ghi thư ra log thay vì gửi), **không** đặt trên Render.
 
@@ -150,18 +156,16 @@ Script chỉ giữ từ đúng 2 chữ, đúng cấu trúc âm tiết tiếng Vi
 ## 4. Test
 
 ```bash
-cd server && npm test        # chuẩn hóa, từ điển Việt & Anh, luật 4 game, giới hạn chọc, hồ sơ, phòng, Socket.IO
+cd server && npm test        # chuẩn hóa, từ điển Việt & Anh, luật 18 game, giới hạn chọc, hồ sơ, phòng, Socket.IO
 cd server && npm run typecheck
 cd app && npx tsc --noEmit && npx expo lint
 ```
-Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô), `accounts.mjs` (đăng ký/quên mật khẩu), `wallet.mjs` (nạp Ruby + quản trị duyệt), `en-rules.mjs` (Nối từ Anh: gõ Telex, cứu trợ nối hộ, thời gian giảm dần, đổi tên + ảnh giữa ván, giới hạn chọc, bù giờ). Xem đầu file `play.mjs` để biết cách chạy.
+Test giao diện (`e2e/`): build bản web của app, chạy server, rồi để nhiều trình duyệt Chrome (khung điện thoại) tự chơi với nhau: `play.mjs` (Nối từ), `edge.mjs` (tình huống đặc biệt), `games.mjs` (Nối từ Anh, Bầu cua, ném/khịa/hối), `typhu.mjs` (Cờ tỷ phú), `v2.mjs` (nghĩa từ, sticker Quỳnh Aka, bát Bầu cua, Cờ tỷ phú 40 ô), `accounts.mjs` (đăng ký/quên mật khẩu), `wallet.mjs` (nạp Ruby + quản trị duyệt), `en-rules.mjs` (Nối từ Anh), `thoitrang.spec.mjs` (Sàn Diễn Xóm Lầy 3D: tủ đồ icon, preview trực tiếp, catwalk, chấm nửa sao, Giám khảo Máy & khung 390×844). Xem đầu file `play.mjs` để biết cách chạy.
 
-## Nguồn icon và ảnh (Cờ tỷ phú)
-- Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy).
-- Ảnh địa danh trong bảng chi tiết ô lấy từ Wikimedia Commons / Wikipedia (xem `app/src/typhuArt.ts`). Trong game có dòng "Nguồn icon/ảnh" ở cuối bảng chi tiết mỗi ô.
-
-## Nguồn hình (Kho chọc ghẹo)
-- Hình 3D của hơn 200 món chọc ghẹo là **Fluent Emoji** của Microsoft, giấy phép **MIT**, bản quyền (c) Microsoft Corporation: https://github.com/microsoft/fluentui-emoji. App tải từng hình lúc chạy qua jsDelivr (`https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/...`), không chép vào repo; mất mạng thì hiện emoji gốc. Danh sách món, giá và mẫu hiệu ứng nằm ở `shared/src/pokes.ts`; chạy `node e2e/poke-gallery.mjs` để chụp ảnh từng mẫu.
+## Nguồn icon, mô hình 3D và ảnh
+- **Sàn Diễn Xóm Lầy 3D (`app/src/thoitrang3d/`)**: Engine 3D toon thiết kế v4 dựng thủ tục hoàn toàn bằng Three.js (`0.170.0`) với 6 dáng người, 14 biểu cảm và 167 món đồ. Chạy `cd app && npm run build:thoitrang:icons` để dựng lại sprite atlas `app/public/thoitrang/icons.webp` + `icons.json`.
+- **Cờ tỷ phú**: Icon trên bàn cờ, bảng giữa và hiệu ứng là **Twemoji** (bản jdecked/twemoji, gói npm `@twemoji/svg`), giấy phép **CC-BY 4.0**, bản quyền (c) Twitter, Inc. và những người đóng góp: https://github.com/jdecked/twemoji. Chỉ các file SVG đang dùng được chép vào `app/assets/typhu-icons/`; chạy `node app/assets/typhu-icons/gen.mjs` để tạo lại `app/src/typhuIcons.ts` (data URI, không thêm thư viện lúc chạy). Ảnh địa danh trong bảng chi tiết ô lấy từ Wikimedia Commons / Wikipedia (xem `app/src/typhuArt.ts`). Trong game có dòng "Nguồn icon/ảnh" ở cuối bảng chi tiết mỗi ô.
+- **Kho chọc ghẹo**: Hình 3D của hơn 200 món chọc ghẹo là **Fluent Emoji** của Microsoft, giấy phép **MIT**, bản quyền (c) Microsoft Corporation: https://github.com/microsoft/fluentui-emoji. App tải từng hình lúc chạy qua jsDelivr (`https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/...`), không chép vào repo; mất mạng thì hiện emoji gốc. Danh sách món, giá và mẫu hiệu ứng nằm ở `shared/src/pokes.ts`; chạy `node e2e/poke-gallery.mjs` để chụp ảnh từng mẫu.
 
 ## Cấu hình server (biến môi trường)
 | Biến | Mặc định | Ý nghĩa |

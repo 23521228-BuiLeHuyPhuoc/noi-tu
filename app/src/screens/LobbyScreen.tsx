@@ -16,6 +16,12 @@ import { FAMILY_FEUD_ROUND_OPTIONS } from '../../../shared/src/familyfeud-types'
 import { whoIsItBoardSize } from '../../../shared/src/whoisit';
 import { WORDCHAIN_DIFFICULTIES, WORDCHAIN_RULES, type WordChainDifficulty, type WordChainRule } from '../../../shared/src/pos';
 import { CROAK_STAGES } from '../../../shared/src/croaksquad';
+import {
+  THOI_TRANG_DEFAULT_DRESS_SEC,
+  THOI_TRANG_DRESS_OPTIONS,
+  type ThoiTrangThemeGroupSetting,
+} from '../../../shared/src/thoitrang';
+import { THOI_TRANG_THEME_GROUPS } from '../../../shared/src/thoitrang-themes';
 import type { Game } from '../useGame';
 import {
   ACCESSORY_OPTIONS, AGE_OPTIONS, BROW_OPTIONS, BUILD_OPTIONS, DETAIL_OPTIONS,
@@ -37,7 +43,7 @@ const GAMES: GameType[] = [
   'wordchain', 'wordchain_en', 'baucua', 'typhu',
   'masoi', 'giandiep', 've_doan', 'bom_tu', 'do_vui',
   'loto', 'caro', 'croaksquad', 'ca_sau', 'boom_online', 'uno_mercy',
-  'family_feud', 'who_is_it',
+  'family_feud', 'who_is_it', 'thoitrang',
 ];
 
 const PRESET_ORDER: number[] = [
@@ -791,7 +797,55 @@ export function LobbyScreen({ game, room }: { game: Game; room: RoomState }) {
         </Card>
       )}
 
-      <T style={[styles.section, { color: pal.text }]}>{isHost ? 'Chọn game (15 trò chơi)' : 'Game của phòng'}</T>
+      {room.gameType === 'thoitrang' && (
+        <Card style={{ gap: 10 }}>
+          <View style={styles.headIconRow}>
+            <EmojiIcon emoji={GAME_META.thoitrang.emoji} size={18} />
+            <T style={styles.h3}>Thời gian phối đồ & Nhóm chủ đề</T>
+          </View>
+          <View style={styles.roundRow}>
+            {THOI_TRANG_DRESS_OPTIONS.map((sec) => {
+              const active = (room.settings.thoiTrangDressSec ?? THOI_TRANG_DEFAULT_DRESS_SEC) === sec;
+              return (
+                <Button
+                  key={sec}
+                  testID={`tt-dress-sec-${sec}`}
+                  small
+                  variant={active ? 'ink' : 'paper'}
+                  title={`${sec / 60} phút`}
+                  disabled={!isHost}
+                  style={{ flex: 1, minWidth: 64 }}
+                  onPress={() => game.configure({ settings: { thoiTrangDressSec: sec } })}
+                />
+              );
+            })}
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {([
+              { id: 'random' as ThoiTrangThemeGroupSetting, label: '🎲 Ngẫu nhiên' },
+              ...THOI_TRANG_THEME_GROUPS.map((g) => ({
+                id: g.id as ThoiTrangThemeGroupSetting,
+                label: `${g.emoji} ${g.name}`,
+              })),
+            ]).map((g) => {
+              const active = (room.settings.thoiTrangThemeGroup ?? 'random') === g.id;
+              return (
+                <Button
+                  key={g.id}
+                  testID={`tt-theme-group-${g.id}`}
+                  small
+                  variant={active ? 'jade' : 'paper'}
+                  title={g.label}
+                  disabled={!isHost}
+                  onPress={() => game.configure({ settings: { thoiTrangThemeGroup: g.id } })}
+                />
+              );
+            })}
+          </ScrollView>
+        </Card>
+      )}
+
+      <T style={[styles.section, { color: pal.text }]}>{isHost ? 'Chọn game (18 trò chơi)' : 'Game của phòng'}</T>
       {isHost ? (
         <View style={styles.games}>
           {GAMES.map((g) => {

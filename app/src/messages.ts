@@ -110,6 +110,7 @@ export const GAME_META: Record<GameType, { emoji: string; tagline: string; playe
   uno_mercy: { emoji: '🃏', tagline: 'UNO Show ’Em No Mercy: chồng +2/+4/+6/+10 không đáy, Số 7 cướp bài & 25 lá CHÁY BÀI!', players: '2–12 người' },
   family_feud: { emoji: '🎤', tagline: 'Khảo sát 260+ câu siêu lầy lội & 18+ nhẹ: đấu đội Đỏ vs Xanh đoán sát nghĩa!', players: '2–12 người' },
   who_is_it: { emoji: '🕵️‍♀️', tagline: 'Who Is It HopKids chia 2 đội (chọn đội sớm): 30–54 nhân vật càng đông càng căng, hỏi đặc điểm tìm thẻ mật!', players: '2–12 người' },
+  thoitrang: { emoji: '👗', tagline: 'Phối đồ 3D theo 640+ chủ đề lầy lội, sải bước catwalk & chấm sao cùng Giám khảo Máy!', players: '2–12 người' },
 };
 
 export const RULES: Record<GameType, string[]> = {
@@ -200,6 +201,11 @@ export const RULES: Record<GameType, string[]> = {
     'Chia 2 đội Đỏ/Xanh (chọn đội ngay ở phòng chờ), số nhân vật tự tăng từ 24 lên 54 thẻ theo số người chơi.',
     'Mỗi đội chọn bí mật 1 nhân vật để giấu; lần lượt đặt câu hỏi đặc điểm (tự chấm chuẩn) hoặc câu hỏi tự do (Có/Không).',
     'Chạm thẻ để úp/mở trên bảng đội mình (nhấn giữ để phóng to), hoặc Chốt Đoán với tối đa 2 mạng sai!',
+  ],
+  thoitrang: [
+    'Bốc ngẫu nhiên 1 trong 640+ chủ đề: xem tên, mô tả, thẻ gợi ý & bảng màu trong 6 giây.',
+    'Phối đồ trên tủ đồ icon 12 danh mục (~1,19 triệu biến thể), bấm Xong để rút ngắn đồng hồ còn 5 giây.',
+    'Sàn diễn catwalk: người sải bước tung 9 dáng chụp hình, khán giả chấm 1,0–5,0★ (bước 0,5★) & cổ vũ; Giám khảo Máy góp đúng 1 phiếu mở vào cuối ván!',
   ],
 };
 

@@ -8,6 +8,7 @@ import type {
 import type { CheckinStatus, CosmeticSlot, ShopError, ShopInfo } from '../../shared/src/shop';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
 import type { BoomTickPayload } from '../../shared/src/boom';
+import type { ThoiTrangPosePayload } from '../../shared/src/thoitrang';
 import { MEME_COOLDOWN_MS, type MemeId } from '../../shared/src/memes';
 import { playMeme } from './sound';
 import { SERVER_URL } from './config';
@@ -81,6 +82,8 @@ export interface Game {
   onCroakTick(cb: (p: CroakTickPayload) => void): () => void;
   /** đăng ký nghe khung vật lý 20Hz của Đặt Bom Tử Chiến */
   onBoomTick(cb: (p: BoomTickPayload) => void): () => void;
+  /** đăng ký nghe pose/cổ vũ nhẹ cho Sàn Diễn Xóm Lầy */
+  onThoiTrangPose(cb: (p: ThoiTrangPosePayload) => void): () => void;
   /** tài khoản đang đăng nhập (null = chơi khách) */
   user: PublicUser | null;
   /** đã thử khôi phục phiên đăng nhập xong chưa */
@@ -154,6 +157,8 @@ export function useGame(): Game {
   const funListeners = useRef(new Set<(e: FunEvent) => void>());
   const croakListeners = useRef(new Set<(p: CroakTickPayload) => void>());
   const boomListeners = useRef(new Set<(p: BoomTickPayload) => void>());
+  const thoiTrangListeners = useRef(new Set<(p: ThoiTrangPosePayload) => void>());
+  const roomRef = useRef<RoomState | null>(null);
   const walletListeners = useRef(new Set<(n: WalletNotice) => void>());
   // ví gắn với tài khoản đang đăng nhập: đổi tài khoản thì ví cũ tự bỏ
   const [walletState, setWalletState] = useState<{ uid: string; info: WalletInfo } | null>(null);
@@ -168,6 +173,7 @@ export function useGame(): Game {
 
   const forget = useCallback(async () => {
     roomCodeRef.current = null;
+    roomRef.current = null;
     setRoom(null);
     setChat([]);
     await storage.setRoom(null);
@@ -241,16 +247,24 @@ export function useGame(): Game {
       if (roomCodeRef.current && state.code !== roomCodeRef.current) return;
       const nextOffset = state.serverNow - Date.now();
       setClockOffset((prev) => (prev === 0 || Math.abs(nextOffset - prev) > 250 ? nextOffset : prev));
+      roomRef.current = state;
       setRoom(state);
     });
     socket.on('fun:event', (e) => {
-      for (const cb of funListeners.current) cb(e);
+      const curGame = roomRef.current?.game;
+      const inDressOrRunway = curGame?.type === 'thoitrang' && (curGame.phase === 'dressing' || curGame.phase === 'runway');
+      const softScreen = inDressOrRunway && (e.kind === 'quake' || e.kind === 'blackout' || e.kind === 'spin');
+      const ev = softScreen && !e.soft ? { ...e, soft: true } : e;
+      for (const cb of funListeners.current) cb(ev);
     });
     socket.on('croak:tick', (p) => {
       for (const cb of croakListeners.current) cb(p);
     });
     socket.on('boom:tick', (p) => {
       for (const cb of boomListeners.current) cb(p);
+    });
+    socket.on('thoitrang:pose', (p) => {
+      for (const cb of thoiTrangListeners.current) cb(p);
     });
     socket.on('meme:played', ({ code, playerId, memeId }) => {
       if (code === roomCodeRef.current) playMeme(memeId, { force: true, speakerId: playerId });
@@ -554,7 +568,7 @@ export function useGame(): Game {
   const act = useCallback(
     async (a: GameAction): Promise<ActionResult> => {
       // input vật lý liên tục (Croak Squad & Boom Online): bắn một chiều không chờ ACK để triệt tiêu độ trễ khứ hồi
-      if (a.type === 'cs_input' || a.type === 'bm_input') {
+      if (a.type === 'cs_input' || a.type === 'bm_input' || a.type === 'tt_pose' || a.type === 'tt_cheer') {
         const s = socketRef.current;
         if (!s || !s.connected) return { ok: false, reason: 'not_playing' };
         s.emit('game:input', a);
@@ -604,6 +618,12 @@ export function useGame(): Game {
     boomListeners.current.add(cb);
     return () => {
       boomListeners.current.delete(cb);
+    };
+  }, []);
+  const onThoiTrangPose = useCallback((cb: (p: ThoiTrangPosePayload) => void) => {
+    thoiTrangListeners.current.add(cb);
+    return () => {
+      thoiTrangListeners.current.delete(cb);
     };
   }, []);
   const onWallet = useCallback((cb: (n: WalletNotice) => void) => {
@@ -761,6 +781,7 @@ export function useGame(): Game {
       onFun,
       onCroakTick,
       onBoomTick,
+      onThoiTrangPose,
       user,
       authReady,
       ...authFns,
@@ -811,6 +832,7 @@ export function useGame(): Game {
       onFun,
       onCroakTick,
       onBoomTick,
+      onThoiTrangPose,
       user,
       authReady,
       authFns,

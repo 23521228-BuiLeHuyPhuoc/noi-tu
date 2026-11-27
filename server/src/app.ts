@@ -15,6 +15,7 @@ import { WalletEvents } from './wallet';
 import { FunQuota } from './shop';
 import { FreshDeck } from './freshDeck';
 import { GIAN_DIEP_DECK } from '../../shared/src/giandiep';
+import { THOI_TRANG_DECK } from '../../shared/src/thoitrang';
 
 /** ví Ruby theo nơi lưu tài khoản: MongoDB thì dùng chung kết nối, bộ nhớ thì dùng chung bảng người dùng */
 function walletFor(store: Store): WalletStore {
@@ -61,6 +62,7 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
   // cặp từ Gián điệp đã chơi: tạm ngưng tới khi chơi hết ngân hàng, nhớ qua lần khởi động lại (MongoDB)
   const freshDeck = new FreshDeck(store, logErr('usedKeys'));
   freshDeck.load(GIAN_DIEP_DECK).catch(logErr('usedKeys'));
+  freshDeck.load(THOI_TRANG_DECK).catch(logErr('usedKeys'));
   const app = express();
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -160,6 +162,9 @@ export function createGameServer(dict: Dictionary, opts: GameServerOptions = {})
         } else {
           io.volatile.to(room.code).emit('boom:tick', payload);
         }
+      },
+      onThoiTrangPose: (room, payload) => {
+        io.to(room.code).emit('thoitrang:pose', payload);
       },
     },
     onRoomChange: (room) => broadcastRoom(io, room),

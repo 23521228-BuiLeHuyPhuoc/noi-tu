@@ -14,6 +14,7 @@ import type { CaroSizeMode, CaroView } from './caro';
 import type { CroakInput, CroakSquadView, CroakTickPayload } from './croaksquad';
 import type { FamilyFeudAction, FamilyFeudView } from './familyfeud-types';
 import type { WhoIsItAction, WhoIsItDifficulty, WhoIsItView } from './whoisit';
+import type { ThoiTrangAction, ThoiTrangDressSec, ThoiTrangPosePayload, ThoiTrangThemeGroupSetting, ThoiTrangView } from './thoitrang';
 import type { WordChainDifficulty, WordChainRule } from './pos';
 import type { CheckinStatus, CosmeticSlot, Equipped, GiftId, PlayerCosmetics, ShopAck, ShopInfo } from './shop';
 /** Kiểu dữ liệu và tên sự kiện dùng chung giữa app và server. */
@@ -40,7 +41,8 @@ export type GameType =
   | 'boom_online'
   | 'uno_mercy'
   | 'family_feud'
-  | 'who_is_it';
+  | 'who_is_it'
+  | 'thoitrang';
 export type Phase = 'lobby' | 'playing' | 'finished';
 
 export const GAME_INFO: Record<GameType, { name: string; min: number; max: number }> = {
@@ -61,6 +63,7 @@ export const GAME_INFO: Record<GameType, { name: string; min: number; max: numbe
   uno_mercy: { name: 'UNO Tàn nhẫn', min: 2, max: 12 },
   family_feud: { name: 'Khảo sát Xóm Lầy', min: 2, max: 12 },
   who_is_it: { name: 'Đoán Ai Đây?', min: 2, max: 12 },
+  thoitrang: { name: 'Sàn diễn Xóm Lầy', min: 2, max: 12 },
 };
 
 export interface RoomSettings {
@@ -112,6 +115,10 @@ export interface RoomSettings {
   familyFeudRounds?: 3 | 5;
   /** Đoán Ai Đây?: chế độ số nhân vật theo số người hoặc Bảng lớn */
   whoIsItDifficulty?: WhoIsItDifficulty;
+  /** Sàn diễn Xóm Lầy: thời gian phối đồ (120 / 180 / 240 / 300 / 420s, mặc định 240s) */
+  thoiTrangDressSec?: ThoiTrangDressSec;
+  /** Sàn diễn Xóm Lầy: nhóm chủ đề ('random' hoặc 1 trong 16 nhóm) */
+  thoiTrangThemeGroup?: ThoiTrangThemeGroupSetting;
   /** @deprecated tương thích ngược */
   ludoPieces?: 2 | 4;
 }
@@ -382,7 +389,8 @@ export type GameView =
   | CaroView
   | CroakSquadView
   | FamilyFeudView
-  | WhoIsItView;
+  | WhoIsItView
+  | ThoiTrangView;
 
 // ================= Nối từ =================
 
@@ -620,6 +628,7 @@ export type GameAction =
   | { type: 'cs_reset_stage' }
   | FamilyFeudAction
   | WhoIsItAction
+  | ThoiTrangAction
   | { type: 'end' };
 
 export type ActionError =
@@ -976,6 +985,8 @@ export interface ServerToClientEvents {
   'croak:tick': (p: CroakTickPayload) => void;
   /** đồng bộ vật lý 20Hz nhẹ cho Đặt Bom Tử Chiến (`boom_online`) */
   'boom:tick': (p: BoomTickPayload) => void;
+  /** đồng bộ pose/cổ vũ nhẹ cho Sàn Diễn Xóm Lầy (`thoitrang`) */
+  'thoitrang:pose': (p: ThoiTrangPosePayload) => void;
   'fun:event': (e: FunEvent) => void;
   'meme:played': (p: { code: string; playerId: string; memeId: MemeId }) => void;
   'chat:msg': (m: ChatMsg) => void;

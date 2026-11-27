@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sàn Diễn — thiết kế mới</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;800&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+<style>
+:root{--pink:#ff5c8a;--pink2:#ffb3c7;--ink:#3b2a3f;--ink2:#7a6880;--glass:rgba(255,255,255,.86);--line:#f1e3ee}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Be Vietnam Pro',system-ui,sans-serif;color:var(--ink);overflow:hidden;background:#f7e9f5;user-select:none}
+#stage{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+.pill{background:var(--glass);border-radius:999px;box-shadow:0 6px 24px rgba(160,90,150,.18);backdrop-filter:blur(10px)}
+.top{position:fixed;top:16px;left:108px;right:420px;display:flex;gap:12px;align-items:center;z-index:3}
+.brand{padding:10px 18px;font-weight:800;font-size:18px;color:var(--pink)}
+.theme{flex:1;padding:10px 20px;display:flex;flex-direction:column;border-radius:22px}
+.theme small{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--pink)}
+.theme b{font-size:17px}.theme span{font-size:12.5px;color:var(--ink2)}
+.timer{padding:12px 18px;font-weight:800;font-size:18px;background:linear-gradient(135deg,#ff7aa2,#ff5c8a);color:#fff}
+.players{position:fixed;top:16px;right:16px;width:388px;display:flex;gap:8px;justify-content:flex-end;z-index:3}
+.pl{width:54px;height:54px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(160,90,150,.2);position:relative;overflow:hidden;border:3px solid #fff}
+.pl img{width:100%;height:100%;object-fit:cover}.pl.ok::after{content:'✓';position:absolute;right:-2px;bottom:-2px;width:20px;height:20px;border-radius:50%;background:#5fd3a6;color:#fff;font-size:12px;display:grid;place-items:center;font-weight:800}
+.rail{position:fixed;left:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:28px;z-index:3}
+.cat{width:64px;padding:8px 0;border-radius:20px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:600 11px 'Be Vietnam Pro';color:var(--ink2)}
+.cat i{font-style:normal;font-size:24px;width:44px;height:44px;border-radius:16px;display:grid;place-items:center;background:#fff4f8}
+.cat.on{color:var(--pink)}.cat.on i{background:linear-gradient(135deg,#ff8fb0,#ff5c8a);box-shadow:0 6px 16px rgba(255,92,138,.4)}
+.closet{position:fixed;right:16px;top:86px;bottom:16px;width:388px;border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:12px;z-index:3}
+.closet h3{font-size:18px;display:flex;justify-content:space-between;align-items:center}.closet h3 em{font-style:normal;font-size:12px;color:var(--ink2);font-weight:600}
+.search{border:2px solid var(--line);border-radius:14px;padding:9px 14px;font:inherit;font-size:13px;outline:none;background:#fff}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;overflow:auto;padding:2px;flex:1;align-content:start}
+.card{border:3px solid transparent;border-radius:20px;background:#fff6fa;cursor:pointer;padding:6px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;font-size:11.5px;font-weight:600;color:var(--ink)}
+.card img{width:100%;aspect-ratio:1;border-radius:14px;background:radial-gradient(circle at 50% 40%,#fff,#fde7f1)}
+.card.on{border-color:var(--pink);background:#fff}.card.on::after{content:'✓';position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:var(--pink);color:#fff;display:grid;place-items:center;font-size:12px}
+.card.none{justify-content:center;color:var(--ink2);font-size:28px}
+.row label{font-size:11.5px;font-weight:800;color:var(--ink2);letter-spacing:.06em;display:block;margin-bottom:6px}
+.sw{display:flex;flex-wrap:wrap;gap:6px}.sw b{width:24px;height:24px;border-radius:50%;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(0,0,0,.06)}.sw b.on{outline:3px solid var(--pink);outline-offset:2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chips b{padding:6px 11px;border-radius:999px;background:#fff4f8;font-size:12px;cursor:pointer;font-weight:600}.chips b.on{background:var(--pink);color:#fff}
+.dock{position:fixed;bottom:22px;left:calc(50% - 202px);transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:3}
+.dock button{border:0;font:800 14px 'Be Vietnam Pro';cursor:pointer;color:var(--ink)}
+.round{width:50px;height:50px;border-radius:50%;background:var(--glass);box-shadow:0 6px 18px rgba(160,90,150,.2);font-size:20px!important}
+.done{padding:16px 40px;border-radius:999px;background:linear-gradient(135deg,#ff8fb0,#ff4f7f)!important;color:#fff!important;font-size:18px!important;box-shadow:0 10px 28px rgba(255,79,127,.45)}
+.runway .closet,.runway .rail,.runway .dock,.runway .players{display:none}
+.rate{display:none;position:fixed;bottom:26px;left:50%;transform:translateX(-50%);padding:14px 24px;border-radius:26px;z-index:3;text-align:center}
+.runway .rate{display:block}.rate small{font-weight:800;color:var(--pink);letter-spacing:.1em;font-size:11px}
+.stars{font-size:40px;letter-spacing:4px;color:#ffd24d;text-shadow:0 2px 0 #e0a800}.stars s{text-decoration:none;color:#e9dbe6;text-shadow:none}
+.poses{display:flex;gap:8px;justify-content:center;margin-top:8px}.poses b{padding:7px 12px;border-radius:999px;background:#fff4f8;font-size:12px}
+.runway .top{right:16px}.runway .theme{background:rgba(255,255,255,.12);color:#fff}.runway .theme span{color:#e9d8ff}.runway .brand{background:rgba(255,255,255,.12)}
+@media (max-width:760px){
+ .top{left:12px;right:12px;flex-wrap:nowrap}.timer{padding:10px 14px;font-size:15px}.brand{display:none}.theme b{font-size:14px}.theme span{display:none}
+ .players{top:96px;right:10px;width:auto;flex-direction:column}.pl{width:40px;height:40px}
+ .rail{top:auto;bottom:calc(46% - 10px);left:8px;right:8px;transform:none;flex-direction:row;overflow-x:auto;padding:6px;border-radius:22px;display:none}
+ .closet{top:auto;left:8px;right:8px;width:auto;height:46%;bottom:0;border-radius:26px 26px 0 0;padding:12px;overflow:auto}.search{display:none}
+ .grid{grid-template-columns:repeat(4,1fr);gap:7px;flex:none;overflow:visible}.cat{width:auto;min-width:56px}
+ .dock{left:50%;bottom:calc(46% + 12px)}.done{padding:11px 24px;font-size:15px!important;white-space:nowrap}.round{width:42px;height:42px}
+ .mtabs{display:flex!important}
+}
+.mtabs{display:none;gap:6px;overflow-x:auto;margin:-2px -2px 0}.mtabs b{flex:0 0 auto;padding:7px 12px;border-radius:999px;background:#fff4f8;font-size:12.5px;font-weight:700}.mtabs b.on{background:var(--pink);color:#fff}
+</style></head><body>
+<canvas id="stage"></canvas>
+<div class="top"><div class="brand pill">✦ Sàn Diễn</div>
+ <div class="theme pill"><small>CHỦ ĐỀ</small><b id="tTitle">Đi rình người yêu cũ ở quán trà sữa</b><span>Kính râm, mũ, áo khoác nguỵ trang — mà vẫn phải xinh!</span></div>
+ <div class="timer pill">⏱ 03:42</div></div>
+<div class="players" id="players"></div>
+<nav class="rail pill" id="rail"></nav>
+<aside class="closet pill"><div class="mtabs" id="mtabs"></div><h3><span id="cTitle">Áo</span><em id="cCount"></em></h3>
+ <input class="search" placeholder="Tìm món đồ…"><div class="grid" id="grid"></div>
+ <div class="row"><label>MÀU CHÍNH</label><div class="sw" id="sw1"></div></div>
+ <div class="row" id="r2"><label>MÀU PHỤ</label><div class="sw" id="sw2"></div></div>
+ <div class="row" id="r3"><label>HOẠ TIẾT</label><div class="chips" id="pat"></div></div></aside>
+<div class="dock"><button class="round" id="undo">↶</button><button class="round" id="rnd">🎲</button><button class="done" id="done">✨ Xong!</button><button class="round" id="cat">👠</button></div>
+<div class="rate pill"><small>ĐANG TRÌNH DIỄN · LAN</small><div class="stars">★★★★<s>★</s></div><div class="poses"><b>💋 Hôn gió</b><b>💪 Gồng cơ</b><b>🤳 Selfie</b><b>🌀 Vấp té</b></div></div>
+<script type="module">
+// app.js — dressing room + runway for the redesigned fashion game (design prototype).
+import * as THREE from 'three';
+// doll.js — stylised toon fashion doll (~4.2 heads) with freely combinable layered clothing.
+// Every garment is its own layer on a slot; any top + bottom + shoes + hair + hat + glasses + accessories combine.
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+// ---------- toon look ----------
+const gradient = (() => {
+  const d = new Uint8Array([90, 170, 255]);
+  const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t;
+})();
+const patCache = new Map();
+function patternTex(p, c, c2) {
+  const key = p + c + c2; if (patCache.has(key)) return patCache.get(key);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
+  g.fillStyle = c; g.fillRect(0, 0, 128, 128); g.fillStyle = c2; g.strokeStyle = c2;
+  if (p === 'stripe') for (let i = 0; i < 8; i++) g.fillRect(0, i * 16, 128, 7);
+  if (p === 'dots') for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.beginPath(); g.arc(16 + x * 32 + (y % 2) * 16, 16 + y * 32, 6, 0, 7); g.fill(); }
+  if (p === 'check') { g.globalAlpha = 0.55; for (let i = 0; i < 4; i++) { g.fillRect(i * 32, 0, 14, 128); g.fillRect(0, i * 32, 128, 14); } }
+  if (p === 'heart') for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+    const cx = 22 + x * 42 + (y % 2) * 21, cy = 22 + y * 42; g.beginPath(); g.moveTo(cx, cy + 9);
+    g.bezierCurveTo(cx - 14, cy - 2, cx - 6, cy - 12, cx, cy - 4); g.bezierCurveTo(cx + 6, cy - 12, cx + 14, cy - 2, cx, cy + 9); g.fill(); }
+  if (p === 'flower') for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+    const cx = 22 + x * 42 + (y % 2) * 21, cy = 22 + y * 42;
+    for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(cx + Math.cos(k * 1.256) * 6, cy + Math.sin(k * 1.256) * 6, 4.5, 0, 7); g.fill(); }
+    g.fillStyle = '#fff4b0'; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill(); g.fillStyle = c2; }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3); t.colorSpace = THREE.SRGBColorSpace;
+  patCache.set(key, t); return t;
+}
+const matCache = new Map();
+function toon(color, pattern = 'plain', c2 = '#ffffff') {
+  const key = color + pattern + c2; if (matCache.has(key)) return matCache.get(key);
+  const m = new THREE.MeshToonMaterial({ color: pattern === 'plain' ? color : '#ffffff', gradientMap: gradient });
+  if (pattern !== 'plain') m.map = patternTex(pattern, color, c2);
+  matCache.set(key, m); return m;
+}
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x3b2a3f, side: THREE.BackSide });
+outlineMat.onBeforeCompile = (s) => { s.vertexShader = s.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position + normal * 0.0055;'); };
+function mesh(geo, mat, outline = true) {
+  const m = new THREE.Mesh(geo, mat); m.castShadow = true;
+  if (outline) { const o = new THREE.Mesh(geo, outlineMat); o.raycast = () => {}; m.add(o); }
+  return m;
+}
+// lathe from [[r, y], ...] bottom→top, elliptic section (sz), smooth
+function lathe(prof, sz = 1, segs = 40, gap = 0) {
+  const pts = new THREE.SplineCurve(prof.map(([r, y]) => new THREE.Vector2(r, y))).getPoints(prof.length * 6);
+  const g = new THREE.LatheGeometry(pts, segs, gap / 2, Math.PI * 2 - gap); g.scale(1, 1, sz); g.computeVertexNormals(); return g;
+}
+const sph = (rx, ry, rz, w = 32, h = 20) => new THREE.SphereGeometry(1, w, h).scale(rx, ry, rz);
+
+// ---------- body ----------
+const SKINS = ['#ffe3d3', '#f7cfb6', '#eab08e', '#c98b66', '#8f5b3e', '#5e3a28'];
+const TYPES = {
+  girl: { sh: 0.135, hip: 0.15, waist: 0.105, chest: 0.13, leg: 0.058 },
+  boy: { sh: 0.16, hip: 0.13, waist: 0.125, chest: 0.14, leg: 0.062 },
+};
+const Y = { ankle: 0.05, knee: 0.37, hip: 0.68, waist: 0.86, chest: 0.99, shoulder: 1.09, neck: 1.15, head: 1.34 };
+
+class Doll {
+  constructor(opts = {}) {
+    this.root = new THREE.Group(); this.slots = {}; this.outfit = null; this.ghost = !!opts.ghost;
+    this.build(opts.type || 'girl', opts.skin || SKINS[1]);
+  }
+  skinMat(c) { return this.ghost ? new THREE.MeshToonMaterial({ color: '#e9e3f0', gradientMap: gradient, transparent: true, opacity: 0.55 }) : toon(c); }
+  build(type, skin) {
+    this.type = type; this.skin = skin; const T = TYPES[type]; this.T = T;
+    this.root.clear(); const S = this.skinMat(skin); this.skinM = S; const out = !this.ghost;
+    const r = this.root;
+    // pivots
+    const hips = new THREE.Group(); hips.position.y = Y.hip; r.add(hips);
+    const chest = new THREE.Group(); chest.position.y = Y.waist - Y.hip; hips.add(chest);
+    const neck = new THREE.Group(); neck.position.y = Y.neck - Y.waist; chest.add(neck);
+    this.j = { hips, chest, neck };
+    // torso (two lathes so it can bend at the waist)
+    hips.add(mesh(lathe([[0.06, -0.08], [T.hip * 0.92, -0.04], [T.hip, 0.02], [T.hip * 0.9, 0.1], [T.waist, 0.18], [T.waist, 0.2]], 0.74).translate(0, 0, 0), S, out));
+    chest.add(mesh(lathe([[T.waist, -0.02], [T.waist * 1.05, 0.04], [T.chest, 0.13], [T.sh * 0.98, 0.2], [T.sh * 0.7, 0.26], [0.045, 0.29], [0.04, 0.31]], 0.72), S, out));
+    neck.add(mesh(new THREE.CylinderGeometry(0.038, 0.042, 0.1, 20).translate(0, 0.02, 0), S, out));
+    // head
+    const head = new THREE.Group(); head.position.y = Y.head - Y.neck; neck.add(head); this.j.head = head;
+    head.add(mesh(sph(0.175, 0.17, 0.165, 40, 28), S, out));
+    for (const s of [1, -1]) head.add(mesh(sph(0.03, 0.04, 0.02).translate(s * 0.17, -0.01, 0), S, out));
+    this.face = new THREE.Group(); head.add(this.face); this.buildFace('#4a2d24');
+    // arms
+    this.j.arm = {};
+    for (const s of [1, -1]) {
+      const sh = new THREE.Group(); sh.position.set(s * T.sh, Y.shoulder - Y.waist, 0); chest.add(sh);
+      sh.add(mesh(sph(0.05, 0.05, 0.05), S, out));
+      sh.add(mesh(lathe([[0.034, -0.24], [0.04, -0.12], [0.046, -0.01], [0.03, 0.03]], 1, 24), S, out));
+      const el = new THREE.Group(); el.position.y = -0.24; sh.add(el);
+      el.add(mesh(lathe([[0.026, -0.2], [0.034, -0.08], [0.036, 0.0], [0.02, 0.025]], 1, 24), S, out));
+      const hand = new THREE.Group(); hand.position.y = -0.21; el.add(hand);
+      hand.add(mesh(sph(0.034, 0.048, 0.026).translate(0, -0.03, 0.004), S, out));
+      hand.add(mesh(sph(0.012, 0.022, 0.012).translate(-s * 0.026, -0.02, 0.016).rotateZ(s * 0.4), S, out));
+      this.j.arm[s] = { sh, el, hand };
+    }
+    // legs
+    this.j.leg = {};
+    for (const s of [1, -1]) {
+      const th = new THREE.Group(); th.position.set(s * 0.07, -0.02, 0); hips.add(th);
+      th.add(mesh(lathe([[T.leg * 0.72, -0.3], [T.leg * 0.85, -0.2], [T.leg, -0.04], [T.leg * 0.6, 0.04]], 1, 28), S, out));
+      const kn = new THREE.Group(); kn.position.y = -0.3; th.add(kn);
+      kn.add(mesh(lathe([[0.03, -0.31], [0.04, -0.2], [0.045, -0.06], [0.042, 0.02], [0.03, 0.04]], 1, 28), S, out));
+      const ft = new THREE.Group(); ft.position.y = -0.31; kn.add(ft);
+      ft.add(mesh(sph(0.04, 0.03, 0.075).translate(0, -0.02, 0.03), S, out));
+      this.j.leg[s] = { th, kn, ft };
+    }
+    if (this.outfit) this.apply(this.outfit);
+  }
+  buildFace(eyeColor, lip = '#e0707a') {
+    const f = this.face; f.clear(); if (this.ghost) return;
+    const dark = new THREE.MeshBasicMaterial({ color: eyeColor }), white = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+    const blush = new THREE.MeshBasicMaterial({ color: '#ff8fa8', transparent: true, opacity: 0.45 });
+    for (const s of [1, -1]) {
+      const eye = new THREE.Mesh(sph(0.027, 0.04, 0.012), dark); eye.position.set(s * 0.062, -0.005, 0.158); eye.rotation.y = s * 0.36; f.add(eye);
+      const hl = new THREE.Mesh(sph(0.009, 0.012, 0.004), white); hl.position.set(s * 0.062 + 0.008, 0.01, 0.17); f.add(hl);
+      const hl2 = new THREE.Mesh(sph(0.004, 0.005, 0.003), white); hl2.position.set(s * 0.062 - 0.006, -0.02, 0.169); f.add(hl2);
+      const lash = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.0045, 6, 16, Math.PI * 0.8), dark);
+      lash.position.set(s * 0.062, 0.0, 0.158); lash.rotation.set(0, s * 0.36, Math.PI * 0.1); f.add(lash);
+      const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.004, 0.03, 4, 8), dark);
+      brow.position.set(s * 0.064, 0.065, 0.152); brow.rotation.set(0, s * 0.36, Math.PI / 2 + s * 0.12); f.add(brow);
+      const b = new THREE.Mesh(sph(0.03, 0.016, 0.006), blush); b.position.set(s * 0.1, -0.055, 0.137); b.rotation.y = s * 0.6; f.add(b);
+    }
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 6, 16, Math.PI), new THREE.MeshBasicMaterial({ color: lip }));
+    mouth.position.set(0, -0.075, 0.158); mouth.rotation.z = Math.PI; f.add(mouth);
+  }
+  clear(slot) { const g = this.slots[slot]; if (g) { g.forEach((m) => m.parent && m.parent.remove(m)); } this.slots[slot] = []; }
+  put(slot, parent, m) { parent.add(m); this.slots[slot].push(m); return m; }
+  apply(o) {
+    this.outfit = JSON.parse(JSON.stringify(o)); this.armSpread = 0;
+    if (o.type && (o.type !== this.type || o.skin !== this.skin)) { const keep = this.outfit; this.outfit = null; this.build(o.type, o.skin); this.outfit = keep; }
+    if (!this.ghost) this.buildFace(o.eye || '#4a2d24', o.lip);
+    for (const slot of Object.keys(BUILD)) {
+      this.clear(slot); const it = o[slot]; if (!it || !it.id) continue;
+      if (slot === 'dress' && (o.top || o.bottom)) continue;
+      const fn = BUILD[slot][it.id]; if (fn) fn(this, it, (m) => this.put(slot, ...m));
+    }
+    if (o.hat && ['cap', 'witch', 'sunhat', 'beret'].includes(o.hat.id)) for (const m of this.slots.hair || []) {
+      m.geometry.computeBoundingSphere(); if (m.geometry.boundingSphere.center.y > 0.11 && m.geometry.boundingSphere.radius < 0.1) m.visible = false; }
+  }
+}
+
+// ---------- garment helpers ----------
+const M = (it) => toon(it.c, it.p || 'plain', it.c2 || '#ffffff');
+const A = (it) => toon(it.c2 || '#ffffff');
+function torsoShell(d, it, y0, y1, inf, flare = 0) {
+  if (y0 < Y.waist - 0.01) { inf = Math.max(inf, 0.018); flare = Math.max(flare, 0.012); } // chest-space shell from y0 (hip-space if < 0) to y1
+  const T = d.T, P = [];
+  const prof = [[T.hip, Y.hip], [T.hip * 0.95, Y.hip + 0.06], [T.waist, Y.waist], [T.chest, Y.chest], [T.sh * 0.98, Y.chest + 0.07], [T.sh * 0.72, Y.chest + 0.13], [0.05, Y.neck]];
+  const rAt = (y) => { for (let i = 0; i < prof.length - 1; i++) if (y <= prof[i + 1][1]) { const t = (y - prof[i][1]) / (prof[i + 1][1] - prof[i][1]); return prof[i][0] + (prof[i + 1][0] - prof[i][0]) * t; } return 0.05; };
+  for (let i = 0; i <= 10; i++) { const y = y0 + (y1 - y0) * i / 10; P.push([rAt(y) + inf + (i === 0 ? flare : flare * Math.max(0, 1 - i / 4)), y - Y.waist]); }
+  if (y1 >= Y.neck - 0.01) P.push([0.048 + inf * 0.5, Y.neck - Y.waist + 0.01]);
+  const g = lathe(P, 0.75); return mesh(g, M(it));
+}
+function sleeve(d, it, s, len, inf = 0.012, puff = 0) {
+  const { sh, el } = d.j.arm[s], out = [];
+  out.push([sh, mesh(lathe([[0.04 + inf + puff * 0.6, -Math.min(len, 0.24)], [0.046 + inf + puff, -0.12], [0.05 + inf + puff * 0.5, 0.0], [0.03, 0.05]], 1, 24), M(it))]);
+  if (len > 0.24) out.push([el, mesh(lathe([[0.03 + inf + 0.004, -(len - 0.24)], [0.036 + inf, -0.08], [0.04 + inf, 0.02]], 1, 24), M(it))]);
+  return out;
+}
+function legShell(d, it, s, len, inf = 0.012, flare = 0) {
+  const { th, kn } = d.j.leg[s], T = d.T, out = [];
+  out.push([th, mesh(lathe([[T.leg * 0.72 + inf, -Math.min(len, 0.3)], [T.leg * 0.85 + inf, -0.2], [T.leg + inf, -0.04], [T.leg + inf * 0.6, 0.05]], 1, 28), M(it))]);
+  if (len > 0.3) out.push([kn, mesh(lathe([[0.034 + inf + flare, -(len - 0.3)], [0.042 + inf + flare * 0.3, -0.18], [0.047 + inf, -0.04], [0.044 + inf, 0.03]], 1, 28), M(it))]);
+  return out;
+}
+function skirt(d, it, top, bot, rBot, pleats = 0) {
+  const T = d.T, cov = topCovers(d) ? 0.0 : 0.004, g = lathe([[rBot, bot - Y.hip], [(rBot + T.hip + 0.012) / 2 + 0.01, (bot + top) / 2 - Y.hip], [T.hip + 0.009, Y.hip - Y.hip + 0.02], [T.hip * 0.9 + 0.012, 0.1], [T.waist + 0.006 + cov, top - Y.hip]], 0.75, 64);
+  d.armSpread = Math.max(d.armSpread || 0, Math.min(0.5, (rBot - 0.2) * 1.4));
+  if (pleats) { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), y = p.getY(i); const a = Math.atan2(z, x), k = Math.max(0, (top - Y.hip - y) / (top - bot)); const dd = 0.012 * Math.abs(Math.sin(a * pleats)) * k; p.setXYZ(i, x + Math.cos(a) * dd, y, z + Math.sin(a) * dd); } g.computeVertexNormals(); }
+  return mesh(g, M(it));
+}
+const band = (r, y, h, it, sz = 0.75) => mesh(new THREE.CylinderGeometry(r, r, h, 40, 1, true).scale(1, 1, sz).translate(0, y, 0), A(it));
+
+const hairCap = (H, m, add, lift = 0) => {
+  add([H, mesh(new THREE.SphereGeometry(0.19, 40, 22, 0, Math.PI * 2, 0, 1.28).scale(1, 0.97, 0.98).translate(0, 0.03 + lift, -0.012), m)]);
+  add([H, mesh(new THREE.SphereGeometry(0.193, 40, 14, Math.PI, Math.PI, 1.2, 1.05).translate(0, 0.03 + lift, -0.014), m)]);
+};
+// ---------- catalogue: every item = a builder; any combination works ----------
+const BUILD = {
+  hair: {
+    bob: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add);
+      add([H, mesh(lathe([[0.2, -0.12], [0.205, -0.02], [0.19, 0.06]], 1, 40, 2.2).translate(0, 0.0, -0.02), m)]);
+      add([H, mesh(sph(0.16, 0.045, 0.06).translate(0, 0.14, 0.11), m)]); },
+    long: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add);
+      add([H, mesh(lathe([[0.15, -0.42], [0.2, -0.25], [0.205, -0.05], [0.19, 0.08]], 0.8, 40, 2.4).translate(0, 0, -0.05), m)]);
+      add([H, mesh(sph(0.155, 0.045, 0.06).translate(0.02, 0.14, 0.11).rotateZ(-0.12), m)]); },
+    ponytail: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add, 0.004);
+      add([H, mesh(sph(0.06, 0.05, 0.05).translate(0, 0.12, -0.15), A(it))]);
+      add([H, mesh(lathe([[0.01, -0.36], [0.06, -0.24], [0.07, -0.1], [0.05, 0.0]], 1, 24).translate(0, 0.08, -0.2).rotateX(-0.25), m)]);
+      add([H, mesh(sph(0.15, 0.042, 0.06).translate(-0.03, 0.14, 0.11).rotateZ(0.15), m)]); },
+    buns: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add, 0.004);
+      for (const s of [1, -1]) add([H, mesh(sph(0.075, 0.075, 0.075).translate(s * 0.13, 0.15, -0.03), m)]);
+      add([H, mesh(sph(0.155, 0.042, 0.06).translate(0, 0.14, 0.11), m)]); },
+    twintails: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add, 0.004);
+      for (const s of [1, -1]) add([H, mesh(lathe([[0.01, -0.4], [0.06, -0.25], [0.065, -0.08], [0.04, 0.0]], 1, 24).translate(s * 0.19, 0.08, -0.04).rotateZ(s * 0.15), m)]);
+      add([H, mesh(sph(0.155, 0.042, 0.06).translate(0, 0.14, 0.11), m)]); },
+    short: (d, it, add) => { const H = d.j.head, m = M(it);
+      hairCap(H, m, add, 0.012);
+      add([H, mesh(sph(0.15, 0.045, 0.065).translate(0.03, 0.145, 0.1).rotateZ(-0.25), m)]); },
+    curly: (d, it, add) => { const H = d.j.head, m = M(it);
+      for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; if (Math.sin(a) > 0.45) continue; add([H, mesh(sph(0.07, 0.07, 0.07).translate(Math.cos(a) * 0.16, 0.06 + 0.06 * Math.sin(i * 1.7), Math.sin(a) * 0.15 - 0.02), m)]); }
+      hairCap(H, m, add, 0.02); },
+  },
+  top: {
+    tee: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip + 0.03, Y.neck, 0.012, 0.01)]); for (const s of [1, -1]) sleeve(d, it, s, 0.12).forEach(add); add([d.j.chest, band(0.055, Y.neck - Y.waist - 0.005, 0.016, it)]); },
+    crop: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.waist + 0.04, Y.neck, 0.012)]); for (const s of [1, -1]) sleeve(d, it, s, 0.1).forEach(add); },
+    tank: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip + 0.04, Y.chest + 0.12, 0.011)]);
+      for (const s of [1, -1]) add([d.j.chest, mesh(new THREE.CapsuleGeometry(0.008, 0.11, 4, 8).rotateZ(s * 0.25).translate(s * 0.075, Y.chest + 0.15 - Y.waist, 0.02), M(it))]); },
+    blouse: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip + 0.04, Y.neck, 0.012, 0.03)]); for (const s of [1, -1]) sleeve(d, it, s, 0.12, 0.014, 0.025).forEach(add);
+      for (const s of [1, -1]) add([d.j.chest, mesh(sph(0.04, 0.008, 0.035).rotateZ(s * 0.5).translate(s * 0.035, Y.neck - Y.waist - 0.02, 0.06), A(it))]); },
+    hoodie: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip - 0.02, Y.neck, 0.024, 0.0)]); for (const s of [1, -1]) sleeve(d, it, s, 0.44, 0.02).forEach(add);
+      add([d.j.chest, mesh(new THREE.TorusGeometry(0.075, 0.035, 12, 32).scale(1, 0.6, 1).rotateX(Math.PI / 2).translate(0, Y.neck - Y.waist - 0.03, -0.03), M(it))]);
+      add([d.j.chest, mesh(new THREE.CylinderGeometry(d.T.waist + 0.032, d.T.waist + 0.04, 0.07, 24, 1, true, -0.55, 1.1).scale(1, 1, 0.78).translate(0, -0.02, 0), A(it))]); },
+    sweater: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip - 0.01, Y.neck, 0.02)]); for (const s of [1, -1]) sleeve(d, it, s, 0.44, 0.018).forEach(add);
+      add([d.j.hips, band(d.T.hip + 0.026, Y.hip - 0.01 - Y.hip + 0.0, 0.03, it, 0.75)]); add([d.j.chest, band(0.058, Y.neck - Y.waist - 0.005, 0.03, it)]); },
+    blazer: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip - 0.02, Y.neck, 0.02, 0.015)]); for (const s of [1, -1]) sleeve(d, it, s, 0.44, 0.016).forEach(add);
+      { const v = new THREE.Shape(); v.moveTo(-0.05, 0.1); v.lineTo(0.05, 0.1); v.lineTo(0, -0.04); v.lineTo(-0.05, 0.1); add([d.j.chest, mesh(new THREE.ShapeGeometry(v).translate(0, Y.chest - Y.waist + 0.02, d.T.chest * 0.75 + 0.03), toon('#ffffff'), false)]); }
+      for (const s of [1, -1]) add([d.j.chest, mesh(new THREE.BoxGeometry(0.022, 0.15, 0.008).rotateZ(-s * 0.32).translate(s * 0.034, Y.chest - Y.waist + 0.04, d.T.chest * 0.75 + 0.034), toon(it.c2 && it.c2 !== '#ffffff' ? it.c2 : '#1f1a26'))]);
+      add([d.j.chest, mesh(sph(0.009, 0.009, 0.005).translate(0, 0.03, d.T.waist * 0.75 + 0.03), toon('#e8c15a'))]); },
+  },
+  bottom: {
+    jeans: (d, it, add) => { add([d.j.hips, torsoShell2(d, it)]); for (const s of [1, -1]) legShell(d, it, s, 0.6, 0.01).forEach(add); if (!topCovers(d)) add([d.j.hips, band(d.T.waist + 0.012, Y.waist - Y.hip - 0.01, 0.022, it, 0.75)]); },
+    wide: (d, it, add) => { add([d.j.hips, torsoShell2(d, it)]); for (const s of [1, -1]) legShell(d, it, s, 0.6, 0.022, 0.035).forEach(add); },
+    shorts: (d, it, add) => { add([d.j.hips, torsoShell2(d, it)]); for (const s of [1, -1]) legShell(d, it, s, 0.16, 0.016).forEach(add); },
+    mini: (d, it, add) => { add([d.j.hips, skirt(d, it, Y.waist - 0.02, Y.hip - 0.17, d.T.hip + 0.07)]); },
+    pleated: (d, it, add) => { add([d.j.hips, skirt(d, it, Y.waist - 0.02, Y.knee + 0.02, d.T.hip + 0.12, 14)]); },
+    maxi: (d, it, add) => { add([d.j.hips, skirt(d, it, Y.waist - 0.02, 0.07, d.T.hip + 0.16)]); },
+  },
+  dress: {
+    sundress: (d, it, add) => { BUILD.top.tank(d, it, add); add([d.j.hips, skirt(d, it, Y.waist + 0.0, Y.knee - 0.02, d.T.hip + 0.13)]); },
+    ballgown: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.waist - 0.005, Y.chest + 0.1, 0.012)]); add([d.j.hips, skirt(d, it, Y.waist - 0.01, 0.02, 0.42, 9)]);
+      add([d.j.hips, band(d.T.waist + 0.02, Y.waist - Y.hip, 0.028, it, 0.8)]); },
+    aodai: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.hip, Y.neck, 0.012)]); for (const s of [1, -1]) sleeve(d, it, s, 0.44, 0.012).forEach(add);
+      for (const s of [1, -1]) add([d.j.hips, mesh(new THREE.PlaneGeometry(0.2, 0.55).translate(0, -0.27, 0).rotateY(s > 0 ? 0 : Math.PI).translate(0, 0, s * (d.T.hip * 0.78 + 0.02)), new THREE.MeshToonMaterial({ color: it.c, gradientMap: gradient, side: THREE.DoubleSide, map: it.p && it.p !== 'plain' ? patternTex(it.p, it.c, it.c2 || '#fff') : null }))]);
+      const pants = { c: it.c2 || '#ffffff' }; for (const s of [1, -1]) legShell(d, pants, s, 0.6, 0.02, 0.02).forEach(add);
+      add([d.j.chest, band(0.052, Y.neck - Y.waist + 0.01, 0.04, it)]); },
+    minidress: (d, it, add) => { add([d.j.chest, torsoShell(d, it, Y.waist - 0.005, Y.neck, 0.012)]); for (const s of [1, -1]) sleeve(d, it, s, 0.1, 0.014, 0.02).forEach(add);
+      add([d.j.hips, skirt(d, it, Y.waist + 0.0, Y.hip - 0.18, d.T.hip + 0.09, 10)]); add([d.j.hips, band(d.T.waist + 0.018, Y.waist - Y.hip, 0.024, it, 0.78)]); },
+  },
+  shoes: {
+    sneaker: (d, it, add) => shoe(d, it, add, 0.016, 0),
+    boots: (d, it, add) => { shoe(d, it, add, 0.014, 0); for (const s of [1, -1]) add([d.j.leg[s].kn, mesh(lathe([[0.05, -0.31], [0.055, -0.18], [0.058, -0.12]], 1, 28), M(it))]); },
+    heels: (d, it, add) => { shoe(d, it, add, 0.008, 0.03); },
+    loafer: (d, it, add) => shoe(d, it, add, 0.01, 0),
+  },
+  hat: {
+    beret: (d, it, add) => add([d.j.head, mesh(sph(0.2, 0.06, 0.19).rotateZ(0.25).translate(0.03, 0.2, -0.01), M(it))]),
+    cap: (d, it, add) => { add([d.j.head, mesh(sph(0.19, 0.12, 0.19, 32, 16).translate(0, 0.13, -0.01), M(it))]); add([d.j.head, mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.012, 32, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 1.2).translate(0, 0.14, 0.13), A(it))]); },
+    sunhat: (d, it, add) => { add([d.j.head, mesh(new THREE.CylinderGeometry(0.3, 0.32, 0.012, 48).translate(0, 0.17, 0), M(it))]); add([d.j.head, mesh(sph(0.17, 0.11, 0.17).translate(0, 0.2, 0), M(it))]); add([d.j.head, band(0.172, 0.2, 0.03, it, 1)]); },
+    crown: (d, it, add) => { const g = toon('#f2c94c'); add([d.j.head, mesh(new THREE.CylinderGeometry(0.09, 0.085, 0.05, 32, 1, true).translate(0, 0.2, -0.01), g)]);
+      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; add([d.j.head, mesh(new THREE.ConeGeometry(0.018, 0.05, 8).translate(Math.cos(a) * 0.09, 0.245, Math.sin(a) * 0.09 - 0.01), g)]); }
+      add([d.j.head, mesh(sph(0.014, 0.014, 0.01).translate(0, 0.2, 0.085), toon(it.c))]); },
+    bunny: (d, it, add) => { for (const s of [1, -1]) { add([d.j.head, mesh(sph(0.035, 0.11, 0.022).rotateZ(-s * 0.2).translate(s * 0.07, 0.3, -0.02), M(it))]); add([d.j.head, mesh(sph(0.02, 0.07, 0.01).rotateZ(-s * 0.2).translate(s * 0.07, 0.3, -0.0), toon('#ffc6d6'), false)]); }
+      add([d.j.head, mesh(new THREE.TorusGeometry(0.18, 0.01, 8, 40, Math.PI).translate(0, 0.0, 0).rotateY(Math.PI / 2).translate(0, 0.04, -0.02), M(it))]); },
+    witch: (d, it, add) => { add([d.j.head, mesh(new THREE.CylinderGeometry(0.29, 0.3, 0.012, 48).translate(0, 0.16, 0), M(it))]); add([d.j.head, mesh(new THREE.ConeGeometry(0.15, 0.36, 32).translate(0, 0.34, 0).rotateZ(-0.12), M(it))]); add([d.j.head, band(0.15, 0.19, 0.04, it, 1)]); },
+  },
+  glasses: {
+    round: (d, it, add) => glasses(d, it, add, 'round'),
+    shades: (d, it, add) => glasses(d, it, add, 'shades'),
+    heart: (d, it, add) => glasses(d, it, add, 'heart'),
+  },
+  acc: {
+    bag: (d, it, add) => { const { hand } = d.j.arm[1]; add([hand, mesh(new THREE.BoxGeometry(0.03, 0.09, 0.12).translate(0.02, -0.12, 0.0), M(it))]); add([hand, mesh(new THREE.TorusGeometry(0.04, 0.006, 6, 20, Math.PI).rotateY(Math.PI / 2).translate(0.02, -0.075, 0), A(it))]); },
+    pearls: (d, it, add) => { for (let i = 0; i < 18; i++) { const a = Math.PI * 0.15 + (i / 17) * Math.PI * 0.7; add([d.j.chest, mesh(sph(0.009, 0.009, 0.009).translate(Math.cos(a) * 0.075, Y.neck - Y.waist - 0.03 - Math.sin(a) * 0.03, Math.sin(a) * 0.065), toon(it.c), false)]); } },
+    scarf: (d, it, add) => { add([d.j.chest, mesh(new THREE.TorusGeometry(0.07, 0.03, 12, 32).rotateX(Math.PI / 2).translate(0, Y.neck - Y.waist - 0.02, 0), M(it))]); add([d.j.chest, mesh(new THREE.BoxGeometry(0.05, 0.18, 0.02).translate(0.04, Y.chest - Y.waist, d.T.chest * 0.75 + 0.03), M(it))]); },
+    wings: (d, it, add) => { const m = new THREE.MeshToonMaterial({ color: it.c, gradientMap: gradient, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+      for (const s of [1, -1]) { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.bezierCurveTo(0.12 * s, 0.25, 0.32 * s, 0.22, 0.3 * s, 0.05); sh.bezierCurveTo(0.26 * s, -0.08, 0.1 * s, -0.12, 0, 0);
+        add([d.j.chest, mesh(new THREE.ShapeGeometry(sh, 24).rotateY(s * 0.4).translate(0.0, Y.chest - Y.waist, -0.1), m)]); } },
+    star: (d, it, add) => { const { hand } = d.j.arm[-1]; add([hand, mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.25, 8).translate(0, -0.06, 0.03).rotateX(1.2), toon('#ffffff'))]);
+      const st = new THREE.Shape(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.02 : 0.045, a = (i / 10) * Math.PI * 2 + Math.PI / 2; i ? st.lineTo(Math.cos(a) * r, Math.sin(a) * r) : st.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+      add([hand, mesh(new THREE.ExtrudeGeometry(st, { depth: 0.012, bevelEnabled: false }).translate(0, 0.05, 0.13), toon(it.c))]); },
+  },
+};
+function torsoShell2(d, it) { return mesh(lathe([[d.T.hip + 0.006, -0.06], [d.T.hip + 0.007, 0.02], [d.T.hip * 0.92 + 0.006, 0.1], [d.T.waist + 0.007, Y.waist - Y.hip]], 0.75), M(it)); }
+const topCovers = (d) => { const t = d.outfit && d.outfit.top; return t && t.id !== 'crop'; };
+function shoe(d, it, add, sole, heel) {
+  for (const s of [1, -1]) { const ft = d.j.leg[s].ft;
+    add([ft, mesh(sph(0.048, 0.04, 0.088).translate(0, -0.012, 0.032), M(it))]);
+    add([ft, mesh(sph(0.05, sole + 0.004, 0.09).translate(0, -0.05, 0.032), A(it))]);
+    if (heel) add([ft, mesh(new THREE.CylinderGeometry(0.008, 0.012, heel + 0.03, 10).translate(0, -0.06, -0.035), A(it))]); }
+}
+function glasses(d, it, add, kind) {
+  const H = d.j.head, frame = toon(it.c);
+  const lens = new THREE.MeshBasicMaterial({ color: kind === 'round' ? '#ffffff' : (it.c2 || '#2a2233'), transparent: true, opacity: kind === 'round' ? 0.25 : 0.85 });
+  for (const s of [1, -1]) {
+    if (kind === 'heart') { const sh = new THREE.Shape(); sh.moveTo(0, -0.03); sh.bezierCurveTo(-0.05, 0.0, -0.025, 0.04, 0, 0.018); sh.bezierCurveTo(0.025, 0.04, 0.05, 0.0, 0, -0.03);
+      add([H, mesh(new THREE.ShapeGeometry(sh, 16).translate(s * 0.062, 0.0, 0.182), toon(it.c2 || '#ff5c8a'))]); }
+    else { add([H, mesh(new THREE.TorusGeometry(kind === 'round' ? 0.036 : 0.04, 0.006, 8, 32).scale(1, kind === 'round' ? 1 : 0.75, 1).translate(s * 0.062, -0.002, 0.178), frame, false)]);
+      add([H, new THREE.Mesh(new THREE.CircleGeometry(kind === 'round' ? 0.034 : 0.038, 24).scale(1, kind === 'round' ? 1 : 0.75, 1).translate(s * 0.062, -0.002, 0.179), lens)]); }
+  }
+  add([H, mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.04, 6).rotateZ(Math.PI / 2).translate(0, 0.005, 0.184), frame, false)]);
+}
+
+// ---------- catalogue for the UI ----------
+const CATALOG = {
+  hair: [['bob', 'Tóc bob'], ['long', 'Tóc dài'], ['ponytail', 'Đuôi ngựa'], ['buns', 'Búi đôi'], ['twintails', 'Hai bím'], ['short', 'Tóc ngắn'], ['curly', 'Tóc xoăn']],
+  top: [['tee', 'Áo thun'], ['crop', 'Croptop'], ['tank', 'Áo hai dây'], ['blouse', 'Blouse tay bồng'], ['hoodie', 'Hoodie'], ['sweater', 'Áo len'], ['blazer', 'Blazer']],
+  bottom: [['jeans', 'Quần jeans'], ['wide', 'Quần ống rộng'], ['shorts', 'Quần short'], ['mini', 'Chân váy ngắn'], ['pleated', 'Váy xếp ly'], ['maxi', 'Váy dài']],
+  dress: [['sundress', 'Đầm hai dây'], ['minidress', 'Đầm xoè'], ['ballgown', 'Đầm dạ hội'], ['aodai', 'Áo dài']],
+  shoes: [['sneaker', 'Sneaker'], ['boots', 'Bốt'], ['heels', 'Cao gót'], ['loafer', 'Giày búp bê']],
+  hat: [['beret', 'Beret'], ['cap', 'Mũ lưỡi trai'], ['sunhat', 'Mũ rộng vành'], ['crown', 'Vương miện'], ['bunny', 'Bờm tai thỏ'], ['witch', 'Mũ phù thuỷ']],
+  glasses: [['round', 'Kính tròn'], ['shades', 'Kính râm'], ['heart', 'Kính trái tim']],
+  acc: [['bag', 'Túi xách'], ['pearls', 'Vòng ngọc trai'], ['scarf', 'Khăn quàng'], ['wings', 'Cánh tiên'], ['star', 'Đũa phép']],
+};
+const PALETTE = ['#ffffff', '#2b2533', '#ff6b8b', '#ffb3c7', '#c79bff', '#7c5cff', '#6ec6ff', '#2f6fd6', '#5fd3a6', '#ffd56b', '#ff9f5a', '#d9483b', '#a6774f', '#f6e7d8'];
+const HAIRCOL = ['#2b1d1a', '#5a3825', '#a86b3c', '#f2d38a', '#ff9ec4', '#a98bff', '#6fd0ff', '#e8e4ee'];
+const PATTERNS = [['plain', 'Trơn'], ['stripe', 'Sọc'], ['dots', 'Chấm bi'], ['check', 'Caro'], ['heart', 'Tim'], ['flower', 'Hoa']];
+
+// ---------- motion ----------
+function animate(d, mode, t) {
+  const j = d.j, L = j.leg, Ar = j.arm;
+  const sp = 0.12 + (d.armSpread || 0); for (const s of [1, -1]) { L[s].th.rotation.set(0, 0, 0); L[s].kn.rotation.set(0, 0, 0); L[s].ft.rotation.set(0, 0, 0); Ar[s].sh.rotation.set(0, 0, s * sp); Ar[s].el.rotation.set(-0.08, 0, -s * (d.armSpread || 0) * 0.4); }
+  j.hips.rotation.set(0, 0, 0); j.chest.rotation.set(0, 0, 0); j.head.rotation.set(0, 0, 0); d.root.position.y = 0;
+  if (mode === 'idle') { const b = Math.sin(t * 2); j.chest.rotation.z = 0.015 * b; j.head.rotation.z = 0.03 * Math.sin(t * 1.3); j.hips.rotation.y = 0.04 * Math.sin(t * 0.7);
+    Ar[1].sh.rotation.z = sp + 0.02 * b; Ar[-1].sh.rotation.z = -sp - 0.02 * b; }
+  if (mode === 'walk') { const p = t * 6.5, s = Math.sin(p), c = Math.cos(p);
+    L[1].th.rotation.x = -0.45 * s; L[-1].th.rotation.x = 0.45 * s; L[1].kn.rotation.x = 0.6 * Math.max(0, c); L[-1].kn.rotation.x = 0.6 * Math.max(0, -c);
+    Ar[1].sh.rotation.x = 0.4 * s; Ar[-1].sh.rotation.x = -0.4 * s; j.hips.rotation.y = 0.12 * s; j.hips.rotation.z = 0.05 * s; j.chest.rotation.y = -0.15 * s; d.root.position.y = 0.012 * Math.abs(c); }
+  if (mode === 'pose') { Ar[1].sh.rotation.z = 0.5; Ar[1].el.rotation.z = -1.6; Ar[-1].sh.rotation.z = -2.6; Ar[-1].el.rotation.z = -0.5; j.hips.rotation.z = -0.08; j.head.rotation.z = 0.15; L[-1].th.rotation.x = -0.15; L[-1].kn.rotation.x = 0.25; L[-1].th.rotation.z = -0.08; }
+}
+
+const $ = (id) => document.getElementById(id);
+const mobile = matchMedia('(max-width:760px)').matches;
+const renderer = new THREE.WebGLRenderer({ canvas: $('stage'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
+
+// ---------- two environments ----------
+const bgTex = (top, bot) => { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, top); gr.addColorStop(1, bot); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+const room = new THREE.Group(), runway = new THREE.Group(); scene.add(room, runway);
+const hemi = new THREE.HemisphereLight('#fff6fb', '#e7c9e6', 1.6); scene.add(hemi);
+const key = new THREE.DirectionalLight('#ffffff', 1.7); key.position.set(1.5, 3, 2.5); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -1.5, right: 1.5, top: 2, bottom: -0.5 }); scene.add(key);
+// dressing room: soft podium + sparkles
+const podium = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.06, 64).translate(0, -0.03, 0), toon('#ffd3e2')); podium.receiveShadow = true; room.add(podium);
+room.add(new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.012, 8, 80).rotateX(Math.PI / 2), toon('#ffffff')));
+const floor = new THREE.Mesh(new THREE.CircleGeometry(8, 64).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.12 })); floor.position.y = -0.059; floor.receiveShadow = true; room.add(floor);
+for (let i = 0; i < 26; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.02 + Math.random() * 0.02), new THREE.MeshBasicMaterial({ color: ['#ffffff', '#ffd56b', '#ffb3c7'][i % 3] }));
+  const a = Math.random() * Math.PI * 2, r = 1.1 + Math.random() * 1.2; s.position.set(Math.cos(a) * r, 0.2 + Math.random() * 1.8, -0.8 - Math.random() * 1.5); room.add(s); }
+// runway: dark stage, catwalk, bulbs, spot
+const walk = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 9), toon('#2a1f3d')); walk.position.set(0, -0.04, -3.6); walk.receiveShadow = true; runway.add(walk);
+const glow = new THREE.MeshBasicMaterial({ color: '#ffe6a8' });
+for (let i = 0; i < 26; i++) for (const s of [1, -1]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), glow); b.position.set(s * 0.68, 0.02, 0.8 - i * 0.34); runway.add(b); }
+const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ff5c8a' })); stripe.position.set(0, 0.002, -3.6); runway.add(stripe);
+for (let i = 0; i < 18; i++) for (const s of [1, -1]) { const p = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.25, 4, 8), new THREE.MeshBasicMaterial({ color: '#160f22' })); p.position.set(s * (1.25 + (i % 3) * 0.35), 0.25, 0.6 - i * 0.5); runway.add(p); }
+const spot = new THREE.SpotLight('#fff1fb', 30, 8, 0.35, 0.6); spot.position.set(0, 4, 2); spot.castShadow = true; runway.add(spot, spot.target);
+
+// ---------- doll + state ----------
+const doll = new Doll({ type: 'girl', skin: SKINS[1] }); scene.add(doll.root);
+let outfit = { type: 'girl', skin: SKINS[1], eye: '#4a2d24', hair: { id: 'ponytail', c: HAIRCOL[1] }, top: { id: 'blouse', c: '#ffb3c7', c2: '#ffffff', p: 'plain' },
+  bottom: { id: 'pleated', c: '#2f6fd6', c2: '#ffffff', p: 'check' }, shoes: { id: 'loafer', c: '#2b2533', c2: '#ffffff' }, hat: { id: 'beret', c: '#ff6b8b' }, glasses: null, acc: { id: 'bag', c: '#ff6b8b', c2: '#ffd56b' } };
+doll.apply(outfit);
+const hist = [], fut = []; const set = (o, rec = true) => { if (rec) { hist.push(JSON.stringify(outfit)); fut.length = 0; } outfit = o; doll.apply(outfit); ui(); };
+
+// ---------- thumbnails (ghost mannequin, item only) ----------
+const tR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); tR.setSize(150, 150); tR.outputColorSpace = THREE.SRGBColorSpace;
+const tS = new THREE.Scene(); tS.add(new THREE.HemisphereLight('#ffffff', '#e8d3e6', 2.2)); const tk = new THREE.DirectionalLight('#fff', 1.6); tk.position.set(1, 2, 3); tS.add(tk);
+const ghost = new Doll({ ghost: true }); tS.add(ghost.root); const tC = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
+const DEF = { hair: '#5a3825', top: '#ff9ec4', bottom: '#6ec6ff', dress: '#c79bff', shoes: '#ff6b8b', hat: '#ffd56b', glasses: '#2b2533', acc: '#ff6b8b' };
+const FRAME = { hair: [1.36, 0.95, 0.15], hat: [1.45, 1.1, 0.2], glasses: [1.34, 0.6, 0], top: [1.0, 1.35, 0], bottom: [0.5, 1.9, 0], dress: [0.72, 2.6, 0], shoes: [0.04, 0.75, 0.35], acc: [0.95, 1.9, 0] };
+const thumbs = {};
+function thumb(slot, id) {
+  const k = slot + id; if (thumbs[k]) return thumbs[k];
+  const o = { type: 'girl', skin: SKINS[1] }; o[slot] = { id, c: DEF[slot], c2: '#ffffff', p: 'plain' };
+  if (slot !== "hair") o.hair = null; ghost.apply(o); ghost.j.head.visible = ["hair", "hat", "glasses"].includes(slot); ghost.root.rotation.y = slot === "acc" ? 0.5 : 0.35;
+  const [y, dist, el] = FRAME[slot]; tC.position.set(0, y + el * dist, dist); tC.lookAt(0, y, 0); tR.render(tS, tC);
+  return (thumbs[k] = tR.domElement.toDataURL());
+}
+// room member portraits
+function portrait(o) { const p = new Doll({ type: o.type, skin: o.skin }); p.apply(o); tS.remove(ghost.root); tS.add(p.root); p.root.rotation.y = 0.3; tC.position.set(0, 1.33, 0.8); tC.lookAt(0, 1.3, 0); tR.render(tS, tC); const u = tR.domElement.toDataURL(); tS.remove(p.root); tS.add(ghost.root); return u; }
+
+// ---------- UI ----------
+const CATS = [['body', '🧸', 'Cơ thể'], ['hair', '💇‍♀️', 'Tóc'], ['top', '👚', 'Áo'], ['bottom', '👖', 'Quần/Váy'], ['dress', '👗', 'Đầm'], ['shoes', '👟', 'Giày'], ['hat', '👒', 'Mũ'], ['glasses', '🕶️', 'Kính'], ['acc', '👜', 'Phụ kiện']];
+let tab = 'top';
+function ui() {
+  $('rail').innerHTML = CATS.map(([k, e, n]) => `<button class="cat ${k === tab ? 'on' : ''}" data-k="${k}"><i>${e}</i>${n}</button>`).join('');
+  $('mtabs').innerHTML = CATS.map(([k, e, n]) => `<b class="${k === tab ? 'on' : ''}" data-k="${k}">${e} ${n}</b>`).join('');
+  document.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { tab = b.dataset.k; ui(); }));
+  const cat = CATS.find((c) => c[0] === tab); $('cTitle').textContent = cat[2];
+  const g = $('grid'), cur = outfit[tab];
+  if (tab === 'body') {
+    $('cCount').textContent = ''; g.innerHTML = [['girl', 'Dáng nữ'], ['boy', 'Dáng nam']].map(([t, n]) => `<div class="card ${outfit.type === t ? 'on' : ''}" data-t="${t}"><img src="${portrait({ ...outfit, type: t })}">${n}</div>`).join('');
+    g.querySelectorAll('[data-t]').forEach((c) => (c.onclick = () => set({ ...outfit, type: c.dataset.t })));
+    sw('sw1', SKINS, outfit.skin, (c) => set({ ...outfit, skin: c })); sw('sw2', ['#4a2d24', '#2b2533', '#3f7d5a', '#2f6fd6', '#8a5cc9', '#b8543b'], outfit.eye, (c) => set({ ...outfit, eye: c }));
+    $('r3').style.display = 'none'; return;
+  }
+  const list = CATALOG[tab]; $('cCount').textContent = list.length + ' món';
+  g.innerHTML = (tab === 'hair' || tab === 'shoes' ? '' : `<div class="card none ${!cur ? 'on' : ''}" data-id="">∅</div>`) + list.map(([id, n]) => `<div class="card ${cur && cur.id === id ? 'on' : ''}" data-id="${id}"><img src="${thumb(tab, id)}">${n}</div>`).join('');
+  g.querySelectorAll('[data-id]').forEach((c) => (c.onclick = () => {
+    const o = { ...outfit }, id = c.dataset.id;
+    if (!id) o[tab] = null; else o[tab] = { ...(cur || { c: DEF[tab], c2: '#ffffff', p: 'plain' }), id };
+    if (tab === 'dress' && id) { o.top = null; o.bottom = null; }
+    if ((tab === 'top' || tab === 'bottom') && id) o.dress = null;
+    set(o);
+  }));
+  const it = cur || {}, upd = (k) => (v) => { if (!cur) return; set({ ...outfit, [tab]: { ...cur, [k]: v } }); };
+  sw('sw1', tab === 'hair' ? HAIRCOL : PALETTE, it.c, upd('c')); sw('sw2', PALETTE, it.c2, upd('c2'));
+  $('r3').style.display = tab === 'hair' || tab === 'glasses' ? 'none' : '';
+  $('pat').innerHTML = PATTERNS.map(([p, n]) => `<b class="${(it.p || 'plain') === p ? 'on' : ''}" data-p="${p}">${n}</b>`).join('');
+  $('pat').querySelectorAll('[data-p]').forEach((b) => (b.onclick = () => upd('p')(b.dataset.p)));
+}
+function sw(id, cols, val, fn) { $(id).innerHTML = cols.map((c) => `<b class="${c === val ? 'on' : ''}" style="background:${c}" data-c="${c}"></b>`).join(''); $(id).querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => fn(b.dataset.c))); }
+$('undo').onclick = () => { if (hist.length) { fut.push(JSON.stringify(outfit)); outfit = JSON.parse(hist.pop()); doll.apply(outfit); ui(); } };
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+function random() { const o = { ...outfit, hair: { id: pick(CATALOG.hair)[0], c: pick(HAIRCOL) } }; const it = (s) => ({ id: pick(CATALOG[s])[0], c: pick(PALETTE), c2: pick(PALETTE), p: Math.random() < 0.4 ? pick(PATTERNS)[0] : 'plain' });
+  if (Math.random() < 0.3) { o.dress = it('dress'); o.top = o.bottom = null; } else { o.top = it('top'); o.bottom = it('bottom'); o.dress = null; }
+  o.shoes = it('shoes'); o.hat = Math.random() < 0.6 ? it('hat') : null; o.glasses = Math.random() < 0.4 ? it('glasses') : null; o.acc = Math.random() < 0.6 ? it('acc') : null; return o; }
+$('rnd').onclick = () => set(random());
+let mode = 'room'; $('done').onclick = () => view('runway'); $('cat').onclick = () => view(mode === 'room' ? 'runway' : 'room');
+// room strip: other players' live looks
+const friends = [0, 1, 2, 3].map(() => random());
+$('players').innerHTML = friends.map((f, i) => `<div class="pl ${i % 2 ? 'ok' : ''}"><img src="${portrait(f)}"></div>`).join('');
+
+// ---------- views ----------
+let walkT = null;
+function view(v) {
+  mode = v; document.body.classList.toggle('runway', v === 'runway'); room.visible = v === 'room'; runway.visible = v === 'runway';
+  scene.background = v === 'room' ? bgTex('#fde4f1', '#e9dcff') : bgTex('#0f0a1c', '#2b1740');
+  hemi.intensity = v === 'room' ? 1.6 : 0.5; key.intensity = v === 'room' ? 1.7 : 0.3; resize();
+}
+let dragX = null, rotY = 0.25;
+$('stage').addEventListener('pointerdown', (e) => (dragX = e.clientX)); addEventListener('pointerup', () => (dragX = null));
+addEventListener('pointermove', (e) => { if (dragX != null && mode === 'room') { rotY += (e.clientX - dragX) * 0.01; dragX = e.clientX; } });
+function resize() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
+  if (mode === 'room') { if (mobile) { camera.setViewOffset(w, h, 0, h * 0.2, w, h); camera.fov = 30; } else { camera.setViewOffset(w, h, 200 - 40, 0, w, h); camera.fov = 26; } }
+  else { camera.clearViewOffset(); camera.fov = 32; }
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+const clock = new THREE.Clock();
+function loop() {
+  const t = clock.getElapsedTime();
+  if (mode === 'room') { doll.root.position.z = 0; doll.root.rotation.y = rotY; animate(doll, 'idle', t); camera.position.set(0, 0.98, mobile ? 7.6 : 5.5); camera.lookAt(0, 0.84, 0); }
+  else { const u = walkT ?? ((t * 0.16) % 1); doll.root.position.z = -6 + u * 6.4; doll.root.rotation.y = 0; animate(doll, u > 0.97 ? 'pose' : 'walk', t);
+    camera.position.set(0.55, 0.95, doll.root.position.z + 4.8); camera.lookAt(0, 0.82, doll.root.position.z); spot.target.position.set(0, 0.6, doll.root.position.z); spot.position.set(0, 4, doll.root.position.z + 1.5); }
+  renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+view('room'); ui(); loop();
+window.design = { ready: true, view, set: (o) => set(o, false), random: () => set(random(), false), tab: (k) => { tab = k; ui(); }, walkAt: (u) => (walkT = u), get outfit() { return outfit; } };
+
+</script>
+</body></html>

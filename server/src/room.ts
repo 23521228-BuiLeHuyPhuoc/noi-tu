@@ -34,6 +34,14 @@ import { FamilyFeudGame } from './games/familyfeud';
 import { WhoIsItGame } from './games/whoisit';
 import type { CroakTickPayload } from '../../shared/src/croaksquad';
 import type { BoomTickPayload } from '../../shared/src/boom';
+import { ThoiTrangGame } from './games/thoitrang';
+import {
+  THOI_TRANG_DRESS_OPTIONS,
+  THOI_TRANG_THEME_GROUP_IDS,
+  type ThoiTrangDressSec,
+  type ThoiTrangPosePayload,
+  type ThoiTrangThemeGroupId,
+} from '../../shared/src/thoitrang';
 
 export interface RoomOptions {
   /** thời gian một lượt/một bước cho mọi game (ms) — để test rút ngắn */
@@ -45,6 +53,8 @@ export interface RoomOptions {
   onCroakTick?: (room: Room, payload: CroakTickPayload) => void;
   /** phát khung vật lý 20Hz cho Đặt Bom Tử Chiến */
   onBoomTick?: (room: Room, payload: BoomTickPayload) => void;
+  /** phát nhanh pose/cổ vũ sân khấu cho Sàn Diễn Xóm Lầy */
+  onThoiTrangPose?: (room: Room, payload: ThoiTrangPosePayload) => void;
   /** ván vừa kết thúc (để cộng thành tích cho tài khoản) */
   onFinish?: (info: { gameType: GameType; participants: string[]; winnerId: string | null; winnerIds?: string[] }) => void;
   /** cả phòng duyệt một từ mới */
@@ -98,7 +108,7 @@ const BOT_THINK_MS: Record<GameType, [number, number]> = {
   ve_doan: [250, 500], bom_tu: [900, 2000], do_vui: [400, 950],
   loto: [350, 800], caro: [500, 1100], croaksquad: [999999, 999999],
   ca_sau: [450, 950], boom_online: [999999, 999999], uno_mercy: [620, 1250],
-  family_feud: [2800, 4800], who_is_it: [3000, 5200],
+  family_feud: [2800, 4800], who_is_it: [3000, 5200], thoitrang: [900, 1800],
 };
 
 export function cleanName(raw: unknown): string | null {
@@ -693,6 +703,19 @@ export class Room {
       if (settings.whoIsItDifficulty !== 'auto' && settings.whoIsItDifficulty !== 'large') return { ok: false, error: 'bad_request' };
       this.settings = { ...this.settings, whoIsItDifficulty: settings.whoIsItDifficulty };
     }
+    if (settings?.thoiTrangDressSec !== undefined) {
+      if (!THOI_TRANG_DRESS_OPTIONS.includes(settings.thoiTrangDressSec as ThoiTrangDressSec)) {
+        return { ok: false, error: 'bad_request' };
+      }
+      this.settings = { ...this.settings, thoiTrangDressSec: settings.thoiTrangDressSec };
+    }
+    if (settings?.thoiTrangThemeGroup !== undefined) {
+      const g = settings.thoiTrangThemeGroup;
+      if (g !== 'random' && !THOI_TRANG_THEME_GROUP_IDS.includes(g as ThoiTrangThemeGroupId)) {
+        return { ok: false, error: 'bad_request' };
+      }
+      this.settings = { ...this.settings, thoiTrangThemeGroup: g };
+    }
     if (settings?.roomTheme !== undefined) {
       if (typeof settings.roomTheme !== 'string' || !ROOM_THEMES.some((t) => t.id === settings.roomTheme)) {
         return { ok: false, error: 'bad_request' };
@@ -845,6 +868,7 @@ export class Room {
       drawFresh: this.opts.drawFresh,
       emitCroakTick: (payload: CroakTickPayload) => this.opts.onCroakTick?.(this, payload),
       emitBoomTick: (payload: BoomTickPayload) => this.opts.onBoomTick?.(this, payload),
+      emitThoiTrangPose: (payload: ThoiTrangPosePayload) => this.opts.onThoiTrangPose?.(this, payload),
       playerColor: (id: string) => this.find(id)?.character.color ?? 0,
     };
     switch (this.gameType) {
@@ -880,6 +904,8 @@ export class Room {
         return new FamilyFeudGame(ctx);
       case 'who_is_it':
         return new WhoIsItGame(ctx);
+      case 'thoitrang':
+        return new ThoiTrangGame(ctx);
       default:
         return new WordChainGame(ctx, 'vi');
     }
