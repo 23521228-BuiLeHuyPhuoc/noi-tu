@@ -1,6 +1,6 @@
 /**
  * Kiểu dữ liệu, hằng số & hàm hỗ trợ dùng chung cho game "Sàn Diễn Xóm Lầy" (`thoitrang`, 2–12 người).
- * Thiết kế v4 (6 dáng người, 14 biểu cảm, 167 món đồ, 11 dáng sàn diễn).
+ * Thiết kế v5 (6 dáng người, 14 biểu cảm, hàng ngàn trang phục thế giới & Xóm Lầy, 32 hoạ tiết, 11 dáng sàn diễn).
  * Thuần TypeScript (không phụ thuộc Three.js hay Node).
  */
 
@@ -50,11 +50,11 @@ export const THOI_TRANG_DEFAULT_DRESS_SEC: ThoiTrangDressSec = 240;
 
 export const THOI_TRANG_THEME_REVEAL_SEC = 6;
 export const THOI_TRANG_READY_SHORTEN_SEC = 5;
-export const THOI_TRANG_RUNWAY_SMALL_SEC = 14;
-export const THOI_TRANG_RUNWAY_LARGE_SEC = 11;
+export const THOI_TRANG_RUNWAY_SMALL_SEC = 18;
+export const THOI_TRANG_RUNWAY_LARGE_SEC = 14;
 export const THOI_TRANG_RUNWAY_MIN_ELAPSED_SEC = 7;
 export const THOI_TRANG_RUNWAY_EARLY_SEC = 2;
-export const THOI_TRANG_REVEAL_SEC = 12;
+export const THOI_TRANG_REVEAL_SEC = 15;
 
 export const THOI_TRANG_POSE_COOLDOWN_MS = 700;
 export const THOI_TRANG_CHEER_COOLDOWN_MS = 1200;
@@ -159,7 +159,10 @@ export type ThoiTrangHairTwoTone = 'none' | 'tips' | 'streaks';
 
 export type ThoiTrangPatternId =
   | 'plain' | 'stripe' | 'pinstripe' | 'dots' | 'check' | 'tartan' | 'houndstooth'
-  | 'heart' | 'flower' | 'stars' | 'leopard' | 'zebra' | 'camo' | 'ombre' | 'sequin';
+  | 'heart' | 'flower' | 'stars' | 'leopard' | 'zebra' | 'camo' | 'ombre' | 'sequin'
+  | 'argyle' | 'chevron' | 'paisley' | 'tie_dye' | 'denim' | 'lace' | 'brocade'
+  | 'tho_cam' | 'dragon_scale' | 'cow' | 'tiger' | 'rainbow' | 'galaxy' | 'flame'
+  | 'lightning' | 'cyber_grid' | 'chan_con_cong';
 
 export type ThoiTrangPrimarySlotId =
   | 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses';
@@ -169,7 +172,21 @@ export type ThoiTrangCategoryId = 'hair' | ThoiTrangPrimarySlotId | 'acc';
 export type ThoiTrangWardrobeTab = 'body' | 'face' | ThoiTrangCategoryId;
 
 export type ThoiTrangAccSubSlot =
-  | 'handR' | 'hipBag' | 'back' | 'neck' | 'ears' | 'head' | 'tail' | 'handL' | 'chestProp';
+  | 'handR' | 'hipBag' | 'back' | 'neck' | 'ears' | 'head' | 'tail' | 'handL' | 'chestProp' | 'waist' | 'wrists';
+
+/** Đặc tả 3D tham số hóa cho phép sinh hàng ngàn biến thể hình khối, viền, cổ, họa tiết & in chữ meme trên 3D thật. */
+export interface ThoiTrangVisualSpec {
+  base: string;
+  fit?: 'tight' | 'regular' | 'oversize' | 'crop' | 'long' | 'giant';
+  sleeve?: 'none' | 'short' | 'mid' | 'long' | 'puff' | 'bell';
+  collar?: 'none' | 'turtle' | 'sailor' | 'ruffle' | 'fur' | 'hood' | 'capelet';
+  trim?: 'none' | 'gold' | 'neon' | 'lace' | 'spikes' | 'bow' | 'buttons' | 'ripped' | 'patches' | 'reflective' | 'chain' | 'flowers';
+  print?: string;
+  scale?: number;
+  glow?: boolean;
+  alpha?: number;
+  forcePat?: ThoiTrangPatternId;
+}
 
 /** Định danh ô bắt buộc (mustHave) trong kho 640 chủ đề, gồm cả nhóm phụ kiện. */
 export type ThoiTrangMustHaveSlot =
@@ -190,6 +207,12 @@ export interface ThoiTrangCatalogItem {
   c2Label: string;
   pat: boolean;
   subSlot?: ThoiTrangAccSubSlot;
+  /** Nhóm phân loại trung tính theo loại trang phục/phụ kiện (KHÔNG liên quan chủ đề) */
+  group?: string;
+  /** Key tile 3D trong atlas (mặc định `${cat}:${id}`, hoặc `${cat}:${v3d.base}`) */
+  iconKey?: string;
+  /** Tham số 3D bổ sung cho biến thể tham số hóa / in chữ lầy lội */
+  v3d?: ThoiTrangVisualSpec;
   excluded?: boolean;
 }
 

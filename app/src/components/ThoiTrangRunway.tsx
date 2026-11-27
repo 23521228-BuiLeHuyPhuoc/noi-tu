@@ -42,6 +42,8 @@ export interface ThoiTrangRunwayProps {
   ratedCount: number;
   cheers: readonly ThoiTrangCheerBubble[];
   countdownText: string;
+  secondsLeft: number;
+  totalSeconds: number;
   mobile: boolean;
   topRightTools?: ReactNode;
   onPose: (pose: ThoiTrangPoseId) => void;
@@ -66,6 +68,8 @@ export function ThoiTrangRunway({
   ratedCount,
   cheers,
   countdownText,
+  secondsLeft,
+  totalSeconds,
   mobile,
   topRightTools,
   onPose,
@@ -73,6 +77,8 @@ export function ThoiTrangRunway({
   onCheer,
 }: ThoiTrangRunwayProps) {
   const audienceTotal = Math.max(0, totalWalkers - 1);
+  const pct = totalSeconds > 0 ? Math.max(0, Math.min(1, secondsLeft / totalSeconds)) : 0;
+  const urgent = secondsLeft <= 5;
 
   return (
     <View testID="tt-runway" style={styles.root}>
@@ -108,7 +114,7 @@ export function ThoiTrangRunway({
             <T numberOfLines={1} style={styles.themeDesc}>{theme.desc}</T>
           )}
         </View>
-        <View style={styles.timerPill}>
+        <View style={[styles.timerPill, urgent && styles.timerPillUrgent]}>
           <T testID="tt-timer" style={[styles.timerTxt, mobile && styles.timerTxtMobile]}>
             ⏱ {countdownText}
           </T>
@@ -136,15 +142,29 @@ export function ThoiTrangRunway({
               ĐANG TRÌNH DIỄN · {walkerName.toUpperCase()}
             </T>
             <View style={styles.metaBadgeRow}>
+              <View style={[styles.countdownBadge, urgent && styles.countdownBadgeUrgent]}>
+                <T testID="tt-runway-countdown" style={[styles.countdownBadgeTxt, urgent && styles.countdownBadgeTxtUrgent]}>
+                  ⏳ {isWalker ? 'Trình diễn' : isSpectator ? 'Còn' : 'Chấm điểm'}: {secondsLeft}s
+                </T>
+              </View>
               <View style={styles.metaBadge}>
                 <T style={styles.metaBadgeTxt}>
                   ⭐ {ratedCount}/{audienceTotal} đã chấm
                 </T>
               </View>
               <View style={styles.machineBadge}>
-                <T style={styles.machineBadgeTxt}>🤖 Giám khảo Máy: bí mật</T>
+                <T style={styles.machineBadgeTxt}>{mobile ? '🤖 Máy: bí mật' : '🤖 Giám khảo Máy: bí mật'}</T>
               </View>
             </View>
+          </View>
+          {/* Live countdown progress track for runway presentation & rating */}
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${pct * 100}%`, backgroundColor: urgent ? '#e11d48' : V4.pink },
+              ]}
+            />
           </View>
 
           {isWalker ? (
@@ -280,8 +300,21 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: V4.pink,
   },
+  timerPillUrgent: { backgroundColor: '#e11d48' },
   timerTxt: { fontSize: 16, fontWeight: '800', color: '#ffffff', fontVariant: ['tabular-nums'] },
   timerTxtMobile: { fontSize: 13.5 },
+  countdownBadge: { paddingVertical: 3, paddingHorizontal: 10, borderRadius: 999, backgroundColor: '#ffe4ee' },
+  countdownBadgeUrgent: { backgroundColor: '#e11d48' },
+  countdownBadgeTxt: { fontSize: 11.5, fontWeight: '800', color: V4.pink, fontVariant: ['tabular-nums'] },
+  countdownBadgeTxtUrgent: { color: '#ffffff' },
+  progressTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#f3e5f0',
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 999 },
   cheerLayer: {
     position: 'absolute',
     right: 16,
@@ -332,7 +365,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rateLabel: { fontSize: 11.5, fontWeight: '800', color: V4.pink, letterSpacing: 0.9 },
-  metaBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  metaBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: '100%', gap: 5 },
   metaBadge: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: V4.soft },
   metaBadgeTxt: { fontSize: 11, fontWeight: '700', color: V4.ink },
   machineBadge: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: 999, backgroundColor: '#f3ecff' },

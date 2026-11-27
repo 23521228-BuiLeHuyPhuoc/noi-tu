@@ -7,32 +7,49 @@ import {
 } from './core.js';
 import { BODY_TYPES, BODY_DEFAULTS, Y, resolveBodyType, buildBody } from './body.js';
 import { FACE_OPTS, EXPRESSIONS, buildFace } from './face.js';
-import { HAIR_BUILD } from './hair.js';
-import { TOP_BUILD } from './wear-tops.js';
-import { OUTER_BUILD } from './wear-outer.js';
-import { BOTTOM_BUILD } from './wear-bottoms.js';
-import { DRESS_BUILD } from './wear-dresses.js';
-import { SHOE_BUILD, HAT_BUILD, GLASSES_BUILD, CLOSED_HATS } from './wear-shoes-hats.js';
-import { ACC_BUILD, ACC_SUB, HELD_KINDS } from './wear-acc.js';
+import { HAIR_BUILD as HAIR_BASE } from './hair.js';
+import { HAIR_BUILD_EXTRA } from './hair-extra.js';
+import { TOP_BUILD as TOP_BASE } from './wear-tops.js';
+import { TOP_BUILD_EXTRA } from './wear-tops-extra.js';
+import { OUTER_BUILD as OUTER_BASE } from './wear-outer.js';
+import { OUTER_BUILD_EXTRA } from './wear-outer-extra.js';
+import { BOTTOM_BUILD as BOTTOM_BASE } from './wear-bottoms.js';
+import { BOTTOM_BUILD_EXTRA } from './wear-bottoms-extra.js';
+import { DRESS_BUILD as DRESS_BASE } from './wear-dresses.js';
+import { DRESS_BUILD_EXTRA } from './wear-dresses-extra.js';
+import { SHOE_BUILD as SHOE_BASE, HAT_BUILD as HAT_BASE, GLASSES_BUILD as GLASSES_BASE, CLOSED_HATS as CLOSED_HATS_BASE } from './wear-shoes-hats.js';
+import { SHOE_BUILD_EXTRA, HAT_BUILD_EXTRA, GLASSES_BUILD_EXTRA, CLOSED_HATS_EXTRA } from './wear-shoes-hats-extra.js';
+import { ACC_BUILD as ACC_BASE, ACC_SUB as ACC_SUB_BASE, HELD_KINDS as HELD_KINDS_BASE } from './wear-acc.js';
+import { ACC_BUILD_EXTRA, ACC_SUB_EXTRA, HELD_KINDS_EXTRA } from './wear-acc-extra.js';
+import {
+  MENSWEAR_HAIR, MENSWEAR_TOP, MENSWEAR_OUTER, MENSWEAR_BOTTOM,
+  MENSWEAR_DRESS, MENSWEAR_SHOES, MENSWEAR_HATS, MENSWEAR_CLOSED_HATS,
+  MENSWEAR_ACC, MENSWEAR_ACC_SUB, MENSWEAR_HELD_KINDS,
+} from './wear-menswear-extra.js';
+import { applyVisualSpec } from './wear-parametric.js';
 import { CATALOG, CATALOG_META, getMeta } from './catalog.js';
 import { POSES, animate } from './poses.js';
+
+export const CLOSED_HATS = new Set([...CLOSED_HATS_BASE, ...CLOSED_HATS_EXTRA, ...MENSWEAR_CLOSED_HATS]);
+export const ACC_SUB = { ...ACC_SUB_BASE, ...ACC_SUB_EXTRA, ...MENSWEAR_ACC_SUB };
+export const HELD_KINDS = { ...HELD_KINDS_BASE, ...HELD_KINDS_EXTRA, ...MENSWEAR_HELD_KINDS };
 
 export {
   SKINS, EYECOL, LIPCOL, SHADOWCOL, PALETTE, HAIRCOL, PATTERNS,
   BODY_TYPES, BODY_DEFAULTS, Y, FACE_OPTS, EXPRESSIONS, CATALOG, CATALOG_META, getMeta,
-  POSES, ACC_SUB, CLOSED_HATS, animate, toon, countTriangles,
+  POSES, animate, toon, countTriangles,
 };
 
-const BUILD = {
-  hair: HAIR_BUILD,
-  bottom: BOTTOM_BUILD,
-  top: TOP_BUILD,
-  dress: DRESS_BUILD,
-  outer: OUTER_BUILD,
-  shoes: SHOE_BUILD,
-  hat: HAT_BUILD,
-  glasses: GLASSES_BUILD,
-  acc: ACC_BUILD,
+export const BUILD = {
+  hair: { ...HAIR_BASE, ...HAIR_BUILD_EXTRA, ...MENSWEAR_HAIR },
+  bottom: { ...BOTTOM_BASE, ...BOTTOM_BUILD_EXTRA, ...MENSWEAR_BOTTOM },
+  top: { ...TOP_BASE, ...TOP_BUILD_EXTRA, ...MENSWEAR_TOP },
+  dress: { ...DRESS_BASE, ...DRESS_BUILD_EXTRA, ...MENSWEAR_DRESS },
+  outer: { ...OUTER_BASE, ...OUTER_BUILD_EXTRA, ...MENSWEAR_OUTER },
+  shoes: { ...SHOE_BASE, ...SHOE_BUILD_EXTRA, ...MENSWEAR_SHOES },
+  hat: { ...HAT_BASE, ...HAT_BUILD_EXTRA, ...MENSWEAR_HATS },
+  glasses: { ...GLASSES_BASE, ...GLASSES_BUILD_EXTRA },
+  acc: { ...ACC_BASE, ...ACC_BUILD_EXTRA, ...MENSWEAR_ACC },
 };
 
 const SLOT_ORDER = ['hair', 'bottom', 'top', 'dress', 'outer', 'shoes', 'hat', 'glasses', 'acc'];
@@ -156,7 +173,8 @@ export class Doll {
 
       // Right before building `hat`: hide closed-hat hair volume FIRST, then measure REAL hair crown top!
       if (slot === 'hat') {
-        if (o.hat && o.hat.id && CLOSED_HATS.has(o.hat.id)) {
+        const hatBase = o.hat && ((o.hat.v3d && o.hat.v3d.base) || o.hat.id);
+        if (hatBase && CLOSED_HATS.has(hatBase)) {
           const sy = this.T.headRy / 0.170;
           for (const m of this.slots.hair || []) {
             if (m.userData && m.userData.hatHide) { m.visible = false; continue; }
@@ -177,9 +195,10 @@ export class Doll {
       const list = Array.isArray(raw) ? raw : [raw];
       for (const it of list) {
         if (!it || !it.id) continue;
-        if (slot === 'acc' && HELD_KINDS[it.id]) this.heldLeftKind = HELD_KINDS[it.id];
-        const fn = BUILD[slot][it.id];
-        if (fn) fn(this, it, (pair) => this.put(slot, pair[0], pair[1]));
+        const baseId = (it.v3d && it.v3d.base) || it.id;
+        if (slot === 'acc' && HELD_KINDS[baseId]) this.heldLeftKind = HELD_KINDS[baseId];
+        const fn = BUILD[slot][baseId] || BUILD[slot][it.id];
+        if (fn) applyVisualSpec(this, slot, it, it.v3d || null, fn, (pair) => this.put(slot, pair[0], pair[1]));
       }
     }
 

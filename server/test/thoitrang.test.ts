@@ -16,9 +16,13 @@ import {
   type ThoiTrangView,
 } from '../../shared/src/thoitrang';
 import {
+  ACC_SUB,
+  ARCHETYPE_CATALOG,
   BASE_OUTFIT,
   CATALOG,
   DEFAULT_FACE,
+  PALETTES,
+  PATTERNS,
   cloneOutfit,
   countVariants,
   outfitHash,
@@ -91,33 +95,67 @@ describe('thoitrang shared constants & helpers', () => {
     expect(runwayPoses).not.toContain('idle');
     expect(runwayPoses).not.toContain('spin');
 
-    expect(runwaySecondsForPlayers(2)).toBe(14);
-    expect(runwaySecondsForPlayers(6)).toBe(14);
-    expect(runwaySecondsForPlayers(7)).toBe(11);
-    expect(runwaySecondsForPlayers(12)).toBe(11);
+    expect(runwaySecondsForPlayers(2)).toBe(18);
+    expect(runwaySecondsForPlayers(6)).toBe(18);
+    expect(runwaySecondsForPlayers(7)).toBe(14);
+    expect(runwaySecondsForPlayers(12)).toBe(14);
     expect(halfStarsToStars(9)).toBe(4.5);
     expect(formatHalfStars(9)).toBe('4,5');
     expect(formatAvgStars(4.5)).toBe('4,5');
   });
 });
 
-describe('thoitrang v4 catalog & outfit validation', () => {
-  it('exposes 167 v4 items, 982,324 honest variants, 6 body types, 14 expressions, and >= 3 valid tags per item', () => {
+describe('thoitrang v5 expanded catalog & outfit validation', () => {
+  it('exposes >= 3,000 curated items, >= 430 bespoke 3D archetypes, >= 50M variants, valid palettes/patterns/subSlots, and balanced menswear/womenswear/lay_loi', () => {
     const stats = countVariants();
-    expect(stats.baseItems).toBe(167);
-    expect(stats.total).toBe(982_324);
+    const archetypeCount = Object.values(ARCHETYPE_CATALOG).reduce((s, list) => s + list.length, 0);
+    expect(archetypeCount).toBeGreaterThanOrEqual(430);
+    expect(stats.baseItems).toBeGreaterThanOrEqual(3000);
+    expect(stats.total).toBeGreaterThanOrEqual(50_000_000);
     expect(stats.bodyTypes).toBe(6);
     expect(stats.expressions).toBe(14);
 
     const validTagSet = new Set<string>(THOI_TRANG_ALL_TAGS);
+    const validPatSet = new Set<string>(PATTERNS.map(([id]) => id));
+    const paletteSets = {
+      fashion: new Set<string>(PALETTES.fashion),
+      hair: new Set<string>(PALETTES.hair),
+      skin: new Set<string>(PALETTES.skin),
+      eye: new Set<string>(PALETTES.eye),
+      lip: new Set<string>(PALETTES.lip),
+      shadow: new Set<string>(PALETTES.shadow),
+    };
+
+    let maleCount = 0;
+    let femaleCount = 0;
+    let layCount = 0;
+
     for (const [cat, items] of Object.entries(CATALOG)) {
+      const seenIds = new Set<string>();
       for (const item of items) {
         expect(item.id.length, `${cat} id`).toBeGreaterThan(0);
+        expect(seenIds.has(item.id), `duplicate id ${cat}:${item.id}`).toBe(false);
+        seenIds.add(item.id);
         expect(item.name.length, `${cat}:${item.id} name`).toBeGreaterThan(0);
         expect(item.tags.length, `${cat}:${item.id} tags`).toBeGreaterThanOrEqual(3);
         for (const tag of item.tags) expect(validTagSet.has(tag), `${cat}:${item.id}:${tag}`).toBe(true);
+        const pal = paletteSets[item.cPal];
+        expect(pal.has(item.c), `${cat}:${item.id} c=${item.c} not in ${item.cPal}`).toBe(true);
+        expect(pal.has(item.c2), `${cat}:${item.id} c2=${item.c2} not in ${item.cPal}`).toBe(true);
+        if (item.p) expect(validPatSet.has(item.p), `${cat}:${item.id} p=${item.p}`).toBe(true);
+        if (cat === 'acc') {
+          expect(item.subSlot, `acc:${item.id} subSlot`).toBeTruthy();
+          expect(ACC_SUB[item.id], `ACC_SUB[${item.id}]`).toBe(item.subSlot);
+        }
+        if (item.group === 'nam') maleCount += 1;
+        if (item.group === 'nu') femaleCount += 1;
+        if (item.group === 'lay_loi' || item.tags.includes('lay_loi')) layCount += 1;
       }
     }
+
+    expect(maleCount).toBeGreaterThanOrEqual(250);
+    expect(femaleCount).toBeGreaterThanOrEqual(250);
+    expect(layCount).toBeGreaterThanOrEqual(400);
   });
 
   it('sanitizes fields, enforces dress/top+bottom exclusivity, outer layering, acc sub-slots, and outfitHash', () => {
@@ -330,7 +368,7 @@ describe('ThoiTrangGame server engine & Room flow', () => {
     vi.advanceTimersByTime(9_000);
     expect(game.view('p0').walkerId).not.toBe(w0);
 
-    vi.advanceTimersByTime(28_000);
+    vi.advanceTimersByTime(36_000);
     const vRev = game.view('p0');
     expect(vRev.phase).toBe('reveal');
     expect(vRev.scores).toHaveLength(3);
@@ -385,14 +423,14 @@ describe('ThoiTrangGame server engine & Room flow', () => {
     vi.advanceTimersByTime(5_000);
     const w0 = game.view('p0').walkerId!;
     game.action(['p0', 'p1'].find((id) => id !== w0)!, { type: 'tt_rate', halfStars: 10 });
-    vi.advanceTimersByTime(14_000);
+    vi.advanceTimersByTime(18_000);
 
     const w1 = game.view('p0').walkerId!;
     expect(w1).not.toBe(w0);
     game.removePlayer(w1);
     expect(game.view('p0').walkerId).not.toBe(w1);
 
-    vi.advanceTimersByTime(15_000);
+    vi.advanceTimersByTime(19_000);
     const rev = game.view('p0');
     expect(rev.phase).toBe('reveal');
     expect(rev.scores?.some((r) => r.playerId === w1)).toBe(false);

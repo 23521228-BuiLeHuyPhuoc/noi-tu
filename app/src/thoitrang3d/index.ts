@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { ThoiTrangOutfit, ThoiTrangPoseId } from '../../../shared/src/thoitrang';
-import { BASE_OUTFIT, validateOutfit } from '../../../shared/src/thoitrang-catalog';
+import { BASE_OUTFIT, getItem, validateOutfit } from '../../../shared/src/thoitrang-catalog';
 import { Doll, animate, toon } from './doll.js';
 
 export type ThoiTrangStageMode = 'wardrobe' | 'runway';
@@ -70,6 +70,12 @@ function makeGradientTex(top: string, bot: string): THREE.CanvasTexture {
   return t;
 }
 
+function withV3d(cat: 'hair' | 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses' | 'acc', eq: { id: string } | undefined | null) {
+  if (!eq) return null;
+  const meta = getItem(cat, eq.id);
+  return meta?.v3d ? { ...eq, v3d: meta.v3d } : eq;
+}
+
 export function toV4Outfit(raw: ThoiTrangOutfit): Record<string, unknown> {
   const { outfit } = validateOutfit(raw);
   return {
@@ -77,15 +83,15 @@ export function toV4Outfit(raw: ThoiTrangOutfit): Record<string, unknown> {
     skin: outfit.skin,
     height: outfit.height,
     face: outfit.face,
-    hair: outfit.hair,
-    top: outfit.slots.top ?? null,
-    outer: outfit.slots.outer ?? null,
-    bottom: outfit.slots.bottom ?? null,
-    dress: outfit.slots.dress ?? null,
-    shoes: outfit.slots.shoes ?? null,
-    hat: outfit.slots.hat ?? null,
-    glasses: outfit.slots.glasses ?? null,
-    acc: outfit.acc,
+    hair: withV3d('hair', outfit.hair),
+    top: withV3d('top', outfit.slots.top),
+    outer: withV3d('outer', outfit.slots.outer),
+    bottom: withV3d('bottom', outfit.slots.bottom),
+    dress: withV3d('dress', outfit.slots.dress),
+    shoes: withV3d('shoes', outfit.slots.shoes),
+    hat: withV3d('hat', outfit.slots.hat),
+    glasses: withV3d('glasses', outfit.slots.glasses),
+    acc: outfit.acc.map((a) => withV3d('acc', a)).filter(Boolean),
   };
 }
 

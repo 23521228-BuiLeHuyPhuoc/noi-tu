@@ -44,9 +44,11 @@ const ACC_SUB_WEIGHT: Readonly<Record<ThoiTrangAccSubSlot, number>> = {
   tail: 0.8,
   handR: 0.7,
   hipBag: 0.7,
+  waist: 0.6,
   neck: 0.6,
   ears: 0.5,
   head: 0.5,
+  wrists: 0.5,
 };
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
@@ -107,7 +109,7 @@ export function hasMustHave(outfit: ThoiTrangOutfit, mustHave: ThoiTrangMustHave
   const accs = outfit.acc ?? [];
   if (mustHave === 'acc') return accs.length > 0;
   if (mustHave === 'bag') {
-    return accs.some((a) => ACC_SUB[a.id] === 'handR' || ACC_SUB[a.id] === 'hipBag' || a.id === 'backpack');
+    return accs.some((a) => ACC_SUB[a.id] === 'handR' || ACC_SUB[a.id] === 'hipBag' || a.id.includes('backpack') || a.id.includes('bag') || a.id.includes('basket') || a.id.includes('fanny_pack'));
   }
   if (mustHave === 'back') {
     return accs.some((a) => ACC_SUB[a.id] === 'back') || outfit.slots.outer?.id === 'royal_cape';
@@ -118,7 +120,7 @@ export function hasMustHave(outfit: ThoiTrangOutfit, mustHave: ThoiTrangMustHave
   if (mustHave === 'necklace') return accs.some((a) => ACC_SUB[a.id] === 'neck');
   if (mustHave === 'earrings') return accs.some((a) => ACC_SUB[a.id] === 'ears' || ACC_SUB[a.id] === 'head');
   if (mustHave === 'tail') return accs.some((a) => ACC_SUB[a.id] === 'tail');
-  if (mustHave === 'belt') return accs.length > 0 || Boolean(outfit.slots.outer);
+  if (mustHave === 'belt') return accs.some((a) => ACC_SUB[a.id] === 'waist') || accs.length > 0 || Boolean(outfit.slots.outer);
   return false;
 }
 

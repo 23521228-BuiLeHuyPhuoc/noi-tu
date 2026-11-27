@@ -1,11 +1,11 @@
 /**
- * Tủ đồ thiết kế v4 ("Sàn Diễn Xóm Lầy"):
+ * Tủ đồ thiết kế v5 ("Sàn Diễn Xóm Lầy"):
  * - Thanh danh mục 11 mục (`ThoiTrangCategoryRail` bên trái trên desktop, dải pill `mtabs` trên mobile).
- * - Tủ kính mờ chứa thẻ icon lớn (3 cột desktop / 4 cột mobile), tìm kiếm, lọc tag chủ đề & nút ✨ Hợp chủ đề,
- *   bảng màu chính/phụ, 15 hoạ tiết (hoặc 2-tone tóc), 6 dáng người + thanh chiều cao, và 6 mục khuôn mặt.
- * Không có bộ phối sẵn (preset).
+ * - Tủ kính mờ chứa hàng ngàn trang phục/phụ kiện (Nam, Nữ, Unisex, Truyền thống thế giới & Xóm Lầy).
+ * - TUYỆT ĐỐI KHÔNG CÓ badge hợp chủ đề, KHÔNG CÓ filter hợp chủ đề, KHÔNG tự xếp đồ hợp chủ đề lên đầu!
+ * - Hỗ trợ tìm kiếm tiếng Việt không dấu (cả desktop lẫn mobile), lọc trung tính theo loại món đồ, và phân trang mượt 60fps.
  */
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type {
   ThoiTrangBodyType,
@@ -17,8 +17,6 @@ import type {
   ThoiTrangOutfit,
   ThoiTrangPatternId,
   ThoiTrangPrimarySlotId,
-  ThoiTrangTag,
-  ThoiTrangTheme,
   ThoiTrangWardrobeTab,
 } from '../../../shared/src/thoitrang';
 import {
@@ -40,36 +38,129 @@ import {
   FaceEditorPanel,
   HorizontalChipRow,
   SwatchRow,
-  TAG_LABELS,
   ThoiTrangIconSprite,
   V4,
   useThoiTrangIconManifest,
   type FaceSubTab,
 } from './ThoiTrangWardrobeControls';
 
+const PAGE_SIZE = 60;
+
+/** Chuẩn hóa tiếng Việt không dấu để gõ "dep to ong" hay "ao dai nam" đều tìm ra ngay lập tức. */
+function normSearch(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+type SubFilterDef = readonly [id: string, label: string, match: (it: ThoiTrangCatalogItem) => boolean];
+
+const isMaleCoreHair = new Set(['undercut', 'quiff', 'buzz', 'mohawk', 'man_bun', 'wolf_cut', 'slick_back', 'curly_fro', 'side_part']);
+const isLayGroup = (it: ThoiTrangCatalogItem) => it.group === 'lay_loi' || Boolean(it.v3d?.print) || it.tags.includes('lay_loi');
+const isMaleItem = (it: ThoiTrangCatalogItem) => it.group === 'nam' || isMaleCoreHair.has(it.id);
+const isFemaleItem = (it: ThoiTrangCatalogItem) => it.group === 'nu';
+const isTradItem = (it: ThoiTrangCatalogItem) => it.group === 'truyen_thong';
+const isJobSportItem = (it: ThoiTrangCatalogItem) => it.group === 'nghe_nghiep' || it.group === 'the_thao';
+const isCostumeItem = (it: ThoiTrangCatalogItem) => it.group === 'hoa_trang' || it.group === 'scifi';
+
+/** Bộ lọc trung tính theo LOẠI TRANG PHỤC (cố định, hoàn toàn không dính tới chủ đề ván đấu). */
+const SUB_FILTERS: Readonly<Record<ThoiTrangCategoryId, readonly SubFilterDef[]>> = {
+  hair: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy lội', isLayGroup],
+    ['nam', '👨 Tóc Nam', isMaleItem],
+    ['nu', '👩 Tóc Nữ', (it) => isFemaleItem(it) || (!isMaleItem(it) && !isLayGroup(it))],
+    ['trad', '🏮 Cổ trang', isTradItem],
+  ],
+  top: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy & In chữ', isLayGroup],
+    ['nam', '👔 Áo Nam', isMaleItem],
+    ['nu', '👚 Áo Nữ', isFemaleItem],
+    ['trad', '🏮 Truyền thống', isTradItem],
+    ['job', '⚽ Nghề & Thể thao', isJobSportItem],
+    ['cos', '🎭 Hóa trang', isCostumeItem],
+  ],
+  outer: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy lội', isLayGroup],
+    ['nam', '🧥 Khoác Nam', isMaleItem],
+    ['nu', '✨ Nữ & Unisex', (it) => !isMaleItem(it) && !isLayGroup(it)],
+    ['job', '👷 Nghề nghiệp', isJobSportItem],
+    ['cos', '🎭 Hóa trang', isCostumeItem],
+  ],
+  bottom: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy lội', isLayGroup],
+    ['nam', '👖 Quần Nam', isMaleItem],
+    ['nu', '👗 Quần/Váy Nữ', isFemaleItem],
+    ['trad', '🏮 Truyền thống', isTradItem],
+    ['sport', '🏃 Thể thao', isJobSportItem],
+  ],
+  dress: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Siêu Lầy', isLayGroup],
+    ['nam', '🤵 Bộ Nam', isMaleItem],
+    ['nu', '👗 Đầm Nữ', isFemaleItem],
+    ['trad', '🏮 Truyền thống', isTradItem],
+    ['job', '👮 Đồng phục & Sport', isJobSportItem],
+    ['cos', '🎭 Hóa trang', isCostumeItem],
+  ],
+  shoes: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy lội', isLayGroup],
+    ['nam', '👞 Giày Nam', isMaleItem],
+    ['nu', '👠 Giày Nữ', isFemaleItem],
+    ['trad', '🏮 Truyền thống', isTradItem],
+    ['sport', '👟 Thể thao', isJobSportItem],
+  ],
+  hat: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Siêu Lầy', isLayGroup],
+    ['nam', '🧢 Mũ Nam', isMaleItem],
+    ['trad', '🏮 Truyền thống', isTradItem],
+    ['job', '👷 Nghề nghiệp', isJobSportItem],
+    ['cos', '🎭 Hóa trang', isCostumeItem],
+  ],
+  glasses: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Lầy lội', isLayGroup],
+    ['nam', '🕶️ Kính Nam', isMaleItem],
+    ['scifi', '🤖 Sci-Fi & Sport', (it) => isCostumeItem(it) || isJobSportItem(it)],
+  ],
+  acc: [
+    ['all', 'Tất cả', () => true],
+    ['lay', '🤡 Siêu Lầy', isLayGroup],
+    ['tui', '👜 Túi xách', (it) => it.group === 'tui' || it.subSlot === 'handR' || it.subSlot === 'hipBag'],
+    ['jewel', '💎 Cổ/Eo/Tay', (it) => it.subSlot === 'neck' || it.subSlot === 'ears' || it.subSlot === 'waist' || it.subSlot === 'wrists' || it.subSlot === 'head'],
+    ['hand', '✋ Cầm tay', (it) => it.subSlot === 'handL' || it.subSlot === 'chestProp'],
+    ['food', '🍜 Đồ ăn', (it) => it.group === 'do_an'],
+    ['weapon', '⚔️ Vũ khí', (it) => it.group === 'vu_khi'],
+    ['wings', '🦋 Cánh & Đuôi', (it) => it.subSlot === 'back' || it.subSlot === 'tail'],
+    ['nam', '⚽ Nam & Sport', (it) => isMaleItem(it) || isJobSportItem(it)],
+  ],
+};
+
 function filterCatalogItems(
   rawList: readonly ThoiTrangCatalogItem[],
-  themeTags: ReadonlySet<string>,
   query: string,
-  matchOnly: boolean,
-  activeTag: ThoiTrangTag | null,
+  subFilterFn: ((it: ThoiTrangCatalogItem) => boolean) | null,
 ): ThoiTrangCatalogItem[] {
-  const q = query.trim().toLowerCase();
-  const out = rawList.filter((item) => {
+  const q = normSearch(query);
+  return rawList.filter((item) => {
     if (item.excluded) return false;
-    if (matchOnly && !item.tags.some((t) => themeTags.has(t))) return false;
-    if (activeTag && !item.tags.includes(activeTag)) return false;
+    if (subFilterFn && !subFilterFn(item)) return false;
     if (q) {
-      const inName = item.name.toLowerCase().includes(q);
-      const inTag = item.tags.some((t) => t.includes(q) || (TAG_LABELS[t]?.toLowerCase().includes(q) ?? false));
-      if (!inName && !inTag) return false;
+      const inName = normSearch(item.name).includes(q);
+      const inId = item.id.toLowerCase().includes(q);
+      const inPrint = item.v3d?.print ? normSearch(item.v3d.print).includes(q) : false;
+      if (!inName && !inId && !inPrint) return false;
     }
     return true;
-  });
-  return [...out].sort((a, b) => {
-    const ah = a.tags.filter((t) => themeTags.has(t)).length;
-    const bh = b.tags.filter((t) => themeTags.has(t)).length;
-    return bh - ah;
   });
 }
 
@@ -107,7 +198,6 @@ export function ThoiTrangCategoryRail({
 
 export interface ThoiTrangWardrobeProps {
   outfit: ThoiTrangOutfit;
-  theme: ThoiTrangTheme;
   tab: ThoiTrangWardrobeTab;
   mobile: boolean;
   disabled?: boolean;
@@ -117,7 +207,6 @@ export interface ThoiTrangWardrobeProps {
 
 export function ThoiTrangWardrobe({
   outfit,
-  theme,
   tab,
   mobile,
   disabled = false,
@@ -127,16 +216,16 @@ export function ThoiTrangWardrobe({
   const manifest = useThoiTrangIconManifest();
   const [faceSub, setFaceSub] = useState<FaceSubTab>('expr');
   const [query, setQuery] = useState('');
-  const [matchOnly, setMatchOnly] = useState(false);
-  const [activeTag, setActiveTag] = useState<ThoiTrangTag | null>(null);
+  const [subGroup, setSubGroup] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
   const [activeAccId, setActiveAccId] = useState<string | null>(null);
 
-  const themeTagSet = new Set<string>(theme.tags);
   const tabMeta = WARDROBE_TABS.find((c) => c[0] === tab) ?? WARDROBE_TABS[3];
 
   const handleTabSwitch = (next: ThoiTrangWardrobeTab) => {
     setQuery('');
-    setActiveTag(null);
+    setSubGroup('all');
+    setVisibleCount(PAGE_SIZE);
     onSelectTab(next);
   };
 
@@ -164,9 +253,17 @@ export function ThoiTrangWardrobe({
 
   const isCatalogTab = tab !== 'body' && tab !== 'face';
   const catTab = isCatalogTab ? (tab as ThoiTrangCategoryId) : 'top';
-  const filteredItems = isCatalogTab
-    ? filterCatalogItems(CATALOG[catTab], themeTagSet, query, matchOnly, activeTag)
-    : [];
+  const subFilterDefs = isCatalogTab ? SUB_FILTERS[catTab] : [];
+  const activeSubDef = subFilterDefs.find((d) => d[0] === subGroup) ?? subFilterDefs[0] ?? null;
+
+  const filteredItems = useMemo(() => {
+    if (!isCatalogTab) return [];
+    const defs = SUB_FILTERS[catTab];
+    const active = defs.find((d) => d[0] === subGroup) ?? defs[0] ?? null;
+    return filterCatalogItems(CATALOG[catTab], query, active ? active[2] : null);
+  }, [isCatalogTab, catTab, query, subGroup]);
+  const shownItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
+  const remainingCount = Math.max(0, filteredItems.length - shownItems.length);
 
   const accs = outfit.acc ?? [];
   const activeAcc = accs.find((a) => a.id === activeAccId) ?? accs[accs.length - 1] ?? null;
@@ -190,8 +287,8 @@ export function ThoiTrangWardrobe({
         ...outfit,
         hair: {
           id: meta.id,
-          c: outfit.hair.c || meta.c,
-          c2: outfit.hair.c2 || meta.c2,
+          c: meta.v3d ? meta.c : (outfit.hair.c || meta.c),
+          c2: meta.v3d ? meta.c2 : (outfit.hair.c2 || meta.c2),
           twoTone: outfit.hair.twoTone || 'none',
         },
       });
@@ -204,10 +301,7 @@ export function ThoiTrangWardrobe({
     }
     const meta = getItem(slot, id);
     if (!meta) return;
-    const existing = outfit.slots[slot];
-    const nextItem: ThoiTrangEquippedItem = existing
-      ? { id: meta.id, c: existing.c, c2: existing.c2, p: meta.pat ? existing.p : 'plain' }
-      : { id: meta.id, c: meta.c, c2: meta.c2, p: meta.p };
+    const nextItem: ThoiTrangEquippedItem = { id: meta.id, c: meta.c, c2: meta.c2, p: meta.p };
     onChangeOutfit(setSlot(outfit, slot, nextItem));
   };
 
@@ -230,7 +324,7 @@ export function ThoiTrangWardrobe({
       ? `${BODY_TYPES.length} dáng · ${Math.round(outfit.height * 100)}%`
       : tab === 'face'
         ? '14 biểu cảm'
-        : `${filteredItems.length} món`;
+        : `${filteredItems.length.toLocaleString('vi-VN')} món`;
 
   const gridStyleWeb: CSSProperties = {
     display: 'grid',
@@ -272,36 +366,32 @@ export function ThoiTrangWardrobe({
 
       {isCatalogTab && (
         <View style={styles.filterWrap}>
-          {!mobile && (
-            <TextInput
-              testID="tt-search"
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Tìm món đồ hoặc tag…"
-              placeholderTextColor={V4.ink2}
-              style={styles.search}
-            />
-          )}
+          <TextInput
+            testID="tt-search"
+            value={query}
+            onChangeText={(txt) => {
+              setQuery(txt);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            placeholder="Tìm tên đồ (vd: áo dài, dép tổ ong, vest, nồi…)"
+            placeholderTextColor={V4.ink2}
+            style={[styles.search, mobile && styles.searchMobile]}
+          />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagRow}>
-            <Pressable
-              testID="tt-filter-match"
-              accessibilityRole="button"
-              onPress={() => setMatchOnly((v) => !v)}
-              style={[styles.tagChip, matchOnly && styles.tagChipOn]}
-            >
-              <T style={[styles.tagChipTxt, matchOnly && styles.tagChipTxtOn]}>✨ Hợp chủ đề</T>
-            </Pressable>
-            {theme.tags.map((tg) => {
-              const on = activeTag === tg;
+            {subFilterDefs.map(([gid, glabel]) => {
+              const on = (activeSubDef?.[0] ?? 'all') === gid;
               return (
                 <Pressable
-                  key={tg}
-                  testID={`tt-tag-${tg}`}
+                  key={gid}
+                  testID={`tt-sub-${gid}`}
                   accessibilityRole="button"
-                  onPress={() => setActiveTag((cur) => (cur === tg ? null : tg))}
+                  onPress={() => {
+                    setSubGroup(gid);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
                   style={[styles.tagChip, on && styles.tagChipOn]}
                 >
-                  <T style={[styles.tagChipTxt, on && styles.tagChipTxtOn]}>#{TAG_LABELS[tg] ?? tg}</T>
+                  <T style={[styles.tagChipTxt, on && styles.tagChipTxtOn]}>{glabel}</T>
                 </Pressable>
               );
             })}
@@ -313,6 +403,14 @@ export function ThoiTrangWardrobe({
         style={styles.gridScroll}
         contentContainerStyle={styles.gridScrollContent}
         showsVerticalScrollIndicator={!mobile}
+        scrollEventThrottle={120}
+        onScroll={(e) => {
+          if (remainingCount <= 0) return;
+          const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 220) {
+            setVisibleCount((v) => v + PAGE_SIZE);
+          }
+        }}
       >
         {tab === 'body' && (
           <View style={styles.bodyCol}>
@@ -354,50 +452,74 @@ export function ThoiTrangWardrobe({
         )}
 
         {isCatalogTab && Platform.OS === 'web' && (
-          <div style={gridStyleWeb}>
-            {tab !== 'hair' && tab !== 'shoes' && (
+          <>
+            <div style={gridStyleWeb}>
+              {tab !== 'hair' && tab !== 'shoes' && (
+                <Pressable
+                  testID="tt-item-none"
+                  accessibilityRole="button"
+                  onPress={() => handleSelectItem(null)}
+                  style={[
+                    styles.card,
+                    styles.noneCard,
+                    (tab === 'acc' ? accs.length === 0 : !curEquipped) && styles.cardOn,
+                  ]}
+                >
+                  <T style={styles.noneGlyph}>∅</T>
+                  <T style={styles.cardTxt}>Bỏ</T>
+                </Pressable>
+              )}
+              {shownItems.map((item) => {
+                const active =
+                  tab === 'hair'
+                    ? outfit.hair.id === item.id
+                    : tab === 'acc'
+                      ? accs.some((a) => a.id === item.id)
+                      : curEquipped?.id === item.id;
+                const swatch = item.v3d
+                  ? { c: item.c, c2: item.c2, label: item.v3d.print ? 'Aa' : undefined }
+                  : undefined;
+                return (
+                  <Pressable
+                    key={item.id}
+                    testID={`tt-item-${tab}-${item.id}`}
+                    accessibilityRole="button"
+                    onPress={() => handleSelectItem(item.id)}
+                    style={[styles.card, mobile && styles.cardMobile, active && styles.cardOn]}
+                  >
+                    <ThoiTrangIconSprite
+                      iconKey={item.iconKey ?? `${tab}:${item.id}`}
+                      manifest={manifest}
+                      swatch={swatch}
+                    />
+                    <T numberOfLines={2} style={[styles.cardTxt, mobile && styles.cardTxtMobile]}>{item.name}</T>
+                    {active && (
+                      <View style={styles.checkBadge}><T style={styles.checkTxt}>✓</T></View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </div>
+            {remainingCount > 0 && (
               <Pressable
-                testID="tt-item-none"
+                testID="tt-load-more"
                 accessibilityRole="button"
-                onPress={() => handleSelectItem(null)}
-                style={[
-                  styles.card,
-                  styles.noneCard,
-                  (tab === 'acc' ? accs.length === 0 : !curEquipped) && styles.cardOn,
-                ]}
+                onPress={() => setVisibleCount((v) => v + PAGE_SIZE)}
+                style={styles.loadMoreBtn}
               >
-                <T style={styles.noneGlyph}>∅</T>
-                <T style={styles.cardTxt}>Bỏ</T>
+                <T style={styles.loadMoreTxt}>
+                  Xem thêm +{Math.min(PAGE_SIZE, remainingCount)} món (còn {remainingCount.toLocaleString('vi-VN')})
+                </T>
               </Pressable>
             )}
-            {filteredItems.map((item) => {
-              const active =
-                tab === 'hair'
-                  ? outfit.hair.id === item.id
-                  : tab === 'acc'
-                    ? accs.some((a) => a.id === item.id)
-                    : curEquipped?.id === item.id;
-              return (
-                <Pressable
-                  key={item.id}
-                  testID={`tt-item-${tab}-${item.id}`}
-                  accessibilityRole="button"
-                  onPress={() => handleSelectItem(item.id)}
-                  style={[styles.card, mobile && styles.cardMobile, active && styles.cardOn]}
-                >
-                  <ThoiTrangIconSprite iconKey={`${tab}:${item.id}`} manifest={manifest} />
-                  <T numberOfLines={2} style={[styles.cardTxt, mobile && styles.cardTxtMobile]}>{item.name}</T>
-                  {active && (
-                    <View style={styles.checkBadge}><T style={styles.checkTxt}>✓</T></View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </div>
+            {filteredItems.length === 0 && (
+              <T style={styles.emptyTxt}>Không tìm thấy món nào khớp “{query}”. Thử từ khóa khác nhé!</T>
+            )}
+          </>
         )}
       </ScrollView>
 
-      {/* Bottom color swatches & pattern/2-tone rows (exact v4 hierarchy) */}
+      {/* Bottom color swatches & pattern/2-tone rows */}
       <View style={[styles.controlsFooter, mobile && styles.controlsFooterMobile]}>
         {tab === 'body' && (
           <>
@@ -488,7 +610,7 @@ export function ThoiTrangWardrobe({
               colors={PALETTES.fashion}
               value={curEquipped?.c}
               testIDPrefix="tt-c1"
-              compact={mobile}
+              compact
               onSelect={(c) => updateCurrentGarment({ c })}
             />
             <SwatchRow
@@ -496,12 +618,12 @@ export function ThoiTrangWardrobe({
               colors={PALETTES.fashion}
               value={curEquipped?.c2}
               testIDPrefix="tt-c2"
-              compact={mobile}
+              compact
               onSelect={(c2) => updateCurrentGarment({ c2 })}
             />
             {tab !== 'glasses' && (
               <HorizontalChipRow
-                label="HOẠ TIẾT"
+                label="HOẠ TIẾT (32)"
                 options={PATTERNS}
                 value={curEquipped?.p ?? 'plain'}
                 testIDPrefix="tt-pat"
@@ -557,7 +679,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     padding: 10,
-    gap: 6,
+    gap: 5,
   },
   disabled: { opacity: 0.65 },
   mtabsScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 34 },
@@ -568,8 +690,8 @@ const styles = StyleSheet.create({
   mtabTxtOn: { color: '#ffffff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '800', color: V4.ink },
-  headerCount: { fontSize: 12, fontWeight: '600', color: V4.ink2 },
-  filterWrap: { gap: 6 },
+  headerCount: { fontSize: 12, fontWeight: '700', color: V4.pink },
+  filterWrap: { gap: 5 },
   search: {
     borderWidth: 2,
     borderColor: V4.line,
@@ -580,13 +702,14 @@ const styles = StyleSheet.create({
     color: V4.ink,
     backgroundColor: '#ffffff',
   },
+  searchMobile: { paddingVertical: 4, paddingHorizontal: 10, fontSize: 12, borderRadius: 10 },
   tagRow: { flexDirection: 'row', gap: 5, alignItems: 'center' },
   tagChip: { paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999, backgroundColor: V4.soft },
   tagChipOn: { backgroundColor: V4.pink },
   tagChipTxt: { fontSize: 11, fontWeight: '700', color: V4.ink2 },
   tagChipTxtOn: { color: '#ffffff' },
   gridScroll: { flex: 1, minHeight: 0 },
-  gridScrollContent: { paddingVertical: 2, paddingBottom: 6 },
+  gridScrollContent: { paddingVertical: 2, paddingBottom: 10, gap: 8 },
   bodyCol: { gap: 8 },
   card: {
     borderWidth: 3,
@@ -617,6 +740,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkTxt: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
+  loadMoreBtn: {
+    marginTop: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: V4.soft,
+    alignItems: 'center',
+  },
+  loadMoreTxt: { fontSize: 12, fontWeight: '800', color: V4.pink },
+  emptyTxt: { fontSize: 12.5, fontWeight: '600', color: V4.ink2, textAlign: 'center', paddingVertical: 18 },
   controlsFooter: { gap: 7, paddingTop: 2 },
   controlsFooterMobile: { gap: 4, paddingTop: 1 },
 });

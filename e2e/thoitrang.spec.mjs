@@ -148,11 +148,11 @@ async function run() {
     attachErrorCollectors(desktop, 'desktop', errors);
     attachErrorCollectors(mobile, 'mobile', errors);
 
-    // 1. Verify v4 icon manifest & webp asset served cleanly
+    // 1. Verify v5 icon manifest & webp asset served cleanly
     const iconJsonRes = await desktop.request.get(`${WEB_URL}/thoitrang/icons.json`);
     if (!iconJsonRes.ok()) throw new Error(`icons.json failed: ${iconJsonRes.status()}`);
     const manifest = await iconJsonRes.json();
-    if (manifest.count < 240) throw new Error(`Expected >= 240 v4 icons, got ${manifest.count}`);
+    if (manifest.count < 500) throw new Error(`Expected >= 500 v5 icons, got ${manifest.count}`);
     const iconWebpRes = await desktop.request.get(`${WEB_URL}/thoitrang/icons.webp`);
     if (!iconWebpRes.ok()) throw new Error(`icons.webp failed: ${iconWebpRes.status()}`);
 
@@ -214,11 +214,29 @@ async function run() {
     await desktop.waitForTimeout(450);
     await desktop.screenshot({ path: path.join(SHOT_DIR, 'ingame-desktop-face.png') });
 
-    // Verify theme match filter toggle
+    // Verify theme-match filter & badge are COMPLETELY REMOVED, and neutral search + type filters work!
     await desktop.getByTestId('tt-tab-top').click();
-    await desktop.getByTestId('tt-filter-match').click();
-    await desktop.waitForTimeout(200);
-    await desktop.getByTestId('tt-filter-match').click();
+    if (await desktop.locator('[data-testid="tt-filter-match"]').count()) {
+      throw new Error('Forbidden theme-match filter (tt-filter-match) is still present!');
+    }
+    await desktop.getByTestId('tt-sub-nam').click();
+    await desktop.waitForTimeout(150);
+    await desktop.getByTestId('tt-sub-lay').click();
+    await desktop.waitForTimeout(150);
+    await desktop.getByTestId('tt-sub-all').click();
+
+    // Test accent-insensitive Vietnamese search & equip a new Xóm Lầy 3D item
+    await desktop.getByTestId('tt-tab-shoes').click();
+    await desktop.getByTestId('tt-search').fill('dep to ong');
+    await desktop.getByTestId('tt-item-shoes-dep_to_ong').waitFor({ state: 'visible', timeout: 5_000 });
+    await desktop.getByTestId('tt-item-shoes-dep_to_ong').click();
+    await desktop.getByTestId('tt-search').fill('');
+
+    await desktop.getByTestId('tt-tab-hat').click();
+    await desktop.getByTestId('tt-search').fill('noi com');
+    await desktop.getByTestId('tt-item-hat-rice_cooker_hat').waitFor({ state: 'visible', timeout: 5_000 });
+    await desktop.getByTestId('tt-item-hat-rice_cooker_hat').click();
+    await desktop.getByTestId('tt-search').fill('');
 
     // 5. Both humans click Xong! -> 5s shorten -> Runway
     await desktop.getByTestId('tt-ready-btn').click();
@@ -228,13 +246,21 @@ async function run() {
     await assertNoOverflow(desktop, 'desktop-runway');
     await assertNoOverflow(mobile, 'mobile-runway');
 
+    // Verify runway live countdown is visible and > 0s!
+    await desktop.getByTestId('tt-runway-countdown').waitFor({ state: 'visible', timeout: 5_000 });
+    const cdTxt = ((await desktop.getByTestId('tt-runway-countdown').textContent()) || '').trim();
+    const cdMatch = cdTxt.match(/(\d+)\s*s/);
+    if (!cdMatch || Number(cdMatch[1]) <= 0) {
+      throw new Error(`Expected live positive runway countdown, got: "${cdTxt}"`);
+    }
+
     // 6. Walk through all runway turns: pose (no spin!), rate 4.5★ & cheer
     let shotRunwayDesktop = false;
     let shotRunwayPoses = false;
     let shotRunwayMobile = false;
     let posedOnce = false;
     let ratedOnce = false;
-    const deadline = Date.now() + 90_000;
+    const deadline = Date.now() + 110_000;
     while (Date.now() < deadline) {
       if (await desktop.getByTestId('tt-reveal').isVisible().catch(() => false)) break;
 

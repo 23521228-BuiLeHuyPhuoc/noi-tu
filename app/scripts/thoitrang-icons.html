@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <link rel="icon" href="data:," />
-  <title>ThoiTrang v4 Icon Atlas Builder</title>
+  <title>ThoiTrang v5 Icon Atlas Builder</title>
   <script type="importmap">
     {
       "imports": {
@@ -13,25 +13,25 @@
   </script>
 </head>
 <body style="margin:0;background:#111;color:#fff;font-family:sans-serif">
-<pre id="log">Đang khởi tạo renderer v4…</pre>
+<pre id="log">Đang khởi tạo renderer v5…</pre>
 <script type="module">
 import * as THREE from 'three';
 import {
-  Doll, CATALOG_META, BODY_TYPES, BODY_DEFAULTS, FACE_OPTS, EXPRESSIONS, SKINS, ACC_SUB, animate,
+  Doll, BUILD, CATALOG_META, BODY_TYPES, BODY_DEFAULTS, FACE_OPTS, EXPRESSIONS, SKINS, ACC_SUB, animate,
 } from '/src/thoitrang3d/doll.js';
 
-const TILE = 128;
-const COLS = 16;
+const TILE = 112;
+const COLS = 24;
 
 const FRAME = {
-  hair: [1.36, 0.98, 0.14],
-  hat: [1.46, 1.15, 0.18],
-  glasses: [1.34, 0.62, 0],
-  top: [0.98, 1.38, 0],
-  outer: [0.94, 1.68, 0],
-  bottom: [0.50, 1.92, 0],
-  dress: [0.74, 2.55, 0],
-  shoes: [0.08, 0.85, 0.25],
+  hair: [1.36, 1.02, 0.14],
+  hat: [1.49, 1.32, 0.16],
+  glasses: [1.34, 0.66, 0],
+  top: [0.98, 1.42, 0],
+  outer: [0.94, 1.72, 0],
+  bottom: [0.50, 1.94, 0],
+  dress: [0.74, 2.60, 0],
+  shoes: [0.09, 0.90, 0.25],
   acc: [0.94, 1.95, 0],
 };
 
@@ -41,7 +41,14 @@ const defFace = () => ({
   eyeliner: 'classic', eyeshadow: 'none', eyeshadowColor: '#b990e8', beard: 'none', expression: 'neutral',
 });
 
+const MALE_SLOTS = new Set(['hair', 'top', 'outer', 'bottom', 'dress', 'shoes']);
+
 async function buildAtlas() {
+  const res = await fetch('/archetypes.json');
+  const payload = res.ok ? await res.json() : { archetypes: CATALOG_META, accSub: ACC_SUB };
+  const archetypes = payload.archetypes || CATALOG_META;
+  const accSubMap = { ...ACC_SUB, ...(payload.accSub || {}) };
+
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(TILE, TILE, false);
@@ -54,14 +61,20 @@ async function buildAtlas() {
   scene.add(key);
 
   const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 20);
-  const ghost = new Doll({ ghost: true, type: 'nu_manh', skin: SKINS[1] });
+  const ghostF = new Doll({ ghost: true, type: 'nu_manh', skin: SKINS[1] });
+  const ghostM = new Doll({ ghost: true, type: 'nam_thu_sinh', skin: SKINS[1] });
   const faceDoll = new Doll({ type: 'nu_manh', skin: SKINS[1] });
   const maleFaceDoll = new Doll({ type: 'nam_thu_sinh', skin: SKINS[1] });
 
   const jobs = [];
-  // 1. All 167 catalog items across 9 categories (ghost mannequin, item-only framing)
-  for (const [slot, items] of Object.entries(CATALOG_META)) {
+  const missingBuilders = [];
+
+  // 1. All ~442 bespoke 3D archetype items across 9 categories
+  for (const [slot, items] of Object.entries(archetypes)) {
     for (const meta of items) {
+      if (!BUILD[slot] || !BUILD[slot][meta.id]) {
+        missingBuilders.push(`${slot}:${meta.id}`);
+      }
       jobs.push({ kind: 'item', key: `${slot}:${meta.id}`, slot, meta });
     }
   }
@@ -109,25 +122,45 @@ async function buildAtlas() {
     const x = col * TILE;
     const y = row * TILE;
 
-    scene.remove(ghost.root, faceDoll.root, maleFaceDoll.root);
+    scene.remove(ghostF.root, ghostM.root, faceDoll.root, maleFaceDoll.root);
 
     if (job.kind === 'item') {
       const { slot, meta } = job;
-      const o = { type: 'nu_manh', skin: SKINS[1] };
+      const useMaleGhost = meta.group === 'nam' && MALE_SLOTS.has(slot);
+      const ghost = useMaleGhost ? ghostM : ghostF;
+      const o = { type: useMaleGhost ? 'nam_thu_sinh' : 'nu_manh', skin: SKINS[1] };
       o[slot] = { id: meta.id, c: meta.c, c2: meta.c2, p: meta.p || 'plain' };
       if (slot !== 'hair') o.hair = null;
       ghost.apply(o);
       animate(ghost, 'idle', 0);
-      ghost.j.head.visible = ['hair', 'hat', 'glasses'].includes(slot) || meta.id === 'headphones' || meta.id === 'earrings_hoop';
-      ghost.root.rotation.y = slot === 'acc'
-        ? (meta.id.includes('wing') || meta.id.includes('tail') || meta.id === 'backpack' ? 2.5 : 0.45)
-        : 0.35;
-      let frame = FRAME[slot];
+
+      const hasHeadMesh = (ghost.slots[slot] || []).some((m) => m.parent === ghost.j.head);
+      ghost.j.head.visible = ['hair', 'hat', 'glasses'].includes(slot) || hasHeadMesh;
+
+      const sub = slot === 'acc' ? accSubMap[meta.id] : null;
       if (slot === 'acc') {
-        const sub = ACC_SUB[meta.id];
-        if (meta.id === 'headphones' || meta.id === 'earrings_hoop') frame = [1.34, 0.92, 0.1];
-        else if (sub === 'neck') frame = [1.14, 1.05, 0.08];
-        else if (sub === 'handR') frame = [0.64, 1.32, 0.04];
+        if (sub === 'back') ghost.root.rotation.y = 2.55;
+        else if (sub === 'tail') ghost.root.rotation.y = 2.45;
+        else if (sub === 'handL') ghost.root.rotation.y = -0.35;
+        else ghost.root.rotation.y = 0.42;
+      } else {
+        ghost.root.rotation.y = 0.35;
+      }
+
+      let frame = FRAME[slot];
+      if (slot === 'dress' && hasHeadMesh) {
+        frame = [0.78, 2.82, 0.04];
+      } else if (slot === 'acc') {
+        if (sub === 'ears' || sub === 'head') frame = [1.34, 0.96, 0.1];
+        else if (sub === 'neck') frame = [1.14, 1.08, 0.08];
+        else if (sub === 'waist') frame = [0.84, 1.30, 0.08];
+        else if (sub === 'wrists') frame = [0.76, 1.44, 0.06];
+        else if (sub === 'handR') frame = [0.64, 1.38, 0.04];
+        else if (sub === 'hipBag') frame = [0.78, 1.35, 0.06];
+        else if (sub === 'handL') frame = [0.78, 1.58, 0.05];
+        else if (sub === 'chestProp') frame = [0.92, 1.48, 0.05];
+        else if (sub === 'back') frame = [0.96, 2.02, 0.04];
+        else if (sub === 'tail') frame = [0.66, 1.78, 0.06];
       }
       const [fy, dist, el] = frame;
       cam.position.set(0, fy + el * dist, dist);
@@ -187,6 +220,7 @@ async function buildAtlas() {
   window.__THOITRANG_ATLAS__ = {
     meta: { width: atlasW, height: atlasH, tile: TILE, cols: COLS, rows, count: jobs.length },
     items: itemsMap,
+    missingBuilders,
     pngDataUrl: atlas.toDataURL('image/png'),
   };
 }

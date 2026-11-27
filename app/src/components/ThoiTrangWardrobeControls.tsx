@@ -101,11 +101,13 @@ export function ThoiTrangIconSprite({
   manifest,
   size,
   round = false,
+  swatch,
 }: {
   iconKey: string;
   manifest: ThoiTrangIconManifest | null;
   size?: number;
   round?: boolean;
+  swatch?: { c: string; c2: string; label?: string };
 }) {
   const rect = manifest?.items?.[iconKey];
   if (Platform.OS !== 'web' || !manifest || !rect) {
@@ -138,8 +140,32 @@ export function ThoiTrangIconSprite({
     backgroundPositionX: `${posX}, 0%`,
     backgroundPositionY: `${posY}, 0%`,
     flexShrink: 0,
+    position: 'relative',
   };
-  return <div style={webStyle} />;
+  return (
+    <div style={webStyle}>
+      {swatch && !round && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '4px',
+            bottom: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            padding: '2px 4px',
+            borderRadius: '999px',
+            backgroundColor: 'rgba(255,255,255,0.88)',
+            boxShadow: '0 1px 3px rgba(59,42,63,0.18)',
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '99px', backgroundColor: swatch.c, border: '1px solid rgba(59,42,63,0.22)' }} />
+          <span style={{ width: '8px', height: '8px', borderRadius: '99px', backgroundColor: swatch.c2, border: '1px solid rgba(59,42,63,0.22)' }} />
+          {swatch.label && <span style={{ fontSize: '8px', fontWeight: 800, color: '#3b2a3f', lineHeight: 1 }}>{swatch.label}</span>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SwatchRow({

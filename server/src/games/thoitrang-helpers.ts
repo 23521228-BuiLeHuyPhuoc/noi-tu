@@ -140,7 +140,7 @@ function pickCatalogItem(
   matched.sort((a, b) =>
     b.tags.filter((t) => themeTags.has(t)).length - a.tags.filter((t) => themeTags.has(t)).length,
   );
-  return pickFrom(matched.length > 0 ? matched.slice(0, Math.min(5, matched.length)) : pool, rng);
+  return pickFrom(matched.length > 0 ? matched.slice(0, Math.min(24, matched.length)) : pool, rng);
 }
 
 function equipItem(item: ThoiTrangCatalogItem, theme: ThoiTrangTheme, rng: Rng): ThoiTrangEquippedItem {
@@ -256,7 +256,7 @@ export function buildBotOutfitCandidate(theme: ThoiTrangTheme, rng: Rng): ThoiTr
     }
   }
 
-  const subOrder: readonly ThoiTrangAccSubSlot[] = ['handL', 'back', 'handR', 'hipBag', 'neck', 'tail', 'ears', 'head', 'chestProp'];
+  const subOrder: readonly ThoiTrangAccSubSlot[] = ['handL', 'back', 'handR', 'hipBag', 'neck', 'waist', 'tail', 'ears', 'head', 'wrists', 'chestProp'];
   for (const sub of subOrder) {
     if (usedSubs.has(sub) || acc.length >= 3) continue;
     if (rng() < 0.38) {

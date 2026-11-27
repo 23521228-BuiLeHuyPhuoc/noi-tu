@@ -22,6 +22,8 @@ export interface ThoiTrangRevealProps {
   outfits: Record<string, ThoiTrangOutfit>;
   me: string | null;
   countdownText: string;
+  secondsLeft: number;
+  totalSeconds: number;
   skipped: boolean;
   mobile: boolean;
   topRightTools?: ReactNode;
@@ -36,6 +38,8 @@ export function ThoiTrangReveal({
   outfits,
   me,
   countdownText,
+  secondsLeft,
+  totalSeconds,
   skipped,
   mobile,
   topRightTools,
@@ -43,6 +47,8 @@ export function ThoiTrangReveal({
 }: ThoiTrangRevealProps) {
   const shots = useThoiTrangSnapshots(outfits, 'full', 160, 210);
   const top3 = scores.slice(0, 3);
+  const pct = totalSeconds > 0 ? Math.max(0, Math.min(1, secondsLeft / totalSeconds)) : 0;
+  const urgent = secondsLeft <= 5;
 
   return (
     <View testID="tt-reveal" style={styles.root}>
@@ -57,8 +63,8 @@ export function ThoiTrangReveal({
           <T style={styles.themeSmall}>KẾT QUẢ CHỦ ĐỀ</T>
           <T numberOfLines={1} style={styles.themeTitle}>{theme.title}</T>
         </View>
-        <View style={styles.timerPill}>
-          <T style={styles.timerTxt}>⏱ {countdownText}</T>
+        <View style={[styles.timerPill, urgent && styles.timerPillUrgent]}>
+          <T testID="tt-timer" style={styles.timerTxt}>⏱ {countdownText}</T>
         </View>
         {topRightTools}
       </View>
@@ -145,6 +151,9 @@ export function ThoiTrangReveal({
 
       {/* Bottom dock */}
       <View style={styles.footer}>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${pct * 100}%`, backgroundColor: urgent ? '#e11d48' : V4.pink }]} />
+        </View>
         <Pressable
           testID="tt-skip-reveal"
           accessibilityRole="button"
@@ -153,7 +162,7 @@ export function ThoiTrangReveal({
           style={({ pressed }) => [styles.doneBtn, skipped && styles.doneBtnDim, pressed && { opacity: 0.88 }]}
         >
           <T style={styles.doneBtnTxt}>
-            {skipped ? '⏳ Đang chờ chuyển sang tổng kết…' : '✨ Xem tổng kết ngay'}
+            {skipped ? '⏳ Đang chờ chuyển sang tổng kết…' : `✨ Xem tổng kết ngay (${secondsLeft}s)`}
           </T>
         </Pressable>
       </View>
@@ -185,7 +194,10 @@ const styles = StyleSheet.create({
   themeSmall: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: V4.pink },
   themeTitle: { fontSize: 15, fontWeight: '800', color: V4.ink },
   timerPill: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: V4.pink },
+  timerPillUrgent: { backgroundColor: '#e11d48' },
   timerTxt: { fontSize: 15, fontWeight: '800', color: '#ffffff', fontVariant: ['tabular-nums'] },
+  progressTrack: { width: '100%', maxWidth: 420, height: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.65)', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 999 },
   scroll: { flex: 1 },
   body: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: 16, paddingBottom: 20, gap: 14 },
   bodyMobile: { paddingHorizontal: 10, gap: 10 },
@@ -269,7 +281,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   machineTxt: { fontSize: 11.5, fontWeight: '700', color: '#4c2f96' },
-  footer: { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
+  footer: { paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', gap: 8 },
   doneBtn: {
     paddingVertical: 13,
     paddingHorizontal: 32,

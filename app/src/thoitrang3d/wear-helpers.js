@@ -8,16 +8,20 @@ import { applyTorsoContour } from './body.js';
 export const M = (it, opts) => toon(it.c, it.p || 'plain', it.c2 || '#ffffff', opts);
 export const A = (it, opts) => toon(it.c2 || '#ffffff', 'plain', '#ffffff', opts);
 
-export const SHORT_TOPS = new Set(['crop', 'crop_top', 'tube_top', 'idol_crop', 'ao_yem']);
+export const SHORT_TOPS = new Set(['crop', 'crop_top', 'tube_top', 'idol_crop', 'ao_yem', 'crop_hoodie', 'hanbok_jeogori', 'bare_chest_towel', 'dad_beer_belly']);
+
+const SLEEVELESS_OUTER = new Set(['royal_cape', 'vampire_cape', 'tarp_cape', 'puffer_vest', 'shawl_stole', 'peacock_blanket', 'fishing_vest_dad']);
 
 export function topCovers(d) {
   const t = d.outfit && d.outfit.top;
-  return !!(t && t.id && !SHORT_TOPS.has(t.id));
+  const bid = t && ((t.v3d && t.v3d.base) || t.id);
+  return !!(bid && !SHORT_TOPS.has(bid));
 }
 
 export function hasOuterSleeves(d) {
   const o = d.outfit && d.outfit.outer;
-  return !!(o && o.id && o.id !== 'royal_cape');
+  const bid = o && ((o.v3d && o.v3d.base) || o.id);
+  return !!(bid && !SLEEVELESS_OUTER.has(bid));
 }
 
 // Piecewise body torso radius at world height y (including trapezius slope for broad male bodies)

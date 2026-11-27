@@ -30,7 +30,7 @@ import { ThoiTrangReveal } from '../components/ThoiTrangReveal';
 import { ThoiTrangRunway, type ThoiTrangCheerBubble } from '../components/ThoiTrangRunway';
 import { ThoiTrangCategoryRail, ThoiTrangWardrobe } from '../components/ThoiTrangWardrobe';
 import { TAG_LABELS, V4 } from '../components/ThoiTrangWardrobeControls';
-import { useStableWindow } from '../hooks';
+import { useSecondsLeft, useStableWindow } from '../hooks';
 import { T } from '../ui';
 import type { Game } from '../useGame';
 
@@ -46,17 +46,29 @@ function formatClock(msLeft: number): string {
 function buildRandomV4Outfit(): ThoiTrangOutfit {
   const body = pick(BODY_TYPES)[0];
   const isM = body === 'nam_thu_sinh' || body === 'nam_vam_vo';
+  const pickForBody = <T extends { group?: string }>(list: readonly T[]): T => {
+    // 70% ưu tiên hợp giới tính hoặc unisex/lầy, 30% phối tự do cực lầy
+    if (Math.random() < 0.7) {
+      const want = list.filter((it) => !it.group || it.group === 'unisex' || it.group === 'lay_loi' || it.group === (isM ? 'nam' : 'nu') || it.group === 'nghe_nghiep' || it.group === 'truyen_thong' || it.group === 'the_thao' || it.group === 'doi_thuong');
+      if (want.length > 0) return pick(want);
+    }
+    return pick(list);
+  };
   const eq = (cat: 'top' | 'outer' | 'bottom' | 'dress' | 'shoes' | 'hat' | 'glasses' | 'acc') => {
-    const m = pick(CATALOG[cat]);
+    const m = pickForBody(CATALOG[cat]);
+    const keepSig = Math.random() < 0.55;
     return {
       id: m.id,
-      c: pick(PALETTES.fashion),
-      c2: pick(PALETTES.fashion),
-      p: m.pat && Math.random() < 0.35 ? pick(PATTERNS)[0] : 'plain' as const,
+      c: keepSig ? m.c : pick(PALETTES.fashion),
+      c2: keepSig ? m.c2 : pick(PALETTES.fashion),
+      p: keepSig && m.p ? m.p : (m.pat && Math.random() < 0.35 ? pick(PATTERNS)[0] : 'plain' as const),
     };
   };
-  const h = pick(CATALOG.hair);
-  const useDress = Math.random() < 0.34;
+  const h = pickForBody(CATALOG.hair);
+  const useDress = Math.random() < (isM ? 0.28 : 0.38);
+  const accList = Math.random() < 0.78
+    ? (Math.random() < 0.45 ? [eq('acc'), eq('acc')] : [eq('acc')])
+    : [];
   return validateOutfit({
     body,
     skin: pick(PALETTES.skin),
@@ -76,7 +88,7 @@ function buildRandomV4Outfit(): ThoiTrangOutfit {
     },
     hair: {
       id: h.id,
-      c: pick(PALETTES.hair),
+      c: Math.random() < 0.35 ? h.c : pick(PALETTES.hair),
       c2: pick(PALETTES.hair),
       twoTone: Math.random() < 0.35 ? (Math.random() < 0.5 ? 'tips' : 'streaks') : 'none',
     },
@@ -87,7 +99,7 @@ function buildRandomV4Outfit(): ThoiTrangOutfit {
       ...(Math.random() < 0.5 ? { hat: eq('hat') } : {}),
       ...(Math.random() < 0.35 ? { glasses: eq('glasses') } : {}),
     },
-    acc: Math.random() < 0.72 ? [eq('acc')] : [],
+    acc: accList,
   }).outfit;
 }
 
@@ -119,13 +131,9 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
   const isSpectator = !me || !view.order.includes(me);
   const myReady = Boolean(me && view.ready.includes(me));
 
-  // Clock tick for phaseEndsAt
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, []);
-  const countdownText = formatClock(view.phaseEndsAt ? view.phaseEndsAt - nowMs : view.phaseSeconds * 1000);
+  // Clock synced with server via game.clockOffset so countdown ALWAYS works accurately across any client clock skew!
+  const secondsLeft = useSecondsLeft(view.phaseEndsAt, game.clockOffset, Math.max(view.phaseSeconds, 1));
+  const countdownText = formatClock((view.phaseEndsAt ? secondsLeft : view.phaseSeconds) * 1000);
 
   // Local dressing draft keyed by themeId (React 19 compiler safe)
   const serverMyOutfit = (me && view.outfits[me]) || BASE_OUTFIT;
@@ -256,6 +264,8 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
           outfits={view.outfits}
           me={me}
           countdownText={countdownText}
+          secondsLeft={view.phaseEndsAt ? secondsLeft : view.phaseSeconds}
+          totalSeconds={view.phaseSeconds}
           skipped={skipped}
           mobile={mobile}
           topRightTools={<RoomMiniTools />}
@@ -290,6 +300,8 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
           ratedCount={view.ratedBy.length}
           cheers={cheers}
           countdownText={countdownText}
+          secondsLeft={view.phaseEndsAt ? secondsLeft : view.phaseSeconds}
+          totalSeconds={view.phaseSeconds}
           mobile={mobile}
           topRightTools={<RoomMiniTools dark />}
           onPose={(pose: ThoiTrangPoseId) => {
@@ -407,7 +419,6 @@ function ThoiTrangInner({ game, room, view }: { game: Game; room: RoomState; vie
           <View style={mobile ? styles.closetMobileAnchor : styles.closetDesktopAnchor}>
             <ThoiTrangWardrobe
               outfit={activeDraft}
-              theme={view.theme}
               tab={tab}
               mobile={mobile}
               disabled={isSpectator}

@@ -203,9 +203,9 @@ export const RULES: Record<GameType, string[]> = {
     'Chạm thẻ để úp/mở trên bảng đội mình (nhấn giữ để phóng to), hoặc Chốt Đoán với tối đa 2 mạng sai!',
   ],
   thoitrang: [
-    'Bốc ngẫu nhiên 1 trong 640+ chủ đề: xem tên, mô tả, thẻ gợi ý & bảng màu trong 6 giây.',
-    'Phối đồ trên tủ đồ icon 12 danh mục (~1,19 triệu biến thể), bấm Xong để rút ngắn đồng hồ còn 5 giây.',
-    'Sàn diễn catwalk: người sải bước tung 9 dáng chụp hình, khán giả chấm 1,0–5,0★ (bước 0,5★) & cổ vũ; Giám khảo Máy góp đúng 1 phiếu mở vào cuối ván!',
+    'Bốc ngẫu nhiên 1 trong 640+ chủ đề: xem tên, mô tả & bảng màu trong 6 giây.',
+    'Tự phối đồ từ kho 3.000+ trang phục Nam/Nữ/Thế giới & Xóm Lầy (hàng chục triệu biến thể màu & 32 họa tiết) — không có bộ lọc gợi ý chủ đề!',
+    'Sàn diễn catwalk có đồng hồ đếm ngược: người sải bước tung 11 dáng chụp hình, khán giả chấm 1,0–5,0★ (bước 0,5★) & cổ vũ; Giám khảo Máy góp đúng 1 phiếu mở vào cuối ván!',
   ],
 };
 

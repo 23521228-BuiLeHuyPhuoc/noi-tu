@@ -1,6 +1,6 @@
 /**
- * Danh mục 167 món đồ chuẩn thiết kế v4 cho "Sàn Diễn Xóm Lầy" (`thoitrang`).
- * Đồng bộ 1:1 với `app/src/thoitrang3d/` (6 dáng người, 14 biểu cảm, 15 hoạ tiết, 9 nhóm phụ kiện).
+ * Danh mục 3.200+ món đồ (đủ trang phục Nam/Nữ/Unisex thế giới + Xóm Lầy) cho "Sàn Diễn Xóm Lầy" (`thoitrang`).
+ * Đồng bộ 1:1 với `app/src/thoitrang3d/` (6 dáng người, 14 biểu cảm, 32 hoạ tiết, 11 nhóm phụ kiện, 440+ hình khối 3D + dựng tham số).
  */
 import type {
   ThoiTrangAccSubSlot,
@@ -28,18 +28,23 @@ import type {
   ThoiTrangTag,
   ThoiTrangWardrobeTab,
 } from './thoitrang';
+import { EXTRA_ACC_SUB, EXTRA_ARCHETYPES } from './thoitrang-catalog-archetypes';
+import { buildExpandedCatalogItems } from './thoitrang-catalog-expanded';
 
 export const PALETTES: Readonly<Record<ThoiTrangPaletteKey, readonly string[]>> = {
   fashion: [
     '#ffffff', '#d9d3cb', '#7c828f', '#2b2533', '#15121b',
-    '#ff6b8b', '#ffb3c7', '#c92a46', '#781d32',
+    '#ff6b8b', '#ff9ec4', '#ffb3c7', '#c92a46', '#781d32',
     '#c79bff', '#7c5cff', '#4b2d80',
     '#6ec6ff', '#2f6fd6', '#1c3568',
     '#5fd3a6', '#1a6b4f', '#ffd56b', '#ff9f5a', '#c95e2f', '#a6774f', '#f6e7d8',
+    '#ff2e93', '#ff5722', '#ffea00', '#76ff03', '#00e5ff', '#18ffff',
+    '#e040fb', '#556b2f', '#008080', '#d4af37', '#5a3825', '#c98b2c',
   ],
   hair: [
     '#1b1518', '#33211b', '#5a3825', '#875331', '#ba7e43', '#e8c47a', '#f5e6c4', '#c9c5c0',
     '#a62936', '#e85f8c', '#ff9ec4', '#a98bff', '#6242b8', '#4285d6', '#52c4bd', '#4f9460',
+    '#ff2e93', '#ff6d00', '#ffd600', '#76ff03', '#00e5ff', '#f8fafc', '#7f1d1d', '#1e3a8a',
   ],
   skin: ['#fce4d4', '#f7cfb6', '#eab08e', '#d69772', '#b3744f', '#845034', '#593523'],
   eye: ['#4a2d24', '#221d26', '#7a5230', '#3d7d5a', '#2f6fd6', '#56b4d3', '#8a5cc9', '#d14b7a', '#c98b2c', '#828b99'],
@@ -52,6 +57,11 @@ export const PATTERNS: readonly (readonly [ThoiTrangPatternId, string])[] = [
   ['check', 'Caro nhỏ'], ['tartan', 'Caro Tartan'], ['houndstooth', 'Răng sói'], ['heart', 'Trái tim'],
   ['flower', 'Hoa nhí'], ['stars', 'Ngôi sao'], ['leopard', 'Da báo'], ['zebra', 'Ngựa vằn'],
   ['camo', 'Rằn ri'], ['ombre', 'Ombre'], ['sequin', 'Kim sa'],
+  ['argyle', 'Quả trám'], ['chevron', 'Zíc zắc'], ['paisley', 'Paisley'], ['tie_dye', 'Tie-Dye'],
+  ['denim', 'Vải bò'], ['lace', 'Ren lưới'], ['brocade', 'Gấm cung đình'], ['tho_cam', 'Thổ cẩm'],
+  ['dragon_scale', 'Vảy rồng'], ['cow', 'Bò sữa'], ['tiger', 'Vằn hổ'], ['rainbow', 'Cầu vồng'],
+  ['galaxy', 'Vũ trụ'], ['flame', 'Ngọn lửa'], ['lightning', 'Sấm sét'], ['cyber_grid', 'Lưới Neon'],
+  ['chan_con_cong', 'Chăn con công'],
 ];
 
 export const HAIR_TWO_TONES: readonly (readonly [ThoiTrangHairTwoTone, string])[] = [
@@ -133,7 +143,7 @@ export const SLOTS: readonly ThoiTrangSlotDef[] = [
   { id: 'glasses', name: 'Kính', emoji: '🕶️', optional: true },
 ];
 
-export const ACC_SUB: Readonly<Record<string, ThoiTrangAccSubSlot>> = {
+const BASE_ACC_SUB: Readonly<Record<string, ThoiTrangAccSubSlot>> = {
   handbag: 'handR', clutch: 'handR', heart_purse: 'hipBag', backpack: 'back',
   pearls: 'neck', choker: 'neck', gold_chain: 'neck', necktie: 'neck', bowtie: 'neck', scarf: 'neck', khan_ran: 'neck',
   earrings_hoop: 'ears', headphones: 'head',
@@ -141,6 +151,7 @@ export const ACC_SUB: Readonly<Record<string, ThoiTrangAccSubSlot>> = {
   cat_tail: 'tail', fox_tail: 'tail', devil_tail: 'tail',
   phone: 'handL', mic: 'handL', folding_fan: 'handL', umbrella: 'handL',
   guitar: 'chestProp', bubble_tea: 'handL', sword: 'handL', wand: 'handL', bouquet: 'handL',
+  ...EXTRA_ACC_SUB,
 };
 
 const mk = (
@@ -153,9 +164,9 @@ const mk = (
 const H = (id: string, n: string, t: readonly ThoiTrangTag[], c: string, c2: string) => mk(id, n, t, c, c2, 'plain', 'hair', 'hair', false);
 const G = (id: string, n: string, t: readonly ThoiTrangTag[], c: string, c2: string) => mk(id, n, t, c, c2, 'plain', 'fashion', 'fashion', false);
 const W = (id: string, n: string, t: readonly ThoiTrangTag[], c: string, c2 = '#ffffff', p: ThoiTrangPatternId = 'plain') => mk(id, n, t, c, c2, p);
-const A = (id: string, n: string, t: readonly ThoiTrangTag[], c: string, c2 = '#ffffff') => mk(id, n, t, c, c2, 'plain', 'fashion', 'fashion', true, ACC_SUB[id]);
+const A = (id: string, n: string, t: readonly ThoiTrangTag[], c: string, c2 = '#ffffff') => mk(id, n, t, c, c2, 'plain', 'fashion', 'fashion', true, BASE_ACC_SUB[id]);
 
-export const CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
+const CORE_CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
   hair: [
     H('undercut', 'Undercut', ['duong_pho', 'the_thao', 'cong_so', 'ca_tinh', 'hanh_dong', 'toi_gian'], '#33211b', '#4285d6'),
     H('quiff', 'Tóc vuốt Quiff', ['cong_so', 'da_hoi', 'sang_chanh', 'retro', 'ca_tinh'], '#33211b', '#ba7e43'),
@@ -341,6 +352,38 @@ export const CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCat
     A('wand', 'Đũa phép sao sáng', ['ky_ao', 'de_thuong', 'hoang_gia', 'ngot_ngao'], '#ffd56b', '#ffffff'),
     A('bouquet', 'Bó hoa cầm tay', ['cuoi_hoi', 'da_hoi', 'tinh_yeu', 'van_hoa_vn', 'ngot_ngao'], '#ff6b8b', '#f6e7d8'),
   ],
+};
+
+/** Tất cả hình khối 3D nguyên bản (~440 món) — mỗi món có 1 ô icon 3D riêng trong atlas WebP. */
+export const ARCHETYPE_CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
+  hair: [...CORE_CATALOG.hair, ...EXTRA_ARCHETYPES.hair],
+  top: [...CORE_CATALOG.top, ...EXTRA_ARCHETYPES.top],
+  outer: [...CORE_CATALOG.outer, ...EXTRA_ARCHETYPES.outer],
+  bottom: [...CORE_CATALOG.bottom, ...EXTRA_ARCHETYPES.bottom],
+  dress: [...CORE_CATALOG.dress, ...EXTRA_ARCHETYPES.dress],
+  shoes: [...CORE_CATALOG.shoes, ...EXTRA_ARCHETYPES.shoes],
+  hat: [...CORE_CATALOG.hat, ...EXTRA_ARCHETYPES.hat],
+  glasses: [...CORE_CATALOG.glasses, ...EXTRA_ARCHETYPES.glasses],
+  acc: [...CORE_CATALOG.acc, ...EXTRA_ARCHETYPES.acc],
+};
+
+const EXPANDED = buildExpandedCatalogItems(ARCHETYPE_CATALOG, BASE_ACC_SUB);
+
+export const ACC_SUB: Readonly<Record<string, ThoiTrangAccSubSlot>> = {
+  ...BASE_ACC_SUB,
+  ...EXPANDED.extraAccSub,
+};
+
+export const CATALOG: Readonly<Record<ThoiTrangCategoryId, readonly ThoiTrangCatalogItem[]>> = {
+  hair: [...ARCHETYPE_CATALOG.hair, ...EXPANDED.items.hair],
+  top: [...ARCHETYPE_CATALOG.top, ...EXPANDED.items.top],
+  outer: [...ARCHETYPE_CATALOG.outer, ...EXPANDED.items.outer],
+  bottom: [...ARCHETYPE_CATALOG.bottom, ...EXPANDED.items.bottom],
+  dress: [...ARCHETYPE_CATALOG.dress, ...EXPANDED.items.dress],
+  shoes: [...ARCHETYPE_CATALOG.shoes, ...EXPANDED.items.shoes],
+  hat: [...ARCHETYPE_CATALOG.hat, ...EXPANDED.items.hat],
+  glasses: [...ARCHETYPE_CATALOG.glasses, ...EXPANDED.items.glasses],
+  acc: [...ARCHETYPE_CATALOG.acc, ...EXPANDED.items.acc],
 };
 
 const ITEM_MAP = new Map<string, ThoiTrangCatalogItem>();
